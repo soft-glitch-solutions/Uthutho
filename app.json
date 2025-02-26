@@ -32,6 +32,9 @@
     },
     "android": {
       "package": "com.shaqeel16.uthutho"
+    },
+    "splash": {
+      "backgroundColor": "#000000"
     }
   }
 }

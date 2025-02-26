@@ -106,7 +106,7 @@ export default function HomeScreen() {
         if (error) throw error;
         setUserProfile(data);
       } catch (error) {
-        console.error('Error fetching user profile:', error);
+        router.replace('/auth');
       } finally {
         setIsProfileLoading(false);
       }
