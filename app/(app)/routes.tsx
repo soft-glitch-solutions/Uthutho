@@ -12,11 +12,11 @@ import {
 import { useTheme } from '../../context/ThemeContext';
 import { PlusCircle, Heart } from 'lucide-react-native'; // Icons
 import { supabase } from '../../lib/supabase'; // Adjust the path
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router'; // Use useRouter for navigation
 
 export default function RoutesScreen() {
   const { colors } = useTheme();
-  const navigation = useNavigation();
+  const router = useRouter(); // Initialize the router
   const [routes, setRoutes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -143,9 +143,9 @@ export default function RoutesScreen() {
     >
       {/* Header Section */}
       <View style={styles.header}>
-        <Text style={[styles.headerText, { color: colors.text }]}>Transport Routes</Text>
+        <Text style={[styles.headerText, { color: colors.text }]}>Routes</Text>
         <TouchableOpacity
-          onPress={() => navigation.navigate('RouteRequest')}
+          onPress={() => router.push('/route-request')}
           style={styles.requestButton}
         >
           <PlusCircle size={20} color={colors.text} />
@@ -179,7 +179,7 @@ export default function RoutesScreen() {
             <TouchableOpacity
               key={route.id}
               style={[styles.routeCard, { backgroundColor: colors.card }]}
-              onPress={() => navigation.navigate('RouteDetails', { routeId: route.id })}
+              onPress={() => router.push(`/route-details?routeId=${route.id}`)} // Navigate to RouteDetails
             >
               <Text style={[styles.routeName, { color: colors.text }]}>{route.name}</Text>
               <View style={styles.routeDetails}>

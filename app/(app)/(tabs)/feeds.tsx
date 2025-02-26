@@ -1,8 +1,84 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Modal, Image, ActivityIndicator, Share } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Modal, Image, ActivityIndicator, Share, Animated } from 'react-native';
 import { supabase } from '../../../lib/supabase'; // Adjust the path
 import { formatDistanceToNow } from 'date-fns';
 import { useTheme } from '../../../context/ThemeContext'; // Import useTheme
+
+// Add this component above your PostSkeleton component
+const Shimmer = ({ children, colors }) => {
+  const animatedValue = new Animated.Value(0);
+
+  React.useEffect(() => {
+    const shimmerAnimation = () => {
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => shimmerAnimation());
+    };
+
+    shimmerAnimation();
+  }, []);
+
+  const translateX = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-100, 100],
+  });
+
+  return (
+    <View style={{ overflow: 'hidden' }}>
+      {children}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.text,
+          opacity: 0.1,
+          transform: [{ translateX }],
+        }}
+      />
+    </View>
+  );
+};
+
+// Add this new component for the skeleton
+const PostSkeleton = ({ colors }) => {
+  return (
+    <Shimmer colors={colors}>
+      <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
+        <View style={styles.postHeader}>
+          <View style={[styles.skeletonAvatar, { backgroundColor: colors.border }]} />
+          <View style={styles.skeletonHeaderContent}>
+            <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '40%' }]} />
+            <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '20%' }]} />
+          </View>
+        </View>
+        <View style={styles.skeletonContent}>
+          <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '100%' }]} />
+          <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '80%' }]} />
+        </View>
+        <View style={styles.postActions}>
+          {[1, 2, 3].map((i) => (
+            <View 
+              key={i} 
+              style={[styles.skeletonAction, { backgroundColor: colors.border }]} 
+            />
+          ))}
+        </View>
+      </View>
+    </Shimmer>
+  );
+};
 
 export default function Feed() {
   const { colors } = useTheme(); // Get theme colors
@@ -281,7 +357,11 @@ export default function Feed() {
         )}
         ListEmptyComponent={
           isPostsLoading ? (
-            <ActivityIndicator size="large" color={colors.primary} />
+            <>
+              <PostSkeleton colors={colors} />
+              <PostSkeleton colors={colors} />
+              <PostSkeleton colors={colors} />
+            </>
           ) : (
             <Text style={{ color: colors.text }}>No posts found.</Text>
           )
@@ -467,5 +547,29 @@ const styles = StyleSheet.create({
   },
   commentContent: {
     color: '#333',
+  },
+  skeletonAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  skeletonHeaderContent: {
+    flex: 1,
+    gap: 8,
+  },
+  skeletonText: {
+    height: 12,
+    borderRadius: 4,
+    marginVertical: 4,
+  },
+  skeletonContent: {
+    marginVertical: 12,
+    gap: 8,
+  },
+  skeletonAction: {
+    width: 60,
+    height: 20,
+    borderRadius: 4,
   },
 });

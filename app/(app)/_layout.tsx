@@ -55,6 +55,29 @@ export default function AppLayout() {
           ),
         }}
       />
+      
+      {/* Hidden screens - they will still be accessible but won't appear in drawer */}
+      <Drawer.Screen
+        name="hub-details"
+        options={{
+          drawerItemStyle: { height: 0 },
+          title: 'Hub Details'
+        }}
+      />
+      <Drawer.Screen
+        name="stop-details"
+        options={{
+          drawerItemStyle: { height: 0 },
+          title: 'Stop Details'
+        }}
+      />
+      <Drawer.Screen
+        name="favorite-details"
+        options={{
+          drawerItemStyle: { height: 0 },
+          title: 'Favorite Details'
+        }}
+      />
     </Drawer>
   );
 }

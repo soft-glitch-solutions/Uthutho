@@ -1,10 +1,86 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext';
+
+const Shimmer = ({ children, colors }) => {
+  const animatedValue = new Animated.Value(0);
+
+  React.useEffect(() => {
+    const shimmerAnimation = () => {
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => shimmerAnimation());
+    };
+
+    shimmerAnimation();
+  }, []);
+
+  const translateX = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-100, 100],
+  });
+
+  return (
+    <View style={{ overflow: 'hidden' }}>
+      {children}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.text,
+          opacity: 0.1,
+          transform: [{ translateX }],
+        }}
+      />
+    </View>
+  );
+};
+
+const FavoritesSkeleton = ({ colors }) => {
+  return (
+    <View style={styles.grid}>
+      {[1, 2, 3].map((i) => (
+        <Shimmer key={i} colors={colors}>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
+            <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '60%' }]} />
+          </View>
+        </Shimmer>
+      ))}
+    </View>
+  );
+};
+
+const NearestLocationsSkeleton = ({ colors }) => {
+  return (
+    <View style={styles.grid}>
+      {[1, 2].map((i) => (
+        <Shimmer key={i} colors={colors}>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
+            <View style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
+            <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '80%' }]} />
+            <View style={[styles.skeletonDistance, { backgroundColor: colors.border }]} />
+          </View>
+        </Shimmer>
+      ))}
+    </View>
+  );
+};
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -138,8 +214,11 @@ export default function HomeScreen() {
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Personalized Greeting */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Hi, {userProfile?.first_name || 'User'}!</Text>
-        <Pressable onPress={() => alert('Add favorite dialog')} style={styles.addButton}>
+        <Text style={[styles.title, { color: colors.text }]}>
+          Hi, {isProfileLoading ? 'Loading...' : userProfile?.first_name || 'User'}!
+        </Text>
+        {/* Navigate to Favorites when the plus button is pressed */}
+        <Pressable onPress={() => router.push('/favorites')} style={styles.addButton}>
           <MaterialIcons name="add" size={24} color={colors.text} />
         </Pressable>
       </View>
@@ -148,7 +227,7 @@ export default function HomeScreen() {
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Favorites</Text>
         {isProfileLoading ? (
-          <ActivityIndicator size="small" color={colors.primary} />
+          <FavoritesSkeleton colors={colors} />
         ) : userProfile?.favorites?.length ? (
           <View style={styles.grid}>
             {userProfile.favorites.map((favorite, index) => (
@@ -174,7 +253,7 @@ export default function HomeScreen() {
             <Text style={[styles.errorText, { color: colors.error }]}>{locationError}</Text>
           </View>
         ) : isNearestLoading || !userLocation ? (
-          <ActivityIndicator size="small" color={colors.primary} />
+          <NearestLocationsSkeleton colors={colors} />
         ) : (
           <View style={styles.grid}>
             {/* Nearest Stop */}
@@ -293,5 +372,22 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
+  },
+  skeletonText: {
+    height: 14,
+    borderRadius: 4,
+    marginVertical: 4,
+  },
+  skeletonTitle: {
+    height: 18,
+    width: '40%',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonDistance: {
+    height: 12,
+    width: '30%',
+    borderRadius: 4,
+    marginTop: 8,
   },
 });

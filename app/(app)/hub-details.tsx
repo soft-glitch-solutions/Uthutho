@@ -1,13 +1,83 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text, StyleSheet, ScrollView, Image, Pressable, Animated } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { MapPin, Bus, Clock } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 
+// Add the Shimmer component
+const Shimmer = ({ children, colors }) => {
+  const animatedValue = new Animated.Value(0);
+
+  React.useEffect(() => {
+    const shimmerAnimation = () => {
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => shimmerAnimation());
+    };
+
+    shimmerAnimation();
+  }, []);
+
+  const translateX = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-100, 100],
+  });
+
+  return (
+    <View style={{ overflow: 'hidden' }}>
+      {children}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.text,
+          opacity: 0.1,
+          transform: [{ translateX }],
+        }}
+      />
+    </View>
+  );
+};
+
+// Add skeleton components
+const HubDetailsSkeleton = ({ colors }) => {
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Shimmer colors={colors}>
+        <View style={styles.imageSkeleton} />
+      </Shimmer>
+      <View style={styles.content}>
+        <Shimmer colors={colors}>
+          <View style={[styles.skeletonText, { width: '60%' }]} />
+        </Shimmer>
+        <Shimmer colors={colors}>
+          <View style={[styles.skeletonText, { width: '80%' }]} />
+        </Shimmer>
+        <Shimmer colors={colors}>
+          <View style={[styles.skeletonText, { width: '40%' }]} />
+        </Shimmer>
+      </View>
+    </View>
+  );
+};
+
 export default function HubDetailsScreen() {
   const { hubId } = useLocalSearchParams();
   const { colors } = useTheme();
+  const router = useRouter();
   const [hub, setHub] = useState(null);
   const [relatedRoutes, setRelatedRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,11 +114,7 @@ export default function HubDetailsScreen() {
   };
 
   if (loading) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.loadingText, { color: colors.text }]}>Loading...</Text>
-      </View>
-    );
+    return <HubDetailsSkeleton colors={colors} />;
   }
 
   return (
@@ -94,9 +160,10 @@ export default function HubDetailsScreen() {
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Related Routes</Text>
           {relatedRoutes.map((route) => (
-            <View 
+            <Pressable 
               key={route.id}
               style={[styles.routeItem, { borderBottomColor: colors.border }]}
+              onPress={() => router.push(`/route-details?routeId=${route.id}`)}
             >
               <Bus size={20} color={colors.text} />
               <View style={styles.routeInfo}>
@@ -110,7 +177,7 @@ export default function HubDetailsScreen() {
               <Text style={[styles.routePrice, { color: colors.primary }]}>
                 R{route.cost}
               </Text>
-            </View>
+            </Pressable>
           ))}
         </View>
       </View>
@@ -121,6 +188,11 @@ export default function HubDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  imageSkeleton: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#ccc',
   },
   loadingText: {
     textAlign: 'center',
@@ -203,5 +275,11 @@ const styles = StyleSheet.create({
   routePrice: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  skeletonText: {
+    height: 14,
+    borderRadius: 4,
+    marginVertical: 4,
+    backgroundColor: '#ccc',
   },
 });

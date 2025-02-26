@@ -1,9 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Animated } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
 import { supabase } from '../../../lib/supabase';
 import { router } from 'expo-router';
 import { Settings, LogOut, CreditCard, Bell, Shield } from 'lucide-react-native';
+
+// Add the Shimmer component
+const Shimmer = ({ children, colors }) => {
+  const animatedValue = new Animated.Value(0);
+
+  React.useEffect(() => {
+    const shimmerAnimation = () => {
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => shimmerAnimation());
+    };
+
+    shimmerAnimation();
+  }, []);
+
+  const translateX = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-100, 100],
+  });
+
+  return (
+    <View style={{ overflow: 'hidden' }}>
+      {children}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.text,
+          opacity: 0.1,
+          transform: [{ translateX }],
+        }}
+      />
+    </View>
+  );
+};
+
+// Add skeleton components
+const ProfileSkeleton = ({ colors }) => {
+  return (
+    <View style={[styles.header, { backgroundColor: colors.card }]}>
+      <View style={[styles.skeletonAvatar, { backgroundColor: colors.border }]} />
+      <View style={styles.skeletonHeaderContent}>
+        <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '60%' }]} />
+        <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '40%' }]} />
+        <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '80%' }]} />
+      </View>
+    </View>
+  );
+};
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
@@ -137,10 +198,10 @@ export default function ProfileScreen() {
     },
   ];
 
-  if (!profile) {
+  if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ProfileSkeleton colors={colors} />
       </View>
     );
   }
@@ -366,5 +427,20 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  skeletonAvatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 15,
+  },
+  skeletonHeaderContent: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  skeletonText: {
+    height: 14,
+    borderRadius: 4,
+    marginVertical: 4,
   },
 });

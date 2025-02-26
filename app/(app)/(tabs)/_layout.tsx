@@ -54,6 +54,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
         }}
       />
+      <Tabs.Screen
+        name="favorites"
+        options={{
+          title: 'Favorite',
+          tabBarButton: () => null,
+        }}
+      />
     </Tabs>
   );
 }
