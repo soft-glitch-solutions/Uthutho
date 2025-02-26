@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
@@ -11,6 +11,7 @@ export default function StopDetailsScreen() {
   const [posts, setPosts] = useState([]);
   const [waitingCount, setWaitingCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [newPostContent, setNewPostContent] = useState('');
 
   useEffect(() => {
     fetchStopDetails();
@@ -28,7 +29,7 @@ export default function StopDetailsScreen() {
       setStop(stopData);
 
       const { data: postsData, error: postsError } = await supabase
-        .from('posts')
+        .from('stop_posts')
         .select('*')
         .eq('stop_id', stopId);
 
@@ -72,6 +73,29 @@ export default function StopDetailsScreen() {
     }
   };
 
+  const handleAddPost = async () => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { error } = await supabase
+        .from('stop_posts')
+        .insert({
+          stop_id: stopId,
+          user_id: session.user.id,
+          content: newPostContent,
+        });
+
+      if (error) throw error;
+      alert('Post added!');
+      setNewPostContent('');
+      fetchStopDetails(); // Refresh data
+    } catch (error) {
+      console.error('Error adding post:', error);
+      alert('Failed to add post');
+    }
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -99,9 +123,27 @@ export default function StopDetailsScreen() {
         </TouchableOpacity>
 
         <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Add a Post</Text>
+          <TextInput
+            style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+            placeholder="What's on your mind?"
+            placeholderTextColor={colors.text}
+            value={newPostContent}
+            onChangeText={setNewPostContent}
+          />
+          <TouchableOpacity
+            style={[styles.postButton, { backgroundColor: colors.primary }]}
+            onPress={handleAddPost}
+          >
+            <Text style={styles.postButtonText}>Post</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Posts</Text>
           {posts.map((post) => (
             <View key={post.id} style={styles.postItem}>
+              <Text style={[styles.postLabel, { color: colors.text }]}>Post</Text>
               <Text style={[styles.postContent, { color: colors.text }]}>{post.content}</Text>
               <Text style={[styles.postTime, { color: colors.text }]}>
                 {new Date(post.created_at).toLocaleString()}
@@ -153,11 +195,36 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 10,
   },
+  input: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  postButton: {
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  postButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   postItem: {
     marginBottom: 15,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  postLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 5,
   },
   postContent: {
     fontSize: 16,
+    marginBottom: 5,
   },
   postTime: {
     fontSize: 14,
