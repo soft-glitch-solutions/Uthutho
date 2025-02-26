@@ -12,7 +12,7 @@ import {
 import { useTheme } from '../../../context/ThemeContext';
 import { MapPin, PlusCircle, Heart } from 'lucide-react-native';
 import { supabase } from '../../../lib/supabase';
-import { useNavigation, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 
 export default function HubsScreen() {
   const { colors } = useTheme();
@@ -132,7 +132,7 @@ export default function HubsScreen() {
       <View style={styles.header}>
         <Text style={[styles.headerText, { color: colors.text }]}>Transport Hubs</Text>
         <TouchableOpacity
-          onPress={() => router.push('/hub-request')}
+          onPress={() => router.push('/AddHub')}
           style={styles.requestButton}
         >
           <PlusCircle size={20} color={colors.text} />

@@ -18,6 +18,7 @@ export default function AppLayout() {
         },
         drawerActiveTintColor: colors.primary,
         drawerInactiveTintColor: colors.text,
+        headerShown: false, 
       }}>
       <Drawer.Screen
         name="(tabs)"

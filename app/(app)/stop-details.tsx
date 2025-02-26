@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator, FlatList } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
@@ -7,10 +7,8 @@ import { supabase } from '../../lib/supabase';
 export default function StopDetailsScreen() {
   const { stopId } = useLocalSearchParams();
   const { colors } = useTheme();
-  const [stop, setStop] = useState(null);
-  const [posts, setPosts] = useState([]);
-  const [waitingCount, setWaitingCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [stopDetails, setStopDetails] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [newPostContent, setNewPostContent] = useState('');
 
   useEffect(() => {
@@ -19,35 +17,18 @@ export default function StopDetailsScreen() {
 
   const fetchStopDetails = async () => {
     try {
-      const { data: stopData, error: stopError } = await supabase
+      const { data, error } = await supabase
         .from('stops')
-        .select('*')
+        .select('*, stop_posts(*, profiles(*))')
         .eq('id', stopId)
         .single();
 
-      if (stopError) throw stopError;
-      setStop(stopData);
-
-      const { data: postsData, error: postsError } = await supabase
-        .from('stop_posts')
-        .select('*')
-        .eq('stop_id', stopId);
-
-      if (postsError) throw postsError;
-      setPosts(postsData);
-
-      const { data: waitingData, error: waitingError } = await supabase
-        .from('stop_waiting')
-        .select('id')
-        .eq('stop_id', stopId)
-        .gt('expires_at', new Date().toISOString());
-
-      if (waitingError) throw waitingError;
-      setWaitingCount(waitingData.length);
+      if (error) throw error;
+      setStopDetails(data);
     } catch (error) {
       console.error('Error fetching stop details:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -96,23 +77,46 @@ export default function StopDetailsScreen() {
     }
   };
 
-  if (loading) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.loadingText, { color: colors.text }]}>Loading...</Text>
+  const renderSkeletonLoader = () => (
+    <View style={styles.skeletonContainer}>
+      <View style={styles.skeletonHeader} />
+      <View style={styles.skeletonText} />
+      <View style={styles.skeletonText} />
+    </View>
+  );
+
+  const renderPost = ({ item }) => (
+    <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
+      <View style={styles.postHeader}>
+        <Image
+          source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+          style={styles.avatar}
+        />
+        <Text style={[styles.userName, { color: colors.text }]}>
+          {item.profiles.first_name} {item.profiles.last_name}
+        </Text>
       </View>
+      <Text style={[styles.postContent, { color: colors.text }]}>{item.content}</Text>
+    </View>
+  );
+
+  if (isLoading) {
+    return (
+      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+        {renderSkeletonLoader()}
+      </ScrollView>
     );
   }
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
-        <Text style={[styles.title, { color: colors.text }]}>{stop?.name}</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{stopDetails.name}</Text>
         <Text style={[styles.details, { color: colors.text }]}>
-          {stop?.latitude}, {stop?.longitude}
+          {stopDetails.latitude}, {stopDetails.longitude}
         </Text>
         <Text style={[styles.waitingCount, { color: colors.text }]}>
-          People waiting: {waitingCount}
+          People waiting: {stopDetails.stop_posts.length}
         </Text>
 
         <TouchableOpacity
@@ -141,15 +145,12 @@ export default function StopDetailsScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Posts</Text>
-          {posts.map((post) => (
-            <View key={post.id} style={styles.postItem}>
-              <Text style={[styles.postLabel, { color: colors.text }]}>Post</Text>
-              <Text style={[styles.postContent, { color: colors.text }]}>{post.content}</Text>
-              <Text style={[styles.postTime, { color: colors.text }]}>
-                {new Date(post.created_at).toLocaleString()}
-              </Text>
-            </View>
-          ))}
+          <FlatList
+            data={stopDetails.stop_posts}
+            renderItem={renderPost}
+            keyExtractor={(item) => item.id.toString()}
+            ListEmptyComponent={<Text style={{ color: colors.text }}>No posts available.</Text>}
+          />
         </View>
       </View>
     </ScrollView>
@@ -211,27 +212,44 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  postItem: {
+  postContainer: {
+    padding: 15,
+    borderRadius: 10,
     marginBottom: 15,
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
   },
-  postLabel: {
-    fontSize: 14,
+  postHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 10,
+  },
+  userName: {
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 5,
   },
   postContent: {
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  postTime: {
     fontSize: 14,
-    opacity: 0.8,
   },
-  loadingText: {
-    textAlign: 'center',
-    fontSize: 16,
+  skeletonContainer: {
+    padding: 20,
+  },
+  skeletonHeader: {
+    width: '60%',
+    height: 20,
+    backgroundColor: '#ccc',
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  skeletonText: {
+    width: '100%',
+    height: 15,
+    backgroundColor: '#ccc',
+    borderRadius: 10,
+    marginBottom: 5,
   },
 });

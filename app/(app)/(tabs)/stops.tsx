@@ -8,11 +8,13 @@ import {
   ActivityIndicator,
   RefreshControl,
   TextInput,
+  Image,
 } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
-import { CheckCircle, PlusCircle } from 'lucide-react-native'; // Icons
+import { CheckCircle, PlusCircle, Heart } from 'lucide-react-native'; // Icons
 import { supabase } from '../../../lib/supabase'; // Adjust the path
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import * as Location from 'expo-location';
 
 const TRANSPORT_TYPES = ['Bus 🚌', 'Train 🚂', 'Taxi 🚕'];
 const WAITING_COLORS = {
@@ -23,7 +25,7 @@ const WAITING_COLORS = {
 
 export default function StopsScreen() {
   const { colors } = useTheme();
-  const navigation = useNavigation();
+  const router = useRouter();
   const [stops, setStops] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -32,13 +34,15 @@ export default function StopsScreen() {
   const [selectedTransport, setSelectedTransport] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const [userSession, setUserSession] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
+  const [userFavorites, setUserFavorites] = useState([]);
 
   // Fetch stops from Supabase
   const fetchStops = async () => {
     try {
       const { data, error } = await supabase
         .from('stops')
-        .select('*')
+        .select('*, routes(name)')
         .order('name');
 
       if (error) throw error;
@@ -64,6 +68,8 @@ export default function StopsScreen() {
   // Initial data fetch
   useEffect(() => {
     fetchStops();
+    getUserLocation();
+    fetchFavorites();
   }, []);
 
   // Pull-to-refresh handler
@@ -76,6 +82,11 @@ export default function StopsScreen() {
   const filteredStops = stops.filter((stop) =>
     stop.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Navigate to stop details
+  const navigateToStopDetails = (stopId) => {
+    router.push(`/stop-details?stopId=${stopId}`);
+  };
 
   // Mark as waiting
   const markAsWaiting = async (stopId, transportType) => {
@@ -150,6 +161,113 @@ export default function StopsScreen() {
     return WAITING_COLORS.high;
   };
 
+  const getUserLocation = async () => {
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      alert('Permission to access location was denied');
+      return;
+    }
+
+    let location = await Location.getCurrentPositionAsync({});
+    setUserLocation(location.coords);
+  };
+
+  const isCloseToStop = (stop) => {
+    if (!userLocation) return false;
+    const distance = calculateDistance(
+      userLocation.latitude,
+      userLocation.longitude,
+      stop.latitude,
+      stop.longitude
+    );
+    return distance < 0.5; // 0.5 km threshold
+  };
+
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Radius of the Earth in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) *
+        Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in km
+  };
+
+  const handleMarkAsWaiting = async (stopId) => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { error } = await supabase
+        .from('stop_waiting')
+        .insert({
+          stop_id: stopId,
+          user_id: session.user.id,
+          transport_type: 'bus', // Example transport type
+        });
+
+      if (error) throw error;
+      alert('Marked as waiting!');
+      fetchStops(); // Refresh data
+    } catch (error) {
+      console.error('Error marking as waiting:', error);
+      alert('Failed to mark as waiting');
+    }
+  };
+
+  const fetchFavorites = async () => {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('stop_id')
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+      setUserFavorites(data.map(fav => fav.stop_id));
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+    }
+  };
+
+  const toggleFavorite = async (stopId) => {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.user) return;
+
+    try {
+      if (userFavorites.includes(stopId)) {
+        // Remove from favorites
+        const { error } = await supabase
+          .from('favorites')
+          .delete()
+          .eq('stop_id', stopId)
+          .eq('user_id', session.user.id);
+
+        if (error) throw error;
+        setUserFavorites(userFavorites.filter(id => id !== stopId));
+      } else {
+        // Add to favorites
+        const { error } = await supabase
+          .from('favorites')
+          .insert({
+            stop_id: stopId,
+            user_id: session.user.id,
+          });
+
+        if (error) throw error;
+        setUserFavorites([...userFavorites, stopId]);
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -167,17 +285,17 @@ export default function StopsScreen() {
       <View style={styles.header}>
         <Text style={[styles.headerText, { color: colors.text }]}>Transport Stops</Text>
         <TouchableOpacity
-          onPress={() => navigation.navigate('StopRequest')}
+          onPress={() => router.push('/AddStop')}
           style={styles.requestButton}
         >
           <PlusCircle size={20} color={colors.text} />
-          <Text style={[styles.requestButtonText, { color: colors.text }]}>Request Stop</Text>
+          <Text style={[styles.requestButtonText, { color: colors.text }]}>Add Stop</Text>
         </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
       <TextInput
-        style={[styles.searchBar, { backgroundColor: colors.card, color: colors.text }]}
+        style={[styles.searchBar, { borderColor: colors.border, color: colors.text }]}
         placeholder="Search stops..."
         placeholderTextColor={colors.text}
         value={searchQuery}
@@ -210,10 +328,24 @@ export default function StopsScreen() {
               <TouchableOpacity
                 key={stop.id}
                 style={[styles.stopCard, { backgroundColor: colors.card }]}
-                onPress={() => setSelectedStop(stop)}
+                onPress={() => navigateToStopDetails(stop.id)}
               >
+                <Image
+                  source={{ uri: stop.image_url || 'https://via.placeholder.com/150' }}
+                  style={styles.stopImage}
+                />
                 <View style={styles.stopHeader}>
                   <Text style={[styles.stopName, { color: colors.text }]}>{stop.name}</Text>
+                  <TouchableOpacity onPress={() => toggleFavorite(stop.id)}>
+                    <Heart
+                      size={20}
+                      color={userFavorites.includes(stop.id) ? colors.primary : colors.text}
+                      fill={userFavorites.includes(stop.id) ? colors.primary : 'transparent'}
+                    />
+                  </TouchableOpacity>
+                  <Text style={[styles.routeName, { color: colors.text }]}>
+                    Route: {stop.routes ? stop.routes.name : 'Unknown'}
+                  </Text>
                   <View style={[styles.waitingBadge, { backgroundColor: waitingColor }]}>
                     <Text style={styles.waitingText}>{waitingCount} waiting</Text>
                   </View>
@@ -232,24 +364,27 @@ export default function StopsScreen() {
 
                 {/* Transport Types */}
                 <View style={styles.transportTypes}>
-                  {TRANSPORT_TYPES.map((type) => {
-                    const typeWaiting = stop.stop_waiting?.filter(
-                      (w) => w.transport_type === type
-                    ).length || 0;
-
-                    return (
-                      <TouchableOpacity
-                        key={type}
-                        style={[styles.transportButton, { borderColor: colors.primary }]}
-                        onPress={() => markAsWaiting(stop.id, type)}
-                      >
-                        <Text style={[styles.transportText, { color: colors.text }]}>
-                          {type} ({typeWaiting})
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                  {(Array.isArray(stop.transport_types) ? stop.transport_types : []).filter(type => TRANSPORT_TYPES.includes(type)).map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[styles.transportButton, { borderColor: colors.primary }]}
+                      onPress={() => markAsWaiting(stop.id, type)}
+                    >
+                      <Text style={[styles.transportText, { color: colors.text }]}>
+                        {type}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
+
+                {isCloseToStop(stop) && (
+                  <TouchableOpacity
+                    style={[styles.waitingButton, { backgroundColor: colors.primary }]}
+                    onPress={() => handleMarkAsWaiting(stop.id)}
+                  >
+                    <Text style={styles.waitingButtonText}>I'm Waiting</Text>
+                  </TouchableOpacity>
+                )}
               </TouchableOpacity>
             );
           })}
@@ -306,7 +441,11 @@ const styles = StyleSheet.create({
   },
   stopCard: {
     borderRadius: 15,
-    padding: 15,
+    overflow: 'hidden',
+  },
+  stopImage: {
+    width: '100%',
+    height: 150,
   },
   stopHeader: {
     flexDirection: 'row',
@@ -317,6 +456,10 @@ const styles = StyleSheet.create({
   stopName: {
     fontSize: 18,
     fontWeight: '600',
+  },
+  routeName: {
+    fontSize: 14,
+    fontStyle: 'italic',
   },
   waitingBadge: {
     paddingHorizontal: 10,
@@ -374,5 +517,16 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 20,
+  },
+  waitingButton: {
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  waitingButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

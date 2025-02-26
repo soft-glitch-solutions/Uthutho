@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image, FlatList } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
-import { MapPin, Clock, Users } from 'lucide-react-native';
+import { MapPin, Clock, Users, ThumbsUp } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 
 export default function FavoriteDetailsScreen() {
@@ -10,6 +10,9 @@ export default function FavoriteDetailsScreen() {
   const { colors } = useTheme();
   const [favorite, setFavorite] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [hubPosts, setHubPosts] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [newPostContent, setNewPostContent] = useState('');
 
   useEffect(() => {
     fetchFavoriteDetails();
@@ -33,14 +36,13 @@ export default function FavoriteDetailsScreen() {
       // Then try hubs
       let { data: hubData } = await supabase
         .from('hubs')
-        .select('*')
+        .select('*, hub_posts(*, profiles(*), post_comments(*, profiles(*)))')
         .eq('name', favoriteId)
         .single();
 
       if (hubData) {
         setFavorite({ ...hubData, type: 'hub' });
-        setLoading(false);
-        return;
+        setHubPosts(hubData.hub_posts || []);
       }
 
       // Finally try routes
@@ -59,6 +61,89 @@ export default function FavoriteDetailsScreen() {
       setLoading(false);
     }
   };
+
+  const handleAddComment = async (postId) => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { error } = await supabase
+        .from('post_comments')
+        .insert({
+          post_id: postId,
+          user_id: session.user.id,
+          content: newComment,
+        });
+
+      if (error) throw error;
+      setNewComment('');
+      fetchFavoriteDetails(); // Refresh data
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      alert('Failed to add comment');
+    }
+  };
+
+  const handleAddPost = async () => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { error } = await supabase
+        .from('hub_posts')
+        .insert({
+          hub_id: favorite.id,
+          user_id: session.user.id,
+          content: newPostContent,
+        });
+
+      if (error) throw error;
+      setNewPostContent('');
+      fetchFavoriteDetails(); // Refresh data
+    } catch (error) {
+      console.error('Error adding post:', error);
+      alert('Failed to add post');
+    }
+  };
+
+  const renderPost = ({ item }) => (
+    <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
+      <View style={styles.postHeader}>
+        <Image
+          source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+          style={styles.avatar}
+        />
+        <Text style={[styles.userName, { color: colors.text }]}>
+          {item.profiles.first_name} {item.profiles.last_name}
+        </Text>
+      </View>
+      <Text style={[styles.postContent, { color: colors.text }]}>{item.content}</Text>
+      <FlatList
+        data={item.post_comments}
+        renderItem={({ item: comment }) => (
+          <View style={styles.commentContainer}>
+            <Text style={[styles.commentText, { color: colors.text }]}>
+              {comment.profiles.first_name}: {comment.content}
+            </Text>
+          </View>
+        )}
+        keyExtractor={(comment) => comment.id.toString()}
+      />
+      <TextInput
+        style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+        placeholder="Add a comment..."
+        placeholderTextColor={colors.text}
+        value={newComment}
+        onChangeText={setNewComment}
+      />
+      <TouchableOpacity
+        style={[styles.commentButton, { backgroundColor: colors.primary }]}
+        onPress={() => handleAddComment(item.id)}
+      >
+        <Text style={styles.commentButtonText}>Comment</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   if (loading) {
     return (
@@ -117,19 +202,26 @@ export default function FavoriteDetailsScreen() {
 
         {favorite?.type === 'hub' && (
           <View style={[styles.section, { backgroundColor: colors.card }]}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Available Services
-            </Text>
-            <View style={styles.servicesGrid}>
-              {favorite?.services?.map((service, index) => (
-                <View 
-                  key={index}
-                  style={[styles.serviceTag, { backgroundColor: colors.primary }]}
-                >
-                  <Text style={styles.serviceText}>{service}</Text>
-                </View>
-              ))}
-            </View>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Posts</Text>
+            <TextInput
+              style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+              placeholder="What's on your mind?"
+              placeholderTextColor={colors.text}
+              value={newPostContent}
+              onChangeText={setNewPostContent}
+            />
+            <TouchableOpacity
+              style={[styles.postButton, { backgroundColor: colors.primary }]}
+              onPress={handleAddPost}
+            >
+              <Text style={styles.postButtonText}>Post</Text>
+            </TouchableOpacity>
+            <FlatList
+              data={hubPosts}
+              renderItem={renderPost}
+              keyExtractor={(item) => item.id.toString()}
+              ListEmptyComponent={<Text style={{ color: colors.text }}>No posts available.</Text>}
+            />
           </View>
         )}
 
@@ -199,28 +291,71 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 15,
   },
-  servicesGrid: {
+  input: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  postButton: {
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  postButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  postContainer: {
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+  },
+  postHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  serviceTag: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 10,
   },
-  serviceText: {
+  userName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  postContent: {
+    fontSize: 14,
+    marginBottom: 10,
+  },
+  commentContainer: {
+    paddingLeft: 60,
+    marginBottom: 5,
+  },
+  commentText: {
+    fontSize: 14,
+  },
+  commentButton: {
+    padding: 5,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  commentButtonText: {
     color: 'white',
     fontSize: 14,
-    fontWeight: '500',
-  },
-  routeInfo: {
-    fontSize: 16,
-    marginBottom: 10,
   },
   placeholder: {
     fontSize: 14,
     fontStyle: 'italic',
     opacity: 0.7,
+  },
+  routeInfo: {
+    fontSize: 16,
+    marginBottom: 10,
   },
 });

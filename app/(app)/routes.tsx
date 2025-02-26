@@ -145,11 +145,11 @@ export default function RoutesScreen() {
       <View style={styles.header}>
         <Text style={[styles.headerText, { color: colors.text }]}>Routes</Text>
         <TouchableOpacity
-          onPress={() => router.push('/route-request')}
-          style={styles.requestButton}
+          style={styles.addButton}
+          onPress={() => router.push('/AddRoutes')}
         >
-          <PlusCircle size={20} color={colors.text} />
-          <Text style={[styles.requestButtonText, { color: colors.text }]}>Request Route</Text>
+          <PlusCircle size={24} color={colors.primary} />
+          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Route</Text>
         </TouchableOpacity>
       </View>
 
@@ -235,14 +235,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
   },
-  requestButton: {
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    marginBottom: 16,
   },
-  requestButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
+  addButtonText: {
+    marginLeft: 8,
+    fontSize: 16,
   },
   searchBar: {
     padding: 10,
