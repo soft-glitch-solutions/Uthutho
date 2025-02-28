@@ -146,14 +146,7 @@ export default function HubDetailsScreen() {
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Available Services</Text>
           <View style={styles.servicesGrid}>
-            {hub?.services?.map((service, index) => (
-              <View 
-                key={index}
-                style={[styles.serviceTag, { backgroundColor: colors.primary }]}
-              >
-                <Text style={styles.serviceText}>{service}</Text>
-              </View>
-            ))}
+          <Text style={styles.hoursText}>{hub?.transport_type}</Text>
           </View>
         </View>
 

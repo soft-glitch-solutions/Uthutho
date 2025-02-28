@@ -9,8 +9,15 @@ export default function AddRoute() {
   const router = useRouter();
   const [startPoint, setStartPoint] = useState('');
   const [endPoint, setEndPoint] = useState('');
-  const [transportType, setTransportType] = useState('');
+  const [selectedTransport, setSelectedTransport] = useState('');
   const [description, setDescription] = useState('');
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(null);
+  const [items, setItems] = useState([
+    { label: 'Bus', value: 'bus' },
+    { label: 'Train', value: 'train' },
+    { label: 'Taxi', value: 'taxi' },
+  ]);
 
   const handleSubmit = async () => {
     try {
@@ -23,7 +30,7 @@ export default function AddRoute() {
           user_id: session.user.id,
           start_point: startPoint,
           end_point: endPoint,
-          transport_type: transportType,
+          transport_type: selectedTransport,
           description,
         });
 
@@ -52,12 +59,8 @@ export default function AddRoute() {
         onChangeText={setEndPoint}
       />
 
-      <Text style={[styles.label, { color: colors.text }]}>Transport Type</Text>
-      <TextInput
-        style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-        value={transportType}
-        onChangeText={setTransportType}
-      />
+      <Text style={[styles.label, { color: colors.text }]}>Select Transport</Text>
+
 
       <Text style={[styles.label, { color: colors.text }]}>Description</Text>
       <TextInput
@@ -86,5 +89,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     marginBottom: 16,
+  },
+  dropdown: {
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    borderRadius: 5,
   },
 }); 

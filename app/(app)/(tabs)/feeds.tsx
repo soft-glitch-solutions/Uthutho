@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Modal, Image, ActivityIndicator, Share, Animated } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Modal, Image, ActivityIndicator, Share, Animated, RefreshControl } from 'react-native';
 import { supabase } from '../../../lib/supabase'; // Adjust the path
 import { formatDistanceToNow } from 'date-fns';
 import { useTheme } from '../../../context/ThemeContext'; // Import useTheme
@@ -92,6 +92,7 @@ export default function Feed() {
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [isCreatingComment, setIsCreatingComment] = useState(false);
   const [isCommentDialogVisible, setIsCommentDialogVisible] = useState(false); // For comment dialog
+  const [refreshing, setRefreshing] = useState(false); // State for refreshing
 
   // Fetch posts
   useEffect(() => {
@@ -291,6 +292,12 @@ export default function Feed() {
     setSelectedPost(null);
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchPosts(); // Fetch posts again
+    setRefreshing(false); // Reset refreshing state
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Create Post Form */}
@@ -348,7 +355,7 @@ export default function Feed() {
               </Pressable>
               <Pressable onPress={() => openCommentDialog(item.id)}>
                 <Text style={{ color: colors.text }}>Comment</Text>
-              </Pressable>
+                </Pressable>
               <Pressable onPress={() => handleSharePost(item)}>
                 <Text style={{ color: colors.text }}>Share</Text>
               </Pressable>
@@ -365,6 +372,13 @@ export default function Feed() {
           ) : (
             <Text style={{ color: colors.text }}>No posts found.</Text>
           )
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]} // Customize the color of the spinner
+          />
         }
       />
 

@@ -12,64 +12,70 @@ import {
 import { router } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import { Eye, EyeOff } from 'lucide-react-native';
 
-export default function AuthScreen() {
-  const [isLogin, setIsLogin] = useState(true);
+export default function Auth() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLogin, setIsLogin] = useState(true); // Track if the user is logging in or signing up
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [preferredTransport, setPreferredTransport] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const { colors } = useTheme();
 
-  const handleSubmit = async () => {
-    setLoading(true);
+  const handleSignIn = async () => {
+    setIsLoading(true);
     try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: `${firstName} ${lastName}`,
-            },
-          },
-        });
-        if (error) throw error;
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-        // Automatically log in the user after sign-up
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (loginError) throw loginError;
+      if (error) throw error;
 
-        // Insert into profiles table
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            first_name: firstName,
-            last_name: lastName,
-            preferred_transport: preferredTransport,
-          });
-
-        if (profileError) throw profileError;
-      }
-      router.replace('/(app)/(tabs)/home');
+      Alert.alert('Success', 'Successfully signed in!');
+      router.replace('/(app)/(tabs)/home'); // Navigate to home
     } catch (error) {
       Alert.alert('Error', error.message);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignUp = async () => {
+    setIsLoading(true);
+    try {
+      if (!firstName.trim()) {
+        throw new Error('First name is required');
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            preferred_transport: preferredTransport || null,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      // Automatically log in the user after sign-up
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (loginError) throw loginError;
+
+      Alert.alert('Success', 'Registration successful! Please check your email.');
+      router.replace('/(app)/(tabs)/home'); // Navigate to home
+    } catch (error) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -90,11 +96,6 @@ export default function AuthScreen() {
         <Text style={[styles.title, { color: colors.text }]}>
           {isLogin ? 'Welcome Back' : 'Create Account'}
         </Text>
-        <Text style={[styles.subtitle, { color: colors.text }]}>
-          {isLogin
-            ? 'Sign in to continue'
-            : 'Sign up to start your journey with Uthutho'}
-        </Text>
       </View>
 
       <View style={styles.form}>
@@ -114,13 +115,6 @@ export default function AuthScreen() {
               value={lastName}
               onChangeText={setLastName}
             />
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-              placeholder="Preferred Transport"
-              placeholderTextColor={colors.text}
-              value={preferredTransport}
-              onChangeText={setPreferredTransport}
-            />
           </>
         )}
         <TextInput
@@ -129,42 +123,37 @@ export default function AuthScreen() {
           placeholderTextColor={colors.text}
           value={email}
           onChangeText={setEmail}
+          keyboardType="email-address"
           autoCapitalize="none"
         />
-        <View style={styles.passwordContainer}>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-            placeholder="Password"
-            placeholderTextColor={colors.text}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-          />
-          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-            {showPassword ? <EyeOff color={colors.text} /> : <Eye color={colors.text} />}
-          </TouchableOpacity>
-        </View>
-
+        <TextInput
+          style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+          placeholder="Password"
+          placeholderTextColor={colors.text}
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.primary }, loading && styles.buttonDisabled]}
-          onPress={handleSubmit}
-          disabled={loading}>
+          style={[styles.button, { backgroundColor: colors.primary }]}
+          onPress={isLogin ? handleSignIn : handleSignUp}
+          disabled={isLoading}>
           <Text style={styles.buttonText}>
-            {loading ? 'Loading...' : isLogin ? 'Sign In' : 'Create Account'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.switchButton}
-          onPress={() => setIsLogin(!isLogin)}
-          disabled={loading}>
-          <Text style={[styles.switchText, { color: colors.text }]}>
-            {isLogin
-              ? "Don't have an account? Sign Up"
-              : 'Already have an account? Sign In'}
+            {isLoading ? 'Loading...' : isLogin ? 'Sign In' : 'Create Account'}
           </Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={styles.switchButton}
+        onPress={() => setIsLogin(!isLogin)}
+        disabled={isLoading}>
+        <Text style={[styles.switchText, { color: colors.text }]}>
+          {isLogin
+            ? "Don't have an account? Sign Up"
+            : 'Already have an account? Sign In'}
+        </Text>
+      </TouchableOpacity>
 
       {/* Footer Section */}
       <View style={styles.footer}>
@@ -202,11 +191,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: 'center',
   },
-  subtitle: {
-    fontSize: 16,
-    opacity: 0.8,
-    textAlign: 'center',
-  },
   form: {
     gap: 15,
   },
@@ -216,19 +200,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     width: '100%', // Ensure full width
   },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   button: {
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 10,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
   },
   buttonText: {
     color: 'white',
