@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, Animated, FlatList, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -92,6 +92,9 @@ export default function HomeScreen() {
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [nearestLocations, setNearestLocations] = useState(null);
   const [isNearestLoading, setIsNearestLoading] = useState(false);
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Fetch the user's profile
   useEffect(() => {
@@ -208,6 +211,25 @@ export default function HomeScreen() {
   // Navigate to nearest hub details
   const handleNearestHubPress = (hubId) => {
     router.push(`/hub-details?hubId=${hubId}`);
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const { data: fetchedData, error } = await supabase.from('your_table_name').select('*'); // Replace with your table name
+      if (error) throw error;
+      setData(fetchedData);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData(); // Fetch data again
+    setRefreshing(false); // Reset refreshing state
   };
 
   return (

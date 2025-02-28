@@ -1,22 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Picker } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
 import { supabase } from '../../../lib/supabase';
 import { router } from 'expo-router';
-import { Settings, LogOut, CreditCard, Bell, Shield } from 'lucide-react-native';
+import { Settings, LogOut, CreditCard, Bell, Shield, Edit } from 'lucide-react-native';
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [titles, setTitles] = useState([]);
+  const [selectedTitle, setSelectedTitle] = useState('');
   const [selectedTab, setSelectedTab] = useState('basic-info');
 
   // Fetch profile and titles
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        // Fetch the current session
         const { data: session, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !session?.session) {
           throw new Error('No user session found. Please log in.');
@@ -36,6 +36,7 @@ export default function ProfileScreen() {
         }
 
         setProfile(profileData);
+        setSelectedTitle(profileData.title || '');
 
         // Fetch titles data
         const { data: titlesData, error: titlesError } = await supabase
@@ -50,7 +51,6 @@ export default function ProfileScreen() {
         setTitles(titlesData || []);
       } catch (error) {
         console.error('Error fetching profile:', error.message);
-        // Redirect to auth screen if no session is found
         if (error.message.includes('No user session found')) {
           router.replace('/auth');
         }
@@ -113,6 +113,28 @@ export default function ProfileScreen() {
     }
   };
 
+  // Handle title selection
+  const handleTitleChange = async (itemValue) => {
+    setSelectedTitle(itemValue);
+    try {
+      const updates = {
+        ...profile,
+        title: itemValue,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .upsert(updates);
+
+      if (updateError) throw updateError;
+
+      setProfile(updates);
+    } catch (error) {
+      console.error('Error updating title:', error);
+    }
+  };
+
   // Menu items
   const menuItems = [
     {
@@ -135,15 +157,24 @@ export default function ProfileScreen() {
       title: 'Settings',
       subtitle: 'App settings and preferences',
     },
+    {
+      icon: <Edit size={24} color={colors.text} />,
+      title: 'Edit Profile',
+      subtitle: 'Update your profile details',
+    },
   ];
 
-  if (!profile) {
+  if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
+
+  // Filter titles based on points
+  const unlockedTitles = titles.filter(title => title.points_required <= profile.points);
+  const lockedTitles = titles.filter(title => title.points_required > profile.points);
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -187,6 +218,11 @@ export default function ProfileScreen() {
             <TouchableOpacity
               key={index}
               style={[styles.menuItem, { backgroundColor: colors.card }]}
+              onPress={() => {
+                if (item.title === 'Edit Profile') {
+                  router.push('/EditProfileScreen'); // Navigate to the EditProfileScreen
+                }
+              }}
             >
               {item.icon}
               <View style={styles.menuText}>
@@ -203,25 +239,23 @@ export default function ProfileScreen() {
       )}
 
       {selectedTab === 'gamification' && (
-        <View style={styles.gamificationContainer}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Rank</Text>
-          <Text style={[styles.points, { color: colors.text }]}>
-            Points: {profile.points || 0}
-          </Text>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Titles</Text>
-          {titles.map((title) => (
-            <View key={title.id} style={[styles.titleItem, { backgroundColor: colors.card }]}>
-              <Text style={[styles.titleText, { color: colors.text }]}>
-                {title.title} ({title.points_required} points)
-              </Text>
-              {profile.titles?.includes(title.title) ? (
-                <Text style={[styles.unlockedText, { color: colors.primary }]}>Unlocked</Text>
-              ) : (
-                <Text style={[styles.lockedText, { color: colors.text }]}>
-                  {title.points_required - (profile.points || 0)} points needed
-                </Text>
-              )}
-            </View>
+        <View style={styles.menuContainer}>
+          <Text style={[styles.title, { color: colors.text }]}>Your Rank</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Select Your Title</Text>
+          <Picker
+            selectedValue={selectedTitle}
+            onValueChange={handleTitleChange}
+            style={{ height: 50, width: '100%', color: colors.text }}
+          >
+            {unlockedTitles.map((title) => (
+              <Picker.Item key={title.id} label={title.title} value={title.title} />
+            ))}
+          </Picker>
+          <Text style={[styles.title, { color: colors.text }]}>Locked Titles</Text>
+          {lockedTitles.map((title) => (
+            <Text key={title.id} style={[styles.lockedTitle, { color: colors.text }]}>
+              {title.title} (Requires {title.points_required} points)
+            </Text>
           ))}
         </View>
       )}
@@ -366,5 +400,10 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  lockedTitle: {
+    fontSize: 14,
+    color: 'gray',
+    marginVertical: 4,
   },
 });
