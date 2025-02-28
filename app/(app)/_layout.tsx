@@ -66,6 +66,62 @@ export default function AppLayout() {
         }}
       />
       <Drawer.Screen
+      name="AddRoute"
+      options={{
+        drawerItemStyle: { height: 0 },
+        title: 'Hub Details'
+      }}
+    />
+    <Drawer.Screen
+    name="AddHub"
+    options={{
+      drawerItemStyle: { height: 0 },
+      title: 'Hub Details'
+    }}
+  />
+  <Drawer.Screen
+  name="AddStop"
+  options={{
+    drawerItemStyle: { height: 0 },
+    title: 'Hub Details'
+  }}
+/>
+<Drawer.Screen
+name="EditProfileScreen"
+options={{
+  drawerItemStyle: { height: 0 },
+  title: 'Hub Details'
+}}
+/>
+<Drawer.Screen
+name="route-details"
+options={{
+  drawerItemStyle: { height: 0 },
+  title: 'Hub Details'
+}}
+/>
+<Drawer.Screen
+name="FavoriteDetailsScreen"
+options={{
+  drawerItemStyle: { height: 0 },
+  title: 'Hub Details'
+}}
+/>
+      <Drawer.Screen
+        name="FavoritesScreen"
+        options={{
+          drawerItemStyle: { height: 0 },
+          title: 'Favourites'
+        }}
+      />
+      <Drawer.Screen
+        name="PostDetails"
+        options={{
+          drawerItemStyle: { height: 0 },
+          title: 'Post Details'
+        }}
+      />
+      <Drawer.Screen
         name="stop-details"
         options={{
           drawerItemStyle: { height: 0 },

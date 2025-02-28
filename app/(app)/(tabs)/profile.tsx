@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Picker } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
 import { supabase } from '../../../lib/supabase';
 import { router } from 'expo-router';
-import { Settings, LogOut, CreditCard, Bell, Shield, Edit } from 'lucide-react-native';
+import { Settings, LogOut, CreditCard, Bell, Captions, Edit } from 'lucide-react-native';
+import { Picker } from '@react-native-picker/picker';
+
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
@@ -138,30 +140,21 @@ export default function ProfileScreen() {
   // Menu items
   const menuItems = [
     {
-      icon: <CreditCard size={24} color={colors.text} />,
-      title: 'Payment Methods',
-      subtitle: 'Manage your payment options',
+      icon: <Edit size={24} color={colors.text} />,
+      title: 'Edit Profile',
+      subtitle: 'Update your profile details',
     },
     {
-      icon: <Bell size={24} color={colors.text} />,
-      title: 'Notifications',
-      subtitle: 'Set your notification preferences',
-    },
-    {
-      icon: <Shield size={24} color={colors.text} />,
-      title: 'Privacy',
-      subtitle: 'Manage your privacy settings',
+      icon: <Captions size={24} color={colors.text} />,
+      title: 'Request',
+      subtitle: 'The request you submited',
     },
     {
       icon: <Settings size={24} color={colors.text} />,
       title: 'Settings',
       subtitle: 'App settings and preferences',
     },
-    {
-      icon: <Edit size={24} color={colors.text} />,
-      title: 'Edit Profile',
-      subtitle: 'Update your profile details',
-    },
+
   ];
 
   if (loading) {
@@ -181,7 +174,7 @@ export default function ProfileScreen() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card }]}>
         <Image
-          source={{ uri: profile.avatar_url || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop' }}
+          source={{ uri: profile.avatar_url || 'https://static.vecteezy.com/system/resources/thumbnails/005/129/844/small_2x/profile-user-icon-isolated-on-white-background-eps10-free-vector.jpg' }}
           style={styles.avatar}
         />
         <Text style={[styles.name, { color: colors.text }]}>{profile.first_name} {profile.last_name}</Text>
@@ -219,6 +212,9 @@ export default function ProfileScreen() {
               key={index}
               style={[styles.menuItem, { backgroundColor: colors.card }]}
               onPress={() => {
+                if (item.title === 'Settings') {
+                  router.push('/settings'); // Navigate to the EditProfileScreen
+                }
                 if (item.title === 'Edit Profile') {
                   router.push('/EditProfileScreen'); // Navigate to the EditProfileScreen
                 }
@@ -240,7 +236,7 @@ export default function ProfileScreen() {
 
       {selectedTab === 'gamification' && (
         <View style={styles.menuContainer}>
-          <Text style={[styles.title, { color: colors.text }]}>Your Rank</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Your Rank : { profile.selected_title }</Text>
           <Text style={[styles.title, { color: colors.text }]}>Select Your Title</Text>
           <Picker
             selectedValue={selectedTitle}

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Modal, Image, A
 import { supabase } from '../../../lib/supabase'; // Adjust the path
 import { formatDistanceToNow } from 'date-fns';
 import { useTheme } from '../../../context/ThemeContext'; // Import useTheme
+import { useRouter } from 'expo-router'; // Ensure you have this import
 
 // Add this component above your PostSkeleton component
 const Shimmer = ({ children, colors }) => {
@@ -93,6 +94,7 @@ export default function Feed() {
   const [isCreatingComment, setIsCreatingComment] = useState(false);
   const [isCommentDialogVisible, setIsCommentDialogVisible] = useState(false); // For comment dialog
   const [refreshing, setRefreshing] = useState(false); // State for refreshing
+  const router = useRouter(); // Initialize the router
 
   // Fetch posts
   useEffect(() => {
@@ -330,37 +332,39 @@ export default function Feed() {
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
-            <View style={styles.postHeader}>
-              <Image
-                source={{ uri: item.profiles?.avatar_url }}
-                style={styles.avatar}
-              />
-              <View>
-                <Text style={[styles.userName, { color: colors.text }]}>
-                  {item.profiles?.first_name} {item.profiles?.last_name}
-                </Text>
-                <Text style={[styles.postTime, { color: colors.text }]}>
-                  {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                </Text>
-                {item.stop_name && (
-                  <Text style={[styles.stopName, { color: colors.text }]}>Stop: {item.stop_name}</Text>
-                )}
+          <Pressable onPress={() => router.push(`/post-details?postId=${item.id}`)}>
+            <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
+              <View style={styles.postHeader}>
+                <Image
+                  source={{ uri: item.profiles?.avatar_url }}
+                  style={styles.avatar}
+                />
+                <View>
+                  <Text style={[styles.userName, { color: colors.text }]}>
+                    {item.profiles?.first_name} {item.profiles?.last_name}
+                  </Text>
+                  <Text style={[styles.postTime, { color: colors.text }]}>
+                    {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                  </Text>
+                  {item.stop_name && (
+                    <Text style={[styles.stopName, { color: colors.text }]}>Stop: {item.stop_name}</Text>
+                  )}
+                </View>
+              </View>
+              <Text style={[styles.postContent, { color: colors.text }]}>{item.content}</Text>
+              <View style={styles.postActions}>
+                <Pressable onPress={() => alert('Like')}>
+                  <Text style={{ color: colors.text }}>Like</Text>
+                </Pressable>
+                <Pressable onPress={() => router.push(`/post-details?postId=${item.id}`)}>
+                  <Text style={{ color: colors.text }}>Comment</Text>
+                </Pressable>
+                <Pressable onPress={() => handleSharePost(item)}>
+                  <Text style={{ color: colors.text }}>Share</Text>
+                </Pressable>
               </View>
             </View>
-            <Text style={[styles.postContent, { color: colors.text }]}>{item.content}</Text>
-            <View style={styles.postActions}>
-              <Pressable onPress={() => alert('Like')}>
-                <Text style={{ color: colors.text }}>Like</Text>
-              </Pressable>
-              <Pressable onPress={() => openCommentDialog(item.id)}>
-                <Text style={{ color: colors.text }}>Comment</Text>
-                </Pressable>
-              <Pressable onPress={() => handleSharePost(item)}>
-                <Text style={{ color: colors.text }}>Share</Text>
-              </Pressable>
-            </View>
-          </View>
+          </Pressable>
         )}
         ListEmptyComponent={
           isPostsLoading ? (

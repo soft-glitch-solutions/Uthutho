@@ -112,9 +112,6 @@ export default function StopDetailsScreen() {
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
         <Text style={[styles.title, { color: colors.text }]}>{stopDetails.name}</Text>
-        <Text style={[styles.details, { color: colors.text }]}>
-          {stopDetails.latitude}, {stopDetails.longitude}
-        </Text>
         <Text style={[styles.waitingCount, { color: colors.text }]}>
           People waiting: {stopDetails.stop_posts.length}
         </Text>
@@ -125,6 +122,17 @@ export default function StopDetailsScreen() {
         >
           <Text style={styles.waitingButtonText}>Mark as Waiting</Text>
         </TouchableOpacity>
+
+
+        <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Posts</Text>
+        <FlatList
+          data={stopDetails.stop_posts}
+          renderItem={renderPost}
+          keyExtractor={(item) => item.id.toString()}
+          ListEmptyComponent={<Text style={{ color: colors.text }}>No posts available.</Text>}
+        />
+      </View>
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Add a Post</Text>
@@ -143,15 +151,7 @@ export default function StopDetailsScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Posts</Text>
-          <FlatList
-            data={stopDetails.stop_posts}
-            renderItem={renderPost}
-            keyExtractor={(item) => item.id.toString()}
-            ListEmptyComponent={<Text style={{ color: colors.text }}>No posts available.</Text>}
-          />
-        </View>
+
       </View>
     </ScrollView>
   );

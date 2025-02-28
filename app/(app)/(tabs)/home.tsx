@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, Animated, FlatList, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Animated, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, FontAwesome } from '@expo/vector-icons'; // Import FontAwesome for the logo
 import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext';
+import { Route, Flag, MapPin, CircleHelp as HelpCircle } from 'lucide-react-native';
 
 const Shimmer = ({ children, colors }) => {
   const animatedValue = new Animated.Value(0);
@@ -82,18 +83,24 @@ const NearestLocationsSkeleton = ({ colors }) => {
   );
 };
 
+const FavoritesLink = ({ colors, onPress }) => {
+  return (
+    <Pressable onPress={onPress} style={[styles.favoritesLink, { backgroundColor: colors.card }]}>
+      <FontAwesome name="star" size={24} color={colors.text} />
+      <Text style={[styles.favoritesLinkText, { color: colors.text }]}>Check Favorites</Text>
+    </Pressable>
+  );
+};
+
 export default function HomeScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [favoriteInput, setFavoriteInput] = useState('');
   const [userProfile, setUserProfile] = useState(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [nearestLocations, setNearestLocations] = useState(null);
   const [isNearestLoading, setIsNearestLoading] = useState(false);
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // Fetch the user's profile
@@ -198,48 +205,63 @@ export default function HomeScreen() {
     return R * c; // Distance in km
   };
 
-  // Navigate to favorite details
+  // Determine the type of favorite (hub, route, or stop)
+  const getFavoriteType = (favorite) => {
+    if (favorite.includes('hub')) return 'hub';
+    if (favorite.includes('route')) return 'route';
+    if (favorite.includes('stop')) return 'stop';
+    return 'unknown';
+  };
+
+  // Render icon based on favorite type
+  const renderFavoriteIcon = (favorite) => {
+    const type = getFavoriteType(favorite);
+    switch (type) {
+      case 'hub':
+        return <MapPin size={20} color={colors.text} />;
+      case 'route':
+        return <Route size={20} color={colors.text} />;
+      case 'stop':
+        return <Flag size={20} color={colors.text} />;
+      default:
+        return <MaterialIcons name="help-outline" size={20} color={colors.text} />;
+    }
+  };
+
+  // Navigate to favorite details based on type
   const handleFavoritePress = (favorite) => {
-    router.push(`/favorite-details?favoriteId=${favorite}`);
-  };
-
-  // Navigate to nearest stop details
-  const handleNearestStopPress = (stopId) => {
-    router.push(`/stop-details?stopId=${stopId}`);
-  };
-
-  // Navigate to nearest hub details
-  const handleNearestHubPress = (hubId) => {
-    router.push(`/hub-details?hubId=${hubId}`);
-  };
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const { data: fetchedData, error } = await supabase.from('your_table_name').select('*'); // Replace with your table name
-      if (error) throw error;
-      setData(fetchedData);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
+    const type = getFavoriteType(favorite);
+    switch (type) {
+      case 'hub':
+        router.push(`/hub-details?hubId=${favorite}`);
+        break;
+      case 'route':
+        router.push(`/route-details?routeId=${favorite}`);
+        break;
+      case 'stop':
+        router.push(`/stop-details?stopId=${favorite}`);
+        break;
+      default:
+        console.warn('Unknown favorite type:', favorite);
     }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchData(); // Fetch data again
-    setRefreshing(false); // Reset refreshing state
+    // Fetch data again if needed
+    setRefreshing(false);
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
       {/* Personalized Greeting */}
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>
           Hi, {isProfileLoading ? 'Loading...' : userProfile?.first_name || 'User'}!
         </Text>
-        {/* Navigate to Favorites when the plus button is pressed */}
         <Pressable onPress={() => router.push('/favorites')} style={styles.addButton}>
           <MaterialIcons name="add" size={24} color={colors.text} />
         </Pressable>
@@ -259,6 +281,9 @@ export default function HomeScreen() {
                 onPress={() => handleFavoritePress(favorite)}
               >
                 <Text style={[styles.cardText, { color: colors.text }]}>{favorite}</Text>
+                <View style={styles.iconContainer}>
+                  {renderFavoriteIcon(favorite)}
+                </View>
               </Pressable>
             ))}
           </View>
@@ -281,8 +306,7 @@ export default function HomeScreen() {
             {/* Nearest Stop */}
             <Pressable
               style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => nearestLocations?.nearestStop && 
-                handleNearestStopPress(nearestLocations.nearestStop.id)}
+              onPress={() => nearestLocations?.nearestStop && handleNearestStopPress(nearestLocations.nearestStop.id)}
             >
               <Text style={[styles.cardTitle, { color: colors.text }]}>Nearest Stop</Text>
               {nearestLocations?.nearestStop ? (
@@ -307,8 +331,7 @@ export default function HomeScreen() {
             {/* Nearest Hub */}
             <Pressable
               style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => nearestLocations?.nearestHub && 
-                handleNearestHubPress(nearestLocations.nearestHub.id)}
+              onPress={() => nearestLocations?.nearestHub && handleNearestHubPress(nearestLocations.nearestHub.id)}
             >
               <Text style={[styles.cardTitle, { color: colors.text }]}>Nearest Hub</Text>
               {nearestLocations?.nearestHub ? (
@@ -378,13 +401,12 @@ const styles = StyleSheet.create({
     elevation: 2,
     minWidth: '48%',
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
   cardText: {
     fontSize: 14,
+  },
+  iconContainer: {
+    alignItems: 'center',
+    marginTop: 8,
   },
   distanceText: {
     fontSize: 12,

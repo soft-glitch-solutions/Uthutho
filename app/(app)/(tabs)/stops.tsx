@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
-import { CheckCircle, PlusCircle, Heart } from 'lucide-react-native'; // Icons
+import { CheckCircle, PlusCircle, Heart, Search, X } from 'lucide-react-native'; // Icons
 import { supabase } from '../../../lib/supabase'; // Adjust the path
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
@@ -286,21 +286,29 @@ export default function StopsScreen() {
         <Text style={[styles.headerText, { color: colors.text }]}>Transport Stops</Text>
         <TouchableOpacity
           onPress={() => router.push('/AddStop')}
-          style={styles.requestButton}
+          style={[styles.addButton, { backgroundColor: colors.primary }]}
         >
           <PlusCircle size={20} color={colors.text} />
-          <Text style={[styles.requestButtonText, { color: colors.text }]}>Add Stop</Text>
+          <Text style={[styles.addButtonText, { color: colors.text }]}>Add Stop</Text>
         </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
-      <TextInput
-        style={[styles.searchBar, { borderColor: colors.border, color: colors.text }]}
-        placeholder="Search stops..."
-        placeholderTextColor={colors.text}
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-      />
+      <View style={[styles.searchBarContainer, { borderColor: colors.border }]}>
+        <Search size={20} color={colors.text} />
+        <TextInput
+          style={[styles.searchBar, { color: colors.text }]}
+          placeholder="Search stops..."
+          placeholderTextColor={colors.text}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <X size={20} color={colors.text} />
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Loading State */}
       {isLoading ? (
@@ -343,12 +351,12 @@ export default function StopsScreen() {
                       fill={userFavorites.includes(stop.id) ? colors.primary : 'transparent'}
                     />
                   </TouchableOpacity>
-                  <Text style={[styles.routeName, { color: colors.text }]}>
-                    Route: {stop.routes ? stop.routes.name : 'Unknown'}
-                  </Text>
-                  <View style={[styles.waitingBadge, { backgroundColor: waitingColor }]}>
-                    <Text style={styles.waitingText}>{waitingCount} waiting</Text>
-                  </View>
+                </View>
+                <Text style={[styles.routeName, { color: colors.text }]}>
+                  Route: {stop.routes ? stop.routes.name : 'Unknown'}
+                </Text>
+                <View style={[styles.waitingBadge, { backgroundColor: waitingColor }]}>
+                  <Text style={styles.waitingText}>{waitingCount} waiting</Text>
                 </View>
 
                 {/* "Got Picked Up" Button */}
@@ -422,18 +430,29 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
   },
-  requestButton: {
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 20,
   },
-  requestButtonText: {
+  addButtonText: {
     fontSize: 14,
     fontWeight: '500',
   },
-  searchBar: {
-    padding: 10,
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
     borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  searchBar: {
+    flex: 1,
+    marginLeft: 10,
     fontSize: 16,
   },
   grid: {
@@ -442,10 +461,18 @@ const styles = StyleSheet.create({
   stopCard: {
     borderRadius: 15,
     overflow: 'hidden',
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   stopImage: {
     width: '100%',
     height: 150,
+    borderRadius: 10,
+    marginBottom: 10,
   },
   stopHeader: {
     flexDirection: 'row',
@@ -460,11 +487,13 @@ const styles = StyleSheet.create({
   routeName: {
     fontSize: 14,
     fontStyle: 'italic',
+    marginBottom: 10,
   },
   waitingBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
+    alignSelf: 'flex-start',
   },
   waitingText: {
     color: 'white',
@@ -483,6 +512,7 @@ const styles = StyleSheet.create({
   transportTypes: {
     flexDirection: 'row',
     gap: 10,
+    marginBottom: 10,
   },
   transportButton: {
     borderWidth: 1,
