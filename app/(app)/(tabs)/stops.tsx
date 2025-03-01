@@ -52,6 +52,7 @@ export default function StopsScreen() {
     } finally {
       setIsLoading(false);
       setRefreshing(false);
+      fetchFavorites();
     }
   };
 
@@ -76,6 +77,7 @@ export default function StopsScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchStops();
+    fetchFavorites();
   };
 
   // Filter stops based on search query
@@ -219,54 +221,63 @@ export default function StopsScreen() {
     }
   };
 
-  const fetchFavorites = async () => {
-    const { data: session } = await supabase.auth.getSession();
-    if (!session?.user) return;
+ // Fetch the user's favorites
+ const fetchFavorites = async () => {
+  const userId = (await supabase.auth.getSession()).data.session?.user.id;
+  if (!userId) return;
 
-    try {
-      const { data, error } = await supabase
-        .from('favorites')
-        .select('stop_id')
-        .eq('user_id', session.user.id);
+  try {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('favorites')
+      .eq('id', userId)
+      .single();
 
-      if (error) throw error;
-      setUserFavorites(data.map(fav => fav.stop_id));
-    } catch (error) {
-      console.error('Error fetching favorites:', error);
+    if (error) throw error;
+    setUserFavorites(profile.favorites || []);
+  } catch (error) {
+    console.error('Error fetching favorites:', error);
+  }
+};
+
+
+
+// Add or remove a stop from favorites
+const handleFavorite = async (stopName) => {
+  const userId = (await supabase.auth.getSession()).data.session?.user.id;
+  if (!userId) return;
+
+  try {
+    const { data: profile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('favorites')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    let updatedFavorites;
+    if (profile.favorites.includes(stopName)) {
+      updatedFavorites = profile.favorites.filter((favorite) => favorite !== stopName);
+      alert('Stop removed from favorites!');
+    } else {
+      updatedFavorites = [...profile.favorites, stopName];
+      alert('Stop added to favorites!');
     }
-  };
 
-  const toggleFavorite = async (stopId) => {
-    const { data: session } = await supabase.auth.getSession();
-    if (!session?.user) return;
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ favorites: updatedFavorites })
+      .eq('id', userId);
 
-    try {
-      if (userFavorites.includes(stopId)) {
-        // Remove from favorites
-        const { error } = await supabase
-          .from('favorites')
-          .delete()
-          .eq('stop_id', stopId)
-          .eq('user_id', session.user.id);
+    if (updateError) throw updateError;
 
-        if (error) throw error;
-        setUserFavorites(userFavorites.filter(id => id !== stopId));
-      } else {
-        // Add to favorites
-        const { error } = await supabase
-          .from('favorites')
-          .insert({
-            stop_id: stopId,
-            user_id: session.user.id,
-          });
-
-        if (error) throw error;
-        setUserFavorites([...userFavorites, stopId]);
-      }
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-    }
-  };
+    setUserFavorites(updatedFavorites);
+  } catch (error) {
+    console.error('Error updating favorites:', error);
+    alert('An error occurred. Please try again.');
+  }
+};
 
   return (
     <ScrollView
@@ -344,11 +355,11 @@ export default function StopsScreen() {
                 />
                 <View style={styles.stopHeader}>
                   <Text style={[styles.stopName, { color: colors.text }]}>{stop.name}</Text>
-                  <TouchableOpacity onPress={() => toggleFavorite(stop.id)}>
+                  <TouchableOpacity onPress={() => handleFavorite(stop.name)}>
                     <Heart
                       size={20}
-                      color={userFavorites.includes(stop.id) ? colors.primary : colors.text}
-                      fill={userFavorites.includes(stop.id) ? colors.primary : 'transparent'}
+                      color={userFavorites.includes(stop.name) ? colors.primary : colors.text}
+                      fill={userFavorites.includes(stop.name) ? colors.primary : 'transparent'}
                     />
                   </TouchableOpacity>
                 </View>

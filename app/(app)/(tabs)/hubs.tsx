@@ -115,6 +115,7 @@ export default function HubsScreen() {
     hub.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
