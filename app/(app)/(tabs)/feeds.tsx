@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useTheme } from '../../../context/ThemeContext'; // Import useTheme
 import { useRouter } from 'expo-router'; // Ensure you have this import
 import * as Animatable from 'react-native-animatable';
+import { Picker } from '@react-native-picker/picker'; // Import Picker
 
 // Add this component above your PostSkeleton component
 const Shimmer = ({ children, colors }) => {
@@ -109,6 +110,8 @@ export default function Feed() {
   const [selectedPostId, setSelectedPostId] = useState(null);
   const [selectedReaction, setSelectedReaction] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [selectedHubId, setSelectedHubId] = useState(null);
+  const [favoriteHubs, setFavoriteHubs] = useState([]);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -130,6 +133,43 @@ export default function Feed() {
 
     fetchUserProfile();
   }, []);
+
+  useEffect(() => {
+    fetchFavoriteHubs();
+  }, []);
+
+  const fetchFavoriteHubs = async () => {
+    const { data: session, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error('Error fetching session:', sessionError.message);
+      Alert.alert('Error', 'Could not retrieve session. Please log in again.');
+      return;
+    }
+
+    const userId = session?.user?.id; // Safely access user ID
+
+    if (!userId) {
+      Alert.alert('Error', 'You must be logged in to fetch favorite hubs.');
+      return;
+    }
+
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('favorites') // Assuming 'favorites' contains the hub IDs
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+
+      // Assuming favorites is an array of hub IDs
+      setFavoriteHubs(profile.favorites || []);
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+      Alert.alert('Error fetching favorites', error.message);
+    }
+  };
 
   // Fetch posts
   useEffect(() => {
@@ -275,7 +315,10 @@ export default function Feed() {
 
   // Create post
   const handleCreatePost = async () => {
-    if (!newPostContent.trim()) return;
+    if (!newPostContent.trim() || !selectedHubId) {
+      Alert.alert('Error', 'Please enter content and select a hub.');
+      return;
+    }
 
     setIsCreatingPost(true);
     try {
@@ -287,7 +330,7 @@ export default function Feed() {
         .insert({
           content: newPostContent,
           user_id: userSession.session.user.id,
-          hub_id: null,
+          hub_id: selectedHubId,
         })
         .select()
         .single();
@@ -298,10 +341,11 @@ export default function Feed() {
 
       setPosts((prevPosts) => [data, ...prevPosts]);
       setNewPostContent('');
-      alert('Post created successfully!');
+      setSelectedHubId(null);
+      Alert.alert('Success', 'Post created successfully!');
     } catch (error) {
       console.error('Error creating post:', error);
-      alert(`Error creating post: ${error.message}`);
+      Alert.alert('Error', 'Failed to create post.');
     } finally {
       setIsCreatingPost(false);
     }
@@ -432,9 +476,9 @@ export default function Feed() {
       }
     }
 
-    setSelectedReaction(reaction);
+    // Refresh posts to show updated reactions
+    fetchPosts();
     setSelectedPostId(null); // Close the reaction section
-    fetchPosts(); // Refresh posts to show updated reactions
   };
 
   return (
@@ -455,6 +499,19 @@ export default function Feed() {
             multiline
           />
         </View>
+
+        {/* Dropdown for Hub Selection */}
+        <Picker
+          selectedValue={selectedHubId}
+          onValueChange={(itemValue) => setSelectedHubId(itemValue)}
+          style={{ height: 50, width: '100%', color: colors.text }}
+        >
+          <Picker.Item label="Select a Hub" value={null} />
+          {favoriteHubs.map((hub) => (
+            <Picker.Item key={hub.hub_id} label={hub.hubs.name} value={hub.hub_id} />
+          ))}
+        </Picker>
+
         <Pressable
           onPress={handleCreatePost}
           style={[styles.postButton, { backgroundColor: colors.primary }]}
@@ -498,9 +555,11 @@ export default function Feed() {
               {/* Display reaction counts */}
               <View style={styles.reactionCounts}>
                 {item.reactionCounts.map((reaction) => (
-                  <Text key={reaction.id} style={styles.reactionCountText}>
-                    {reaction.emoji} {reaction.count}
-                  </Text>
+                  reaction.count > 0 && (
+                    <Text key={reaction.id} style={styles.reactionCountText}>
+                      {reaction.emoji} {reaction.count}
+                    </Text>
+                  )
                 ))}
               </View>
               <View style={styles.postActions}>
@@ -540,7 +599,6 @@ export default function Feed() {
                   {item.userReaction.emoji}
                 </Animatable.Text>
               )}
-
             </View>
           </Pressable>
         )}

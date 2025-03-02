@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator, FlatList, Alert } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
@@ -19,7 +19,7 @@ export default function StopDetailsScreen() {
     try {
       const { data, error } = await supabase
         .from('stops')
-        .select('*, stop_posts(*, profiles(*))')
+        .select('*, stop_posts(*, profiles(*)), routes(*)')
         .eq('id', stopId)
         .single();
 
@@ -32,16 +32,20 @@ export default function StopDetailsScreen() {
     }
   };
 
+  const { user } = supabase.auth;
+
+  if (!user) {
+    Alert.alert('Error', 'You must be logged in to perform this action.');
+    return;
+  }
+
   const handleMarkAsWaiting = async () => {
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.user) return;
-
       const { error } = await supabase
         .from('stop_waiting')
         .insert({
           stop_id: stopId,
-          user_id: session.user.id,
+          user_id: user.id,
           transport_type: 'bus', // Example transport type
         });
 
@@ -56,14 +60,11 @@ export default function StopDetailsScreen() {
 
   const handleAddPost = async () => {
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.user) return;
-
       const { error } = await supabase
         .from('stop_posts')
         .insert({
           stop_id: stopId,
-          user_id: session.user.id,
+          user_id: user.id,
           content: newPostContent,
         });
 
@@ -122,6 +123,12 @@ export default function StopDetailsScreen() {
         <Text style={[styles.waitingCount, { color: colors.text }]}>
           People waiting: {stopDetails.stop_posts.length}
         </Text>
+
+        {stopDetails.routes && stopDetails.routes.length > 0 && (
+          <Text style={[styles.details, { color: colors.text }]}>
+            Route: {stopDetails.routes.map(route => route.name).join(', ')}
+          </Text>
+        )}
 
         <TouchableOpacity
           style={[styles.waitingButton, { backgroundColor: colors.primary }]}
