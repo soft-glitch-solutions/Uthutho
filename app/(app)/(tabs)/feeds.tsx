@@ -4,6 +4,7 @@ import { supabase } from '../../../lib/supabase'; // Adjust the path
 import { formatDistanceToNow } from 'date-fns';
 import { useTheme } from '../../../context/ThemeContext'; // Import useTheme
 import { useRouter } from 'expo-router'; // Ensure you have this import
+import * as Animatable from 'react-native-animatable';
 
 // Add this component above your PostSkeleton component
 const Shimmer = ({ children, colors }) => {
@@ -81,6 +82,14 @@ const PostSkeleton = ({ colors }) => {
   );
 };
 
+// Define the emoji reactions
+const reactions = [
+  { id: 'heart', emoji: '❤️' },
+  { id: 'laugh', emoji: '😂' },
+  { id: 'middleFinger', emoji: '🖕' },
+  { id: 'angry', emoji: '😡' },
+];
+
 export default function Feed() {
   const { colors } = useTheme(); // Get theme colors
   const [newPostContent, setNewPostContent] = useState('');
@@ -89,12 +98,37 @@ export default function Feed() {
   const [posts, setPosts] = useState([]);
   const [selectedPostDetails, setSelectedPostDetails] = useState(null);
   const [isPostsLoading, setIsPostsLoading] = useState(true);
+  const [profiles, setProfiles] = useState(null); // State to hold user profile data
   const [isPostDetailsLoading, setIsPostDetailsLoading] = useState(false);
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [isCreatingComment, setIsCreatingComment] = useState(false);
   const [isCommentDialogVisible, setIsCommentDialogVisible] = useState(false); // For comment dialog
   const [refreshing, setRefreshing] = useState(false); // State for refreshing
   const router = useRouter(); // Initialize the router
+  const [selectedPostId, setSelectedPostId] = useState(null);
+  const [selectedReaction, setSelectedReaction] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      const { data: session } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('avatar_url')
+          .eq('id', session.user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user profile:', error);
+        } else {
+          setProfiles(data); // Store the user profile data
+        }
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   // Fetch posts
   useEffect(() => {
@@ -300,13 +334,24 @@ export default function Feed() {
     setRefreshing(false); // Reset refreshing state
   };
 
+  const handleReactionPress = (postId) => {
+    setSelectedPostId(postId);
+    setModalVisible(true);
+  };
+
+  const handleReactionSelect = (reaction) => {
+    // Here you can handle the reaction logic, e.g., save it to the backend
+    setSelectedReaction(reaction);
+    setModalVisible(false);
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Create Post Form */}
       <View style={[styles.createPostContainer, { backgroundColor: colors.card }]}>
         <View style={styles.postInputContainer}>
           <Image
-            source={{ uri: '/default-avatar.png' }}
+          source={{ uri: profiles?.avatar_url || 'https://static.vecteezy.com/system/resources/thumbnails/005/129/844/small_2x/profile-user-icon-isolated-on-white-background-eps10-free-vector.jpg' }}
             style={styles.avatar}
           />
           <TextInput
@@ -332,7 +377,7 @@ export default function Feed() {
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <Pressable onPress={() => router.push(`/post-details?postId=${item.id}`)}>
+          <Pressable onPress={() => handleReactionPress(item.id)}>
             <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
               <View style={styles.postHeader}>
                 <Image
@@ -352,10 +397,15 @@ export default function Feed() {
                 </View>
               </View>
               <Text style={[styles.postContent, { color: colors.text }]}>{item.content}</Text>
+              {selectedPostId === item.id && selectedReaction && (
+                <Animatable.Text
+                  animation="bounceIn"
+                  style={styles.reactionText}
+                >
+                  {selectedReaction.emoji}
+                </Animatable.Text>
+              )}
               <View style={styles.postActions}>
-                <Pressable onPress={() => alert('Like')}>
-                  <Text style={{ color: colors.text }}>Like</Text>
-                </Pressable>
                 <Pressable onPress={() => router.push(`/post-details?postId=${item.id}`)}>
                   <Text style={{ color: colors.text }}>Comment</Text>
                 </Pressable>
@@ -444,6 +494,39 @@ export default function Feed() {
           </View>
         </View>
       </Modal>
+
+      {/* Reaction Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Select Reaction</Text>
+            <View style={styles.reactionContainer}>
+              {reactions.map((reaction) => (
+                <Pressable
+                  key={reaction.id}
+                  onPress={() => handleReactionSelect(reaction)}
+                  style={styles.reactionButton}
+                >
+                  <Animatable.Text
+                    animation="bounce"
+                    style={styles.reactionEmoji}
+                  >
+                    {reaction.emoji}
+                  </Animatable.Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable onPress={() => setModalVisible(false)} style={styles.closeButton}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -517,22 +600,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContainer: {
-    width: '90%',
-    padding: 16,
-    borderRadius: 8,
+    width: '80%',
+    padding: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    alignItems: 'center',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 15,
+  },
+  reactionContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+  },
+  reactionButton: {
+    padding: 10,
+  },
+  reactionEmoji: {
+    fontSize: 30,
   },
   closeButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#FF6B6B',
+    borderRadius: 5,
   },
   closeButtonText: {
-    fontSize: 24,
+    color: 'white',
+    fontWeight: 'bold',
   },
   commentInput: {
     borderWidth: 1,
@@ -589,5 +687,9 @@ const styles = StyleSheet.create({
     width: 60,
     height: 20,
     borderRadius: 4,
+  },
+  reactionText: {
+    fontSize: 24,
+    marginTop: 5,
   },
 });

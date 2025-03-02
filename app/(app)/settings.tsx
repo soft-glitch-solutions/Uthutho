@@ -95,7 +95,7 @@ export default function SettingsScreen() {
         <View style={styles.settingOption}>
           <View style={styles.settingLeft}>
             <Info color={colors.text} />
-            <Text style={[styles.settingText, { color: colors.text }]}>App Version 1.0.0</Text>
+            <Text style={[styles.settingText, { color: colors.text }]}>App Version 0.0.1</Text>
           </View>
         </View>
       </View>

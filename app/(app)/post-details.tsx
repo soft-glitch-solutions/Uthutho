@@ -110,7 +110,7 @@ const PostDetails = () => {
   if (loading) {
     return (
       <View style={[styles.skeletonContainer, { backgroundColor: colors.background }]}>
-        <Text style={[styles.skeletonText, { color: colors.text }]}>Loading post...</Text>
+        <SkeletonLoader />
       </View>
     );
   }
@@ -178,6 +178,19 @@ const PostDetails = () => {
         />
         <Button title="Comment" onPress={handleCommentSubmit} />
       </View>
+    </View>
+  );
+};
+
+// Skeleton Loader Component
+const SkeletonLoader = () => {
+  return (
+    <View style={styles.skeletonLoaderContainer}>
+      <View style={styles.skeletonHeader} />
+      <View style={styles.skeletonContent} />
+      <View style={styles.skeletonRelatedHub} />
+      <View style={styles.skeletonComment} />
+      <View style={styles.skeletonComment} />
     </View>
   );
 };
@@ -263,8 +276,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  skeletonText: {
-    fontSize: 18,
+  skeletonLoaderContainer: {
+    padding: 20,
+    width: '100%',
+  },
+  skeletonHeader: {
+    height: 20,
+    width: '60%',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    marginBottom: 10,
+  },
+  skeletonContent: {
+    height: 15,
+    width: '80%',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    marginBottom: 10,
+  },
+  skeletonRelatedHub: {
+    height: 15,
+    width: '40%',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    marginBottom: 10,
+  },
+  skeletonComment: {
+    height: 15,
+    width: '100%',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    marginBottom: 10,
   },
 });
 

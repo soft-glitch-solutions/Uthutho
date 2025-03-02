@@ -1,15 +1,15 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  Dimensions,
   TouchableOpacity,
   Image,
+  Dimensions,
 } from 'react-native';
-import { router } from 'expo-router';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext'; // Adjust the path
+import { useRouter } from 'expo-router'; // For navigation
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons'; // Updated icon library
 
 const { width } = Dimensions.get('window');
 
@@ -17,91 +17,106 @@ const slides = [
   {
     id: '1',
     title: 'Welcome to Uthutho',
-    description: 'Your all-in-one transportation companion',
-    image: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?q=80&w=1470&auto=format&fit=crop',
+    description: 'For commuters, by commuters',
+    icon: 'car', // Using MaterialCommunityIcons
+    color: '#FF6B6B', // Custom color for taxi
   },
   {
     id: '2',
-    title: 'Find Your Way',
-    description: 'Discover the best routes and transportation hubs near you',
-    image: 'https://images.unsplash.com/photo-1494515843206-f3117d3f51b7?q=80&w=1472&auto=format&fit=crop',
+    title: 'Plan Your Journey',
+    description: 'Find the best routes and transport options',
+    icon: 'bus', // Using MaterialCommunityIcons
+    color: '#4ECDC4', // Custom color for bus
   },
   {
     id: '3',
-    title: 'Connect & Share',
-    description: 'Join the community and share your journey experiences',
-    image: 'https://images.unsplash.com/photo-1557223562-6c77ef16210f?q=80&w=1470&auto=format&fit=crop',
+    title: 'Stay Connected',
+    description: 'Get real-time updates and travel insights',
+    icon: 'train', // Using MaterialCommunityIcons
+    color: '#6B5B95', // Custom color for train
   },
 ];
 
-export default function OnboardingScreen() {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
-  const { colors } = useTheme();
+export default function Onboarding() {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const router = useRouter(); // For navigation
+  const { colors } = useTheme(); // For theme colors
 
-  const renderItem = ({ item }: { item: typeof slides[0] }) => (
-    <View style={[styles.slide, { width }]}>
-      <Image
-        source={{ uri: item.image }}
-        style={styles.image}
-        resizeMode="cover"
-      />
-      <View style={styles.content}>
-        <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
-        <Text style={[styles.description, { color: colors.text }]}>
-          {item.description}
-        </Text>
-      </View>
-    </View>
-  );
-
-  const handleNext = () => {
-    if (currentIndex === slides.length - 1) {
-      router.replace('/auth');
+  const nextSlide = () => {
+    if (currentSlide === slides.length - 1) {
+      router.replace('/auth'); // Navigate to auth screen
     } else {
-      flatListRef.current?.scrollToIndex({
-        index: currentIndex + 1,
-        animated: true,
-      });
+      setCurrentSlide((prev) => prev + 1);
     }
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <FlatList
-        ref={flatListRef}
-        data={slides}
-        renderItem={renderItem}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={(e) => {
-          const index = Math.round(e.nativeEvent.contentOffset.x / width);
-          setCurrentIndex(index);
-        }}
-      />
-      <View style={styles.footer}>
-        <View style={styles.pagination}>
-          {slides.map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.dot,
-                {
-                  backgroundColor:
-                    index === currentIndex ? colors.primary : colors.border,
-                },
-              ]}
-            />
-          ))}
-        </View>
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.primary }]}
-          onPress={handleNext}>
-          <Text style={styles.buttonText}>
-            {currentIndex === slides.length - 1 ? 'Get Started' : 'Next'}
+      <View style={styles.content}>
+        {/* Logo and App Name */}
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('../../assets/logo.png')} // Adjust the path to your logo
+            style={styles.logo}
+          />
+          <Text style={[styles.appName, { color: colors.text }]}>Uthutho</Text>
+          <Text style={[styles.tagline, { color: colors.text }]}>
+            For commuters, by commuters
           </Text>
-        </TouchableOpacity>
+        </View>
+
+        {/* Onboarding Card */}
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
+          {/* Pagination Dots */}
+          <View style={styles.pagination}>
+            {slides.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.dot,
+                  {
+                    backgroundColor:
+                      index === currentSlide ? colors.primary : colors.border,
+                  },
+                ]}
+              />
+            ))}
+          </View>
+
+          {/* Slide Content */}
+          <View style={styles.slideContent}>
+            <View style={styles.iconContainer}>
+              <Icon
+                name={slides[currentSlide].icon}
+                size={64}
+                color={slides[currentSlide].color}
+              />
+            </View>
+            <Text style={[styles.title, { color: colors.text }]}>
+              {slides[currentSlide].title}
+            </Text>
+            <Text style={[styles.description, { color: colors.text }]}>
+              {slides[currentSlide].description}
+            </Text>
+          </View>
+
+          {/* Next Button */}
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: colors.primary }]}
+            onPress={nextSlide}>
+            <Text style={styles.buttonText}>
+              {currentSlide === slides.length - 1 ? 'Get Started' : 'Next'}
+            </Text>
+            <Icon name="arrow-right" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={[styles.footerText, { color: colors.text }]}>
+            Developed by Soft Glitch Solutions
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -110,38 +125,44 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  slide: {
-    flex: 1,
-  },
-  image: {
-    width: '100%',
-    height: '60%',
-  },
-  content: {
-    flex: 1,
-    padding: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
   },
-  title: {
+  content: {
+    width: '100%',
+    maxWidth: 400,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  logo: {
+    width: 64,
+    height: 64,
+    marginBottom: 8,
+  },
+  appName: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 10,
-    textAlign: 'center',
   },
-  description: {
-    fontSize: 16,
-    textAlign: 'center',
-    paddingHorizontal: 20,
+  tagline: {
+    fontSize: 14,
+    color: '#666',
   },
-  footer: {
-    padding: 20,
+  card: {
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   pagination: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   dot: {
     width: 8,
@@ -149,14 +170,43 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginHorizontal: 4,
   },
-  button: {
-    padding: 15,
-    borderRadius: 10,
+  slideContent: {
     alignItems: 'center',
+    marginBottom: 24,
+  },
+  iconContainer: {
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  description: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: '#666',
+  },
+  button: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 8,
   },
   buttonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+    marginRight: 8,
+  },
+  footer: {
+    marginTop: 24,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 12,
+    color: '#666',
   },
 });

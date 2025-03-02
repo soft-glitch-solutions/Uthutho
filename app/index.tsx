@@ -19,18 +19,25 @@ export default function Index() {
     }
   };
 
-  const { data: { session } } = supabase.auth.getSession();
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      const session = data.session;
 
+      const hasLaunched = await AsyncStorage.getItem('hasLaunched');
+      if (!hasLaunched) {
+        return <Redirect href="/onboarding" />;
+      }
 
+      if (session) {
+        return <Redirect href="/(app)/(tabs)/home" />;
+      }
 
-  const hasLaunched = AsyncStorage.getItem('hasLaunched');
-  if (!hasLaunched) {
-    return <Redirect href="/onboarding" />;
-  }
+      return <Redirect href="/onboarding" />;
+    };
 
-    if (session) {
-    return <Redirect href="/(app)/(tabs)/home" />;
-  }
+    checkSession();
+  }, []);
 
-  return <Redirect href="/auth" />;
+  return <Redirect href="/onboarding" />;
 }

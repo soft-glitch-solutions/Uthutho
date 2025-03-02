@@ -3,7 +3,7 @@ import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
-import ModalDropdown from 'react-native-modal-dropdown';
+import { Picker } from '@react-native-picker/picker';
 
 export default function AddHub() {
   const { colors } = useTheme();
@@ -79,13 +79,16 @@ export default function AddHub() {
       />
 
       <Text style={[styles.label, { color: colors.text }]}>Transport Type</Text>
-      <ModalDropdown
-        options={['Train', 'Bus', 'Taxi']}
-        onSelect={(index, value) => setTransportType(value.toLowerCase())}
-        style={styles.dropdown}
-        textStyle={{ color: colors.text }}
-        dropdownStyle={styles.dropdownStyle}
-      />
+      <Picker
+        selectedValue={transportType}
+        onValueChange={(itemValue) => setTransportType(itemValue)}
+        style={[styles.dropdown, { color: colors.text }]}
+      >
+        <Picker.Item label="Select Transport Type" value="" />
+        <Picker.Item label="Train" value="train" />
+        <Picker.Item label="Bus" value="bus" />
+        <Picker.Item label="Taxi" value="taxi" />
+      </Picker>
 
       <Text style={[styles.label, { color: colors.text }]}>Description</Text>
       <TextInput
