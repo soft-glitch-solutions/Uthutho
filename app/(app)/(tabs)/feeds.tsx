@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Modal, Image, ActivityIndicator, Share, Animated, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Modal, Image, ActivityIndicator, Share, Animated, RefreshControl, Alert } from 'react-native';
 import { supabase } from '../../../lib/supabase'; // Adjust the path
 import { formatDistanceToNow } from 'date-fns';
 import { useTheme } from '../../../context/ThemeContext'; // Import useTheme
@@ -86,6 +86,7 @@ const PostSkeleton = ({ colors }) => {
 const reactions = [
   { id: 'heart', emoji: '❤️' },
   { id: 'laugh', emoji: '😂' },
+  { id: 'shit', emoji: '💩' },
   { id: 'middleFinger', emoji: '🖕' },
   { id: 'angry', emoji: '😡' },
 ];
@@ -135,7 +136,7 @@ export default function Feed() {
     const fetchPosts = async () => {
       setIsPostsLoading(true);
       try {
-        const { data, error } = await supabase
+        const { data: postsData, error } = await supabase
           .from('hub_posts')
           .select(`
             *,
@@ -161,13 +162,54 @@ export default function Feed() {
               reaction_type,
               user_id
             )
-          `)
-          .order('created_at', { ascending: false });
+          `);
 
         if (error) {
-          throw error;
+          console.error('Error fetching posts:', error.message);
+          Alert.alert('Error fetching posts', error.message);
+          return;
         }
-        setPosts(data);
+
+        console.log('Fetched Posts Data:', postsData); // Log the fetched posts data
+
+        // Create an array of hub IDs to fetch hub names
+        const hubIds = postsData.map(post => post.hub_id);
+        
+        // Fetch hub names based on hub IDs
+        const { data: hubsData, error: hubsError } = await supabase
+          .from('hubs')
+          .select('id, name')
+          .in('id', hubIds);
+
+        if (hubsError) {
+          console.error('Error fetching hubs:', hubsError.message);
+          Alert.alert('Error fetching hubs', hubsError.message);
+          return;
+        }
+
+        // Create a mapping of hub IDs to hub names
+        const hubMap = {};
+        hubsData.forEach(hub => {
+          hubMap[hub.id] = hub.name;
+        });
+
+        // Process posts to include the user's reaction and hub name if available
+        const processedPosts = postsData.map(post => {
+          const userReaction = post.post_reactions.find(reaction => reaction.user_id === supabase.auth.user()?.id);
+          const reactionCounts = reactions.map(reaction => ({
+            ...reaction,
+            count: post.post_reactions.filter(r => r.reaction_type === reaction.id).length,
+          }));
+
+          return {
+            ...post,
+            userReaction: userReaction ? reactions.find(r => r.id === userReaction.reaction_type) : null,
+            reactionCounts,
+            hub_name: hubMap[post.hub_id] || 'Unknown Hub', // Get the hub name from the map
+          };
+        });
+
+        setPosts(processedPosts);
       } catch (error) {
         console.error('Error fetching posts:', error);
         alert('Failed to fetch posts');
@@ -335,14 +377,64 @@ export default function Feed() {
   };
 
   const handleReactionPress = (postId) => {
-    setSelectedPostId(postId);
-    setModalVisible(true);
+    setSelectedPostId(selectedPostId === postId ? null : postId);
   };
 
-  const handleReactionSelect = (reaction) => {
-    // Here you can handle the reaction logic, e.g., save it to the backend
+  const handleReactionSelect = async (reaction) => {
+    const { user } = supabase.auth;
+    if (!user) {
+      Alert.alert('Error', 'You must be logged in to react.');
+      return;
+    }
+
+    // Check if the user has already reacted to the post
+    const { data: existingReaction, error: fetchError } = await supabase
+      .from('post_reactions')
+      .select('id')
+      .eq('post_id', selectedPostId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 means no rows found
+      console.error('Error checking existing reaction:', fetchError.message);
+      Alert.alert('Error', 'Failed to check existing reaction.');
+      return;
+    }
+
+    if (existingReaction) {
+      // Update the existing reaction
+      const { error: updateError } = await supabase
+        .from('post_reactions')
+        .update({ reaction_type: reaction.id })
+        .eq('id', existingReaction.id);
+
+      if (updateError) {
+        console.error('Error updating reaction:', updateError.message);
+        Alert.alert('Error', 'Failed to update reaction.');
+        return;
+      }
+    } else {
+      // Insert a new reaction
+      const { error: insertError } = await supabase
+        .from('post_reactions')
+        .insert([
+          {
+            post_id: selectedPostId,
+            user_id: user.id,
+            reaction_type: reaction.id,
+          },
+        ]);
+
+      if (insertError) {
+        console.error('Error inserting reaction:', insertError.message);
+        Alert.alert('Error', 'Failed to save reaction.');
+        return;
+      }
+    }
+
     setSelectedReaction(reaction);
-    setModalVisible(false);
+    setSelectedPostId(null); // Close the reaction section
+    fetchPosts(); // Refresh posts to show updated reactions
   };
 
   return (
@@ -377,7 +469,7 @@ export default function Feed() {
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <Pressable onPress={() => handleReactionPress(item.id)}>
+          <Pressable onLongPress={() => handleReactionPress(item.id)}>
             <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
               <View style={styles.postHeader}>
                 <Image
@@ -391,20 +483,26 @@ export default function Feed() {
                   <Text style={[styles.postTime, { color: colors.text }]}>
                     {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                   </Text>
-                  {item.stop_name && (
-                    <Text style={[styles.stopName, { color: colors.text }]}>Stop: {item.stop_name}</Text>
+                  {item.stop_post?.stop_name && (
+                    <Text style={[styles.stopName, { color: colors.text }]}>Stop: {item.stop_post.stop_name}</Text>
+                  )}
+                  {item.hub_name && (
+                    <Text style={[styles.stopName, { color: colors.text }]}>Hub: {item.hub_name}</Text>
+                  )}
+                  {item.route_name && (
+                    <Text style={[styles.stopName, { color: colors.text }]}>Hub: {item.route_name}</Text>
                   )}
                 </View>
               </View>
               <Text style={[styles.postContent, { color: colors.text }]}>{item.content}</Text>
-              {selectedPostId === item.id && selectedReaction && (
-                <Animatable.Text
-                  animation="bounceIn"
-                  style={styles.reactionText}
-                >
-                  {selectedReaction.emoji}
-                </Animatable.Text>
-              )}
+              {/* Display reaction counts */}
+              <View style={styles.reactionCounts}>
+                {item.reactionCounts.map((reaction) => (
+                  <Text key={reaction.id} style={styles.reactionCountText}>
+                    {reaction.emoji} {reaction.count}
+                  </Text>
+                ))}
+              </View>
               <View style={styles.postActions}>
                 <Pressable onPress={() => router.push(`/post-details?postId=${item.id}`)}>
                   <Text style={{ color: colors.text }}>Comment</Text>
@@ -413,6 +511,36 @@ export default function Feed() {
                   <Text style={{ color: colors.text }}>Share</Text>
                 </Pressable>
               </View>
+
+              {/* Reaction Section */}
+              {selectedPostId === item.id && (
+                <View style={styles.reactionSection}>
+                  {reactions.map((reaction) => (
+                    <Pressable
+                      key={reaction.id}
+                      onPress={() => handleReactionSelect(reaction)}
+                      style={styles.reactionButton}
+                    >
+                      <Animatable.Text
+                        animation="bounce"
+                        style={styles.reactionEmoji}
+                      >
+                        {reaction.emoji}
+                      </Animatable.Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              {item.userReaction && (
+                <Animatable.Text
+                  animation="bounceIn"
+                  style={styles.reactionText}
+                >
+                  {item.userReaction.emoji}
+                </Animatable.Text>
+              )}
+
             </View>
           </Pressable>
         )}
@@ -491,39 +619,6 @@ export default function Feed() {
                 </>
               )
             )}
-          </View>
-        </View>
-      </Modal>
-
-      {/* Reaction Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Select Reaction</Text>
-            <View style={styles.reactionContainer}>
-              {reactions.map((reaction) => (
-                <Pressable
-                  key={reaction.id}
-                  onPress={() => handleReactionSelect(reaction)}
-                  style={styles.reactionButton}
-                >
-                  <Animatable.Text
-                    animation="bounce"
-                    style={styles.reactionEmoji}
-                  >
-                    {reaction.emoji}
-                  </Animatable.Text>
-                </Pressable>
-              ))}
-            </View>
-            <Pressable onPress={() => setModalVisible(false)} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>Close</Text>
-            </Pressable>
           </View>
         </View>
       </Modal>
@@ -611,16 +706,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 15,
   },
-  reactionContainer: {
+  reactionSection: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
+    marginTop: 5,
   },
   reactionButton: {
-    padding: 10,
+    padding: 5,
   },
   reactionEmoji: {
     fontSize: 30,
+  },
+  reactionText: {
+    fontSize: 24,
+    marginTop: 5,
   },
   closeButton: {
     marginTop: 20,
@@ -688,8 +786,12 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 4,
   },
-  reactionText: {
-    fontSize: 24,
+  reactionCounts: {
+    flexDirection: 'row',
     marginTop: 5,
+  },
+  reactionCountText: {
+    marginRight: 10,
+    fontSize: 16,
   },
 });

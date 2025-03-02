@@ -86,12 +86,14 @@ export default function StopDetailsScreen() {
   );
 
   const renderPost = ({ item }) => (
+    
     <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
+    <Image
+    source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+    style={styles.avatar}
+  />
       <View style={styles.postHeader}>
-        <Image
-          source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
-          style={styles.avatar}
-        />
+
         <Text style={[styles.userName, { color: colors.text }]}>
           {item.profiles.first_name} {item.profiles.last_name}
         </Text>
@@ -111,6 +113,11 @@ export default function StopDetailsScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
+          <Image
+          source={{ uri: stopDetails?.image_url }}
+          style={styles.image}
+          resizeMode="cover"
+        />
         <Text style={[styles.title, { color: colors.text }]}>{stopDetails.name}</Text>
         <Text style={[styles.waitingCount, { color: colors.text }]}>
           People waiting: {stopDetails.stop_posts.length}
@@ -202,6 +209,10 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
   },
+  image: {
+    width: '100%',
+    height: 200,
+  },
   postButton: {
     padding: 10,
     borderRadius: 8,
@@ -213,7 +224,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   postContainer: {
-    padding: 15,
     borderRadius: 10,
     marginBottom: 15,
   },
