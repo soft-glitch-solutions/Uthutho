@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Pressable, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, Pressable, Animated, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
-import { MapPin, Bus, Clock } from 'lucide-react-native';
+import { MapPin, Bus, Clock, Plus } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 
 // Add the Shimmer component
@@ -81,6 +81,7 @@ export default function HubDetailsScreen() {
   const [hub, setHub] = useState(null);
   const [relatedRoutes, setRelatedRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchHubDetails();
@@ -150,29 +151,42 @@ export default function HubDetailsScreen() {
           </View>
         </View>
 
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Related Routes</Text>
-          {relatedRoutes.map((route) => (
-            <Pressable 
-              key={route.id}
-              style={[styles.routeItem, { borderBottomColor: colors.border }]}
-              onPress={() => router.push(`/route-details?routeId=${route.id}`)}
-            >
-              <Bus size={20} color={colors.text} />
-              <View style={styles.routeInfo}>
-                <Text style={[styles.routeName, { color: colors.text }]}>
-                  {route.name}
-                </Text>
-                <Text style={[styles.routeDetails, { color: colors.text }]}>
-                  {route.start_point} → {route.end_point}
-                </Text>
-              </View>
-              <Text style={[styles.routePrice, { color: colors.primary }]}>
-                R{route.cost}
-              </Text>
-            </Pressable>
-          ))}
+          <Pressable onPress={() => router.push('/add-route')} style={styles.addButton}>
+            <Plus size={24} color={colors.text} />
+          </Pressable>
         </View>
+
+        {/* Search Input */}
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search related routes..."
+          placeholderTextColor="#888"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+
+        {relatedRoutes.map((route) => (
+          <Pressable 
+            key={route.id}
+            style={[styles.routeItem, { borderBottomColor: colors.border }]}
+            onPress={() => router.push(`/route-details?routeId=${route.id}`)}
+          >
+            <Bus size={20} color={colors.text} />
+            <View style={styles.routeInfo}>
+              <Text style={[styles.routeName, { color: colors.text }]}>
+                {route.name}
+              </Text>
+              <Text style={[styles.routeDetails, { color: colors.text }]}>
+                {route.start_point} → {route.end_point}
+              </Text>
+            </View>
+            <Text style={[styles.routePrice, { color: colors.primary }]}>
+              R{route.cost}
+            </Text>
+          </Pressable>
+        ))}
       </View>
     </ScrollView>
   );
@@ -274,5 +288,22 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginVertical: 4,
     backgroundColor: '#ccc',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  addButton: {
+    padding: 5,
+  },
+  searchInput: {
+    height: 40,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    marginBottom: 15,
   },
 });

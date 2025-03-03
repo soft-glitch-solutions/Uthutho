@@ -239,7 +239,7 @@ export default function ProfileScreen() {
           <Text style={[styles.title, { color: colors.text }]}>Your Rank : { profile.selected_title }</Text>
           <Text style={[styles.title, { color: colors.text }]}>Select Your Title</Text>
           <Picker
-            selectedValue={selectedTitle}
+            selectedValue={selectedTitle || ''}
             onValueChange={handleTitleChange}
             style={{ height: 50, width: '100%', color: colors.text }}
           >

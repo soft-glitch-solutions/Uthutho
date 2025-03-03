@@ -123,7 +123,7 @@ export default function AddRoutes() {
 
       <Text style={[styles.label, { color: colors.text }]}>Transport Type</Text>
       <Picker
-        selectedValue={transportType}
+        selectedValue={transportType || ''}
         onValueChange={(itemValue) => setTransportType(itemValue)}
         style={[styles.dropdown, { color: colors.text }]}
       >

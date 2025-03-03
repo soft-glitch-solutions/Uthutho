@@ -147,12 +147,6 @@ export default function Feed() {
       return;
     }
 
-    const userId = session?.user?.id; // Safely access user ID
-
-    if (!userId) {
-      Alert.alert('Error', 'You must be logged in to fetch favorite hubs.');
-      return;
-    }
 
     try {
       const { data: profile, error } = await supabase
@@ -479,11 +473,11 @@ export default function Feed() {
 
         {/* Dropdown for Hub Selection */}
         <Picker
-          selectedValue={selectedHubId}
+          selectedValue={selectedHubId || ''}
           onValueChange={(itemValue) => setSelectedHubId(itemValue)}
           style={{ height: 50, width: '100%', color: colors.text }}
         >
-          <Picker.Item label="Select a Hub" value={null} />
+          <Picker.Item label="Select a hub" value="" />
           {favoriteHubs.map((hub) => (
             <Picker.Item key={hub.hub_id} label={hub.hubs.name} value={hub.hub_id} />
           ))}
