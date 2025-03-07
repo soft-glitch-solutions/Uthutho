@@ -153,7 +153,7 @@ export default function HubDetailsScreen() {
 
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Related Routes</Text>
-          <Pressable onPress={() => router.push('/add-route')} style={styles.addButton}>
+          <Pressable onPress={() => router.push('/AddRoute')} style={styles.addButton}>
             <Plus size={24} color={colors.text} />
           </Pressable>
         </View>

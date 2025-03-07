@@ -92,14 +92,16 @@ export default function StopsScreen() {
 
   // Mark as waiting
   const markAsWaiting = async (stopId, transportType) => {
-    if (!userSession?.user?.id) return;
+    const userId = (await supabase.auth.getSession()).data.session?.user.id;
+    if (!userId) return;
+
 
     try {
       const { error } = await supabase
         .from('stop_waiting')
         .insert({
           stop_id: stopId,
-          user_id: userSession.user.id,
+          user_id: userId,
           transport_type: transportType,
         });
 
@@ -114,14 +116,15 @@ export default function StopsScreen() {
 
   // Remove waiting status
   const removeWaiting = async (stopId) => {
-    if (!userSession?.user?.id) return;
+    const userId = (await supabase.auth.getSession()).data.session?.user.id;
+    if (!userId) return;
 
     try {
       const { error } = await supabase
         .from('stop_waiting')
         .delete()
         .eq('stop_id', stopId)
-        .eq('user_id', userSession.user.id);
+        .eq('user_id', userId);
 
       if (error) throw error;
       alert('Marked as picked up!');
@@ -134,14 +137,16 @@ export default function StopsScreen() {
 
   // Create a stop post
   const createStopPost = async (stopId, content) => {
-    if (!userSession?.user?.id || !content.trim()) return;
+    const userId = (await supabase.auth.getSession()).data.session?.user.id;
+    if (!userId) return;
+
 
     try {
       const { error } = await supabase
         .from('stop_posts')
         .insert({
           stop_id: stopId,
-          user_id: userSession.user.id,
+          user_id: userId,
           content,
           transport_waiting_for: selectedTransport,
         });
@@ -201,14 +206,15 @@ export default function StopsScreen() {
 
   const handleMarkAsWaiting = async (stopId) => {
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.user) return;
+      const userId = (await supabase.auth.getSession()).data.session?.user.id;
+      if (!userId) return;
+
 
       const { error } = await supabase
         .from('stop_waiting')
         .insert({
           stop_id: stopId,
-          user_id: session.user.id,
+          user_id: userId,
           transport_type: 'bus', // Example transport type
         });
 
