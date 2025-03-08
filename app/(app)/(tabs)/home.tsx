@@ -281,7 +281,15 @@ export default function HomeScreen() {
             ))}
           </View>
         ) : (
-          <Text style={[styles.emptyText, { color: colors.text }]}>No favorites added yet.</Text>
+          <View style={styles.emptyFavoritesContainer}>
+            <Text style={[styles.emptyText, { color: colors.text }]}>No favorites added yet.</Text>
+            <Pressable
+              onPress={() => router.push('/favorites')}
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+            >
+              <MaterialIcons name="add" size={24} color="white" />
+            </Pressable>
+          </View>
         )}
       </View>
 
@@ -444,5 +452,16 @@ const styles = StyleSheet.create({
     width: '30%',
     borderRadius: 4,
     marginTop: 8,
+  },
+  emptyFavoritesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  addButton: {
+    padding: 10,
+    borderRadius: 5,
+    marginLeft: 10,
   },
 });

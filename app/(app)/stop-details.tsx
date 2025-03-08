@@ -1,10 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator, FlatList, Linking } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Image,
+  FlatList,
+  Linking,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import StopBlock from '../../components/stop/StopBlock'; // Import the StopBlock component
-import { MaterialIcons } from '@expo/vector-icons'; // Import MaterialIcons for the map icon
+import StopBlock from '../../components/stop/StopBlock';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons'; // Import Ionicons for the "+" icon
+import * as Sharing from 'expo-sharing'; // For sharing functionality
 
 export default function StopDetailsScreen() {
   const { stopId } = useLocalSearchParams();
@@ -12,6 +25,7 @@ export default function StopDetailsScreen() {
   const [stopDetails, setStopDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [newPostContent, setNewPostContent] = useState('');
+  const [showAddPost, setShowAddPost] = useState(false); // State to control visibility of the "Add Post" section
 
   useEffect(() => {
     fetchStopDetails();
@@ -26,9 +40,19 @@ export default function StopDetailsScreen() {
         .single();
 
       if (error) throw error;
-      setStopDetails(data);
+
+      // Filter out posts older than a day
+      const filteredPosts = data.stop_posts.filter((post) => {
+        const postDate = new Date(post.created_at);
+        const now = new Date();
+        const timeDiff = now - postDate;
+        return timeDiff < 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+      });
+
+      setStopDetails({ ...data, stop_posts: filteredPosts });
     } catch (error) {
       console.error('Error fetching stop details:', error);
+      Alert.alert('Error', 'Failed to fetch stop details.');
     } finally {
       setIsLoading(false);
     }
@@ -36,62 +60,106 @@ export default function StopDetailsScreen() {
 
   const handleAddPost = async () => {
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.user) return;
+      const userId = (await supabase.auth.getSession()).data.session?.user.id;
+      if (!userId) return;
 
       const { error } = await supabase
         .from('stop_posts')
         .insert({
           stop_id: stopId,
-          user_id: session.user.id,
+          user_id: userId,
           content: newPostContent,
         });
 
       if (error) throw error;
-      alert('Post added!');
+      Alert.alert('Success', 'Post added!');
       setNewPostContent('');
+      setShowAddPost(false); // Hide the "Add Post" section after posting
       fetchStopDetails(); // Refresh data
     } catch (error) {
       console.error('Error adding post:', error);
-      alert('Failed to add post');
+      Alert.alert('Error', 'Failed to add post');
     }
   };
 
-  const renderSkeletonLoader = () => (
-    <View style={styles.skeletonContainer}>
-      <View style={styles.skeletonHeader} />
-      <View style={styles.skeletonText} />
-      <View style={styles.skeletonText} />
-    </View>
-  );
+  const formatTimeAgo = (timestamp) => {
+    const now = new Date();
+    const postDate = new Date(timestamp);
+    const timeDiff = now - postDate;
+
+    const seconds = Math.floor(timeDiff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return `${seconds}s ago`;
+  };
+
+  const handleSharePost = async (postContent) => {
+    try {
+      await Sharing.shareAsync({
+        message: postContent,
+      });
+    } catch (error) {
+      console.error('Error sharing post:', error);
+    }
+  };
 
   const renderPost = ({ item }) => (
     <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
-      <Image
-        source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
-        style={styles.avatar}
-      />
       <View style={styles.postHeader}>
-        <Text style={[styles.userName, { color: colors.text }]}>
-          {item.profiles.first_name} {item.profiles.last_name}
-        </Text>
+        <Image
+          source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+          style={styles.avatar}
+        />
+        <View style={styles.postHeaderText}>
+          <Text style={[styles.userName, { color: colors.text }]}>
+            {item.profiles.first_name} {item.profiles.last_name}
+          </Text>
+          {item.profiles.selected_title && (
+            <Text style={[styles.selectedTitle, { color: colors.primary }]}>
+              {item.profiles.selected_title}
+            </Text>
+          )}
+          <Text style={[styles.postTime, { color: colors.textSecondary }]}>
+            {formatTimeAgo(item.created_at)}
+          </Text>
+        </View>
       </View>
       <Text style={[styles.postContent, { color: colors.text }]}>{item.content}</Text>
+      <TouchableOpacity
+        style={styles.shareButton}
+        onPress={() => handleSharePost(item.content)}
+      >
+        <Text style={[styles.shareButtonText, { color: colors.primary }]}>Share</Text>
+      </TouchableOpacity>
     </View>
   );
 
   const openMap = () => {
+    if (!stopDetails) return; // Guard clause to prevent errors
     const lat = stopDetails.latitude;
     const long = stopDetails.longitude;
     const url = `https://www.google.com/maps/search/?api=1&query=${lat},${long}`;
-    Linking.openURL(url).catch(err => console.error('Error opening map:', err));
+    Linking.openURL(url).catch((err) => console.error('Error opening map:', err));
   };
 
   if (isLoading) {
     return (
-      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-        {renderSkeletonLoader()}
-      </ScrollView>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!stopDetails) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={{ color: colors.text }}>Failed to load stop details.</Text>
+      </View>
     );
   }
 
@@ -108,7 +176,10 @@ export default function StopDetailsScreen() {
           <Text style={[styles.waitingCount, { color: colors.text }]}>
             People waiting: {stopDetails.stop_posts.length}
           </Text>
-          <TouchableOpacity onPress={openMap} style={[styles.mapButton, { backgroundColor: colors.primary }]}>
+          <TouchableOpacity
+            onPress={openMap}
+            style={[styles.mapButton, { backgroundColor: colors.primary }]}
+          >
             <MaterialIcons name="map" size={24} color="white" />
           </TouchableOpacity>
         </View>
@@ -118,35 +189,52 @@ export default function StopDetailsScreen() {
           stopName={stopDetails.name}
           stopLocation={{ latitude: stopDetails.latitude, longitude: stopDetails.longitude }}
           colors={colors}
-          radius={0.5} // Adjust the radius as needed (in kilometers)
+          radius={0.5}
         />
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Posts</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Posts</Text>
+            <TouchableOpacity
+              onPress={() => setShowAddPost(!showAddPost)} // Toggle visibility of the "Add Post" section
+              style={styles.addPostButton}
+            >
+              <Ionicons name="add" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
           <FlatList
             data={stopDetails.stop_posts}
             renderItem={renderPost}
             keyExtractor={(item) => item.id.toString()}
-            ListEmptyComponent={<Text style={{ color: colors.text }}>No posts available.</Text>}
+            ListEmptyComponent={
+              <View style={styles.noPostsContainer}>
+                <Text style={[styles.noPostsText, { color: colors.text, textAlign: 'center' }]}>
+                  Be the first to post and get 1 point for early bird!
+                </Text>
+              </View>
+            }
           />
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Add a Post</Text>
-          <TextInput
-            style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-            placeholder="What's on your mind?"
-            placeholderTextColor={colors.text}
-            value={newPostContent}
-            onChangeText={setNewPostContent}
-          />
-          <TouchableOpacity
-            style={[styles.postButton, { backgroundColor: colors.primary }]}
-            onPress={handleAddPost}
-          >
-            <Text style={styles.postButtonText}>Post</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Conditionally render the "Add Post" section */}
+        {showAddPost && (
+          <View style={styles.section}>
+            <TextInput
+              style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+              placeholder="What's on your mind?"
+              placeholderTextColor={colors.textSecondary}
+              value={newPostContent}
+              onChangeText={setNewPostContent}
+              multiline
+            />
+            <TouchableOpacity
+              style={[styles.postButton, { backgroundColor: colors.primary }]}
+              onPress={handleAddPost}
+            >
+              <Text style={styles.postButtonText}>Post</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -164,45 +252,47 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
   },
-  details: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  waitingCount: {
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  waitingButton: {
-    padding: 15,
-    borderRadius: 10,
+  waitingCountContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
   },
-  waitingButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+  mapButton: {
+    padding: 10,
+    borderRadius: 5,
   },
   section: {
     marginTop: 20,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 10,
+  },
+  addPostButton: {
+    padding: 5,
   },
   input: {
     borderWidth: 1,
     borderRadius: 8,
     padding: 10,
     marginBottom: 10,
+    fontSize: 16,
   },
   image: {
     width: '100%',
     height: 200,
+    borderRadius: 10,
+    marginBottom: 20,
   },
   postButton: {
-    padding: 10,
+    padding: 15,
     borderRadius: 8,
     alignItems: 'center',
   },
@@ -213,7 +303,13 @@ const styles = StyleSheet.create({
   },
   postContainer: {
     borderRadius: 10,
+    padding: 15,
     marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
   },
   postHeader: {
     flexDirection: 'row',
@@ -221,43 +317,51 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     marginRight: 10,
+  },
+  postHeaderText: {
+    flex: 1,
   },
   userName: {
     fontSize: 16,
     fontWeight: 'bold',
   },
+  postTime: {
+    fontSize: 12,
+    color: '#666',
+  },
   postContent: {
     fontSize: 14,
-  },
-  skeletonContainer: {
-    padding: 20,
-  },
-  skeletonHeader: {
-    width: '60%',
-    height: 20,
-    backgroundColor: '#ccc',
-    borderRadius: 10,
     marginBottom: 10,
   },
-  skeletonText: {
-    width: '100%',
-    height: 15,
-    backgroundColor: '#ccc',
-    borderRadius: 10,
-    marginBottom: 5,
+  shareButton: {
+    alignSelf: 'flex-end',
   },
-  waitingCountContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  shareButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  selectedTitle: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginBottom: 4,
+  },
+  noPostsContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 20,
   },
-  mapButton: {
-    marginLeft: 10,
-    padding: 5,
-    borderRadius: 5,
+  noPostsText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  addPostButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
