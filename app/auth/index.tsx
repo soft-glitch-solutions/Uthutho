@@ -12,6 +12,7 @@ import {
 import { router } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons'; // Import the icon library
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
@@ -21,6 +22,7 @@ export default function Auth() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [preferredTransport, setPreferredTransport] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false); // State for password visibility
   const { colors } = useTheme();
 
   const handleSignIn = async () => {
@@ -126,14 +128,23 @@ export default function Auth() {
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        <TextInput
-          style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-          placeholder="Password"
-          placeholderTextColor={colors.text}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+            placeholder="Password"
+            placeholderTextColor={colors.text}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!passwordVisible} // Toggle visibility
+          />
+          <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
+            <Icon
+              name={passwordVisible ? 'eye-off' : 'eye'}
+              size={24}
+              color={colors.text}
+            />
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
           style={[styles.button, { backgroundColor: colors.primary }]}
           onPress={isLogin ? handleSignIn : handleSignUp}
@@ -225,5 +236,10 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     opacity: 0.6,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%', // Ensure full width
   },
 });

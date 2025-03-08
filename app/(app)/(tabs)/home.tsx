@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabase';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext';
+import StopBlock from '../../../components/stop/StopBlock'; // Import the StopBlock component
 
 const Shimmer = ({ children, colors }) => {
   const animatedValue = new Animated.Value(0);
@@ -298,6 +299,17 @@ export default function HomeScreen() {
                       nearestLocations.nearestStop.longitude
                     ).toFixed(2)} km
                   </Text>
+                  {/* Add the StopBlock component here */}
+                  <StopBlock
+                    stopId={nearestLocations.nearestStop.id}
+                    stopName={nearestLocations.nearestStop.name}
+                    stopLocation={{
+                      latitude: nearestLocations.nearestStop.latitude,
+                      longitude: nearestLocations.nearestStop.longitude,
+                    }}
+                    colors={colors}
+                    radius={0.5} // Adjust the radius as needed
+                  />
                 </>
               ) : (
                 <Text style={[styles.emptyText, { color: colors.text }]}>No stops found.</Text>

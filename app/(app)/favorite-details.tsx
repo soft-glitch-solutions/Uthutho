@@ -4,6 +4,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { MapPin, Clock, Users, ThumbsUp } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
+import StopBlock from '../../components/stop/StopBlock'; // Import the StopBlock component
 
 export default function FavoriteDetailsScreen() {
   const { favoriteId } = useLocalSearchParams();
@@ -188,6 +189,21 @@ export default function FavoriteDetailsScreen() {
           )}
         </View>
 
+        {/* Render the StopBlock if the favorite is a stop */}
+        {favorite?.type === 'stop' && (
+          <View style={styles.stopBlockContainer}>
+            <StopBlock
+              stopId={favorite.id}
+              stopName={favorite.name}
+              stopLocation={{
+                latitude: favorite.latitude,
+                longitude: favorite.longitude,
+              }}
+              colors={colors}
+            />
+          </View>
+        )}
+
         {favorite?.type === 'stop' && (
           <View style={[styles.section, { backgroundColor: colors.card }]}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -357,5 +373,8 @@ const styles = StyleSheet.create({
   routeInfo: {
     fontSize: 16,
     marginBottom: 10,
+  },
+  stopBlockContainer: {
+    marginBottom: 20,
   },
 });

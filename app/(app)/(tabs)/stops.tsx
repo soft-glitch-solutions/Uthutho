@@ -9,12 +9,15 @@ import {
   RefreshControl,
   TextInput,
   Image,
+  Alert,
 } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
-import { CheckCircle, PlusCircle, Heart, Search, X } from 'lucide-react-native'; // Icons
+import { PlusCircle, Heart, Search, X } from 'lucide-react-native'; // Icons
 import { supabase } from '../../../lib/supabase'; // Adjust the path
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
+// stops.tsx
+import StopBlock from '../../../components/stop/StopBlock'; // Ensure the path is correct
 
 const TRANSPORT_TYPES = ['Bus 🚌', 'Train 🚂', 'Taxi 🚕'];
 const WAITING_COLORS = {
@@ -30,9 +33,6 @@ export default function StopsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStop, setSelectedStop] = useState(null);
-  const [selectedTransport, setSelectedTransport] = useState(null);
-  const [newMessage, setNewMessage] = useState('');
   const [userSession, setUserSession] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [userFavorites, setUserFavorites] = useState([]);
@@ -90,77 +90,6 @@ export default function StopsScreen() {
     router.push(`/stop-details?stopId=${stopId}`);
   };
 
-  // Mark as waiting
-  const markAsWaiting = async (stopId, transportType) => {
-    const userId = (await supabase.auth.getSession()).data.session?.user.id;
-    if (!userId) return;
-
-
-    try {
-      const { error } = await supabase
-        .from('stop_waiting')
-        .insert({
-          stop_id: stopId,
-          user_id: userId,
-          transport_type: transportType,
-        });
-
-      if (error) throw error;
-      alert('Marked as waiting!');
-      fetchStops(); // Refresh stops
-    } catch (error) {
-      console.error('Error marking as waiting:', error);
-      alert('An error occurred. Please try again.');
-    }
-  };
-
-  // Remove waiting status
-  const removeWaiting = async (stopId) => {
-    const userId = (await supabase.auth.getSession()).data.session?.user.id;
-    if (!userId) return;
-
-    try {
-      const { error } = await supabase
-        .from('stop_waiting')
-        .delete()
-        .eq('stop_id', stopId)
-        .eq('user_id', userId);
-
-      if (error) throw error;
-      alert('Marked as picked up!');
-      fetchStops(); // Refresh stops
-    } catch (error) {
-      console.error('Error marking as picked up:', error);
-      alert('An error occurred. Please try again.');
-    }
-  };
-
-  // Create a stop post
-  const createStopPost = async (stopId, content) => {
-    const userId = (await supabase.auth.getSession()).data.session?.user.id;
-    if (!userId) return;
-
-
-    try {
-      const { error } = await supabase
-        .from('stop_posts')
-        .insert({
-          stop_id: stopId,
-          user_id: userId,
-          content,
-          transport_waiting_for: selectedTransport,
-        });
-
-      if (error) throw error;
-      alert('Message posted successfully!');
-      setNewMessage('');
-      fetchStops(); // Refresh stops
-    } catch (error) {
-      console.error('Error posting message:', error);
-      alert('An error occurred. Please try again.');
-    }
-  };
-
   // Get waiting color based on waiting count
   const getWaitingColor = (waitingCount) => {
     if (waitingCount <= 3) return WAITING_COLORS.low;
@@ -179,111 +108,61 @@ export default function StopsScreen() {
     setUserLocation(location.coords);
   };
 
-  const isCloseToStop = (stop) => {
-    if (!userLocation) return false;
-    const distance = calculateDistance(
-      userLocation.latitude,
-      userLocation.longitude,
-      stop.latitude,
-      stop.longitude
-    );
-    return distance < 0.5; // 0.5 km threshold
-  };
+  // Fetch the user's favorites
+  const fetchFavorites = async () => {
+    const userId = (await supabase.auth.getSession()).data.session?.user.id;
+    if (!userId) return;
 
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // Radius of the Earth in km
-    const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLon = (lon2 - lon1) * (Math.PI / 180);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * (Math.PI / 180)) *
-        Math.cos(lat2 * (Math.PI / 180)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in km
-  };
-
-  const handleMarkAsWaiting = async (stopId) => {
     try {
-      const userId = (await supabase.auth.getSession()).data.session?.user.id;
-      if (!userId) return;
-
-
-      const { error } = await supabase
-        .from('stop_waiting')
-        .insert({
-          stop_id: stopId,
-          user_id: userId,
-          transport_type: 'bus', // Example transport type
-        });
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('favorites')
+        .eq('id', userId)
+        .single();
 
       if (error) throw error;
-      alert('Marked as waiting!');
-      fetchStops(); // Refresh data
+      setUserFavorites(profile.favorites || []);
     } catch (error) {
-      console.error('Error marking as waiting:', error);
-      alert('Failed to mark as waiting');
+      console.error('Error fetching favorites:', error);
     }
   };
 
- // Fetch the user's favorites
- const fetchFavorites = async () => {
-  const userId = (await supabase.auth.getSession()).data.session?.user.id;
-  if (!userId) return;
+  // Add or remove a stop from favorites
+  const handleFavorite = async (stopName) => {
+    const userId = (await supabase.auth.getSession()).data.session?.user.id;
+    if (!userId) return;
 
-  try {
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('favorites')
-      .eq('id', userId)
-      .single();
+    try {
+      const { data: profile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('favorites')
+        .eq('id', userId)
+        .single();
 
-    if (error) throw error;
-    setUserFavorites(profile.favorites || []);
-  } catch (error) {
-    console.error('Error fetching favorites:', error);
-  }
-};
+      if (fetchError) throw fetchError;
 
+      let updatedFavorites;
+      if (profile.favorites.includes(stopName)) {
+        updatedFavorites = profile.favorites.filter((favorite) => favorite !== stopName);
+        alert('Stop removed from favorites!');
+      } else {
+        updatedFavorites = [...profile.favorites, stopName];
+        alert('Stop added to favorites!');
+      }
 
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ favorites: updatedFavorites })
+        .eq('id', userId);
 
-// Add or remove a stop from favorites
-const handleFavorite = async (stopName) => {
-  const userId = (await supabase.auth.getSession()).data.session?.user.id;
-  if (!userId) return;
+      if (updateError) throw updateError;
 
-  try {
-    const { data: profile, error: fetchError } = await supabase
-      .from('profiles')
-      .select('favorites')
-      .eq('id', userId)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    let updatedFavorites;
-    if (profile.favorites.includes(stopName)) {
-      updatedFavorites = profile.favorites.filter((favorite) => favorite !== stopName);
-      alert('Stop removed from favorites!');
-    } else {
-      updatedFavorites = [...profile.favorites, stopName];
-      alert('Stop added to favorites!');
+      setUserFavorites(updatedFavorites);
+    } catch (error) {
+      console.error('Error updating favorites:', error);
+      alert('An error occurred. Please try again.');
     }
-
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ favorites: updatedFavorites })
-      .eq('id', userId);
-
-    if (updateError) throw updateError;
-
-    setUserFavorites(updatedFavorites);
-  } catch (error) {
-    console.error('Error updating favorites:', error);
-    alert('An error occurred. Please try again.');
-  }
-};
+  };
 
   return (
     <ScrollView
@@ -310,7 +189,6 @@ const handleFavorite = async (stopName) => {
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
       <View style={[styles.searchBarContainer, { borderColor: colors.border }]}>
         <Search size={20} color={colors.text} />
         <TextInput
@@ -344,11 +222,6 @@ const handleFavorite = async (stopName) => {
             const waitingCount = stop.stop_waiting?.length || 0;
             const waitingColor = getWaitingColor(waitingCount);
 
-            // Check if the current user is waiting at this stop
-            const isUserWaitingAtThisStop = stop.stop_waiting?.some(
-              (w) => w.user_id === userSession?.user?.id
-            );
-
             return (
               <TouchableOpacity
                 key={stop.id}
@@ -376,53 +249,16 @@ const handleFavorite = async (stopName) => {
                   <Text style={styles.waitingText}>{waitingCount} waiting</Text>
                 </View>
 
-                {/* "Got Picked Up" Button */}
-                {isUserWaitingAtThisStop && (
-                  <TouchableOpacity
-                    style={styles.pickedUpButton}
-                    onPress={() => removeWaiting(stop.id)}
-                  >
-                    <CheckCircle size={16} color={colors.text} />
-                    <Text style={[styles.pickedUpText, { color: colors.text }]}>Got Picked Up</Text>
-                  </TouchableOpacity>
-                )}
-
-                {/* Transport Types */}
-                <View style={styles.transportTypes}>
-                  {(Array.isArray(stop.transport_types) ? stop.transport_types : []).filter(type => TRANSPORT_TYPES.includes(type)).map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[styles.transportButton, { borderColor: colors.primary }]}
-                      onPress={() => markAsWaiting(stop.id, type)}
-                    >
-                      <Text style={[styles.transportText, { color: colors.text }]}>
-                        {type}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {isCloseToStop(stop) && (
-                  <TouchableOpacity
-                    style={[styles.waitingButton, { backgroundColor: colors.primary }]}
-                    onPress={() => handleMarkAsWaiting(stop.id)}
-                  >
-                    <Text style={styles.waitingButtonText}>I'm Waiting</Text>
-                  </TouchableOpacity>
-                )}
+                {/* Add the StopBlock component here */}
+                <StopBlock
+                  stopId={stop.id}
+                  stopName={stop.name}
+                  stopLocation={{ latitude: stop.latitude, longitude: stop.longitude }}
+                  colors={colors}
+                />
               </TouchableOpacity>
             );
           })}
-        </View>
-      )}
-
-      {/* Stop Details Modal */}
-      {selectedStop && (
-        <View style={styles.modal}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Stop Details</Text>
-            {/* Add stop details and chat UI here */}
-          </View>
         </View>
       )}
     </ScrollView>
@@ -517,63 +353,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  pickedUpButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginBottom: 10,
-  },
-  pickedUpText: {
-    fontSize: 14,
-  },
-  transportTypes: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 10,
-  },
-  transportButton: {
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  transportText: {
-    fontSize: 12,
-  },
   skeletonText: {
     height: 16,
     borderRadius: 8,
     marginBottom: 8,
-  },
-  modal: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    width: '90%',
-    padding: 20,
-    borderRadius: 15,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  waitingButton: {
-    padding: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  waitingButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

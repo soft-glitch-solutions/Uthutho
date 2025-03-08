@@ -1,37 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator, FlatList, Pressable, Animated } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator, FlatList } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import { formatDistanceToNow } from 'date-fns';
-
-const Post = ({ post }) => {
-  const { colors } = useTheme();
-  const timestamp = formatDistanceToNow(new Date(post.created_at), { addSuffix: true });
-
-  return (
-    <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
-      <View style={styles.postHeader}>
-        <Image source={{ uri: post.profiles.avatar_url }} style={styles.avatar} />
-        <View style={styles.headerText}>
-          <Text style={[styles.userName, { color: colors.text }]}>{post.profiles.first_name} {post.profiles.last_name}</Text>
-          <Text style={[styles.timestamp, { color: colors.text }]}>{timestamp}</Text>
-        </View>
-      </View>
-      <Text style={[styles.postContent, { color: colors.text }]}>{post.content}</Text>
-    </View>
-  );
-};
+import StopBlock from '../../components/stop/StopBlock'; // Import the StopBlock component
 
 export default function StopDetailsScreen() {
   const { stopId } = useLocalSearchParams();
   const { colors } = useTheme();
-  const router = useRouter();
   const [stopDetails, setStopDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [newPostContent, setNewPostContent] = useState('');
-  const [isWaiting, setIsWaiting] = useState(false);
-  const [waitingAnimation] = useState(new Animated.Value(0));
 
   useEffect(() => {
     fetchStopDetails();
@@ -54,57 +33,16 @@ export default function StopDetailsScreen() {
     }
   };
 
-  const handleMarkAsWaiting = async () => {
-    if (isWaiting) return;
-
-    setIsWaiting(true);
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(waitingAnimation, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(waitingAnimation, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    try {
-      const userId = (await supabase.auth.getSession()).data.session?.user.id;
-      if (!userId) return;
-
-      const { error } = await supabase
-        .from('stop_waiting')
-        .insert({
-          stop_id: stopId,
-          user_id: userId,
-          transport_type: 'bus', // Example transport type
-        });
-
-      if (error) throw error;
-      alert('Marked as waiting!');
-      fetchStopDetails(); // Refresh data
-    } catch (error) {
-      console.error('Error marking as waiting:', error);
-      alert('Failed to mark as waiting');
-    }
-  };
-
   const handleAddPost = async () => {
     try {
-      const userId = (await supabase.auth.getSession()).data.session?.user.id;
-      if (!userId) return;
-
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.user) return;
 
       const { error } = await supabase
         .from('stop_posts')
         .insert({
           stop_id: stopId,
-          user_id: userId,
+          user_id: session.user.id,
           content: newPostContent,
         });
 
@@ -126,8 +64,20 @@ export default function StopDetailsScreen() {
     </View>
   );
 
-  const buttonText = isWaiting ? "Waiting" : "Mark as Waiting";
-  const buttonStyle = isWaiting ? styles.buttonDisabled : styles.buttonEnabled;
+  const renderPost = ({ item }) => (
+    <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
+      <Image
+        source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+        style={styles.avatar}
+      />
+      <View style={styles.postHeader}>
+        <Text style={[styles.userName, { color: colors.text }]}>
+          {item.profiles.first_name} {item.profiles.last_name}
+        </Text>
+      </View>
+      <Text style={[styles.postContent, { color: colors.text }]}>{item.content}</Text>
+    </View>
+  );
 
   if (isLoading) {
     return (
@@ -140,7 +90,7 @@ export default function StopDetailsScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
-          <Image
+        <Image
           source={{ uri: stopDetails?.image_url }}
           style={styles.image}
           resizeMode="cover"
@@ -150,25 +100,24 @@ export default function StopDetailsScreen() {
           People waiting: {stopDetails.stop_posts.length}
         </Text>
 
-        <Pressable
-          onPress={handleMarkAsWaiting}
-          style={[styles.waitingButton, buttonStyle]}
-          disabled={isWaiting}
-        >
-          <Text style={styles.buttonText}>{buttonText}</Text>
-        </Pressable>
-
+        {/* Add the StopBlock component here */}
+        <StopBlock
+          stopId={stopId}
+          stopName={stopDetails.name}
+          stopLocation={{ latitude: stopDetails.latitude, longitude: stopDetails.longitude }}
+          colors={colors}
+          radius={0.5} // Adjust the radius as needed (in kilometers)
+        />
 
         <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Posts</Text>
-        <FlatList
-          data={stopDetails.stop_posts}
-          renderItem={({ item }) => <Post post={item} />}
-          keyExtractor={(item) => item.id.toString()}
-          ListEmptyComponent={<Text style={{ color: colors.text }}>No posts available.</Text>}
-          contentContainerStyle={{ padding: 20 }}
-        />
-      </View>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Posts</Text>
+          <FlatList
+            data={stopDetails.stop_posts}
+            renderItem={renderPost}
+            keyExtractor={(item) => item.id.toString()}
+            ListEmptyComponent={<Text style={{ color: colors.text }}>No posts available.</Text>}
+          />
+        </View>
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Add a Post</Text>
@@ -186,8 +135,6 @@ export default function StopDetailsScreen() {
             <Text style={styles.postButtonText}>Post</Text>
           </TouchableOpacity>
         </View>
-
-
       </View>
     </ScrollView>
   );
@@ -219,13 +166,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  buttonEnabled: {
-    backgroundColor: '#007BFF',
-  },
-  buttonDisabled: {
-    backgroundColor: '#A9A9A9',
-  },
-  buttonText: {
+  waitingButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
@@ -259,17 +200,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   postContainer: {
-    padding: 15,
     borderRadius: 10,
     marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-    elevation: 2,
   },
   postHeader: {
     flexDirection: 'row',
@@ -277,21 +209,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     marginRight: 10,
   },
-  headerText: {
-    flex: 1,
-  },
   userName: {
-    fontWeight: 'bold',
     fontSize: 16,
-  },
-  timestamp: {
-    fontSize: 12,
-    opacity: 0.7,
+    fontWeight: 'bold',
   },
   postContent: {
     fontSize: 14,
