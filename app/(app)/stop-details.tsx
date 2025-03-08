@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator, FlatList, Linking } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import StopBlock from '../../components/stop/StopBlock'; // Import the StopBlock component
+import { MaterialIcons } from '@expo/vector-icons'; // Import MaterialIcons for the map icon
 
 export default function StopDetailsScreen() {
   const { stopId } = useLocalSearchParams();
@@ -79,6 +80,13 @@ export default function StopDetailsScreen() {
     </View>
   );
 
+  const openMap = () => {
+    const lat = stopDetails.latitude;
+    const long = stopDetails.longitude;
+    const url = `https://www.google.com/maps/search/?api=1&query=${lat},${long}`;
+    Linking.openURL(url).catch(err => console.error('Error opening map:', err));
+  };
+
   if (isLoading) {
     return (
       <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -96,11 +104,15 @@ export default function StopDetailsScreen() {
           resizeMode="cover"
         />
         <Text style={[styles.title, { color: colors.text }]}>{stopDetails.name}</Text>
-        <Text style={[styles.waitingCount, { color: colors.text }]}>
-          People waiting: {stopDetails.stop_posts.length}
-        </Text>
+        <View style={styles.waitingCountContainer}>
+          <Text style={[styles.waitingCount, { color: colors.text }]}>
+            People waiting: {stopDetails.stop_posts.length}
+          </Text>
+          <TouchableOpacity onPress={openMap} style={[styles.mapButton, { backgroundColor: colors.primary }]}>
+            <MaterialIcons name="map" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
 
-        {/* Add the StopBlock component here */}
         <StopBlock
           stopId={stopId}
           stopName={stopDetails.name}
@@ -237,5 +249,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
     borderRadius: 10,
     marginBottom: 5,
+  },
+  waitingCountContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  mapButton: {
+    marginLeft: 10,
+    padding: 5,
+    borderRadius: 5,
   },
 });

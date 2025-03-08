@@ -6,6 +6,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext';
 import StopBlock from '../../../components/stop/StopBlock'; // Import the StopBlock component
+import LoginStreakTracker from '@/components/LoginStreakTracker';
 
 const Shimmer = ({ children, colors }) => {
   const animatedValue = new Animated.Value(0);
@@ -96,11 +97,22 @@ export default function HomeScreen() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null); // State to store the user ID
+
 
   // Fetch the user's profile
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
+        const session = await supabase.auth.getSession();
+        const userId = session.data.session?.user.id; // Get the user ID
+
+        if (!userId) {
+          router.replace('/auth');
+          return;
+        }
+  
+        setUserId(userId); // Set the user ID  
         const { data, error } = await supabase
           .from('profiles')
           .select('first_name, selected_title, favorites')
@@ -116,9 +128,13 @@ export default function HomeScreen() {
       }
     };
 
+    
+
     fetchUserProfile();
   }, []);
 
+
+  
   // Fetch the user's current location
   useEffect(() => {
     (async () => {
@@ -246,6 +262,7 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
+      {userId && <LoginStreakTracker userId={userId} />}
       {/* Favorites List */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Favorites</Text>
@@ -267,6 +284,8 @@ export default function HomeScreen() {
           <Text style={[styles.emptyText, { color: colors.text }]}>No favorites added yet.</Text>
         )}
       </View>
+
+
 
       {/* Nearest Locations */}
       <View style={styles.section}>
@@ -344,6 +363,8 @@ export default function HomeScreen() {
           </View>
         )}
       </View>
+
+
     </ScrollView>
   );
 }
