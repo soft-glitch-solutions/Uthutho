@@ -96,7 +96,7 @@ export default function Auth() {
 
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>
-          {isLogin ? 'Welcome Back' : 'Create Account'}
+          {isLogin ? 'Welcome' : 'Create Account'}
         </Text>
       </View>
 
