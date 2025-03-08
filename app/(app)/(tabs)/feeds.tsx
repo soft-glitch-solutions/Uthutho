@@ -112,6 +112,8 @@ export default function Feed() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedHubId, setSelectedHubId] = useState(null);
   const [favoriteHubs, setFavoriteHubs] = useState([]);
+  const [hubPosts, setHubPosts] = useState([]);
+  const [stopPosts, setStopPosts] = useState([]);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -165,10 +167,8 @@ export default function Feed() {
     }
   };
 
-  // Fetch posts
   useEffect(() => {
-    const fetchPosts = async () => {
-      setIsPostsLoading(true);
+    const fetchHubPosts = async () => {
       try {
         const { data: postsData, error } = await supabase
           .from('hub_posts')
@@ -180,76 +180,66 @@ export default function Feed() {
               avatar_url,
               selected_title
             ),
-            post_comments (
-              id,
-              content,
-              created_at,
-              user_id,
-              profiles (
-                first_name,
-                last_name,
-                avatar_url
-              )
-            ),
-            post_reactions (
-              id,
-              reaction_type,
-              user_id
+            hubs (
+              name
             )
           `);
 
         if (error) {
-          console.error('Error fetching posts:', error.message);
-          Alert.alert('Error fetching posts', error.message);
+          console.error('Error fetching hub posts:', error.message);
+          Alert.alert('Error fetching hub posts', error.message);
           return;
         }
 
-        console.log('Fetched Posts Data:', postsData); // Log the fetched posts data
-
-        // Create an array of hub IDs to fetch hub names
-        const hubIds = postsData.map(post => post.hub_id);
-        
-        // Fetch hub names based on hub IDs
-        const { data: hubsData, error: hubsError } = await supabase
-          .from('hubs')
-          .select('id, name')
-          .in('id', hubIds);
-
-        if (hubsError) {
-          console.error('Error fetching hubs:', hubsError.message);
-          Alert.alert('Error fetching hubs', hubsError.message);
-          return;
-        }
-
-        // Create a mapping of hub IDs to hub names
-        const hubMap = {};
-        hubsData.forEach(hub => {
-          hubMap[hub.id] = hub.name;
-        });
-
-        // Process posts to include the user's reaction and hub name if available
-        const processedPosts = postsData.map(post => {
-          const userReaction = post.post_reactions.find(reaction => reaction.user_id === supabase.auth.user()?.id);
-          const reactionCounts = reactions.map(reaction => ({
-            ...reaction,
-            count: post.post_reactions.filter(r => r.reaction_type === reaction.id).length,
-          }));
-
-          return {
-            ...post,
-            userReaction: userReaction ? reactions.find(r => r.id === userReaction.reaction_type) : null,
-            reactionCounts,
-            hub_name: hubMap[post.hub_id] || 'Unknown Hub', // Get the hub name from the map
-          };
-        });
-
-        setPosts(processedPosts);
+        setHubPosts(postsData);
       } catch (error) {
-        console.error('Error fetching posts:', error);
-        alert('Failed to fetch posts');
-      } finally {
-        setIsPostsLoading(false);
+        console.error('Error fetching hub posts:', error);
       }
+    };
+
+    const fetchStopPosts = async () => {
+      try {
+        const { data: postsData, error } = await supabase
+          .from('stop_posts')
+          .select(`
+            *,
+            profiles (
+              first_name,
+              last_name,
+              avatar_url,
+              selected_title
+            ),
+            stops (
+              routes (
+                name
+              )
+            )
+          `);
+
+        if (error) {
+          console.error('Error fetching stop posts:', error.message);
+          Alert.alert('Error fetching stop posts', error.message);
+          return;
+        }
+
+        // Filter out posts older than a day
+        const filteredStopPosts = postsData.filter(post => {
+          const postDate = new Date(post.created_at);
+          const now = new Date();
+          const timeDiff = now - postDate;
+          return timeDiff < 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+        });
+
+        setStopPosts(filteredStopPosts);
+      } catch (error) {
+        console.error('Error fetching stop posts:', error);
+      }
+    };
+
+    const fetchPosts = async () => {
+      setIsPostsLoading(true);
+      await Promise.all([fetchHubPosts(), fetchStopPosts()]);
+      setIsPostsLoading(false);
     };
 
     fetchPosts();
@@ -452,6 +442,59 @@ export default function Feed() {
     setSelectedPostId(null); // Close the reaction section
   };
 
+  const formatTimeAgo = (timestamp) => {
+    const now = new Date();
+    const postDate = new Date(timestamp);
+    const timeDiff = now - postDate;
+
+    const seconds = Math.floor(timeDiff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return `${seconds}s ago`;
+  };
+
+  const renderPost = ({ item }) => (
+    <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
+      <View style={styles.postHeader}>
+        <Image
+          source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+          style={styles.avatar}
+        />
+        <View style={styles.postHeaderText}>
+          <Text style={[styles.userName, { color: colors.text }]}>
+            {item.profiles.first_name} {item.profiles.last_name}
+          </Text>
+          {item.profiles.selected_title && (
+            <Text style={[styles.selectedTitle, { color: colors.primary }]}>
+              {item.profiles.selected_title}
+            </Text>
+          )}
+          <Text style={[styles.postTime, { color: colors.textSecondary }]}>
+            {formatTimeAgo(item.created_at)}
+          </Text>
+        </View>
+      </View>
+      <Text style={[styles.postContent, { color: colors.text }]}>
+        {item.content}
+      </Text>
+      {item.type === 'hub' && (
+        <Text style={[styles.hubName, { color: colors.primary }]}>
+          Hub: {item.hubs?.name || 'Unknown Hub'}
+        </Text>
+      )}
+      {item.type === 'stop' && (
+        <Text style={[styles.routeName, { color: colors.primary }]}>
+          Related Route: {item.stops?.routes?.name || 'Unknown Route'}
+        </Text>
+      )}
+    </View>
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Create Post Form */}
@@ -494,80 +537,9 @@ export default function Feed() {
 
       {/* Posts Feed */}
       <FlatList
-        data={posts}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <Pressable onLongPress={() => handleReactionPress(item.id)}>
-            <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
-              <View style={styles.postHeader}>
-                <Image
-                  source={{ uri: item.profiles?.avatar_url }}
-                  style={styles.avatar}
-                />
-                <View>
-                  <Text style={[styles.userName, { color: colors.text }]}>
-                    {item.profiles?.first_name} {item.profiles?.last_name}
-                  </Text>
-                  <Text style={[styles.postTime, { color: colors.text }]}>
-                    {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                  </Text>
-                  {item.stop_post?.stop_name && (
-                    <Text style={[styles.stopName, { color: colors.text }]}>Stop: {item.stop_post.stop_name}</Text>
-                  )}
-                  {item.hub_name && (
-                    <Text style={[styles.stopName, { color: colors.text }]}>Hub: {item.hub_name}</Text>
-                  )}
-                  {item.route_name && (
-                    <Text style={[styles.stopName, { color: colors.text }]}>Hub: {item.route_name}</Text>
-                  )}
-                </View>
-              </View>
-              <Text style={[styles.postContent, { color: colors.text }]}>{item.content}</Text>
-              {/* Display reaction counts */}
-              <View style={styles.reactionCounts}>
-                {item.reactionCounts.map((reaction) => (
-                  reaction.count > 0 && (
-                    <Text key={reaction.id} style={styles.reactionCountText}>
-                      {reaction.emoji} {reaction.count}
-                    </Text>
-                  )
-                ))}
-              </View>
-              <View style={styles.postActions}>
-                <Pressable onPress={() => router.push(`/post-details?postId=${item.id}`)}>
-                  <Text style={{ color: colors.text }}>Comment</Text>
-                </Pressable>
-                <Pressable onPress={() => handleSharePost(item)}>
-                  <Text style={{ color: colors.text }}>Share</Text>
-                </Pressable>
-              </View>
-
-              {/* Reaction Section */}
-              {selectedPostId === item.id && (
-                <View style={styles.reactionSection}>
-                  {reactions.map((reaction) => (
-                    <Pressable
-                      key={reaction.id}
-                      onPress={() => handleReactionSelect(reaction)}
-                      style={styles.reactionButton}
-                    >
-                        <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-
-              {item.userReaction && (
-                <Animatable.Text
-                  animation="bounceIn"
-                  style={styles.reactionText}
-                >
-                  {item.userReaction.emoji}
-                </Animatable.Text>
-              )}
-            </View>
-          </Pressable>
-        )}
+        data={[...hubPosts.map(post => ({ ...post, type: 'hub' })), ...stopPosts.map(post => ({ ...post, type: 'stop' }))]}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderPost}
         ListEmptyComponent={
           isPostsLoading ? (
             <>
@@ -820,5 +792,30 @@ const styles = StyleSheet.create({
   reactionCountText: {
     marginRight: 10,
     fontSize: 16,
+  },
+  routeName: {
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  hubName: {
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  postHeaderText: {
+    flex: 1,
+  },
+  selectedTitle: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginBottom: 4,
+  },
+  noPostsContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  noPostsText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 10,
   },
 });
