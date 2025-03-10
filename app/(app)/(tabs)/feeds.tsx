@@ -94,7 +94,6 @@ const reactions = [
 
 export default function Feed() {
   const { colors } = useTheme(); // Get theme colors
-  const [newPostContent, setNewPostContent] = useState('');
   const [selectedPost, setSelectedPost] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
   const [posts, setPosts] = useState([]);
@@ -102,7 +101,6 @@ export default function Feed() {
   const [isPostsLoading, setIsPostsLoading] = useState(true);
   const [profiles, setProfiles] = useState(null); // State to hold user profile data
   const [isPostDetailsLoading, setIsPostDetailsLoading] = useState(false);
-  const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [isCreatingComment, setIsCreatingComment] = useState(false);
   const [isCommentDialogVisible, setIsCommentDialogVisible] = useState(false); // For comment dialog
   const [refreshing, setRefreshing] = useState(false); // State for refreshing
@@ -148,7 +146,6 @@ export default function Feed() {
       Alert.alert('Error', 'Could not retrieve session. Please log in again.');
       return;
     }
-
 
     try {
       const { data: profile, error } = await supabase
@@ -333,44 +330,6 @@ export default function Feed() {
     fetchPostDetails();
   }, [selectedPost]);
 
-  // Create post
-  const handleCreatePost = async () => {
-    if (!newPostContent.trim() || !selectedHubId) {
-      Alert.alert('Error', 'Please enter content and select a hub.');
-      return;
-    }
-
-    setIsCreatingPost(true);
-    try {
-      const { data: userSession } = await supabase.auth.getSession();
-      if (!userSession?.session?.user.id) throw new Error('Not authenticated');
-
-      const { data, error } = await supabase
-        .from('hub_posts')
-        .insert({
-          content: newPostContent,
-          user_id: userSession.session.user.id,
-          hub_id: selectedHubId,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      setPosts((prevPosts) => [data, ...prevPosts]);
-      setNewPostContent('');
-      setSelectedHubId(null);
-      Alert.alert('Success', 'Post created successfully!');
-    } catch (error) {
-      console.error('Error creating post:', error);
-      Alert.alert('Error', 'Failed to create post.');
-    } finally {
-      setIsCreatingPost(false);
-    }
-  };
-
   // Create comment
   const handleCreateComment = async () => {
     if (!newComment.trim() || !selectedPost) return;
@@ -543,44 +502,6 @@ export default function Feed() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Create Post Form */}
-      <View style={[styles.createPostContainer, { backgroundColor: colors.card }]}>
-        <View style={styles.postInputContainer}>
-          <Image
-          source={{ uri: profiles?.avatar_url || 'https://static.vecteezy.com/system/resources/thumbnails/005/129/844/small_2x/profile-user-icon-isolated-on-white-background-eps10-free-vector.jpg' }}
-            style={styles.avatar}
-          />
-          <TextInput
-            value={newPostContent}
-            onChangeText={setNewPostContent}
-            placeholder="What's on your mind?"
-            placeholderTextColor={colors.text}
-            style={[styles.postInput, { color: colors.text }]}
-            multiline
-          />
-        </View>
-
-        {/* Dropdown for Hub Selection */}
-        <Picker
-          selectedValue={selectedHubId || ''}
-          onValueChange={(itemValue) => setSelectedHubId(itemValue)}
-          style={{ height: 50, width: '100%', color: colors.text }}
-        >
-          <Picker.Item label="Select a hub" value="" />
-          {favoriteHubs.map((hub) => (
-            <Picker.Item key={hub.hub_id} label={hub.hubs.name} value={hub.hub_id} />
-          ))}
-        </Picker>
-
-        <Pressable
-          onPress={handleCreatePost}
-          style={[styles.postButton, { backgroundColor: colors.primary }]}
-          disabled={isCreatingPost}
-        >
-          <Text style={[styles.postButtonText, { color: colors.buttonText }]}>Post</Text>
-        </Pressable>
-      </View>
-
       {/* Posts Feed */}
       <FlatList
         data={[...hubPosts.map(post => ({ ...post, type: 'hub' })), ...stopPosts.map(post => ({ ...post, type: 'stop' }))]}
@@ -677,37 +598,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  createPostContainer: {
-    marginBottom: 16,
-    padding: 16,
-    borderRadius: 8,
-  },
-  postInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  postInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 8,
-  },
-  postButton: {
-    padding: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  postButtonText: {
-    fontWeight: 'bold',
-  },
   postContainer: {
     borderRadius: 10,
     padding: 15,
@@ -722,6 +612,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 8,
   },
   postHeaderText: {
     flex: 1,
