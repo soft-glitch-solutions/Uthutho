@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Modal, Image, ActivityIndicator, Share, Animated, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Modal, Image, ActivityIndicator, Share, Animated, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { supabase } from '../../../lib/supabase'; // Adjust the path
 import { formatDistanceToNow } from 'date-fns';
 import { useTheme } from '../../../context/ThemeContext'; // Import useTheme
@@ -175,6 +175,7 @@ export default function Feed() {
           .select(`
             *,
             profiles (
+              id,
               first_name,
               last_name,
               avatar_url,
@@ -191,7 +192,28 @@ export default function Feed() {
           return;
         }
 
-        setHubPosts(postsData);
+        // Filter and delete posts older than a day
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+        for (const post of postsData) {
+          const postDate = new Date(post.created_at);
+          if (postDate < oneDayAgo) {
+            const { error: deleteError } = await supabase
+              .from('hub_posts')
+              .delete()
+              .eq('id', post.id);
+
+            if (deleteError) {
+              console.error('Error deleting post:', deleteError);
+              Alert.alert('Error', 'Failed to delete old hub post.');
+            }
+          }
+        }
+
+        // Filter out deleted posts
+        const filteredPosts = postsData.filter(post => new Date(post.created_at) >= oneDayAgo);
+        setHubPosts(filteredPosts);
       } catch (error) {
         console.error('Error fetching hub posts:', error);
       }
@@ -204,6 +226,7 @@ export default function Feed() {
           .select(`
             *,
             profiles (
+              id,
               first_name,
               last_name,
               avatar_url,
@@ -222,15 +245,28 @@ export default function Feed() {
           return;
         }
 
-        // Filter out posts older than a day
-        const filteredStopPosts = postsData.filter(post => {
-          const postDate = new Date(post.created_at);
-          const now = new Date();
-          const timeDiff = now - postDate;
-          return timeDiff < 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-        });
+        // Filter and delete posts older than a day
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-        setStopPosts(filteredStopPosts);
+        for (const post of postsData) {
+          const postDate = new Date(post.created_at);
+          if (postDate < oneDayAgo) {
+            const { error: deleteError } = await supabase
+              .from('stop_posts')
+              .delete()
+              .eq('id', post.id);
+
+            if (deleteError) {
+              console.error('Error deleting post:', deleteError);
+              Alert.alert('Error', 'Failed to delete old stop post.');
+            }
+          }
+        }
+
+        // Filter out deleted posts
+        const filteredPosts = postsData.filter(post => new Date(post.created_at) >= oneDayAgo);
+        setStopPosts(filteredPosts);
       } catch (error) {
         console.error('Error fetching stop posts:', error);
       }
@@ -458,17 +494,27 @@ export default function Feed() {
     return `${seconds}s ago`;
   };
 
+  const handlePostPress = (post) => {
+    if (post.type === 'hub') {
+      router.push(`/hub-post-details?postId=${post.id}`); // Navigate to hub post details
+    } else if (post.type === 'stop') {
+      router.push(`/stop-post-details?postId=${post.id}`); // Navigate to stop post details
+    }
+  };
+
   const renderPost = ({ item }) => (
-    <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
+    <TouchableOpacity onPress={() => handlePostPress(item)} style={[styles.postContainer, { backgroundColor: colors.card }]}>
       <View style={styles.postHeader}>
         <Image
           source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
           style={styles.avatar}
         />
         <View style={styles.postHeaderText}>
-          <Text style={[styles.userName, { color: colors.text }]}>
-            {item.profiles.first_name} {item.profiles.last_name}
-          </Text>
+        <Pressable onPress={() => router.push(`/social-profile?id=${item.profiles.id}`)}>
+        <Text style={[styles.userName, { color: colors.text }]}>
+          {item.profiles.first_name} {item.profiles.last_name}
+        </Text>
+      </Pressable>
           {item.profiles.selected_title && (
             <Text style={[styles.selectedTitle, { color: colors.primary }]}>
               {item.profiles.selected_title}
@@ -492,7 +538,7 @@ export default function Feed() {
           Related Route: {item.stops?.routes?.name || 'Unknown Route'}
         </Text>
       )}
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -548,7 +594,11 @@ export default function Feed() {
               <PostSkeleton colors={colors} />
             </>
           ) : (
-            <Text style={{ color: colors.text }}>No posts found.</Text>
+            <View style={styles.noPostsContainer}>
+              <Text style={[styles.noPostsText, { color: colors.text }]}>
+                No posts available.
+              </Text>
+            </View>
           )
         }
         refreshControl={
@@ -659,31 +709,56 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   postContainer: {
-    marginBottom: 16,
-    padding: 16,
-    borderRadius: 8,
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
   },
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
+  },
+  postHeaderText: {
+    flex: 1,
   },
   userName: {
+    fontSize: 16,
     fontWeight: 'bold',
   },
+  selectedTitle: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginBottom: 4,
+  },
   postTime: {
+    fontSize: 12,
     color: '#666',
   },
-  stopName: {
-    color: '#888',
-    fontSize: 12,
-  },
   postContent: {
-    marginBottom: 8,
+    fontSize: 14,
+    marginBottom: 10,
   },
-  postActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+  hubName: {
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  routeName: {
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  noPostsContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  noPostsText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 10,
   },
   modalOverlay: {
     flex: 1,
@@ -792,30 +867,5 @@ const styles = StyleSheet.create({
   reactionCountText: {
     marginRight: 10,
     fontSize: 16,
-  },
-  routeName: {
-    fontSize: 12,
-    fontStyle: 'italic',
-  },
-  hubName: {
-    fontSize: 12,
-    fontStyle: 'italic',
-  },
-  postHeaderText: {
-    flex: 1,
-  },
-  selectedTitle: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    marginBottom: 4,
-  },
-  noPostsContainer: {
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  noPostsText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 10,
   },
 });

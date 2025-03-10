@@ -12,12 +12,13 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import StopBlock from '../../components/stop/StopBlock';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons'; // Import Ionicons for the "+" icon
 import * as Sharing from 'expo-sharing'; // For sharing functionality
+import { formatTimeAgo } from '../../components/utils'; // Ensure you have this utility function
 
 export default function StopDetailsScreen() {
   const { stopId } = useLocalSearchParams();
@@ -26,6 +27,7 @@ export default function StopDetailsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [newPostContent, setNewPostContent] = useState('');
   const [showAddPost, setShowAddPost] = useState(false); // State to control visibility of the "Add Post" section
+  const router = useRouter();
 
   useEffect(() => {
     fetchStopDetails();
@@ -82,20 +84,8 @@ export default function StopDetailsScreen() {
     }
   };
 
-  const formatTimeAgo = (timestamp) => {
-    const now = new Date();
-    const postDate = new Date(timestamp);
-    const timeDiff = now - postDate;
-
-    const seconds = Math.floor(timeDiff / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days}d ago`;
-    if (hours > 0) return `${hours}h ago`;
-    if (minutes > 0) return `${minutes}m ago`;
-    return `${seconds}s ago`;
+  const handlePostPress = (postId) => {
+    router.push(`/stop-post-details?postId=${postId}`); // Navigate to stop post details
   };
 
   const handleSharePost = async (postContent) => {
@@ -109,7 +99,7 @@ export default function StopDetailsScreen() {
   };
 
   const renderPost = ({ item }) => (
-    <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
+    <TouchableOpacity onPress={() => handlePostPress(item.id)} style={[styles.postContainer, { backgroundColor: colors.card }]}>
       <View style={styles.postHeader}>
         <Image
           source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
@@ -136,7 +126,7 @@ export default function StopDetailsScreen() {
       >
         <Text style={[styles.shareButtonText, { color: colors.primary }]}>Share</Text>
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 
   const openMap = () => {
