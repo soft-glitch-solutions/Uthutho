@@ -6,6 +6,7 @@ import { useTheme } from '../../../context/ThemeContext'; // Import useTheme
 import { useRouter } from 'expo-router'; // Ensure you have this import
 import * as Animatable from 'react-native-animatable';
 import { Picker } from '@react-native-picker/picker'; // Import Picker
+import { MaterialCommunityIcons } from '@expo/vector-icons'; // Importing Expo vector icons
 
 // Add this component above your PostSkeleton component
 const Shimmer = ({ children, colors }) => {
@@ -112,6 +113,8 @@ export default function Feed() {
   const [favoriteHubs, setFavoriteHubs] = useState([]);
   const [hubPosts, setHubPosts] = useState([]);
   const [stopPosts, setStopPosts] = useState([]);
+  const [reactionModalVisible, setReactionModalVisible] = useState(false);
+  const [showReactions, setShowReactions] = useState({}); // Track which post's reactions are shown
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -180,7 +183,9 @@ export default function Feed() {
             ),
             hubs (
               name
-            )
+            ),
+            post_comments (id),
+            post_reactions (id, reaction_type)
           `);
 
         if (error) {
@@ -233,7 +238,9 @@ export default function Feed() {
               routes (
                 name
               )
-            )
+            ),
+            post_comments (id),
+            post_reactions (id, reaction_type)
           `);
 
         if (error) {
@@ -400,43 +407,113 @@ export default function Feed() {
   };
 
   const handleReactionPress = (postId) => {
-    setSelectedPostId(selectedPostId === postId ? null : postId);
+    console.log(`Toggling reactions for post ID: ${postId}`);
+    setShowReactions((prev) => ({
+      ...prev,
+      [postId]: !prev[postId], // Toggle the visibility of reactions for the selected post
+    }));
   };
 
-  const handleReactionSelect = async (reaction) => {
-    const { user } = supabase.auth;
-    if (!user) {
-      Alert.alert('Error', 'You must be logged in to react.');
-      return;
+  const handleReactionSelect = async (reactionType, postId) => {
+    const { data: userSession } = await supabase.auth.getSession();
+    if (!userSession?.session?.user.id) {
+        Alert.alert('Error', 'You must be logged in to react.');
+        return;
     }
 
-    // Check if the user has already reacted to the post
-    const { data: existingReaction, error: fetchError } = await supabase
-      .from('post_reactions')
-      .select('id')
-      .eq('post_id', selectedPostId)
-      .eq('user_id', user.id)
-      .single();
+    console.log(`User clicked ${reactionType} reaction for post ID: ${postId}`);
 
-    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 means no rows found
-      console.error('Error checking existing reaction:', fetchError.message);
-      Alert.alert('Error', 'Failed to check existing reaction.');
-      return;
+    // Check if the post exists in hub_posts
+    const { data: hubPost, error: hubPostError } = await supabase
+        .from('hub_posts')
+        .select('id')
+        .eq('id', postId)
+        .single();
+
+    let postType = null;
+    if (hubPost && !hubPostError) {
+        postType = 'hub';
+    } else {
+        // Check if the post exists in stop_posts
+        const { data: stopPost, error: stopPostError } = await supabase
+            .from('stop_posts')
+            .select('id')
+            .eq('id', postId)
+            .single();
+
+        if (stopPost && !stopPostError) {
+            postType = 'stop';
+        } else {
+            console.error('Post not found in hub_posts or stop_posts:', postId);
+            Alert.alert('Error', 'Post not found.');
+            return;
+        }
+    }
+
+    // Determine which column to use based on the post type
+    const reactionData = {
+        user_id: userSession.session.user.id,
+        reaction_type: reactionType,
+        created_at: new Date().toISOString(),
+    };
+
+    if (postType === 'hub') {
+        reactionData.post_hub_id = postId;
+    } else if (postType === 'stop') {
+        reactionData.post_stop_id = postId;
+    }
+
+    // Check for existing reaction
+    const { data: existingReaction, error: fetchError } = await supabase
+        .from('post_reactions')
+        .select('id')
+        .eq(postType === 'hub' ? 'post_hub_id' : 'post_stop_id', postId)
+        .eq('user_id', userSession.session.user.id)
+        .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error checking existing reaction:', fetchError.message);
+        Alert.alert('Error', 'Failed to check existing reaction.');
+        return;
     }
 
     if (existingReaction) {
-      console.log('Updating existing reaction:', existingReaction.id);
-      // Update logic...
+        // Update existing reaction
+        const { error: updateError } = await supabase
+            .from('post_reactions')
+            .update({ reaction_type: reactionType })
+            .eq('id', existingReaction.id);
+        if (updateError) {
+            console.error('Error updating existing reaction:', updateError.message);
+            Alert.alert('Error', 'Failed to update existing reaction.');
+        } else {
+            console.log(`Updated existing reaction to ${reactionType} for post ID: ${postId}`);
+        }
     } else {
-      console.log('Inserting new reaction for post:', selectedPostId);
-      // Insert logic...
+        // Insert new reaction
+        const { error: insertError } = await supabase
+            .from('post_reactions')
+            .insert(reactionData);
+        if (insertError) {
+            console.error('Error inserting new reaction:', insertError.message);
+            Alert.alert('Error', 'Failed to insert new reaction.');
+        } else {
+            console.log(`Inserted new ${reactionType} reaction for post ID: ${postId}`);
+        }
     }
 
-    // Refresh posts to show updated reactions
-    fetchPosts();
-    setSelectedPostId(null); // Close the reaction section
-  };
-
+    // Update the post's reaction count and selected reaction
+    const updatedPosts = [...hubPosts, ...stopPosts].map(post => {
+        if (post.id === postId) {
+            post.reaction_count = (post.reaction_count || 0) + 1; // Increment the count
+            post.selected_reaction = reactionType; // Set the selected reaction
+        }
+        return post;
+    });
+    setHubPosts(updatedPosts.filter(post => post.type === 'hub'));
+    setStopPosts(updatedPosts.filter(post => post.type === 'stop'));
+    setShowReactions((prev) => ({ ...prev, [postId]: false })); // Hide reactions after selection
+};
   const formatTimeAgo = (timestamp) => {
     const now = new Date();
     const postDate = new Date(timestamp);
@@ -453,7 +530,7 @@ export default function Feed() {
     return `${seconds}s ago`;
   };
 
-  const handlePostPress = (post) => {
+  const handlePostPress = async (post) => {
     if (post.type === 'hub') {
       router.push(`/hub-post-details?postId=${post.id}`); // Navigate to hub post details
     } else if (post.type === 'stop') {
@@ -461,45 +538,113 @@ export default function Feed() {
     }
   };
 
-  const renderPost = ({ item }) => (
-    <TouchableOpacity onPress={() => handlePostPress(item)} style={[styles.postContainer, { backgroundColor: colors.card }]}>
-      <View style={styles.postHeader}>
-        <Image
-          source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
-          style={styles.avatar}
-        />
-        <View style={styles.postHeaderText}>
-        <Pressable onPress={() => router.push(`/social-profile?id=${item.profiles.id}`)}>
-        <Text style={[styles.userName, { color: colors.text }]}>
-          {item.profiles.first_name} {item.profiles.last_name}
-        </Text>
-      </Pressable>
-          {item.profiles.selected_title && (
-            <Text style={[styles.selectedTitle, { color: colors.primary }]}>
-              {item.profiles.selected_title}
-            </Text>
-          )}
-          <Text style={[styles.postTime, { color: colors.textSecondary }]}>
-            {formatTimeAgo(item.created_at)}
-          </Text>
-        </View>
-      </View>
-      <Text style={[styles.postContent, { color: colors.text }]}>
-        {item.content}
-      </Text>
-      {item.type === 'hub' && (
-        <Text style={[styles.hubName, { color: colors.primary }]}>
-          Hub: {item.hubs?.name || 'Unknown Hub'}
-        </Text>
-      )}
-      {item.type === 'stop' && (
-        <Text style={[styles.routeName, { color: colors.primary }]}>
-          Related Route: {item.stops?.routes?.name || 'Unknown Route'}
-        </Text>
-      )}
-    </TouchableOpacity>
-  );
 
+  const renderReactionOptions = (postId, postType) => (
+    <View style={styles.reactionOptions}>
+      <Pressable onPress={() => handleReactionSelect('like', postId, postType)}>
+        <MaterialCommunityIcons name="thumb-up" size={24} color={colors.text} />
+      </Pressable>
+      <Pressable onPress={() => handleReactionSelect('love', postId, postType)}>
+        <MaterialCommunityIcons name="heart" size={24} color={colors.text} />
+      </Pressable>
+      <Pressable onPress={() => handleReactionSelect('laugh', postId, postType)}>
+        <MaterialCommunityIcons name="emoticon-happy" size={24} color={colors.text} />
+      </Pressable>
+      <Pressable onPress={() => handleReactionSelect('sad', postId, postType)}>
+        <MaterialCommunityIcons name="emoticon-sad" size={24} color={colors.text} />
+      </Pressable>
+      <Pressable onPress={() => handleReactionSelect('angry', postId, postType)}>
+        <MaterialCommunityIcons name="emoticon-angry" size={24} color={colors.text} />
+      </Pressable>
+    </View>
+);
+
+ // ... existing code ...
+
+const renderPost = ({ item }) => {
+  const reactionEmojis = {
+      AWE: '🔥', // Fire emoji
+      'Leka Leka': '😎', // Emoji with glasses
+      Shoo: '😲', // Shocked emoji
+      'Neh bru': '😞', // Disappointed emoji
+      Jas: '🖕', // Middle finger emoji
+  };
+
+  return (
+      <TouchableOpacity onPress={() => handlePostPress(item)} style={[styles.postContainer, { backgroundColor: colors.card }]}>
+          <View style={styles.postHeader}>
+              <Image
+                  source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+                  style={styles.avatar}
+              />
+              <View style={styles.postHeaderText}>
+        <Pressable onPress={() => router.push(`/social-profile?id=${item.profiles.id}`)}>
+                  <Text style={[styles.userName, { color: colors.text }]}>
+                      {item.profiles.first_name} {item.profiles.last_name}
+                  </Text>
+      </Pressable>
+                  {item.profiles.selected_title && (
+                      <Text style={[styles.selectedTitle, { color: colors.primary }]}>
+                          {item.profiles.selected_title}
+                      </Text>
+                  )}
+                  <Text style={[styles.postTime, { color: colors.textSecondary }]}>
+                      {formatTimeAgo(item.created_at)}
+                  </Text>
+              </View>
+          </View>
+          <Text style={[styles.postContent, { color: colors.text }]}>
+              {item.content}
+          </Text>
+          {item.type === 'hub' && (
+              <Text style={[styles.hubName, { color: colors.primary }]}>
+                  Hub: {item.hubs?.name || 'Unknown Hub'}
+              </Text>
+          )}
+          {item.type === 'stop' && (
+              <Text style={[styles.routeName, { color: colors.primary }]}>
+                  Related Route: {item.stops?.routes?.name || 'Unknown Route'}
+              </Text>
+          )}
+          {/* Reaction Counter */}
+          {item.reaction_count > 0 && (
+              <View style={styles.reactionCounter}>
+                  <Text style={[styles.reactionCounterText, { color: colors.text }]}>
+                      {item.reaction_count} {reactionEmojis[item.selected_reaction] || '👍'}
+                  </Text>
+              </View>
+          )}
+          {/* Reaction Button */}
+          <TouchableOpacity onPress={() => handleReactionPress(item.id)} style={styles.reactionButton}>
+              <MaterialCommunityIcons name="emoticon-happy-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
+          {/* Reaction Options */}
+          {showReactions[item.id] && (
+              <View style={styles.reactionOptionsContainer}>
+                  <View style={styles.reactionOptions}>
+                      <Pressable onPress={() => handleReactionSelect('AWE', item.id)}>
+                          <Text style={styles.reactionEmoji}>🔥</Text>
+                      </Pressable>
+                      <Pressable onPress={() => handleReactionSelect('Leka Leka', item.id)}>
+                          <Text style={styles.reactionEmoji}>😎</Text>
+                      </Pressable>
+                      <Pressable onPress={() => handleReactionSelect('Shoo', item.id)}>
+                          <Text style={styles.reactionEmoji}>😲</Text>
+                      </Pressable>
+                      <Pressable onPress={() => handleReactionSelect('Neh bru', item.id)}>
+                          <Text style={styles.reactionEmoji}>😞</Text>
+                      </Pressable>
+                      <Pressable onPress={() => handleReactionSelect('Jas', item.id)}>
+                          <Text style={styles.reactionEmoji}>🖕</Text>
+                      </Pressable>
+                  </View>
+              </View>
+          )}
+      </TouchableOpacity>
+  );
+};
+
+// ... existing code ...
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Posts Feed */}
@@ -589,6 +734,23 @@ export default function Feed() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={reactionModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setReactionModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Select a Reaction</Text>
+            {renderReactionOptions(selectedPostId)}
+            <Pressable onPress={() => setReactionModalVisible(false)} style={styles.closeButton}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -661,6 +823,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  reactionCounter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+},
+reactionCounterText: {
+    fontSize: 14,
+},
+reactionButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+},
+reactionOptionsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 8,
+    borderTopWidth: 1,
+},
+reactionOptions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+},
+reactionEmoji: {
+    fontSize: 24,
+},
   modalContainer: {
     width: '80%',
     padding: 20,
@@ -763,5 +953,14 @@ const styles = StyleSheet.create({
   reactionCountText: {
     marginRight: 10,
     fontSize: 16,
+  },
+  reactionOptions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 5,
+  },
+  reactionOption: {
+    padding: 5,
+    marginHorizontal: 5,
   },
 });
