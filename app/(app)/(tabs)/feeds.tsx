@@ -118,25 +118,20 @@ export default function Feed() {
 
   useEffect(() => {
     const fetchUserProfile = async () => {
-      const { data: session, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session?.session) {
-        throw new Error('No user session found. Please log in.');
-      }
-
-      const userId = session.session.user.id;
-      
-        const { data: profileData, error: profileError } = await supabase
+      const { data: session } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data, error } = await supabase
           .from('profiles')
-          .select('*')
-          .eq('id', userId)
+          .select('avatar_url')
+          .eq('id', session.user.id)
           .single();
-          
 
-        if (Error()) {
-          console.error('Error fetching user profile:', Error);
+        if (error) {
+          console.error('Error fetching user profile:', error);
         } else {
           setProfiles(data); // Store the user profile data
         }
+      }
     };
 
     fetchUserProfile();
@@ -148,22 +143,19 @@ export default function Feed() {
 
   const fetchFavoriteHubs = async () => {
     const { data: session, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session?.session) {
-      throw new Error('No user session found. Please log in.');
-    }
+
     if (sessionError) {
       console.error('Error fetching session:', sessionError.message);
       Alert.alert('Error', 'Could not retrieve session. Please log in again.');
       return;
     }
-    const userId = session.session.user.id;
 
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('favorites') // Assuming 'favorites' contains the hub IDs
         .eq('id', userId)
-        .maybeSingle()
+        .single();
 
       if (error) throw error;
 
@@ -222,10 +214,7 @@ export default function Feed() {
         }
 
         // Filter out deleted posts
-        const filteredPosts = postsData.filter(post => 
-          new Date(post.created_at) >= oneDayAgo && 
-          favoriteHubs.includes(post.hubs?.name)
-        );
+        const filteredPosts = postsData.filter(post => new Date(post.created_at) >= oneDayAgo);
         setHubPosts(filteredPosts);
       } catch (error) {
         console.error('Error fetching hub posts:', error);
@@ -280,11 +269,7 @@ export default function Feed() {
         }
 
         // Filter out deleted posts
-        const filteredPosts = postsData.filter(post => 
-          new Date(post.created_at) >= oneDayAgo && 
-          favoriteHubs.includes(post.stops?.name)
-        );
-  
+        const filteredPosts = postsData.filter(post => new Date(post.created_at) >= oneDayAgo);
         setStopPosts(filteredPosts);
       } catch (error) {
         console.error('Error fetching stop posts:', error);
@@ -351,12 +336,6 @@ export default function Feed() {
 
     fetchPostDetails();
   }, [selectedPost]);
-
-  useEffect(() => {
-    if (favoriteHubs.length > 0) {
-      fetchPosts();
-    }
-  }, [favoriteHubs]);
 
   // Create comment
   const handleCreateComment = async () => {
@@ -438,103 +417,99 @@ export default function Feed() {
   const handleReactionSelect = async (reactionType, postId) => {
     const { data: userSession } = await supabase.auth.getSession();
     if (!userSession?.session?.user.id) {
-        Alert.alert('Error', 'You must be logged in to react.');
-        return;
+      Alert.alert('Error', 'You must be logged in to react.');
+      return;
     }
-
-    console.log(`User clicked ${reactionType} reaction for post ID: ${postId}`);
-
-    // Check if the post exists in hub_posts
-    const { data: hubPost, error: hubPostError } = await supabase
+  
+    try {
+      // Check if the post exists in hub_posts
+      const { data: hubPost, error: hubPostError } = await supabase
         .from('hub_posts')
         .select('id')
         .eq('id', postId)
         .single();
-
-    let postType = null;
-    if (hubPost && !hubPostError) {
+  
+      let postType = null;
+      if (hubPost && !hubPostError) {
         postType = 'hub';
-    } else {
+      } else {
         // Check if the post exists in stop_posts
         const { data: stopPost, error: stopPostError } = await supabase
-            .from('stop_posts')
-            .select('id')
-            .eq('id', postId)
-            .single();
-
+          .from('stop_posts')
+          .select('id')
+          .eq('id', postId)
+          .single();
+  
         if (stopPost && !stopPostError) {
-            postType = 'stop';
+          postType = 'stop';
         } else {
-            console.error('Post not found in hub_posts or stop_posts:', postId);
-            Alert.alert('Error', 'Post not found.');
-            return;
+          console.error('Post not found in hub_posts or stop_posts:', postId);
+          Alert.alert('Error', 'Post not found.');
+          return;
         }
-    }
-
-    // Determine which column to use based on the post type
-    const reactionData = {
+      }
+  
+      // Determine which column to use based on the post type
+      const reactionData = {
         user_id: userSession.session.user.id,
         reaction_type: reactionType,
         created_at: new Date().toISOString(),
-    };
-
-    if (postType === 'hub') {
+      };
+  
+      if (postType === 'hub') {
         reactionData.post_hub_id = postId;
-    } else if (postType === 'stop') {
+      } else if (postType === 'stop') {
         reactionData.post_stop_id = postId;
-    }
-
-    // Check for existing reaction
-    const { data: existingReaction, error: fetchError } = await supabase
+      }
+  
+      // Check for existing reaction
+      const { data: existingReaction, error: fetchError } = await supabase
         .from('post_reactions')
         .select('id')
         .eq(postType === 'hub' ? 'post_hub_id' : 'post_stop_id', postId)
         .eq('user_id', userSession.session.user.id)
         .single();
-
-    if (fetchError && fetchError.code !== 'PGRST116') {
+  
+      if (fetchError && fetchError.code !== 'PGRST116') {
         console.error('Error checking existing reaction:', fetchError.message);
         Alert.alert('Error', 'Failed to check existing reaction.');
         return;
-    }
-
-    if (existingReaction) {
+      }
+  
+      if (existingReaction) {
         // Update existing reaction
         const { error: updateError } = await supabase
-            .from('post_reactions')
-            .update({ reaction_type: reactionType })
-            .eq('id', existingReaction.id);
+          .from('post_reactions')
+          .update({ reaction_type: reactionType })
+          .eq('id', existingReaction.id);
+  
         if (updateError) {
-            console.error('Error updating existing reaction:', updateError.message);
-            Alert.alert('Error', 'Failed to update existing reaction.');
+          console.error('Error updating existing reaction:', updateError.message);
+          Alert.alert('Error', 'Failed to update existing reaction.');
         } else {
-            console.log(`Updated existing reaction to ${reactionType} for post ID: ${postId}`);
+          console.log(`Updated existing reaction to ${reactionType} for post ID: ${postId}`);
         }
-    } else {
+      } else {
         // Insert new reaction
         const { error: insertError } = await supabase
-            .from('post_reactions')
-            .insert(reactionData);
+          .from('post_reactions')
+          .insert(reactionData);
+  
         if (insertError) {
-            console.error('Error inserting new reaction:', insertError.message);
-            Alert.alert('Error', 'Failed to insert new reaction.');
+          console.error('Error inserting new reaction:', insertError.message);
+          Alert.alert('Error', 'Failed to insert new reaction.');
         } else {
-            console.log(`Inserted new ${reactionType} reaction for post ID: ${postId}`);
+          console.log(`Inserted new ${reactionType} reaction for post ID: ${postId}`);
         }
+      }
+  
+      // Refresh posts to show updated reactions
+      fetchPosts();
+    } catch (error) {
+      console.error('Error handling reaction:', error);
+      Alert.alert('Error', 'Failed to react to the post.');
     }
-
-    // Update the post's reaction count and selected reaction
-    const updatedPosts = [...hubPosts, ...stopPosts].map(post => {
-        if (post.id === postId) {
-            post.reaction_count = (post.reaction_count || 0) + 1; // Increment the count
-            post.selected_reaction = reactionType; // Set the selected reaction
-        }
-        return post;
-    });
-    setHubPosts(updatedPosts.filter(post => post.type === 'hub'));
-    setStopPosts(updatedPosts.filter(post => post.type === 'stop'));
-    setShowReactions((prev) => ({ ...prev, [postId]: false })); // Hide reactions after selection
-};
+  };
   const formatTimeAgo = (timestamp) => {
     const now = new Date();
     const postDate = new Date(timestamp);
@@ -559,7 +534,6 @@ export default function Feed() {
     }
   };
 
-
   const renderReactionOptions = (postId, postType) => (
     <View style={styles.reactionOptions}>
       <Pressable onPress={() => handleReactionSelect('like', postId, postType)}>
@@ -580,92 +554,49 @@ export default function Feed() {
     </View>
 );
 
- // ... existing code ...
-
-const renderPost = ({ item }) => {
-  const reactionEmojis = {
-      AWE: '🔥', // Fire emoji
-      'Leka Leka': '😎', // Emoji with glasses
-      Shoo: '😲', // Shocked emoji
-      'Neh bru': '😞', // Disappointed emoji
-      Jas: '🖕', // Middle finger emoji
-  };
-
-  return (
-      <TouchableOpacity onPress={() => handlePostPress(item)} style={[styles.postContainer, { backgroundColor: colors.card }]}>
-          <View style={styles.postHeader}>
-              <Image
-                  source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
-                  style={styles.avatar}
-              />
-              <View style={styles.postHeaderText}>
+  const renderPost = ({ item }) => (
+    <TouchableOpacity onPress={() => handlePostPress(item)} style={[styles.postContainer, { backgroundColor: colors.card }]}>
+      <View style={styles.postHeader}>
+        <Image
+          source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+          style={styles.avatar}
+        />
+        <View style={styles.postHeaderText}>
         <Pressable onPress={() => router.push(`/social-profile?id=${item.profiles.id}`)}>
-                  <Text style={[styles.userName, { color: colors.text }]}>
-                      {item.profiles.first_name} {item.profiles.last_name}
-                  </Text>
+        <Text style={[styles.userName, { color: colors.text }]}>
+          {item.profiles.first_name} {item.profiles.last_name}
+        </Text>
       </Pressable>
-                  {item.profiles.selected_title && (
-                      <Text style={[styles.selectedTitle, { color: colors.primary }]}>
-                          {item.profiles.selected_title}
-                      </Text>
-                  )}
-                  <Text style={[styles.postTime, { color: colors.textSecondary }]}>
-                      {formatTimeAgo(item.created_at)}
-                  </Text>
-              </View>
-          </View>
-          <Text style={[styles.postContent, { color: colors.text }]}>
-              {item.content}
+          {item.profiles.selected_title && (
+            <Text style={[styles.selectedTitle, { color: colors.primary }]}>
+              {item.profiles.selected_title}
+            </Text>
+          )}
+          <Text style={[styles.postTime, { color: colors.textSecondary }]}>
+            {formatTimeAgo(item.created_at)}
           </Text>
-          {item.type === 'hub' && (
-              <Text style={[styles.hubName, { color: colors.primary }]}>
-                  Hub: {item.hubs?.name || 'Unknown Hub'}
-              </Text>
-          )}
-          {item.type === 'stop' && (
-              <Text style={[styles.routeName, { color: colors.primary }]}>
-                  Related Route: {item.stops?.routes?.name || 'Unknown Route'}
-              </Text>
-          )}
-          {/* Reaction Counter */}
-          {item.reaction_count > 0 && (
-              <View style={styles.reactionCounter}>
-                  <Text style={[styles.reactionCounterText, { color: colors.text }]}>
-                      {item.reaction_count} {reactionEmojis[item.selected_reaction] || '👍'}
-                  </Text>
-              </View>
-          )}
-          {/* Reaction Button */}
-          <TouchableOpacity onPress={() => handleReactionPress(item.id)} style={styles.reactionButton}>
-              <MaterialCommunityIcons name="emoticon-happy-outline" size={24} color={colors.text} />
-          </TouchableOpacity>
-          {/* Reaction Options */}
-          {showReactions[item.id] && (
-              <View style={styles.reactionOptionsContainer}>
-                  <View style={styles.reactionOptions}>
-                      <Pressable onPress={() => handleReactionSelect('AWE', item.id)}>
-                          <Text style={styles.reactionEmoji}>🔥</Text>
-                      </Pressable>
-                      <Pressable onPress={() => handleReactionSelect('Leka Leka', item.id)}>
-                          <Text style={styles.reactionEmoji}>😎</Text>
-                      </Pressable>
-                      <Pressable onPress={() => handleReactionSelect('Shoo', item.id)}>
-                          <Text style={styles.reactionEmoji}>😲</Text>
-                      </Pressable>
-                      <Pressable onPress={() => handleReactionSelect('Neh bru', item.id)}>
-                          <Text style={styles.reactionEmoji}>😞</Text>
-                      </Pressable>
-                      <Pressable onPress={() => handleReactionSelect('Jas', item.id)}>
-                          <Text style={styles.reactionEmoji}>🖕</Text>
-                      </Pressable>
-                  </View>
-              </View>
-          )}
+        </View>
+      </View>
+      <Text style={[styles.postContent, { color: colors.text }]}>
+        {item.content}
+      </Text>
+      {item.type === 'hub' && (
+        <Text style={[styles.hubName, { color: colors.primary }]}>
+          Hub: {item.hubs?.name || 'Unknown Hub'}
+        </Text>
+      )}
+      {item.type === 'stop' && (
+        <Text style={[styles.routeName, { color: colors.primary }]}>
+          Related Route: {item.stops?.routes?.name || 'Unknown Route'}
+        </Text>
+      )}
+      <TouchableOpacity onPress={() => handleReactionPress(item.id)} style={styles.reactionButton}>
+        <MaterialCommunityIcons name="emoticon-happy-outline" size={24} color={colors.text} />
       </TouchableOpacity>
+      {showReactions[item.id] && renderReactionOptions(item.id)}
+    </TouchableOpacity>
   );
-};
 
-// ... existing code ...
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Posts Feed */}
@@ -844,34 +775,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  reactionCounter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-},
-reactionCounterText: {
-    fontSize: 14,
-},
-reactionButton: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-},
-reactionOptionsContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 8,
-    borderTopWidth: 1,
-},
-reactionOptions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-},
-reactionEmoji: {
-    fontSize: 24,
-},
   modalContainer: {
     width: '80%',
     padding: 20,
