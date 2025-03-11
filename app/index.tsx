@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
+import { ActivityIndicator, View, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../lib/supabase';
-import { ActivityIndicator, View } from 'react-native';
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
@@ -11,38 +10,40 @@ export default function Index() {
   useEffect(() => {
     const checkFirstTime = async () => {
       try {
-        const hasLaunched = await AsyncStorage.getItem('hasLaunched');
+        let hasLaunched: string | null = null;
+
+        // Check if the platform is web or mobile
+        if (Platform.OS === 'web') {
+          // Use localStorage for web
+          hasLaunched = localStorage.getItem('hasLaunched');
+        } else {
+          // Use AsyncStorage for mobile
+          hasLaunched = await AsyncStorage.getItem('hasLaunched');
+        }
+
         if (!hasLaunched) {
-          await AsyncStorage.setItem('hasLaunched', 'true');
+          // First-time user, redirect to onboarding
+          setRedirectTo('/onboarding');
+
+          // Set the flag for first launch
+          if (Platform.OS === 'web') {
+            localStorage.setItem('hasLaunched', 'true');
+          } else {
+            await AsyncStorage.setItem('hasLaunched', 'true');
+          }
+        } else {
+          // Not first-time user, redirect to auth or home
+          setRedirectTo('/onboarding'); // Default to auth, or you can add session check here
         }
       } catch (error) {
         console.error('Error checking first launch:', error);
-      }
-    };
-
-    const checkSession = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        const session = data.session;
-
-        const hasLaunched = await AsyncStorage.getItem('hasLaunched');
-        if (!hasLaunched) {
-          setRedirectTo('/onboarding');
-        } else if (session) {
-          setRedirectTo('/(app)/(tabs)/home');
-        } else {
-          setRedirectTo('/onboarding');
-        }
-      } catch (error) {
-        console.error('Error checking session:', error);
-        setRedirectTo('/onboarding');
+        setRedirectTo('/onboarding'); // Fallback to onboarding on error
       } finally {
         setIsLoading(false);
       }
     };
 
     checkFirstTime();
-    checkSession();
   }, []);
 
   if (isLoading) {
@@ -57,5 +58,5 @@ export default function Index() {
     return <Redirect href={redirectTo} />;
   }
 
-  return <Redirect href="/onboarding" />;
+  return <Redirect href="/onboarding" />; // Default to onboarding
 }
