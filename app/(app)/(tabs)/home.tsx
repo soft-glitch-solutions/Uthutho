@@ -262,39 +262,6 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      {userId && <LoginStreakTracker userId={userId} />}
-      {/* Favorites List */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Favorites</Text>
-        {isProfileLoading ? (
-          <FavoritesSkeleton colors={colors} />
-        ) : userProfile?.favorites?.length ? (
-          <View style={styles.grid}>
-            {userProfile.favorites.map((favorite, index) => (
-              <Pressable
-                key={index}
-                style={[styles.card, { backgroundColor: colors.card }]}
-                onPress={() => handleFavoritePress(favorite)}
-              >
-                <Text style={[styles.cardText, { color: colors.text }]}>{favorite}</Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyFavoritesContainer}>
-            <Text style={[styles.emptyText, { color: colors.text }]}>No favorites added yet.</Text>
-            <Pressable
-              onPress={() => router.push('/favorites')}
-              style={[styles.addButton, { backgroundColor: colors.primary }]}
-            >
-              <MaterialIcons name="add" size={24} color="white" />
-            </Pressable>
-          </View>
-        )}
-      </View>
-
-
-
       {/* Nearest Locations */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Nearby You</Text>
@@ -371,6 +338,41 @@ export default function HomeScreen() {
           </View>
         )}
       </View>
+
+      {userId && <LoginStreakTracker userId={userId} />}
+      {/* Favorites List */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Favorites</Text>
+        {isProfileLoading ? (
+          <FavoritesSkeleton colors={colors} />
+        ) : userProfile?.favorites?.length ? (
+          <View style={styles.grid}>
+            {userProfile.favorites.map((favorite, index) => (
+              <Pressable
+                key={index}
+                style={[styles.card, { backgroundColor: colors.card }]}
+                onPress={() => handleFavoritePress(favorite)}
+              >
+                <Text style={[styles.cardText, { color: colors.text }]}>{favorite}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyFavoritesContainer}>
+            <Text style={[styles.emptyText, { color: colors.text }]}>No favorites added yet.</Text>
+            <Pressable
+              onPress={() => router.push('/favorites')}
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+            >
+              <MaterialIcons name="add" size={24} color="white" />
+            </Pressable>
+          </View>
+        )}
+      </View>
+
+
+
+      
 
 
     </ScrollView>

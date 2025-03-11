@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image, FlatList, Pressable } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { MapPin, Clock, Users, ThumbsUp } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
-import StopBlock from '../../components/stop/StopBlock'; // Import the StopBlock component
+import StopBlock from '../../components/stop/StopBlock'; 
+import { MaterialCommunityIcons } from '@expo/vector-icons'; // Importing Expo vector icons
+// Import the StopBlock component
 
 export default function FavoriteDetailsScreen() {
   const { favoriteId } = useLocalSearchParams();
@@ -107,43 +109,68 @@ export default function FavoriteDetailsScreen() {
     }
   };
 
+  const formatTimeAgo = (timestamp) => {
+    const now = new Date();
+    const postDate = new Date(timestamp);
+    const timeDiff = now - postDate;
+
+    const seconds = Math.floor(timeDiff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return `${seconds}s ago`;
+  };
+
   const renderPost = ({ item }) => (
-    <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
-      <View style={styles.postHeader}>
+    <TouchableOpacity onPress={() => handlePostPress(item)} style={[styles.postContainer, { backgroundColor: colors.card }]}>
+    <View style={styles.postHeader}>
         <Image
-          source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
-          style={styles.avatar}
+            source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+            style={styles.avatar}
         />
-        <Text style={[styles.userName, { color: colors.text }]}>
-          {item.profiles.first_name} {item.profiles.last_name}
-        </Text>
-      </View>
-      <Text style={[styles.postContent, { color: colors.text }]}>{item.content}</Text>
-      <FlatList
-        data={item.post_comments}
-        renderItem={({ item: comment }) => (
-          <View style={styles.commentContainer}>
-            <Text style={[styles.commentText, { color: colors.text }]}>
-              {comment.profiles.first_name}: {comment.content}
+        <View style={styles.postHeaderText}>
+  <Pressable onPress={() => router.push(`/social-profile?id=${item.profiles.id}`)}>
+            <Text style={[styles.userName, { color: colors.text }]}>
+                {item.profiles.first_name} {item.profiles.last_name}
             </Text>
-          </View>
-        )}
-        keyExtractor={(comment) => comment.id.toString()}
-      />
-      <TextInput
-        style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-        placeholder="Add a comment..."
-        placeholderTextColor={colors.text}
-        value={newComment}
-        onChangeText={setNewComment}
-      />
-      <TouchableOpacity
-        style={[styles.commentButton, { backgroundColor: colors.primary }]}
-        onPress={() => handleAddComment(item.id)}
-      >
-        <Text style={styles.commentButtonText}>Comment</Text>
-      </TouchableOpacity>
+</Pressable>
+            {item.profiles.selected_title && (
+                <Text style={[styles.selectedTitle, { color: colors.primary }]}>
+                    {item.profiles.selected_title}
+                </Text>
+            )}
+            <Text style={[styles.postTime, { color: colors.textSecondary }]}>
+                {formatTimeAgo(item.created_at)}
+            </Text>
+        </View>
     </View>
+    <Text style={[styles.postContent, { color: colors.text }]}>
+        {item.content}
+    </Text>
+    {item.type === 'hub' && (
+        <Text style={[styles.hubName, { color: colors.primary }]}>
+            Hub: {item.hubs?.name || 'Unknown Hub'}
+        </Text>
+    )}
+    {item.type === 'stop' && (
+        <Text style={[styles.routeName, { color: colors.primary }]}>
+            Related Route: {item.stops?.routes?.name || 'Unknown Route'}
+        </Text>
+    )}
+    {/* Reaction Counter */}
+    {item.reaction_count > 0 && (
+        <View style={styles.reactionCounter}>
+            <Text style={[styles.reactionCounterText, { color: colors.text }]}>
+                {item.reaction_count} {reactionEmojis[item.selected_reaction] || '👍'}
+            </Text>
+        </View>
+    )}
+
+</TouchableOpacity>
   );
 
   if (loading) {
@@ -219,19 +246,6 @@ export default function FavoriteDetailsScreen() {
         {favorite?.type === 'hub' && (
           <View style={[styles.section, { backgroundColor: colors.card }]}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Posts</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-              placeholder="What's on your mind?"
-              placeholderTextColor={colors.text}
-              value={newPostContent}
-              onChangeText={setNewPostContent}
-            />
-            <TouchableOpacity
-              style={[styles.postButton, { backgroundColor: colors.primary }]}
-              onPress={handleAddPost}
-            >
-              <Text style={styles.postButtonText}>Post</Text>
-            </TouchableOpacity>
             <FlatList
               data={hubPosts}
               renderItem={renderPost}

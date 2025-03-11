@@ -118,20 +118,25 @@ export default function Feed() {
 
   useEffect(() => {
     const fetchUserProfile = async () => {
-      const { data: session } = await supabase.auth.getSession();
-      if (session?.user) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('avatar_url')
-          .eq('id', session.user.id)
-          .single();
+      const { data: session, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.session) {
+        throw new Error('No user session found. Please log in.');
+      }
 
-        if (error) {
-          console.error('Error fetching user profile:', error);
+      const userId = session.session.user.id;
+      
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+          
+
+        if (Error()) {
+          console.error('Error fetching user profile:', Error);
         } else {
           setProfiles(data); // Store the user profile data
         }
-      }
     };
 
     fetchUserProfile();
@@ -143,19 +148,22 @@ export default function Feed() {
 
   const fetchFavoriteHubs = async () => {
     const { data: session, error: sessionError } = await supabase.auth.getSession();
-
+    if (sessionError || !session?.session) {
+      throw new Error('No user session found. Please log in.');
+    }
     if (sessionError) {
       console.error('Error fetching session:', sessionError.message);
       Alert.alert('Error', 'Could not retrieve session. Please log in again.');
       return;
     }
+    const userId = session.session.user.id;
 
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('favorites') // Assuming 'favorites' contains the hub IDs
         .eq('id', userId)
-        .single();
+        .maybeSingle()
 
       if (error) throw error;
 
@@ -214,7 +222,10 @@ export default function Feed() {
         }
 
         // Filter out deleted posts
-        const filteredPosts = postsData.filter(post => new Date(post.created_at) >= oneDayAgo);
+        const filteredPosts = postsData.filter(post => 
+          new Date(post.created_at) >= oneDayAgo && 
+          favoriteHubs.includes(post.hubs?.name)
+        );
         setHubPosts(filteredPosts);
       } catch (error) {
         console.error('Error fetching hub posts:', error);
@@ -269,7 +280,11 @@ export default function Feed() {
         }
 
         // Filter out deleted posts
-        const filteredPosts = postsData.filter(post => new Date(post.created_at) >= oneDayAgo);
+        const filteredPosts = postsData.filter(post => 
+          new Date(post.created_at) >= oneDayAgo && 
+          favoriteHubs.includes(post.stops?.name)
+        );
+  
         setStopPosts(filteredPosts);
       } catch (error) {
         console.error('Error fetching stop posts:', error);
@@ -336,6 +351,12 @@ export default function Feed() {
 
     fetchPostDetails();
   }, [selectedPost]);
+
+  useEffect(() => {
+    if (favoriteHubs.length > 0) {
+      fetchPosts();
+    }
+  }, [favoriteHubs]);
 
   // Create comment
   const handleCreateComment = async () => {
