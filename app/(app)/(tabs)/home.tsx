@@ -253,13 +253,23 @@ export default function HomeScreen() {
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Personalized Greeting */}
       <View style={styles.header}>
+      <View>
+      {/* First Row: Greeting and Plus Button */}
+      <View style={styles.firstRow}>
         <Text style={[styles.title, { color: colors.text }]}>
           Hi, {isProfileLoading ? 'Loading...' : userProfile?.first_name || 'User'}!
         </Text>
-        {/* Navigate to Favorites when the plus button is pressed */}
         <Pressable onPress={() => router.push('/favorites')} style={styles.addButton}>
           <MaterialIcons name="add" size={24} color={colors.text} />
         </Pressable>
+      </View>
+      {/* Second Row: Selected Title */}
+      {!isProfileLoading && userProfile?.selected_title && (
+        <Text style={[styles.selectedTitle, { color: colors.text }]}>
+          {userProfile.selected_title}
+        </Text>
+      )}
+    </View>
       </View>
 
       {/* Nearest Locations */}
@@ -385,14 +395,21 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   header: {
+    marginBottom: 20,
+  },
+  firstRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  selectedTitle: {
+    fontSize: 16,
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   addButton: {
     padding: 8,

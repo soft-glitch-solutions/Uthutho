@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { router } from 'expo-router';
@@ -10,8 +10,11 @@ export default function EditProfileScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState(null); // State for avatar URL
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [points, setPoints] = useState(0);
+  const [uploading, setUploading] = useState(false); // State for avatar upload loading
 
+  // Fetch profile data on component mount
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -22,7 +25,6 @@ export default function EditProfileScreen() {
 
         const userId = session.session.user.id;
 
-        // Fetch profile data
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -36,7 +38,8 @@ export default function EditProfileScreen() {
         setFirstName(profileData.first_name);
         setLastName(profileData.last_name);
         setEmail(profileData.email);
-        setAvatarUrl(profileData.avatar_url); // Set the avatar URL
+        setAvatarUrl(profileData.avatar_url);
+        setPoints(profileData.points || 0);
       } catch (error) {
         console.error('Error fetching profile:', error.message);
       }
@@ -45,6 +48,7 @@ export default function EditProfileScreen() {
     fetchProfile();
   }, []);
 
+  // Handle saving profile changes
   const handleSave = async () => {
     try {
       const { data: session, error: sessionError } = await supabase.auth.getSession();
@@ -59,7 +63,7 @@ export default function EditProfileScreen() {
         first_name: firstName,
         last_name: lastName,
         email: email,
-        avatar_url: avatarUrl, // Include the avatar URL
+        avatar_url: avatarUrl,
         updated_at: new Date().toISOString(),
       };
 
@@ -70,96 +74,136 @@ export default function EditProfileScreen() {
       if (error) throw error;
 
       alert('Profile updated successfully!');
-      router.back(); // Go back to the previous screen
+      router.back();
     } catch (error) {
       console.error('Error updating profile:', error.message);
     }
   };
 
+  // Handle image picker for avatar upload
   const handleImagePicker = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
+    try {
+      setUploading(true); // Start loading
 
-    if (!result.canceled) {
-      const selectedImage = result.assets[0].uri;
-      setAvatarUrl(selectedImage); // Set the selected image URI
-      await uploadImage(selectedImage); // Upload the image to Supabase
+      // Request media library permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Sorry, we need camera roll permissions to make this work!');
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+
+      if (!result.canceled) {
+        const selectedImage = result.assets[0].uri;
+        await uploadImage(selectedImage); // Upload the selected image
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      alert('Failed to pick an image. Please try again.');
+    } finally {
+      setUploading(false); // Stop loading
     }
   };
 
-  const uploadImage = async (uri) => {
+  // Upload image to Supabase storage
+  const uploadImage = async (uri: string) => {
     try {
       const fileExt = uri.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
 
+      // Fetch the image file
       const response = await fetch(uri);
       const blob = await response.blob();
 
+      // Upload the image to Supabase storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, blob);
+        .upload(filePath, blob, {
+          cacheControl: '3600',
+          upsert: true,
+        });
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
+      // Get the public URL of the uploaded image
+      const { data: { publicUrl } } = await supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
-      setAvatarUrl(publicUrl); // Update the avatar URL with the public URL
+      setAvatarUrl(publicUrl); // Update the avatar URL in state
     } catch (error) {
       console.error('Error uploading image:', error.message);
+      alert('Failed to upload image. Please try again.');
     }
   };
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.formContainer}>
-        <TouchableOpacity onPress={handleImagePicker}>
-          {avatarUrl ? (
+        {/* Avatar Upload Section */}
+        <TouchableOpacity onPress={handleImagePicker} style={styles.avatarContainer} disabled={uploading}>
+          {uploading ? (
+            <View style={[styles.avatar, { justifyContent: 'center', alignItems: 'center' }]}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : avatarUrl ? (
             <Image source={{ uri: avatarUrl }} style={styles.avatar} />
           ) : (
-            <View style={styles.avatarPlaceholder}>
+            <View style={[styles.avatarPlaceholder, { backgroundColor: colors.card }]}>
               <Text style={{ color: colors.text }}>Select Profile Picture</Text>
             </View>
           )}
         </TouchableOpacity>
 
+        {/* Points Display */}
+        <View style={styles.pointsContainer}>
+          <Text style={[styles.pointsText, { color: colors.text }]}>Points: {points}</Text>
+        </View>
+
+        {/* First Name Input */}
         <Text style={[styles.label, { color: colors.text }]}>First Name</Text>
         <TextInput
           style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
           value={firstName}
           onChangeText={setFirstName}
           placeholder="Enter your first name"
-          placeholderTextColor={colors.text}
+          placeholderTextColor={colors.textSecondary}
         />
 
+        {/* Last Name Input */}
         <Text style={[styles.label, { color: colors.text }]}>Last Name</Text>
         <TextInput
           style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
           value={lastName}
           onChangeText={setLastName}
           placeholder="Enter your last name"
-          placeholderTextColor={colors.text}
+          placeholderTextColor={colors.textSecondary}
         />
 
+        {/* Email Input */}
         <Text style={[styles.label, { color: colors.text }]}>Email</Text>
         <TextInput
           style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
           value={email}
           onChangeText={setEmail}
           placeholder="Enter your email"
-          placeholderTextColor={colors.text}
+          placeholderTextColor={colors.textSecondary}
           keyboardType="email-address"
         />
 
+        {/* Save Button */}
         <TouchableOpacity
           style={[styles.saveButton, { backgroundColor: colors.primary }]}
           onPress={handleSave}
+          disabled={uploading}
         >
           <Text style={styles.saveButtonText}>Save Changes</Text>
         </TouchableOpacity>
@@ -175,6 +219,30 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     gap: 16,
+  },
+  avatarContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  avatarPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pointsContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  pointsText: {
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   label: {
     fontSize: 16,
@@ -196,20 +264,5 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 16,
-  },
-  avatarPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#ccc',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
   },
 });
