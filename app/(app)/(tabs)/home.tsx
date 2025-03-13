@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, Animated, FlatList, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, Animated, FlatList, RefreshControl, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext';
 import StopBlock from '../../../components/stop/StopBlock'; // Import the StopBlock component
 import LoginStreakTracker from '@/components/LoginStreakTracker';
+import { useNavigation } from 'expo-router'; 
 
 const Shimmer = ({ children, colors }) => {
   const animatedValue = new Animated.Value(0);
@@ -98,6 +99,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null); // State to store the user ID
+  const navigation = useNavigation(); 
 
 
   // Fetch the user's profile
@@ -215,6 +217,9 @@ export default function HomeScreen() {
     return R * c; // Distance in km
   };
 
+  const openSidebar = () => {
+    navigation.toggleDrawer(); // Toggle the sidebar
+  };
   // Navigate to favorite details
   const handleFavoritePress = (favorite) => {
     router.push(`/favorite-details?favoriteId=${favorite}`);
@@ -251,6 +256,22 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+
+    <View style={styles.topHeader}>
+    {/* Left Side: Logo and UTHUTHO Text */}
+    <Pressable onPress={openSidebar} style={styles.logoContainer}>
+    <Image
+      source={require('../../../assets/uthutho-logo.png')} // Replace with your logo path
+      style={styles.logo}
+    />
+    <Text style={styles.uthuthoText}>UTHUTHO</Text>
+  </Pressable>
+    {/* Right Side: User Points */}
+    <View style={styles.pointsContainer}>
+      <Text style={styles.pointsText}>TP - {userProfile?.points || 0}</Text>
+    </View>
+  </View>
+
       {/* Personalized Greeting */}
       <View style={styles.header}>
       <View>
@@ -393,6 +414,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
+  },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logo: {
+    width: 40,
+    height: 40,
+    marginRight: 8,
+  },
+  uthuthoText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    textTransform: 'uppercase',
+  },
+  pointsContainer: {
+    alignItems: 'flex-end',
+  },
+  pointsText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: 'white',
   },
   header: {
     marginBottom: 20,
