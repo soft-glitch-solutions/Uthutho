@@ -215,6 +215,9 @@ export default function ProfileScreen() {
                 if (item.title === 'Settings') {
                   router.push('/settings'); // Navigate to the EditProfileScreen
                 }
+                if (item.title === 'Request') {
+                  router.push('/request'); // Navigate to the EditProfileScreen
+                }
                 if (item.title === 'Edit Profile') {
                   router.push('/EditProfileScreen'); // Navigate to the EditProfileScreen
                 }

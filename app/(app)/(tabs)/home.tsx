@@ -277,9 +277,11 @@ export default function HomeScreen() {
       <View>
       {/* First Row: Greeting and Plus Button */}
       <View style={styles.firstRow}>
+      <Pressable onPress={() => router.push('/profile')}>
         <Text style={[styles.title, { color: colors.text }]}>
           Hi, {isProfileLoading ? 'Loading...' : userProfile?.first_name || 'User'}!
         </Text>
+        </Pressable>
         <Pressable onPress={() => router.push('/favorites')} style={styles.addButton}>
           <MaterialIcons name="add" size={24} color={colors.text} />
         </Pressable>

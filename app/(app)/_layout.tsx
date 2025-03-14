@@ -108,6 +108,13 @@ options={{
 }}
 />
 <Drawer.Screen
+name="request"
+options={{
+  drawerItemStyle: { height: 0 },
+  title: 'Request'
+}}
+/>
+<Drawer.Screen
 name="route-details"
 options={{
   drawerItemStyle: { height: 0 },
