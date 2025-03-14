@@ -264,11 +264,11 @@ export default function HomeScreen() {
       source={require('../../../assets/uthutho-logo.png')} // Replace with your logo path
       style={styles.logo}
     />
-    <Text style={styles.uthuthoText}>Uthutho</Text>
+    <Text style={[styles.uthuthoText, {  color: colors.text }]}>Uthutho</Text>
   </Pressable>
     {/* Right Side: User Points */}
     <View style={styles.pointsContainer}>
-      <Text style={styles.pointsText}>TP - {userProfile?.points || 0}</Text>
+      <Text style={[styles.pointsText, {  color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
     </View>
   </View>
 
@@ -286,7 +286,7 @@ export default function HomeScreen() {
       </View>
       {/* Second Row: Selected Title */}
       {!isProfileLoading && userProfile?.selected_title && (
-        <Text style={[styles.selectedTitle, { color: colors.text }]}>
+        <Text style={[styles.selectedTitle, { color: colors.primary }]}>
           {userProfile.selected_title}
         </Text>
       )}

@@ -3,6 +3,8 @@ import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
+import DropDownPicker from 'react-native-dropdown-picker';
+
 
 export default function AddRoute() {
   const { colors } = useTheme();
@@ -18,8 +20,48 @@ export default function AddRoute() {
     { label: 'Train', value: 'train' },
     { label: 'Taxi', value: 'taxi' },
   ]);
+  const [startOpen, setStartOpen] = useState(false); // State for start dropdown
+  const [endOpen, setEndOpen] = useState(false); // State for end dropdown
+  const [hubs, setHubs] = useState([]); // State to store hubs
+
+
+  useEffect(() => {
+    const fetchHubs = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('hubs')
+          .select('id, name'); // Fetch hub ID and name
+
+        if (error) throw error;
+
+        // Format hubs for dropdown
+        const formattedHubs = data.map((hub) => ({
+          label: hub.name,
+          value: hub.id,
+        }));
+        setHubs(formattedHubs);
+      } catch (error) {
+        console.error('Error fetching hubs:', error);
+        Alert.alert('Error', 'Failed to fetch hubs');
+      }
+    };
+
+    fetchHubs();
+  }, []);
+
 
   const handleSubmit = async () => {
+
+    if (!startPoint || !endPoint) {
+      Alert.alert('Error', 'Please select both start and end points');
+      return;
+    }
+
+    if (startPoint === endPoint) {
+      Alert.alert('Error', 'Start and end points cannot be the same');
+      return;
+    }
+
     try {
       const { data: session } = await supabase.auth.getSession();
       if (!session?.user) return;
@@ -46,17 +88,33 @@ export default function AddRoute() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Text style={[styles.label, { color: colors.text }]}>Start Point</Text>
-      <TextInput
-        style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+      <DropDownPicker
+        open={startOpen}
         value={startPoint}
-        onChangeText={setStartPoint}
+        items={hubs}
+        setOpen={setStartOpen}
+        setValue={setStartPoint}
+        placeholder="Select start point"
+        searchable={true}
+        searchPlaceholder="Search for a hub..."
+        style={[styles.dropdown, { borderColor: colors.border }]}
+        dropDownContainerStyle={{ borderColor: colors.border }}
+        textStyle={{ color: colors.text }}
       />
 
       <Text style={[styles.label, { color: colors.text }]}>End Point</Text>
-      <TextInput
-        style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+      <DropDownPicker
+        open={endOpen}
         value={endPoint}
-        onChangeText={setEndPoint}
+        items={hubs}
+        setOpen={setEndOpen}
+        setValue={setEndPoint}
+        placeholder="Select end point"
+        searchable={true}
+        searchPlaceholder="Search for a hub..."
+        style={[styles.dropdown, { borderColor: colors.border }]}
+        dropDownContainerStyle={{ borderColor: colors.border }}
+        textStyle={{ color: colors.text }}
       />
 
       <Text style={[styles.label, { color: colors.text }]}>Select Transport</Text>
@@ -91,9 +149,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   dropdown: {
-    height: 40,
-    borderColor: 'gray',
     borderWidth: 1,
-    borderRadius: 5,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 16,
   },
 }); 
