@@ -117,7 +117,7 @@ export default function HomeScreen() {
         setUserId(userId); // Set the user ID  
         const { data, error } = await supabase
           .from('profiles')
-          .select('first_name, selected_title, favorites')
+          .select('first_name, selected_title, favorites, points')
           .eq('id', (await supabase.auth.getSession()).data.session?.user.id)
           .single();
 
