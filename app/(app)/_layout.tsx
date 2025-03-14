@@ -73,6 +73,20 @@ export default function AppLayout() {
       }}
     />
     <Drawer.Screen
+    name="favorities"
+    options={{
+      drawerItemStyle: { height: 0 },
+      title: 'favorities'
+    }}
+  />
+  <Drawer.Screen
+  name="AddRoutes"
+  options={{
+    drawerItemStyle: { height: 0 },
+    title: 'AddRoutes'
+  }}
+/>
+    <Drawer.Screen
     name="AddHub"
     options={{
       drawerItemStyle: { height: 0 },

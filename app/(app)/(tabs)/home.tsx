@@ -264,7 +264,7 @@ export default function HomeScreen() {
       source={require('../../../assets/uthutho-logo.png')} // Replace with your logo path
       style={styles.logo}
     />
-    <Text style={styles.uthuthoText}>UTHUTHO</Text>
+    <Text style={styles.uthuthoText}>Uthutho</Text>
   </Pressable>
     {/* Right Side: User Points */}
     <View style={styles.pointsContainer}>
