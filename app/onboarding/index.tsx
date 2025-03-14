@@ -61,8 +61,11 @@ export default function Onboarding() {
           />
           <Text style={[styles.appName, { color: colors.text }]}>Uthutho</Text>
           <Text style={[styles.tagline, { color: colors.text }]}>
-            For commuters, by commuters
+              yazi indlela yakho!
           </Text>
+          <Text style={[styles.tagline, { color: colors.text }]}>
+             Know your route!
+         </Text>
         </View>
 
         {/* Onboarding Card */}
