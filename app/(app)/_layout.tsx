@@ -122,14 +122,14 @@ options={{
 }}
 />
       <Drawer.Screen
-        name="FavoritesScreen"
+        name="favorites"
         options={{
           drawerItemStyle: { height: 0 },
           title: 'Favourites'
         }}
       />
       <Drawer.Screen
-        name="PostDetails"
+        name="post-details"
         options={{
           drawerItemStyle: { height: 0 },
           title: 'Post Details'
@@ -149,6 +149,27 @@ options={{
           title: 'Favorite Details'
         }}
       />
+      <Drawer.Screen
+      name="hub-post-details"
+      options={{
+        drawerItemStyle: { height: 0 },
+        title: 'Favorite Details'
+      }}
+    />
+    <Drawer.Screen
+    name="stop-post-details"
+    options={{
+      drawerItemStyle: { height: 0 },
+      title: 'Favorite Details'
+    }}
+  />
+  <Drawer.Screen
+  name="social-profile"
+  options={{
+    drawerItemStyle: { height: 0 },
+    title: 'Favorite Details'
+  }}
+/>
     </Drawer>
   );
 }

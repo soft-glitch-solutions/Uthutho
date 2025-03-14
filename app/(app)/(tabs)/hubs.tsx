@@ -134,7 +134,7 @@ export default function HubsScreen() {
         <Text style={[styles.headerText, { color: colors.text }]}>Transport Hubs</Text>
         <TouchableOpacity
           onPress={() => router.push('/AddHub')}
-          style={styles.requestButton}
+          style={[styles.requestButton, { backgroundColor: colors.primary }]}
         >
           <PlusCircle size={20} color={colors.text} />
           <Text style={[styles.requestButtonText, { color: colors.text }]}>Request Hub</Text>
@@ -223,10 +223,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   requestButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 15,
+      paddingVertical: 10,
+      borderRadius: 20,
+    },
   requestButtonText: {
     fontSize: 14,
     fontWeight: '500',

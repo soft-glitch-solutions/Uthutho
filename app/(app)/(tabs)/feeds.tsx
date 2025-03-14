@@ -182,6 +182,7 @@ export default function Feed() {
               selected_title
             ),
             hubs (
+              id,
               name
             ),
             post_comments (id),
@@ -235,6 +236,8 @@ export default function Feed() {
               selected_title
             ),
             stops (
+              id,
+              name,
               routes (
                 name
               )
@@ -580,15 +583,25 @@ export default function Feed() {
       <Text style={[styles.postContent, { color: colors.text }]}>
         {item.content}
       </Text>
+
       {item.type === 'hub' && (
-        <Text style={[styles.hubName, { color: colors.primary }]}>
-          Hub: {item.hubs?.name || 'Unknown Hub'}
-        </Text>
+        <Pressable onPress={() => router.push(`/hub-details?hubId=${item.hubs?.id}`)}>
+          <Text style={[styles.hubName, { color: colors.primary }]}>
+            Hub: {item.hubs?.name || 'Unknown Hub'}
+          </Text>
+        </Pressable>
       )}
       {item.type === 'stop' && (
-        <Text style={[styles.routeName, { color: colors.primary }]}>
-          Related Route: {item.stops?.routes?.name || 'Unknown Route'}
-        </Text>
+        <View>
+          <Pressable onPress={() => router.push(`/stop-details?stopId=${item.stops?.id}`)}>
+            <Text style={[styles.stopName, { color: colors.primary }]}>
+              Stop: {item.stops?.name || 'Unknown Stop'}
+            </Text>
+          </Pressable>
+          <Text style={[styles.routeName, { color: colors.primary }]}>
+            Related Route: {item.stops?.routes?.name || 'Unknown Route'}
+          </Text>
+        </View>
       )}
       <TouchableOpacity onPress={() => handleReactionPress(item.id)} style={styles.reactionButton}>
         <MaterialCommunityIcons name="emoticon-happy-outline" size={24} color={colors.text} />
