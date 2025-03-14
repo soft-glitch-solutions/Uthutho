@@ -1,7 +1,7 @@
 import React from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { useTheme } from '../../context/ThemeContext';
-import { Route, House, Settings, CircleHelp as HelpCircle } from 'lucide-react-native';
+import { Route, House, Settings, CircleHelp as HelpCircle, User } from 'lucide-react-native';
 
 export default function AppLayout() {
   const { colors } = useTheme();
@@ -30,11 +30,11 @@ export default function AppLayout() {
         }}
       />
       <Drawer.Screen
-        name="routes"
+        name="profile"
         options={{
-          title: 'Route',
+          title: 'Profile',
           drawerIcon: ({ color, size }) => (
-            <Route color={color} size={size} />
+            <User color={color} size={size} />
           ),
         }}
       />

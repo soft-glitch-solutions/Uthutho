@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator } from 'react-native';
-import { useTheme } from '../../../context/ThemeContext';
-import { supabase } from '../../../lib/supabase';
+import { useTheme } from '../../context/ThemeContext';
+import { supabase } from '../../lib/supabase';
 import { router } from 'expo-router';
 import { Settings, LogOut, CreditCard, Bell, Captions, Edit } from 'lucide-react-native';
 import { Picker } from '@react-native-picker/picker';
