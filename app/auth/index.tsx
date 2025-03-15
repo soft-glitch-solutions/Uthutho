@@ -119,8 +119,9 @@ export default function Auth() {
             />
           </>
         )}
+        <View style={[styles.emailContainer, { backgroundColor: colors.card, borderRadius: 10 }]}>
         <TextInput
-          style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+          style={[styles.input, { flex: 1, color: colors.text }]}
           placeholder="Email"
           placeholderTextColor={colors.text}
           value={email}
@@ -128,23 +129,28 @@ export default function Auth() {
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        <View style={styles.passwordContainer}>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-            placeholder="Password"
-            placeholderTextColor={colors.text}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!passwordVisible} // Toggle visibility
-          />
-          <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
-            <Icon
-              name={passwordVisible ? 'eye-off' : 'eye'}
-              size={24}
-              color={colors.text}
-            />
-          </TouchableOpacity>
         </View>
+
+        <View style={[styles.passwordContainer, { backgroundColor: colors.card, borderRadius: 10 }]}>
+        <TextInput
+          style={[styles.input, { flex: 1, color: colors.text }]}
+          placeholder="Password"
+          placeholderTextColor={colors.text}
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!passwordVisible} // Toggle visibility
+        />
+        <TouchableOpacity
+          onPress={() => setPasswordVisible(!passwordVisible)}
+          style={{ padding: 10 }}
+        >
+          <Icon
+            name={passwordVisible ? 'eye-off' : 'eye'}
+            size={24}
+            color={colors.text}
+          />
+        </TouchableOpacity>
+      </View>
         <TouchableOpacity
           style={[styles.button, { backgroundColor: colors.primary }]}
           onPress={isLogin ? handleSignIn : handleSignUp}
@@ -205,12 +211,6 @@ const styles = StyleSheet.create({
   form: {
     gap: 15,
   },
-  input: {
-    padding: 15,
-    borderRadius: 10,
-    fontSize: 16,
-    width: '100%', // Ensure full width
-  },
   button: {
     padding: 15,
     borderRadius: 10,
@@ -237,9 +237,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.6,
   },
+  emailContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '100%', // Ensure full width
+    width: '100%',
+  },
+  input: {
+    padding: 15,
+    fontSize: 16,
   },
 });

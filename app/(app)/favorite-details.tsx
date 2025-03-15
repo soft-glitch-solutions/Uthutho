@@ -14,6 +14,7 @@ export default function FavoriteDetailsScreen() {
   const [favorite, setFavorite] = useState(null);
   const [loading, setLoading] = useState(true);
   const [hubPosts, setHubPosts] = useState([]);
+  const [routeDetails, setRouteDetails] = useState(null); // State for route details
   const [newComment, setNewComment] = useState('');
   const [newPostContent, setNewPostContent] = useState('');
 
@@ -23,6 +24,9 @@ export default function FavoriteDetailsScreen() {
 
   const fetchFavoriteDetails = async () => {
     try {
+
+      const encodedFavoriteId = encodeURIComponent(favoriteId);
+
       // First try to find in stops
       let { data: stopData } = await supabase
         .from('stops')
@@ -52,11 +56,18 @@ export default function FavoriteDetailsScreen() {
       let { data: routeData } = await supabase
         .from('routes')
         .select('*')
-        .eq('name', favoriteId)
+        .eq('name', encodedFavoriteId)
         .single();
 
       if (routeData) {
         setFavorite({ ...routeData, type: 'route' });
+        // Fetch additional route details if needed
+        const { data: routeDetails } = await supabase
+          .from('routes')
+          .select('*')
+          .eq('id', routeData.id)
+          .single();
+        setRouteDetails(routeDetails); // Set route details
       }
     } catch (error) {
       console.error('Error fetching favorite details:', error);
@@ -243,6 +254,25 @@ export default function FavoriteDetailsScreen() {
           </View>
         )}
 
+        {favorite?.type === 'route' && routeDetails && (
+          <View style={[styles.section, { backgroundColor: colors.card }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Route Information</Text>
+            <Text style={[styles.routeInfo, { color: colors.text }]}>
+              From: {routeDetails.start_point}
+            </Text>
+            <Text style={[styles.routeInfo, { color: colors.text }]}>
+              To: {routeDetails.end_point}
+            </Text>
+            <Text style={[styles.routeInfo, { color: colors.text }]}>
+              Cost: R{routeDetails.cost}
+            </Text>
+            <Text style={[styles.routeInfo, { color: colors.text }]}>
+              Transport Type: {routeDetails.transport_type}
+            </Text>
+          </View>
+        )}
+
+
         {favorite?.type === 'hub' && (
           <View style={[styles.section, { backgroundColor: colors.card }]}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Posts</Text>
@@ -315,6 +345,10 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     marginBottom: 20,
+  },
+  routeInfo: {
+    fontSize: 16,
+    marginBottom: 10,
   },
   sectionTitle: {
     fontSize: 18,
