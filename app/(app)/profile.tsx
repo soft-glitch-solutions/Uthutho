@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { router } from 'expo-router';
-import { Settings, LogOut, Camera, Bell, Captions, Edit } from 'lucide-react-native';
+import { Settings, LogOut, Camera, Captions, Edit } from 'lucide-react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
-
+import { useImageUpload } from '@/components/profile/useImageUpload';
+import { useProfile } from '@/components/profile/useProfile';
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
@@ -15,7 +16,8 @@ export default function ProfileScreen() {
   const [titles, setTitles] = useState([]);
   const [selectedTitle, setSelectedTitle] = useState('');
   const [selectedTab, setSelectedTab] = useState('basic-info');
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);  // Add this to track the image upload status
+  const { updateProfile } = useProfile();
 
   // Fetch profile and titles
   useEffect(() => {
@@ -66,64 +68,9 @@ export default function ProfileScreen() {
     fetchProfile();
   }, []);
 
-  const pickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
+  const { handleImagePicker, uploading } = useImageUpload(updateProfile, profile?.avatar_url);
 
-      if (!result.canceled && result.assets[0]) {
-        console.log('Selected image:', result.assets[0].uri);
-        await uploadImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
-    }
-  };
-
-  // Handle avatar upload
-  const handleAvatarUpload = async (file) => {
-    try {
-      setLoading(true);
-
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${profile.id}-${Date.now()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      const updates = {
-        ...profile,
-        avatar_url: publicUrl,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .upsert(updates);
-
-      if (updateError) throw updateError;
-
-      setProfile(updates);
-      alert('Avatar updated successfully!');
-    } catch (error) {
-      console.error('Error uploading avatar:', error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const profilePictureURL = profile?.avatar_url || '';
 
   // Handle sign out
   const handleSignOut = async () => {
@@ -158,7 +105,6 @@ export default function ProfileScreen() {
     }
   };
 
-  // Menu items
   const menuItems = [
     {
       icon: <Edit size={24} color={colors.text} />,
@@ -168,14 +114,13 @@ export default function ProfileScreen() {
     {
       icon: <Captions size={24} color={colors.text} />,
       title: 'Request',
-      subtitle: 'The request you submited',
+      subtitle: 'The request you submitted',
     },
     {
       icon: <Settings size={24} color={colors.text} />,
       title: 'Settings',
       subtitle: 'App settings and preferences',
     },
-
   ];
 
   if (loading) {
@@ -186,7 +131,6 @@ export default function ProfileScreen() {
     );
   }
 
-  // Filter titles based on points
   const unlockedTitles = titles.filter(title => title.points_required <= profile.points);
   const lockedTitles = titles.filter(title => title.points_required > profile.points);
 
@@ -194,15 +138,15 @@ export default function ProfileScreen() {
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card }]}>
-      <TouchableOpacity 
-          style={styles.avatarContainer} 
-          onPress={pickImage}
-          disabled={uploadingImage}
+        <TouchableOpacity
+          style={styles.avatarContainer}
+          onPress={handleImagePicker}
+          disabled={uploadingImage}  // Disable button while uploading
         >
           <Image
-            source={{ 
-              uri: profile?.avatar_url || 
-              'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop' 
+            source={{
+              uri: profilePictureURL ||
+                'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop',
             }}
             style={styles.avatar}
           />
@@ -272,37 +216,6 @@ export default function ProfileScreen() {
               </View>
             </TouchableOpacity>
           ))}
-        </View>
-      )}
-
-      {selectedTab === 'gamification' && (
-        <View style={styles.menuContainer}>
-          <Text style={[styles.title, { color: colors.text }]}>Your Rank : { profile.selected_title }</Text>
-          <Text style={[styles.title, { color: colors.text }]}>Select Your Title</Text>
-          <Picker
-            selectedValue={selectedTitle || ''}
-            onValueChange={handleTitleChange}
-            style={{ height: 50, width: '100%', color: colors.text }}
-          >
-            {unlockedTitles.map((title) => (
-              <Picker.Item key={title.id} label={title.title} value={title.title} />
-            ))}
-          </Picker>
-          <Text style={[styles.title, { color: colors.text }]}>Locked Titles</Text>
-          {lockedTitles.map((title) => (
-            <Text key={title.id} style={[styles.lockedTitle, { color: colors.text }]}>
-              {title.title} (Requires {title.points_required} points)
-            </Text>
-          ))}
-        </View>
-      )}
-
-      {selectedTab === 'achievements' && (
-        <View style={styles.achievementsContainer}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Achievements</Text>
-          <Text style={[styles.achievementText, { color: colors.text }]}>
-            Coming soon!
-          </Text>
         </View>
       )}
 
