@@ -3,8 +3,9 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIn
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { router } from 'expo-router';
-import { Settings, LogOut, CreditCard, Bell, Captions, Edit } from 'lucide-react-native';
+import { Settings, LogOut, Camera, Bell, Captions, Edit } from 'lucide-react-native';
 import { Picker } from '@react-native-picker/picker';
+import * as ImagePicker from 'expo-image-picker';
 
 
 export default function ProfileScreen() {
@@ -14,6 +15,7 @@ export default function ProfileScreen() {
   const [titles, setTitles] = useState([]);
   const [selectedTitle, setSelectedTitle] = useState('');
   const [selectedTab, setSelectedTab] = useState('basic-info');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Fetch profile and titles
   useEffect(() => {
@@ -63,6 +65,25 @@ export default function ProfileScreen() {
 
     fetchProfile();
   }, []);
+
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        console.log('Selected image:', result.assets[0].uri);
+        await uploadImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
 
   // Handle avatar upload
   const handleAvatarUpload = async (file) => {
@@ -173,10 +194,27 @@ export default function ProfileScreen() {
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card }]}>
-        <Image
-          source={{ uri: profile.avatar_url || 'https://static.vecteezy.com/system/resources/thumbnails/005/129/844/small_2x/profile-user-icon-isolated-on-white-background-eps10-free-vector.jpg' }}
-          style={styles.avatar}
-        />
+      <TouchableOpacity 
+          style={styles.avatarContainer} 
+          onPress={pickImage}
+          disabled={uploadingImage}
+        >
+          <Image
+            source={{ 
+              uri: profile?.avatar_url || 
+              'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop' 
+            }}
+            style={styles.avatar}
+          />
+          <View style={[styles.cameraButton, { backgroundColor: colors.primary }]}>
+            <Camera size={16} color="white" />
+          </View>
+          {uploadingImage && (
+            <View style={styles.uploadingOverlay}>
+              <ActivityIndicator color="white" />
+            </View>
+          )}
+        </TouchableOpacity>
         <Text style={[styles.name, { color: colors.text }]}>{profile.first_name} {profile.last_name}</Text>
         <Text style={[styles.title, { color: colors.text }]}>{profile.selected_title}</Text>
         <Text style={[styles.email, { color: colors.text }]}>{profile.email}</Text>
@@ -347,6 +385,23 @@ const styles = StyleSheet.create({
   menuSubtitle: {
     fontSize: 14,
     opacity: 0.8,
+  },
+  cameraButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uploadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   gamificationContainer: {
     padding: 20,
