@@ -283,7 +283,7 @@ export default function HomeScreen() {
         </Text>
         </Pressable>
         <Pressable onPress={() => router.push('/favorites')} style={styles.addButton}>
-          <MaterialIcons name="add" size={24} color={colors.text} />
+          <MaterialIcons name="search" size={24} color={colors.text} />
         </Pressable>
       </View>
       {/* Second Row: Selected Title */}

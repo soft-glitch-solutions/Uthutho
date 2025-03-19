@@ -59,7 +59,7 @@ export default function RequestScreen() {
         // Fetch price change requests
         const { data: priceChangeData, error: priceChangeError } = await supabase
           .from('price_change_requests')
-          .select('*')
+          .select('*, routes(name)') 
           .eq('user_id', userId);
 
         if (priceChangeError) throw priceChangeError;
@@ -103,9 +103,6 @@ export default function RequestScreen() {
               <Text style={[styles.cardTimestamp, { color: colors.text }]}>
                 Created: {formatTimestamp(request.created_at)}
               </Text>
-              <Text style={[styles.cardTimestamp, { color: colors.text }]}>
-                Updated: {formatTimestamp(request.updated_at)}
-              </Text>
             </View>
           ))}
         </View>
@@ -121,9 +118,6 @@ export default function RequestScreen() {
               <Text style={[styles.cardStatus, { color: colors.primary }]}>Status: {request.status}</Text>
               <Text style={[styles.cardTimestamp, { color: colors.text }]}>
                 Created: {formatTimestamp(request.created_at)}
-              </Text>
-              <Text style={[styles.cardTimestamp, { color: colors.text }]}>
-                Updated: {formatTimestamp(request.updated_at)}
               </Text>
             </View>
           ))}
@@ -143,9 +137,6 @@ export default function RequestScreen() {
               <Text style={[styles.cardTimestamp, { color: colors.text }]}>
                 Created: {formatTimestamp(request.created_at)}
               </Text>
-              <Text style={[styles.cardTimestamp, { color: colors.text }]}>
-                Updated: {formatTimestamp(request.updated_at)}
-              </Text>
             </View>
           ))}
         </View>
@@ -153,24 +144,31 @@ export default function RequestScreen() {
 
       {/* Price Change Requests */}
       {priceChangeRequests.length > 0 && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Price Change Requests</Text>
-          {priceChangeRequests.map((request) => (
-            <View key={request.id} style={[styles.card, { backgroundColor: colors.card }]}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>
-                Current Price: {request.current_price} → New Price: {request.new_price}
-              </Text>
-              <Text style={[styles.cardStatus, { color: colors.primary }]}>Status: {request.status}</Text>
-              <Text style={[styles.cardTimestamp, { color: colors.text }]}>
-                Created: {formatTimestamp(request.created_at)}
-              </Text>
-              <Text style={[styles.cardTimestamp, { color: colors.text }]}>
-                Updated: {formatTimestamp(request.updated_at)}
-              </Text>
-            </View>
-          ))}
-        </View>
-      )}
+  <View style={styles.section}>
+    <Text style={[styles.sectionTitle, { color: colors.text }]}>Price Change Requests</Text>
+    {priceChangeRequests.map((request) => (
+      <View key={request.id} style={[styles.card, { backgroundColor: colors.card }]}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>
+          Current Price: {request.current_price} → New Price: {request.new_price}
+        </Text>
+        <Text style={[styles.cardStatus, { color: colors.primary }]}>Status: {request.status}</Text>
+        <Pressable
+          onPress={() => router.push(`/route-details?routeId=${request.route_id}`)} // Navigate to route details
+        >
+          <Text style={[styles.routeLink, { color: colors.primary }]}>
+            Route: {request.routes?.name || 'Unknown Route'}
+          </Text>
+        </Pressable>
+        <Text style={[styles.cardTimestamp, { color: colors.text }]}>
+          Created: {formatTimestamp(request.created_at)}
+        </Text>
+        <Text style={[styles.cardTimestamp, { color: colors.text }]}>
+          Updated: {formatTimestamp(request.updated_at)}
+        </Text>
+      </View>
+    ))}
+  </View>
+)}
 
       {/* No Requests */}
       {hubRequests.length === 0 && stopRequests.length === 0 && routeRequests.length === 0 && priceChangeRequests.length === 0 && (
