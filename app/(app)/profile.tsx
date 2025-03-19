@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIn
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { router } from 'expo-router';
-import { Settings, LogOut, Camera, Captions, Edit } from 'lucide-react-native';
+import { Settings, LogOut, Camera, Captions, Edit , Badge } from 'lucide-react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useImageUpload } from '@/components/profile/useImageUpload';
@@ -105,7 +105,7 @@ export default function ProfileScreen() {
     }
   };
 
-  const menuItems = [
+  const basicMenuItems = [
     {
       icon: <Edit size={24} color={colors.text} />,
       title: 'Edit Profile',
@@ -122,6 +122,21 @@ export default function ProfileScreen() {
       subtitle: 'App settings and preferences',
     },
   ];
+
+  const rankMenuItems = [
+
+    {
+      icon: <Badge size={24} color={colors.text} />,
+      title: 'Change Title',
+      subtitle: 'Change your profile title',
+    },
+    {
+      icon: <Edit size={24} color={colors.text} />,
+      title: 'Title To Earn',
+      subtitle: 'Look at what title to earn',
+    },
+  ];
+
 
   if (loading) {
     return (
@@ -189,7 +204,7 @@ export default function ProfileScreen() {
       {/* Tab Content */}
       {selectedTab === 'basic-info' && (
         <View style={styles.menuContainer}>
-          {menuItems.map((item, index) => (
+          {basicMenuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
               style={[styles.menuItem, { backgroundColor: colors.card }]}
@@ -198,6 +213,40 @@ export default function ProfileScreen() {
                   router.push('/settings'); // Navigate to the EditProfileScreen
                 }
                 if (item.title === 'Request') {
+                  router.push('/request'); // Navigate to the EditProfileScreen
+                }
+                if (item.title === 'Edit Profile') {
+                  router.push('/EditProfileScreen'); // Navigate to the EditProfileScreen
+                }
+              }}
+            >
+              {item.icon}
+              <View style={styles.menuText}>
+                <Text style={[styles.menuTitle, { color: colors.text }]}>
+                  {item.title}
+                </Text>
+                <Text style={[styles.menuSubtitle, { color: colors.text }]}>
+                  {item.subtitle}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+
+            {/* Tab Content */}
+       {selectedTab === 'gamification' && (
+        <View style={styles.menuContainer}>
+          {rankMenuItems.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[styles.menuItem, { backgroundColor: colors.card }]}
+              onPress={() => {
+                if (item.title === 'Change Title') {
+                  router.push('/settings'); // Navigate to the EditProfileScreen
+                }
+                if (item.title === 'Title To Earn') {
                   router.push('/request'); // Navigate to the EditProfileScreen
                 }
                 if (item.title === 'Edit Profile') {
