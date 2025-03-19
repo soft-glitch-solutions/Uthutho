@@ -149,10 +149,8 @@ export default function FavoritesScreen() {
       let updatedFavorites;
       if (userFavorites.includes(item.id)) {
         updatedFavorites = userFavorites.filter((favorite) => favorite !== item.id);
-        alert('Removed from favorites!');
       } else {
         updatedFavorites = [...userFavorites, item.id];
-        alert('Added to favorites!');
       }
 
       await supabase
@@ -181,21 +179,18 @@ export default function FavoritesScreen() {
     const isFavorited = userFavorites.includes(item.id);
 
     // Get image URL (assuming images are stored in Supabase Storage)
-    const imageUrl = item.image_url
-      ? supabase.storage.from('your-bucket-name').getPublicUrl(item.image_url).data.publicUrl
-      : null;
 
     return (
       <Pressable onPress={() => handleItemPress(item)}>
         <View style={[styles.card, { backgroundColor: colors.card, width: cardWidth }]}>
           {/* Display image if available */}
-          {imageUrl && (
-            <Image
-              source={{ uri: imageUrl }}
-              style={styles.image}
-              resizeMode="cover"
-            />
-          )}
+          {item.image && ( // Check if item.image exists
+          <Image
+            source={{ uri: item.image }} // Use item.image as the source
+            style={styles.image}
+            resizeMode="cover"
+          />
+        )}
           <Text style={[styles.cardTitle, { color: colors.text }]}>{item.name}</Text>
           <Text style={[styles.cardType, { color: colors.primary }]}>
             {item.type.toUpperCase()}
@@ -256,11 +251,11 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16, // Increased gap for better spacing
     justifyContent: 'space-between',
   },
   columnWrapper: {
     justifyContent: 'space-between', // Add spacing between columns
+    marginBottom: 16, // Add vertical spacing between rows
   },
   card: {
     borderRadius: 8,
@@ -270,7 +265,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    marginBottom: 16,
+    marginBottom: 10,
+    marginLeft: 5,
   },
   cardTitle: {
     fontSize: 16,
