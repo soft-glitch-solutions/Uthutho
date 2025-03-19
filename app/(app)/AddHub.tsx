@@ -25,9 +25,12 @@ export default function AddHub() {
 
   const handleSubmit = async () => {
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.user) return;
+        const { data: session, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session?.session) {
+          throw new Error('No user session found. Please log in.');
+        }
 
+        const userId = session.session.user.id;
       const coordinates = extractCoordinates(googleMapsUrl);
       if (!coordinates) {
         Alert.alert('Error', 'Invalid Google Maps URL');
@@ -37,7 +40,7 @@ export default function AddHub() {
       const { error } = await supabase
         .from('hub_requests')
         .insert({
-          user_id: session.user.id,
+          user_id: userId,
           name,
           address,
           latitude: coordinates.latitude,

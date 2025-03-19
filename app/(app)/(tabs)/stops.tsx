@@ -144,10 +144,8 @@ export default function StopsScreen() {
       let updatedFavorites;
       if (profile.favorites.includes(stopName)) {
         updatedFavorites = profile.favorites.filter((favorite) => favorite !== stopName);
-        alert('Stop removed from favorites!');
       } else {
         updatedFavorites = [...profile.favorites, stopName];
-        alert('Stop added to favorites!');
       }
 
       const { error: updateError } = await supabase

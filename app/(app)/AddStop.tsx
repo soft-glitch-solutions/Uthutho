@@ -9,94 +9,150 @@ export default function AddStop() {
   const { colors } = useTheme();
   const router = useRouter();
   const [name, setName] = useState('');
-  const [address, setAddress] = useState('');
   const [googleMapsUrl, setGoogleMapsUrl] = useState('');
-  const [transportType, setTransportType] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [cost, setCost] = useState('');
   const [description, setDescription] = useState('');
+  const [routeId, setRouteId] = useState('');
+  const [routes, setRoutes] = useState([]); // To store available routes
 
+  // Fetch available routes when the component mounts
+  React.useEffect(() => {
+    const fetchRoutes = async () => {
+      try {
+        const { data: routesData, error } = await supabase
+          .from('routes')
+          .select('id, name');
+
+        if (error) throw error;
+        setRoutes(routesData || []);
+      } catch (error) {
+        console.error('Error fetching routes:', error);
+        Alert.alert('Error', 'Failed to fetch routes');
+      }
+    };
+
+    fetchRoutes();
+  }, []);
+
+  // Function to extract latitude and longitude from Google Maps URL
   const extractCoordinates = (url) => {
     const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
     const match = url.match(regex);
     if (match) {
-      return { latitude: parseFloat(match[1]), longitude: parseFloat(match[2]) };
+      setLatitude(match[1]);
+      setLongitude(match[2]);
+    } else {
+      Alert.alert('Error', 'Invalid Google Maps URL');
     }
-    return null;
   };
 
   const handleSubmit = async () => {
     try {
       const { data: session } = await supabase.auth.getSession();
-      if (!session?.user) return;
+      if (!session?.user) {
+        Alert.alert('Error', 'You must be logged in to submit a stop request.');
+        return;
+      }
 
-      const coordinates = extractCoordinates(googleMapsUrl);
-      if (!coordinates) {
-        Alert.alert('Error', 'Invalid Google Maps URL');
+      if (!routeId) {
+        Alert.alert('Error', 'Please select a route.');
+        return;
+      }
+
+      if (!latitude || !longitude) {
+        Alert.alert('Error', 'Please provide a valid Google Maps URL.');
         return;
       }
 
       const { error } = await supabase
-        .from('hub_requests')
+        .from('stop_requests')
         .insert({
           user_id: session.user.id,
+          route_id: routeId,
           name,
-          address,
-          latitude: coordinates.latitude,
-          longitude: coordinates.longitude,
-          transport_type: transportType,
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude),
+          cost: cost ? parseFloat(cost) : null,
           description,
         });
 
       if (error) throw error;
-      Alert.alert('Success', 'Hub request submitted!');
+      Alert.alert('Success', 'Stop request submitted!');
       router.back();
     } catch (error) {
-      console.error('Error submitting hub request:', error);
-      Alert.alert('Error', 'Failed to submit hub request');
+      console.error('Error submitting stop request:', error);
+      Alert.alert('Error', 'Failed to submit stop request');
     }
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.label, { color: colors.text }]}>Hub Name</Text>
+      <Text style={[styles.label, { color: colors.text }]}>Stop Name</Text>
       <TextInput
         style={[styles.input, { borderColor: colors.border, color: colors.text }]}
         value={name}
         onChangeText={setName}
-      />
-
-      <Text style={[styles.label, { color: colors.text }]}>Address</Text>
-      <TextInput
-        style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-        value={address}
-        onChangeText={setAddress}
+        placeholder="Enter stop name"
       />
 
       <Text style={[styles.label, { color: colors.text }]}>Google Maps URL</Text>
       <TextInput
         style={[styles.input, { borderColor: colors.border, color: colors.text }]}
         value={googleMapsUrl}
-        onChangeText={setGoogleMapsUrl}
+        onChangeText={(text) => {
+          setGoogleMapsUrl(text);
+          extractCoordinates(text); // Extract coordinates when the URL changes
+        }}
+        placeholder="Enter Google Maps URL"
       />
 
-      <Text style={[styles.label, { color: colors.text }]}>Transport Type</Text>
-      <Picker
-        selectedValue={transportType || ''}
-        onValueChange={(itemValue) => setTransportType(itemValue)}
-        style={[styles.dropdown, { color: colors.text }]}
-      >
-        <Picker.Item label="Select Transport Type" value="" />
-        <Picker.Item label="Train" value="train" />
-        <Picker.Item label="Bus" value="bus" />
-        <Picker.Item label="Taxi" value="taxi" />
-      </Picker>
+      <Text style={[styles.label, { color: colors.text }]}>Latitude</Text>
+      <TextInput
+        style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+        value={latitude}
+        editable={false} // Disable manual editing
+        placeholder="Latitude (auto-filled)"
+      />
 
-      <Text style={[styles.label, { color: colors.text }]}>Description</Text>
+      <Text style={[styles.label, { color: colors.text }]}>Longitude</Text>
+      <TextInput
+        style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+        value={longitude}
+        editable={false} // Disable manual editing
+        placeholder="Longitude (auto-filled)"
+      />
+
+      <Text style={[styles.label, { color: colors.text }]}>Cost (Optional)</Text>
+      <TextInput
+        style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+        value={cost}
+        onChangeText={setCost}
+        placeholder="Enter cost"
+        keyboardType="numeric"
+      />
+
+      <Text style={[styles.label, { color: colors.text }]}>Description (Optional)</Text>
       <TextInput
         style={[styles.input, { borderColor: colors.border, color: colors.text }]}
         value={description}
         onChangeText={setDescription}
+        placeholder="Enter description"
         multiline
       />
+
+      <Text style={[styles.label, { color: colors.text }]}>Select Route</Text>
+      <Picker
+        selectedValue={routeId}
+        onValueChange={(itemValue) => setRouteId(itemValue)}
+        style={[styles.dropdown, { color: colors.text }]}
+      >
+        <Picker.Item label="Select a route" value="" />
+        {routes.map((route) => (
+          <Picker.Item key={route.id} label={route.name} value={route.id} />
+        ))}
+      </Picker>
 
       <Button title="Submit" onPress={handleSubmit} color={colors.primary} />
     </View>
@@ -123,7 +179,4 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
   },
-  dropdownStyle: {
-    borderRadius: 8,
-  },
-}); 
+});

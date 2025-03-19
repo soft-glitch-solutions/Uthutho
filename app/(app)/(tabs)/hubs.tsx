@@ -90,10 +90,8 @@ export default function HubsScreen() {
       let updatedFavorites;
       if (profile.favorites.includes(hubName)) {
         updatedFavorites = profile.favorites.filter((favorite) => favorite !== hubName);
-        alert('Hub removed from favorites!');
       } else {
         updatedFavorites = [...profile.favorites, hubName];
-        alert('Hub added to favorites!');
       }
 
       const { error: updateError } = await supabase

@@ -386,7 +386,7 @@ function RouteInfo({ hubId, hub, colors }) {
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}      contentContainerStyle={styles.scrollContent}>
       <View style={styles.content}>
 
       <View style={styles.sectionHeader}>
@@ -436,6 +436,9 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: 200,
+  },
+  scrollContent: {
+    flexGrow: 1, // Ensure the content can scroll
   },
   content: {
     padding: 20,

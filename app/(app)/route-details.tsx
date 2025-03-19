@@ -213,11 +213,6 @@ export default function RouteDetailsScreen() {
         {/* Route Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>{route.name}</Text>
-          <Pressable
-            style={[styles.backButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.back()}>
-            <Text style={styles.buttonText}>Back to Routes</Text>
-          </Pressable>
         </View>
 
         {/* Route Details */}
@@ -232,15 +227,26 @@ export default function RouteDetailsScreen() {
             {route.transport_type}
           </Text>
 
-          <Text style={[styles.detailLabel, { color: colors.text }]}>Start Point</Text>
-          <Text style={[styles.detailValue, { color: colors.text }]}>
-            {route.start_point}
-          </Text>
+          {/* Start and End Points in Two Columns */}
+          <View style={styles.pointsContainer}>
+            <Pressable
+              style={styles.pointColumn}
+              onPress={() => router.push(`/hub-details?hubId=${route.start_hub_id}`)}>
+              <Text style={[styles.detailLabel, { color: colors.text }]}>Start Point</Text>
+              <Text style={[styles.detailValue, { color: colors.text }]}>
+                {route.start_point}
+              </Text>
+            </Pressable>
 
-          <Text style={[styles.detailLabel, { color: colors.text }]}>End Point</Text>
-          <Text style={[styles.detailValue, { color: colors.text }]}>
-            {route.end_point}
-          </Text>
+            <Pressable
+              style={styles.pointColumn}
+              onPress={() => router.push(`/hub-details?hubId=${route.end_hub_id}`)}>
+              <Text style={[styles.detailLabel, { color: colors.text }]}>End Point</Text>
+              <Text style={[styles.detailValue, { color: colors.text }]}>
+                {route.end_point}
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Price Change Button */}
@@ -363,14 +369,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
   },
-  backButton: {
-    padding: 8,
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
   detailsContainer: {
     marginBottom: 16,
   },
@@ -382,6 +380,15 @@ const styles = StyleSheet.create({
   detailValue: {
     fontSize: 14,
     marginBottom: 12,
+  },
+  pointsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  pointColumn: {
+    flex: 1,
+    marginRight: 8,
   },
   priceChangeButton: {
     padding: 12,
