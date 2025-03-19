@@ -14,7 +14,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { MapPin, Bus, Clock, Plus, Heart } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
-const [hub, setHub] = useState(null);
 
 // Shimmer component for loading state
 const Shimmer = ({ children, colors }) => {
@@ -257,6 +256,7 @@ function EkSeWall({ hubId, hub, colors }) {
     const now = new Date();
     const postDate = new Date(timestamp);
     const timeDiff = now.getTime() - postDate.getTime();
+    const [hub, setHub] = useState(null);
 
     const seconds = Math.floor(timeDiff / 1000);
     const minutes = Math.floor(seconds / 60);
@@ -360,7 +360,7 @@ function RouteInfo({ hubId, hub, colors }) {
   const router = useRouter();
   const [relatedRoutes, setRelatedRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
-
+  const [searchQuery, setSearchQuery] = useState('');
   useEffect(() => {
     fetchRelatedRoutes();
   }, [hubId]);
@@ -388,6 +388,22 @@ function RouteInfo({ hubId, hub, colors }) {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
+
+      <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Related Routes</Text>
+          <Pressable onPress={() => router.push('/add-route')} style={styles.addButton}>
+            <Plus size={24} color={colors.text} />
+          </Pressable>
+        </View>
+
+        {/* Search Input */}
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search related routes..."
+          placeholderTextColor="#888"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
         {relatedRoutes.map((route) => (
           <Pressable
             key={route.id}
@@ -544,6 +560,23 @@ const styles = StyleSheet.create({
   firstPostButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  addButton: {
+    padding: 5,
+  },
+  searchInput: {
+    height: 40,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    marginBottom: 15,
   },
   postCard: {
     padding: 15,

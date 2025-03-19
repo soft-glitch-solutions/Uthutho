@@ -141,7 +141,7 @@ export default function ProfileScreen() {
         <TouchableOpacity
           style={styles.avatarContainer}
           onPress={handleImagePicker}
-          disabled={uploadingImage}  // Disable button while uploading
+          disabled={uploading}  // Disable button while uploading
         >
           <Image
             source={{
@@ -218,6 +218,8 @@ export default function ProfileScreen() {
           ))}
         </View>
       )}
+
+      
 
       {/* Sign Out Button */}
       <TouchableOpacity
