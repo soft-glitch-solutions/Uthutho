@@ -1,7 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, FlatList, Pressable, Animated } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  FlatList,
+  Pressable,
+  Image,
+  Animated,
+  useWindowDimensions,
+} from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
+import { Ionicons } from '@expo/vector-icons'; // Import icons
+import { useRouter } from 'expo-router'; // Import router for navigation
 
 // Add the Shimmer component
 const Shimmer = ({ children, colors }) => {
@@ -68,10 +80,15 @@ const SearchResultSkeleton = ({ colors }) => {
 
 export default function FavoritesScreen() {
   const { colors } = useTheme();
+  const router = useRouter(); // Initialize router
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [userFavorites, setUserFavorites] = useState([]);
+  const { width } = useWindowDimensions(); // Get screen width
+
+  // Calculate card width based on screen size
+  const cardWidth = width / 2 - 24; // 2 columns with 12px gap on each side
 
   useEffect(() => {
     const fetchFavorites = async () => {
@@ -91,22 +108,32 @@ export default function FavoritesScreen() {
   const handleSearch = async () => {
     setLoading(true);
     try {
+      // Fetch hubs
       const { data: hubs } = await supabase
         .from('hubs')
         .select('*')
         .ilike('name', `%${searchQuery}%`);
 
+      // Fetch routes
       const { data: routes } = await supabase
         .from('routes')
         .select('*')
         .ilike('name', `%${searchQuery}%`);
 
+      // Fetch stops
       const { data: stops } = await supabase
         .from('stops')
         .select('*')
         .ilike('name', `%${searchQuery}%`);
 
-      setSearchResults([...hubs, ...routes, ...stops]);
+      // Combine results into a single array
+      const combinedResults = [
+        ...(hubs ? hubs.map((hub) => ({ ...hub, type: 'hub' })) : []),
+        ...(routes ? routes.map((route) => ({ ...route, type: 'route' })) : []),
+        ...(stops ? stops.map((stop) => ({ ...stop, type: 'stop' })) : []),
+      ];
+
+      setSearchResults(combinedResults);
     } catch (error) {
       console.error('Error fetching search results:', error);
     } finally {
@@ -139,6 +166,55 @@ export default function FavoritesScreen() {
     }
   };
 
+  const handleItemPress = (item) => {
+    // Navigate to the respective details screen based on the item type
+    if (item.type === 'hub') {
+      router.push(`/hub-details?hubId=${item.id}`);
+    } else if (item.type === 'route') {
+      router.push(`/route-details?routeId=${item.id}`);
+    } else if (item.type === 'stop') {
+      router.push(`/stop-details?stopId=${item.id}`);
+    }
+  };
+
+  const renderItem = ({ item }) => {
+    const isFavorited = userFavorites.includes(item.id);
+
+    // Get image URL (assuming images are stored in Supabase Storage)
+    const imageUrl = item.image_url
+      ? supabase.storage.from('your-bucket-name').getPublicUrl(item.image_url).data.publicUrl
+      : null;
+
+    return (
+      <Pressable onPress={() => handleItemPress(item)}>
+        <View style={[styles.card, { backgroundColor: colors.card, width: cardWidth }]}>
+          {/* Display image if available */}
+          {imageUrl && (
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+          )}
+          <Text style={[styles.cardTitle, { color: colors.text }]}>{item.name}</Text>
+          <Text style={[styles.cardType, { color: colors.primary }]}>
+            {item.type.toUpperCase()}
+          </Text>
+          <Pressable
+            onPress={() => toggleFavorite(item)}
+            style={styles.favoriteButton}
+          >
+            <Ionicons
+              name={isFavorited ? 'heart' : 'heart-outline'}
+              size={24}
+              color={isFavorited ? colors.primary : colors.text}
+            />
+          </Pressable>
+        </View>
+      </Pressable>
+    );
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <TextInput
@@ -155,16 +231,10 @@ export default function FavoritesScreen() {
         <FlatList
           data={searchResults}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{item.name}</Text>
-              <Pressable onPress={() => toggleFavorite(item)}>
-                <Text style={[styles.addButton, { color: colors.primary }]}>
-                  {userFavorites.includes(item.id) ? 'Remove from Favorites' : 'Add to Favorites'}
-                </Text>
-              </Pressable>
-            </View>
-          )}
+          renderItem={renderItem}
+          numColumns={2} // Display items in a grid
+          contentContainerStyle={styles.grid}
+          columnWrapperStyle={styles.columnWrapper} // Add spacing between columns
         />
       )}
     </View>
@@ -179,16 +249,20 @@ const styles = StyleSheet.create({
   searchBar: {
     borderWidth: 1,
     borderRadius: 8,
-    padding: 8,
+    padding: 12,
     marginBottom: 16,
+    fontSize: 16,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 16, // Increased gap for better spacing
+    justifyContent: 'space-between',
+  },
+  columnWrapper: {
+    justifyContent: 'space-between', // Add spacing between columns
   },
   card: {
-    flex: 1,
     borderRadius: 8,
     padding: 16,
     shadowColor: '#000',
@@ -196,7 +270,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    minWidth: '48%',
     marginBottom: 16,
   },
   cardTitle: {
@@ -204,13 +277,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 8,
   },
-  addButton: {
-    fontSize: 14,
+  cardType: {
+    fontSize: 12,
     fontWeight: '600',
+    marginBottom: 8,
+  },
+  image: {
+    width: '100%',
+    height: 100,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  favoriteButton: {
+    alignSelf: 'flex-end',
   },
   skeletonText: {
     height: 14,
     borderRadius: 4,
     marginVertical: 4,
   },
-}); 
+});
