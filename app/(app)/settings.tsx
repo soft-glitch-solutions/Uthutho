@@ -1,19 +1,58 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { Sun, Moon, Smartphone, Bell, Lock, User, Globe, Info } from 'lucide-react-native';
+import { LanguageContext } from '../../context/LanguageContext';
+import { Sun, Moon, Smartphone, Bell, Lock, Globe, Info } from 'lucide-react-native';
+import { useRouter } from 'expo-router'; // Import useRouter from expo-router
 
 export default function SettingsScreen() {
   const { theme, setTheme, colors } = useTheme();
+  const { language, setLanguage } = useContext(LanguageContext);
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
+  const router = useRouter(); // Initialize the router
+
+  // Language-specific text
+  const languageText = {
+    en: {
+      settings: 'Settings',
+      theme: 'Theme',
+      light: 'Light',
+      dark: 'Dark',
+      system: 'System',
+      language: 'Language',
+      changeLanguage: 'Change Language',
+      privacy: 'Privacy',
+      privacyPolicy: 'Privacy Policy',
+      about: 'About',
+      appVersion: 'App Version 0.0.1',
+      notifications: 'Notifications',
+    },
+    es: {
+      settings: 'Configuración',
+      theme: 'Tema',
+      light: 'Claro',
+      dark: 'Oscuro',
+      system: 'Sistema',
+      language: 'Idioma',
+      changeLanguage: 'Cambiar Idioma',
+      privacy: 'Privacidad',
+      privacyPolicy: 'Política de Privacidad',
+      about: 'Acerca de',
+      appVersion: 'Versión de la App 0.0.1',
+      notifications: 'Notificaciones',
+    },
+    // Add more languages as needed
+  };
+
+  const text = languageText[language] || languageText.en; // Fallback to English if language not found
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={styles.container}>
-        <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{text.settings}</Text>
 
         {/* Theme Settings */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Theme</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{text.theme}</Text>
         <View style={styles.themeOptions}>
           <TouchableOpacity
             style={[
@@ -29,7 +68,7 @@ export default function SettingsScreen() {
                 styles.themeText,
                 { color: theme === 'light' ? 'white' : colors.text },
               ]}>
-              Light
+              {text.light}
             </Text>
           </TouchableOpacity>
 
@@ -47,7 +86,7 @@ export default function SettingsScreen() {
                 styles.themeText,
                 { color: theme === 'dark' ? 'white' : colors.text },
               ]}>
-              Dark
+              {text.dark}
             </Text>
           </TouchableOpacity>
 
@@ -65,37 +104,52 @@ export default function SettingsScreen() {
                 styles.themeText,
                 { color: theme === 'system' ? 'white' : colors.text },
               ]}>
-              System
+              {text.system}
             </Text>
           </TouchableOpacity>
         </View>
 
+        {/* Notification Settings */}
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{text.notifications}</Text>
+        <View style={styles.settingOption}>
+          <View style={styles.settingLeft}>
+            <Bell color={colors.text} />
+            <Text style={[styles.settingText, { color: colors.text }]}>{text.notifications}</Text>
+          </View>
+          <Switch
+            value={notificationsEnabled}
+            onValueChange={setNotificationsEnabled}
+            thumbColor={notificationsEnabled ? colors.primary : colors.text}
+            trackColor={{ false: colors.card, true: colors.primary }}
+          />
+        </View>
 
         {/* Language Settings */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Language</Text>
-        <TouchableOpacity style={styles.settingOption}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{text.language}</Text>
+        <TouchableOpacity
+          style={styles.settingOption}
+          onPress={() => router.push('/ChangeLanguage')}> {/* Use router.push for navigation */}
           <View style={styles.settingLeft}>
             <Globe color={colors.text} />
-            <Text style={[styles.settingText, { color: colors.text }]}>Change Language</Text>
+            <Text style={[styles.settingText, { color: colors.text }]}>{text.changeLanguage}</Text>
           </View>
         </TouchableOpacity>
 
-
         {/* Privacy Settings */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Privacy</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{text.privacy}</Text>
         <TouchableOpacity style={styles.settingOption}>
           <View style={styles.settingLeft}>
             <Lock color={colors.text} />
-            <Text style={[styles.settingText, { color: colors.text }]}>Privacy Policy</Text>
+            <Text style={[styles.settingText, { color: colors.text }]}>{text.privacyPolicy}</Text>
           </View>
         </TouchableOpacity>
 
         {/* App Info */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>About</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{text.about}</Text>
         <View style={styles.settingOption}>
           <View style={styles.settingLeft}>
             <Info color={colors.text} />
-            <Text style={[styles.settingText, { color: colors.text }]}>App Version 0.0.1</Text>
+            <Text style={[styles.settingText, { color: colors.text }]}>{text.appVersion}</Text>
           </View>
         </View>
       </View>

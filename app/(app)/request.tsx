@@ -6,9 +6,9 @@ import { useTheme } from '@/context/ThemeContext';
 
 const SkeletonLoader = ({ colors }) => (
   <View style={styles.skeletonContainer}>
-    <View style={[styles.skeletonCard, { backgroundColor: colors.card }]} />
-    <View style={[styles.skeletonCard, { backgroundColor: colors.card }]} />
-    <View style={[styles.skeletonCard, { backgroundColor: colors.card }]} />
+    <View style={[styles.skeletonCard, { backgroundColor: colors.text }]} />
+    <View style={[styles.skeletonCard, { backgroundColor: colors.primary }]} />
+    <View style={[styles.skeletonCard, { backgroundColor: colors.primary }]} />
   </View>
 );
 

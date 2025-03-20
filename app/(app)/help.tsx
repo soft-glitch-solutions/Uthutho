@@ -2,32 +2,43 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { ChevronRight } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 
 export default function HelpScreen() {
   const { colors } = useTheme();
+  const router = useRouter();
 
   const helpTopics = [
     {
       title: 'Getting Started',
       description: 'Learn the basics of using Uthutho',
+      screen: 'GettingStartedScreen',
     },
     {
       title: 'Finding Transportation Hubs',
       description: 'How to locate and navigate to nearby hubs',
+      screen: 'FindingHubsScreen',
     },
     {
       title: 'Using the Feed',
       description: 'Stay updated with latest transportation news',
+      screen: 'UsingFeedScreen',
     },
     {
       title: 'Managing Your Profile',
       description: 'Update your information and preferences',
+      screen: 'ManagingProfileScreen',
     },
     {
       title: 'Contact Support',
       description: 'Get help from our support team',
+      screen: 'ContactSupportScreen',
     },
   ];
+
+  const handleTopicPress = (screen) => {
+    router.push(`/help/${screen}`);
+  };
 
   return (
     <ScrollView
@@ -42,7 +53,8 @@ export default function HelpScreen() {
         {helpTopics.map((topic, index) => (
           <TouchableOpacity
             key={index}
-            style={[styles.topicCard, { backgroundColor: colors.card }]}>
+            style={[styles.topicCard, { backgroundColor: colors.card }]}
+            onPress={() => handleTopicPress(topic.screen)}>
             <View style={styles.topicContent}>
               <Text style={[styles.topicTitle, { color: colors.text }]}>
                 {topic.title}

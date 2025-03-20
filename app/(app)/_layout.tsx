@@ -135,6 +135,13 @@ options={{
           title: 'Favourites'
         }}
       />
+      <Drawer.Screen name="titleearn" options={{ drawerItemStyle: { height: 0 }, title: 'Change Title' }} />
+       <Drawer.Screen name="changetitle" options={{ drawerItemStyle: { height: 0 }, title: 'Change Title' }} />
+      <Drawer.Screen name="help/UsingFeedScreen" options={{ drawerItemStyle: { height: 0 }, title: 'Using Feed' }} />
+      <Drawer.Screen name="help/FindingHubsScreen" options={{ drawerItemStyle: { height: 0 }, title: 'Finding Hubs' }} />
+      <Drawer.Screen name="help/ContactSupportScreen" options={{ drawerItemStyle: { height: 0 }, title: 'Contact Support' }} />
+      <Drawer.Screen name="help/GettingStartedScreen" options={{ drawerItemStyle: { height: 0 }, title: 'Getting Started' }} />
+      <Drawer.Screen name="help/ManagingProfileScreen" options={{ drawerItemStyle: { height: 0 }, title: 'Managing Profile' }} />
       <Drawer.Screen
         name="post-details"
         options={{
