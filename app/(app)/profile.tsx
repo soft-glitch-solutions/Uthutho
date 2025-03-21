@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Platform } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { router } from 'expo-router';
 import { Settings, LogOut, Camera, Captions, Edit, Badge } from 'lucide-react-native';
@@ -32,10 +32,9 @@ export default function ProfileScreen() {
         return;
       }
 
-      const publicUrl = await uploadAvatar(file); // Use the uploadAvatar function from the hook
-      console.log('Avatar uploaded successfully:', publicUrl);
+      await uploadAvatar(file); // Use the uploadAvatar function from the hook
     } catch (error) {
-      console.error('Error uploading image:', error);
+      alert('Failed to upload image. Please try again.');
     }
   };
 
@@ -68,20 +67,47 @@ export default function ProfileScreen() {
 
       if (!result.canceled) {
         const selectedImage = result.assets[0].uri;
-        const publicUrl = await uploadAvatar(selectedImage); // Use the uploadAvatar function from the hook
-        console.log('Avatar uploaded successfully:', publicUrl);
+        await uploadAvatar(selectedImage); // Use the uploadAvatar function from the hook
       }
     } catch (error) {
-      console.error('Error picking or uploading image:', error);
       alert('Failed to pick or upload image. Please try again.');
     }
   };
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Header Skeleton */}
+        <View style={[styles.header, { backgroundColor: colors.card }]}>
+          <View style={styles.avatarSkeleton} />
+          <View style={styles.nameSkeleton} />
+          <View style={styles.titleSkeleton} />
+          <View style={styles.emailSkeleton} />
+        </View>
+
+        {/* Tabs Skeleton */}
+        <View style={styles.tabs}>
+          <View style={styles.tabSkeleton} />
+          <View style={styles.tabSkeleton} />
+          <View style={styles.tabSkeleton} />
+        </View>
+
+        {/* Menu Items Skeleton */}
+        <View style={styles.menuContainer}>
+          {[1, 2, 3].map((_, index) => (
+            <View key={index} style={[styles.menuItemSkeleton, { backgroundColor: colors.card }]}>
+              <View style={styles.menuIconSkeleton} />
+              <View style={styles.menuTextSkeleton}>
+                <View style={styles.menuTitleSkeleton} />
+                <View style={styles.menuSubtitleSkeleton} />
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* Sign Out Button Skeleton */}
+        <View style={[styles.signOutButtonSkeleton, { backgroundColor: colors.primary }]} />
+      </ScrollView>
     );
   }
 
@@ -139,19 +165,18 @@ export default function ProfileScreen() {
           onPress={handleImagePicker}
           disabled={uploading}
         >
-          <Image
-            source={{
-              uri: profile?.avatar_url ||
-                'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop',
-            }}
-            style={styles.avatar}
-          />
-          <View style={[styles.cameraButton, { backgroundColor: colors.primary }]}>
-            <Camera size={16} color="white" />
-          </View>
-          {uploading && (
-            <View style={styles.uploadingOverlay}>
-              <ActivityIndicator color="white" />
+          {uploading ? (
+            <View style={styles.avatarSkeleton} />
+          ) : avatarUrl ? (
+            <View style={{ position: 'relative' }}>
+              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+              <View style={[styles.cameraButton, { backgroundColor: colors.primary }]}>
+                <Camera size={16} color="white" />
+              </View>
+            </View>
+          ) : (
+            <View style={[styles.avatarPlaceholder, { backgroundColor: colors.card }]}>
+              <Text style={{ color: colors.text }}>Select Profile Picture</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -275,9 +300,22 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     marginBottom: 15,
   },
+  avatarSkeleton: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#e1e1e1',
+  },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  nameSkeleton: {
+    width: 150,
+    height: 24,
+    borderRadius: 4,
+    backgroundColor: '#e1e1e1',
     marginBottom: 5,
   },
   title: {
@@ -285,9 +323,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1ea2b1',
   },
+  titleSkeleton: {
+    width: 100,
+    height: 24,
+    borderRadius: 4,
+    backgroundColor: '#e1e1e1',
+    marginBottom: 5,
+  },
   email: {
     fontSize: 16,
     opacity: 0.8,
+  },
+  emailSkeleton: {
+    width: 200,
+    height: 16,
+    borderRadius: 4,
+    backgroundColor: '#e1e1e1',
   },
   tabs: {
     flexDirection: 'row',
@@ -297,6 +348,12 @@ const styles = StyleSheet.create({
   tab: {
     padding: 10,
     borderRadius: 10,
+  },
+  tabSkeleton: {
+    width: 100,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#e1e1e1',
   },
   activeTab: {
     borderBottomWidth: 2,
@@ -317,17 +374,46 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     gap: 15,
   },
+  menuItemSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderRadius: 10,
+    gap: 15,
+  },
   menuText: {
     flex: 1,
+  },
+  menuTextSkeleton: {
+    flex: 1,
+    gap: 8,
   },
   menuTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
   },
+  menuTitleSkeleton: {
+    width: '70%',
+    height: 16,
+    borderRadius: 4,
+    backgroundColor: '#e1e1e1',
+  },
   menuSubtitle: {
     fontSize: 14,
     opacity: 0.8,
+  },
+  menuSubtitleSkeleton: {
+    width: '50%',
+    height: 14,
+    borderRadius: 4,
+    backgroundColor: '#e1e1e1',
+  },
+  menuIconSkeleton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#e1e1e1',
   },
   cameraButton: {
     position: 'absolute',
@@ -336,13 +422,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  uploadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -355,6 +434,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     gap: 10,
     marginTop: 20,
+  },
+  signOutButtonSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    marginHorizontal: 20,
+    borderRadius: 10,
+    gap: 10,
+    marginTop: 20,
+    height: 48,
   },
   signOutText: {
     color: 'white',

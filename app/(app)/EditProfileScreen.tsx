@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, Platform } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { useProfile } from '@/hook/useProfile'; // Import the useProfile hook
+import { useProfile } from '@/hook/useProfile';
+import { Camera } from 'lucide-react-native';
 
 export default function EditProfileScreen() {
   const { colors } = useTheme();
@@ -13,13 +14,13 @@ export default function EditProfileScreen() {
     loading: profileLoading,
     updateProfile,
     uploadAvatar,
-  } = useProfile(); // Use the useProfile hook
+  } = useProfile();
 
   const [firstName, setFirstName] = useState(profile?.first_name || '');
   const [lastName, setLastName] = useState(profile?.last_name || '');
   const [email, setEmail] = useState(profile?.email || '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || null);
-  const [uploading, setUploading] = useState(false); // State for avatar upload loading
+  const [uploading, setUploading] = useState(false);
 
   // Ref for file input (web only)
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,7 +45,7 @@ export default function EditProfileScreen() {
         avatar_url: avatarUrl,
       };
 
-      await updateProfile(updates); // Use the updateProfile function from the hook
+      await updateProfile(updates);
       alert('Profile updated successfully!');
       router.back();
     } catch (error) {
@@ -56,16 +57,14 @@ export default function EditProfileScreen() {
   // Handle image picker for avatar upload (mobile)
   const handleImagePickerMobile = async () => {
     try {
-      setUploading(true); // Start loading
+      setUploading(true);
 
-      // Request media library permissions
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         alert('Sorry, we need camera roll permissions to make this work!');
         return;
       }
 
-      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -75,21 +74,21 @@ export default function EditProfileScreen() {
 
       if (!result.canceled) {
         const selectedImage = result.assets[0].uri;
-        const publicUrl = await uploadAvatar(selectedImage); // Use the uploadAvatar function from the hook
-        setAvatarUrl(publicUrl); // Update the avatar URL in state
+        const publicUrl = await uploadAvatar(selectedImage);
+        setAvatarUrl(publicUrl);
       }
     } catch (error) {
       console.error('Error picking or uploading image:', error);
       alert('Failed to pick or upload image. Please try again.');
     } finally {
-      setUploading(false); // Stop loading
+      setUploading(false);
     }
   };
 
   // Handle file input change for avatar upload (web)
   const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
-      setUploading(true); // Start loading
+      setUploading(true);
 
       const file = event.target.files?.[0];
       if (!file || !file.type.startsWith('image/')) {
@@ -97,19 +96,18 @@ export default function EditProfileScreen() {
         return;
       }
 
-      const publicUrl = await uploadAvatar(file); // Use the uploadAvatar function from the hook
-      setAvatarUrl(publicUrl); // Update the avatar URL in state
+      const publicUrl = await uploadAvatar(file);
+      setAvatarUrl(publicUrl);
     } catch (error) {
       console.error('Error uploading image:', error);
     } finally {
-      setUploading(false); // Stop loading
+      setUploading(false);
     }
   };
 
   // Handle image picker (mobile) or file input (web)
   const handleImagePicker = () => {
     if (Platform.OS === 'web') {
-      // Trigger file input click
       fileInputRef.current?.click();
     } else {
       handleImagePickerMobile();
@@ -118,9 +116,39 @@ export default function EditProfileScreen() {
 
   if (profileLoading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.formContainer}>
+          {/* Avatar Skeleton */}
+          <View style={styles.avatarContainer}>
+            <View style={[styles.avatarSkeleton, { backgroundColor: colors.card }]} />
+          </View>
+
+          {/* Points Skeleton */}
+          <View style={styles.pointsContainer}>
+            <View style={[styles.pointsSkeleton, { backgroundColor: colors.card }]} />
+          </View>
+
+          {/* First Name Skeleton */}
+          <View style={styles.inputSkeleton}>
+            <View style={[styles.skeleton, { backgroundColor: colors.card }]} />
+          </View>
+
+          {/* Last Name Skeleton */}
+          <View style={styles.inputSkeleton}>
+            <View style={[styles.skeleton, { backgroundColor: colors.card }]} />
+          </View>
+
+          {/* Email Skeleton */}
+          <View style={styles.inputSkeleton}>
+            <View style={[styles.skeleton, { backgroundColor: colors.card }]} />
+          </View>
+
+          {/* Save Button Skeleton */}
+          <View style={styles.saveButtonSkeleton}>
+            <View style={[styles.skeleton, { backgroundColor: colors.card }]} />
+          </View>
+        </View>
+      </ScrollView>
     );
   }
 
@@ -141,11 +169,14 @@ export default function EditProfileScreen() {
         {/* Avatar Upload Section */}
         <TouchableOpacity onPress={handleImagePicker} style={styles.avatarContainer} disabled={uploading}>
           {uploading ? (
-            <View style={[styles.avatar, { justifyContent: 'center', alignItems: 'center' }]}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
+            <View style={[styles.avatarSkeleton, { backgroundColor: colors.card }]} />
           ) : avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+            <View style={{ position: 'relative' }}>
+              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+              <View style={[styles.cameraButton, { backgroundColor: colors.primary }]}>
+                <Camera size={16} color="white" />
+              </View>
+            </View>
           ) : (
             <View style={[styles.avatarPlaceholder, { backgroundColor: colors.card }]}>
               <Text style={{ color: colors.text }}>Select Profile Picture</Text>
@@ -226,6 +257,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  avatarSkeleton: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
   pointsContainer: {
     alignItems: 'center',
     marginBottom: 16,
@@ -233,6 +269,11 @@ const styles = StyleSheet.create({
   pointsText: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  pointsSkeleton: {
+    width: 100,
+    height: 20,
+    borderRadius: 4,
   },
   label: {
     fontSize: 16,
@@ -245,14 +286,35 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 8,
   },
+  inputSkeleton: {
+    marginBottom: 16,
+  },
+  skeleton: {
+    width: '100%',
+    height: 40,
+    borderRadius: 8,
+  },
   saveButton: {
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
+  saveButtonSkeleton: {
+    marginTop: 20,
+  },
   saveButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  cameraButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

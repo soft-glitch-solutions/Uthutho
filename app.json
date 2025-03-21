@@ -31,7 +31,7 @@
       }
     },
     "android": {
-      "package": "com.shaqeel16.uthutho"
+      "package": "com.softglitchsolutions.uthutho"
     },
     "splash": {
       "image": "./assets/images/SplashScreen.png",
