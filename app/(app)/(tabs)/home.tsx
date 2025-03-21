@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, Animated, FlatList, RefreshControl, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, Animated, FlatList, RefreshControl, Image, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -7,7 +7,7 @@ import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext';
 import StopBlock from '../../../components/stop/StopBlock'; // Import the StopBlock component
 import LoginStreakTracker from '@/components/LoginStreakTracker';
-import { useNavigation } from 'expo-router'; 
+import { useNavigation } from 'expo-router';
 
 const Shimmer = ({ children, colors }) => {
   const animatedValue = new Animated.Value(0);
@@ -99,8 +99,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null); // State to store the user ID
-  const navigation = useNavigation(); 
-
+  const navigation = useNavigation();
 
   // Fetch the user's profile
   useEffect(() => {
@@ -113,12 +112,12 @@ export default function HomeScreen() {
           router.replace('/auth');
           return;
         }
-  
-        setUserId(userId); // Set the user ID  
+
+        setUserId(userId); // Set the user ID
         const { data, error } = await supabase
           .from('profiles')
           .select('first_name, selected_title, favorites, points')
-          .eq('id', (await supabase.auth.getSession()).data.session?.user.id)
+          .eq('id', userId)
           .single();
 
         if (error) throw error;
@@ -130,13 +129,9 @@ export default function HomeScreen() {
       }
     };
 
-    
-
     fetchUserProfile();
   }, []);
 
-
-  
   // Fetch the user's current location
   useEffect(() => {
     (async () => {
@@ -220,9 +215,52 @@ export default function HomeScreen() {
   const openSidebar = () => {
     navigation.toggleDrawer(); // Toggle the sidebar
   };
-  // Navigate to favorite details
-  const handleFavoritePress = (favorite) => {
-    router.push(`/favorite-details?favoriteId=${favorite}`);
+
+  // Navigate to favorite details based on type
+  const handleFavoritePress = async (favoriteName) => {
+    try {
+      // Check if the favorite is a hub
+      const { data: hubData, error: hubError } = await supabase
+        .from('hubs')
+        .select('id')
+        .eq('name', favoriteName) // Look up by name
+        .single();
+  
+      if (hubData && !hubError) {
+        router.push(`/hub-details?hubId=${hubData.id}`);
+        return;
+      }
+  
+      // Check if the favorite is a stop
+      const { data: stopData, error: stopError } = await supabase
+        .from('stops')
+        .select('id')
+        .eq('name', favoriteName) // Look up by name
+        .single();
+  
+      if (stopData && !stopError) {
+        router.push(`/stop-details?stopId=${stopData.id}`);
+        return;
+      }
+  
+      // Check if the favorite is a route
+      const { data: routeData, error: routeError } = await supabase
+        .from('routes')
+        .select('id')
+        .eq('name', favoriteName) // Look up by name
+        .single();
+  
+      if (routeData && !routeError) {
+        router.push(`/route-details?routeId=${routeData.id}`);
+        return;
+      }
+  
+      // If the favorite type is unknown, show an error
+      Alert.alert('Error', 'Favorite type not recognized.');
+    } catch (error) {
+      console.error('Error fetching favorite details:', error);
+      Alert.alert('Error', 'Failed to fetch favorite details.');
+    }
   };
 
   // Navigate to nearest stop details
@@ -256,43 +294,42 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-
-    <View style={styles.topHeader}>
-    {/* Left Side: Logo and UTHUTHO Text */}
-    <Pressable onPress={openSidebar} style={styles.logoContainer}>
-    <Image
-      source={require('../../../assets/uthutho-logo.png')} // Replace with your logo path
-      style={styles.logo}
-    />
-    <Text style={[styles.uthuthoText, {  color: colors.text }]}>Uthutho</Text>
-  </Pressable>
-    {/* Right Side: User Points */}
-    <View style={styles.pointsContainer}>
-      <Text style={[styles.pointsText, {  color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
-    </View>
-  </View>
+      <View style={styles.topHeader}>
+        {/* Left Side: Logo and UTHUTHO Text */}
+        <Pressable onPress={openSidebar} style={styles.logoContainer}>
+          <Image
+            source={require('../../../assets/uthutho-logo.png')} // Replace with your logo path
+            style={styles.logo}
+          />
+          <Text style={[styles.uthuthoText, { color: colors.text }]}>Uthutho</Text>
+        </Pressable>
+        {/* Right Side: User Points */}
+        <View style={styles.pointsContainer}>
+          <Text style={[styles.pointsText, { color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
+        </View>
+      </View>
 
       {/* Personalized Greeting */}
       <View style={styles.header}>
-      <View>
-      {/* First Row: Greeting and Plus Button */}
-      <View style={styles.firstRow}>
-      <Pressable onPress={() => router.push('/profile')}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          Hi, {isProfileLoading ? 'Loading...' : userProfile?.first_name || 'User'}!
-        </Text>
-        </Pressable>
-        <Pressable onPress={() => router.push('/favorites')} style={styles.addButton}>
-          <MaterialIcons name="search" size={24} color={colors.text} />
-        </Pressable>
-      </View>
-      {/* Second Row: Selected Title */}
-      {!isProfileLoading && userProfile?.selected_title && (
-        <Text style={[styles.selectedTitle, { color: colors.primary }]}>
-          {userProfile.selected_title}
-        </Text>
-      )}
-    </View>
+        <View>
+          {/* First Row: Greeting and Plus Button */}
+          <View style={styles.firstRow}>
+            <Pressable onPress={() => router.push('/profile')}>
+              <Text style={[styles.title, { color: colors.text }]}>
+                Hi, {isProfileLoading ? 'Loading...' : userProfile?.first_name || 'User'}!
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => router.push('/favorites')} style={styles.addButton}>
+              <MaterialIcons name="search" size={24} color={colors.text} />
+            </Pressable>
+          </View>
+          {/* Second Row: Selected Title */}
+          {!isProfileLoading && userProfile?.selected_title && (
+            <Text style={[styles.selectedTitle, { color: colors.primary }]}>
+              {userProfile.selected_title}
+            </Text>
+          )}
+        </View>
       </View>
 
       {/* Nearest Locations */}
@@ -309,8 +346,7 @@ export default function HomeScreen() {
             {/* Nearest Stop */}
             <Pressable
               style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => nearestLocations?.nearestStop && 
-                handleNearestStopPress(nearestLocations.nearestStop.id)}
+              onPress={() => nearestLocations?.nearestStop && handleNearestStopPress(nearestLocations.nearestStop.id)}
             >
               <Text style={[styles.cardTitle, { color: colors.text }]}>Nearest Stop</Text>
               {nearestLocations?.nearestStop ? (
@@ -346,8 +382,7 @@ export default function HomeScreen() {
             {/* Nearest Hub */}
             <Pressable
               style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => nearestLocations?.nearestHub && 
-                handleNearestHubPress(nearestLocations.nearestHub.id)}
+              onPress={() => nearestLocations?.nearestHub && handleNearestHubPress(nearestLocations.nearestHub.id)}
             >
               <Text style={[styles.cardTitle, { color: colors.text }]}>Nearest Hub</Text>
               {nearestLocations?.nearestHub ? (
@@ -373,6 +408,7 @@ export default function HomeScreen() {
       </View>
 
       {userId && <LoginStreakTracker userId={userId} />}
+
       {/* Favorites List */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Favorites</Text>
@@ -402,12 +438,6 @@ export default function HomeScreen() {
           </View>
         )}
       </View>
-
-
-
-      
-
-
     </ScrollView>
   );
 }

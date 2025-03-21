@@ -211,11 +211,38 @@ export function useProfile() {
       const fileName = `${userId}.${fileExt}`; // Create a unique file name
       const filePath = `${fileName}`;
   
+      // Check if a file already exists for the user
+      const { data: existingFiles, error: listError } = await supabase.storage
+        .from('avatars')
+        .list(userId); // List files in the user's folder
+  
+      if (listError) {
+        console.error('Error listing existing files:', listError);
+        throw listError;
+      }
+  
+      // If a file exists, delete it
+      if (existingFiles && existingFiles.length > 0) {
+        const { error: deleteError } = await supabase.storage
+          .from('avatars')
+          .remove([filePath]); // Delete the old file
+  
+        if (deleteError) {
+          console.error('Error deleting old file:', deleteError);
+          throw deleteError;
+        }
+  
+        console.log('Old file deleted successfully.');
+      }
+  
       // Convert base64 image data to a Blob
       const response = await fetch(file.uri);
+      if (!response.ok) {
+        throw new Error('Failed to fetch image');
+      }
       const blob = await response.blob();
   
-      // Upload the image to Supabase Storage
+      // Upload the new image to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, blob, {
@@ -241,7 +268,7 @@ export function useProfile() {
   
       // Update the user's avatar URL in the profile
       await handleAvatarUpload(publicUrl);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error in handleImagePicker:', error.message);
     } finally {
       setUploading(false);
@@ -266,6 +293,39 @@ export function useProfile() {
     }
   }, []);
 
+  
+  // Handle title selection
+  const handleSelectTitle = useCallback(async (title: string) => {
+    try {
+      setLoading(true);
+      if (!session?.user) throw new Error('No user session found');
+      if (!profile?.titles?.includes(title)) {
+        throw new Error('You have not unlocked this title yet.');
+      }
+
+      const userId = session.user.id;
+      console.log('Selecting title for user ID:', userId);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ selected_title: title })
+        .eq('id', userId);
+
+      if (updateError) {
+        console.error('Error selecting title:', updateError);
+        throw updateError;
+      }
+
+      console.log('Title selected successfully.');
+      setProfile(prev => prev ? { ...prev, selected_title: title } : null);
+    } catch (error: any) {
+      console.error('Error in handleSelectTitle:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [session, profile]);
+
+
   return {
     loading,
     uploading,
@@ -275,6 +335,7 @@ export function useProfile() {
     getProfile,
     fetchTitles,
     handleAvatarUpload,
+    handleSelectTitle,
     handleImagePicker,
     handleSignOut,
   };

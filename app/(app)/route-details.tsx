@@ -88,6 +88,7 @@ export default function RouteDetailsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [newPrice, setNewPrice] = useState('');
   const [priceChangeRequests, setPriceChangeRequests] = useState([]);
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
 
   useEffect(() => {
     fetchRouteDetails();
@@ -138,12 +139,16 @@ export default function RouteDetailsScreen() {
     try {
       const { data, error } = await supabase
         .from('price_change_requests')
-        .select('*')
+        .select('*, profiles(*)')
         .eq('route_id', routeId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setPriceChangeRequests(data);
+
+      // Check if there's a pending request
+      const hasPending = data.some((request) => request.status === 'pending');
+      setHasPendingRequest(hasPending);
     } catch (error) {
       console.error('Error fetching price change requests:', error);
     }
@@ -161,6 +166,12 @@ export default function RouteDetailsScreen() {
 
       if (authError || !user) {
         Alert.alert('Error', 'You must be logged in to submit a price change request.');
+        return;
+      }
+
+      // Check if there's already a pending request
+      if (hasPendingRequest) {
+        Alert.alert('Error', 'There is already a pending price change request for this route.');
         return;
       }
 
@@ -190,6 +201,10 @@ export default function RouteDetailsScreen() {
   };
 
   const openPriceChangeModal = () => {
+    if (hasPendingRequest) {
+      Alert.alert('Info', 'There is already a pending price change request for this route.');
+      return;
+    }
     setModalVisible(true);
   };
 
@@ -319,6 +334,9 @@ export default function RouteDetailsScreen() {
               </Text>
               <Text style={[styles.requestText, { color: colors.text }]}>
                 Status: {request.status}
+              </Text>
+              <Text style={[styles.requestText, { color: colors.text }]}>
+                Requested by: {request.profiles.first_name} {request.profiles.last_name}
               </Text>
             </View>
           ))
