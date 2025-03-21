@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { router } from 'expo-router';
@@ -19,6 +19,63 @@ export default function ProfileScreen() {
 
   const [selectedTab, setSelectedTab] = useState('basic-info');
   const [selectedTitle, setSelectedTitle] = useState(profile?.selected_title || '');
+
+  // Ref for file input (web only)
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle file input change for web
+  const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const file = event.target.files?.[0];
+      if (!file || !file.type.startsWith('image/')) {
+        alert('Please select a valid image file.');
+        return;
+      }
+
+      const publicUrl = await uploadAvatar(file); // Use the uploadAvatar function from the hook
+      console.log('Avatar uploaded successfully:', publicUrl);
+    } catch (error) {
+      console.error('Error uploading image:', error);
+    }
+  };
+
+  // Handle image picker (mobile) or file input (web)
+  const handleImagePicker = () => {
+    if (Platform.OS === 'web') {
+      // Trigger file input click
+      fileInputRef.current?.click();
+    } else {
+      // Mobile: Use expo-image-picker
+      handleImagePickerMobile();
+    }
+  };
+
+  // Handle image picker for mobile
+  const handleImagePickerMobile = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Sorry, we need camera roll permissions to make this work!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+
+      if (!result.canceled) {
+        const selectedImage = result.assets[0].uri;
+        const publicUrl = await uploadAvatar(selectedImage); // Use the uploadAvatar function from the hook
+        console.log('Avatar uploaded successfully:', publicUrl);
+      }
+    } catch (error) {
+      console.error('Error picking or uploading image:', error);
+      alert('Failed to pick or upload image. Please try again.');
+    }
+  };
 
   if (loading) {
     return (
@@ -64,21 +121,22 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
+      {/* Hidden file input for web */}
+      {Platform.OS === 'web' && (
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          accept="image/*"
+          onChange={handleFileInputChange}
+        />
+      )}
 
-              {Platform.OS === 'web' && (
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  style={{ display: 'none' }}
-                  accept="image/*"
-                  onChange={handleFileInputChange}
-                />
-              )}
+      {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card }]}>
         <TouchableOpacity
           style={styles.avatarContainer}
-          onPress={uploadAvatar}
+          onPress={handleImagePicker}
           disabled={uploading}
         >
           <Image

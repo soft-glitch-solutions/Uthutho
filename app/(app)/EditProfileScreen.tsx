@@ -101,7 +101,6 @@ export default function EditProfileScreen() {
       setAvatarUrl(publicUrl); // Update the avatar URL in state
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('Failed to upload image. Please try again.');
     } finally {
       setUploading(false); // Stop loading
     }

@@ -146,7 +146,7 @@ export default function EditProfileScreen() {
       await handleAvatarUpload(publicUrl);
     } catch (error) {
       console.error('Error uploading image:', error.message);
-      alert('Failed to upload image. Please try again.');
+
     }
   };
 
