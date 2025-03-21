@@ -293,6 +293,84 @@ export function useProfile() {
     }
   }, []);
 
+    // Upload an avatar image to Supabase storage
+    const uploadAvatar = async (uri: string | File) => {
+      try {
+        setUploading(true);
+    
+        // Get the user ID
+        const userId = session?.user?.id;
+        if (!userId) throw new Error('User not authenticated');
+    
+        let blob: Blob;
+    
+        // Handle web (File object) and mobile (URI string)
+        if (typeof uri === 'string') {
+          // Mobile: Fetch the image from the URI and convert it to a Blob
+          if (!uri.startsWith('http') && !uri.startsWith('data:')) {
+            throw new Error('Invalid image URI');
+          }
+    
+          console.log('Fetching image from URI:', uri);
+          const response = await fetch(uri);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch image: ${response.statusText}`);
+          }
+    
+          blob = await response.blob();
+        } else {
+          // Web: Use the File object directly
+          blob = uri;
+        }
+    
+        console.log('Image fetched successfully. Size:', blob.size, 'bytes');
+    
+        // Generate a unique filename with timestamp and user ID
+        const timestamp = new Date().toISOString();
+        const fileExt = typeof uri === 'string' ? uri.split('.').pop() || 'jpg' : uri.name.split('.').pop() || 'jpg';
+        const fileName = `${userId}_${timestamp}.${fileExt}`;
+        const filePath = `avatars/${fileName}`; // Explicitly specify the bucket in the path
+    
+        // Log the file and filename
+        console.log('Uploading file:', fileName);
+        console.log('File path:', filePath);
+    
+        // Upload the image to Supabase Storage
+        const { error: uploadError } = await supabase.storage
+          .from('avatars') // Explicitly specify the bucket
+          .upload(filePath, blob, {
+            cacheControl: '3600',
+            upsert: true,
+          });
+    
+        if (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          throw uploadError;
+        }
+    
+        // Construct the public URL of the uploaded image
+        const { data: publicUrlData } = await supabase.storage
+          .from('avatars') // Explicitly specify the bucket
+          .getPublicUrl(filePath);
+    
+        if (!publicUrlData) {
+          throw new Error('Failed to get public URL for the uploaded image.');
+        }
+    
+        const publicUrl = publicUrlData.publicUrl;
+        console.log('Public URL:', publicUrl);
+    
+        // Update the profile with the new avatar URL
+        await handleAvatarUpload(publicUrl);
+        Alert.alert('Success', 'Avatar updated successfully!');
+      } catch (err) {
+        console.error('Error in uploadAvatar:', err);
+        Alert.alert('Error', 'Failed to upload avatar. Please try again.');
+      } finally {
+        setUploading(false);
+      }
+    };
+
   
   // Handle title selection
   const handleSelectTitle = useCallback(async (title: string) => {
@@ -335,6 +413,7 @@ export function useProfile() {
     getProfile,
     fetchTitles,
     handleAvatarUpload,
+    uploadAvatar,
     handleSelectTitle,
     handleImagePicker,
     handleSignOut,

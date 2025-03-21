@@ -1,87 +1,60 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator, Platform } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { useProfile } from '@/hook/useProfile'; // Import the useProfile hook
 
 export default function EditProfileScreen() {
   const { colors } = useTheme();
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [points, setPoints] = useState(0);
+  const {
+    profile,
+    loading: profileLoading,
+    updateProfile,
+    uploadAvatar,
+  } = useProfile(); // Use the useProfile hook
+
+  const [firstName, setFirstName] = useState(profile?.first_name || '');
+  const [lastName, setLastName] = useState(profile?.last_name || '');
+  const [email, setEmail] = useState(profile?.email || '');
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || null);
   const [uploading, setUploading] = useState(false); // State for avatar upload loading
 
-  // Fetch profile data on component mount
+  // Ref for file input (web only)
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Update local state when profile data changes
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const { data: session, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !session?.session) {
-          throw new Error('No user session found. Please log in.');
-        }
-
-        const userId = session.session.user.id;
-
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
-
-        if (profileError || !profileData) {
-          throw new Error('Failed to fetch profile data.');
-        }
-
-        setFirstName(profileData.first_name);
-        setLastName(profileData.last_name);
-        setEmail(profileData.email);
-        setAvatarUrl(profileData.avatar_url);
-        setPoints(profileData.points || 0);
-      } catch (error) {
-        console.error('Error fetching profile:', error.message);
-      }
-    };
-
-    fetchProfile();
-  }, []);
+    if (profile) {
+      setFirstName(profile.first_name || '');
+      setLastName(profile.last_name || '');
+      setEmail(profile.email || '');
+      setAvatarUrl(profile.avatar_url || null);
+    }
+  }, [profile]);
 
   // Handle saving profile changes
   const handleSave = async () => {
     try {
-      const { data: session, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session?.session) {
-        throw new Error('No user session found. Please log in.');
-      }
-
-      const userId = session.session.user.id;
-
       const updates = {
-        id: userId,
         first_name: firstName,
         last_name: lastName,
         email: email,
         avatar_url: avatarUrl,
-        updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
-        .from('profiles')
-        .upsert(updates);
-
-      if (error) throw error;
-
+      await updateProfile(updates); // Use the updateProfile function from the hook
       alert('Profile updated successfully!');
       router.back();
     } catch (error) {
       console.error('Error updating profile:', error.message);
+      alert('Failed to update profile. Please try again.');
     }
   };
 
-  // Handle image picker for avatar upload
-  const handleImagePicker = async () => {
+  // Handle image picker for avatar upload (mobile)
+  const handleImagePickerMobile = async () => {
     try {
       setUploading(true); // Start loading
 
@@ -102,52 +75,70 @@ export default function EditProfileScreen() {
 
       if (!result.canceled) {
         const selectedImage = result.assets[0].uri;
-        await uploadImage(selectedImage); // Upload the selected image
+        const publicUrl = await uploadAvatar(selectedImage); // Use the uploadAvatar function from the hook
+        setAvatarUrl(publicUrl); // Update the avatar URL in state
       }
     } catch (error) {
-      console.error('Error picking image:', error);
-      alert('Failed to pick an image. Please try again.');
+      console.error('Error picking or uploading image:', error);
+      alert('Failed to pick or upload image. Please try again.');
     } finally {
       setUploading(false); // Stop loading
     }
   };
 
-  // Upload image to Supabase storage
-  const uploadImage = async (uri: string) => {
+  // Handle file input change for avatar upload (web)
+  const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
-      const fileExt = uri.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
+      setUploading(true); // Start loading
 
-      // Fetch the image file
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      const file = event.target.files?.[0];
+      if (!file || !file.type.startsWith('image/')) {
+        alert('Please select a valid image file.');
+        return;
+      }
 
-      // Upload the image to Supabase storage
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, blob, {
-          cacheControl: '3600',
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Get the public URL of the uploaded image
-      const { data: { publicUrl } } = await supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
+      const publicUrl = await uploadAvatar(file); // Use the uploadAvatar function from the hook
       setAvatarUrl(publicUrl); // Update the avatar URL in state
     } catch (error) {
-      console.error('Error uploading image:', error.message);
+      console.error('Error uploading image:', error);
       alert('Failed to upload image. Please try again.');
+    } finally {
+      setUploading(false); // Stop loading
     }
   };
+
+  // Handle image picker (mobile) or file input (web)
+  const handleImagePicker = () => {
+    if (Platform.OS === 'web') {
+      // Trigger file input click
+      fileInputRef.current?.click();
+    } else {
+      handleImagePickerMobile();
+    }
+  };
+
+  if (profileLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.formContainer}>
+        {/* Hidden file input for web */}
+        {Platform.OS === 'web' && (
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept="image/*"
+            onChange={handleFileInputChange}
+          />
+        )}
+
         {/* Avatar Upload Section */}
         <TouchableOpacity onPress={handleImagePicker} style={styles.avatarContainer} disabled={uploading}>
           {uploading ? (
@@ -165,7 +156,7 @@ export default function EditProfileScreen() {
 
         {/* Points Display */}
         <View style={styles.pointsContainer}>
-          <Text style={[styles.pointsText, { color: colors.text }]}>Points: {points}</Text>
+          <Text style={[styles.pointsText, { color: colors.text }]}>Points: {profile?.points || 0}</Text>
         </View>
 
         {/* First Name Input */}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { router } from 'expo-router';
 import { Settings, LogOut, Camera, Captions, Edit, Badge } from 'lucide-react-native';
@@ -13,7 +13,7 @@ export default function ProfileScreen() {
     titles,
     handleSelectTitle,
     handleSignOut,
-    handleImagePicker,
+    uploadAvatar,
     uploading,
   } = useProfile();
 
@@ -65,10 +65,20 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
+
+              {Platform.OS === 'web' && (
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  accept="image/*"
+                  onChange={handleFileInputChange}
+                />
+              )}
       <View style={[styles.header, { backgroundColor: colors.card }]}>
         <TouchableOpacity
           style={styles.avatarContainer}
-          onPress={handleImagePicker}
+          onPress={uploadAvatar}
           disabled={uploading}
         >
           <Image
