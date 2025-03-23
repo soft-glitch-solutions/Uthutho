@@ -1,5 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Modal, Image, ActivityIndicator, Share, Animated, RefreshControl, Alert, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  Pressable,
+  TextInput,
+  Modal,
+  Image,
+  ActivityIndicator,
+  Share,
+  Animated,
+  RefreshControl,
+  Alert,
+  TouchableOpacity,
+} from 'react-native';
 import { supabase } from '../../../lib/supabase'; // Adjust the path
 import { formatDistanceToNow } from 'date-fns';
 import { useTheme } from '../../../context/ThemeContext'; // Import useTheme
@@ -150,6 +165,14 @@ export default function Feed() {
       return;
     }
 
+    const userId = session?.session?.user.id; // Get the userId from the session
+
+    if (!userId) {
+      console.error('User ID not found in session.');
+      Alert.alert('Error', 'User not authenticated.');
+      return;
+    }
+
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -185,8 +208,22 @@ export default function Feed() {
               id,
               name
             ),
-            post_comments (id),
-            post_reactions (id, reaction_type)
+            post_comments!post_comments_post_id_fkey (
+              id,
+              content,
+              created_at,
+              user_id,
+              profiles (
+                first_name,
+                last_name,
+                avatar_url
+              )
+            ),
+            post_reactions!post_reactions_post_hub_id_fkey (
+              id,
+              reaction_type,
+              user_id
+            )
           `);
 
         if (error) {
@@ -242,8 +279,22 @@ export default function Feed() {
                 name
               )
             ),
-            post_comments (id),
-            post_reactions (id, reaction_type)
+            post_comments!post_comments_post_id_fkey (
+              id,
+              content,
+              created_at,
+              user_id,
+              profiles (
+                first_name,
+                last_name,
+                avatar_url
+              )
+            ),
+            post_reactions!post_reactions_post_stop_id_fkey (
+              id,
+              reaction_type,
+              user_id
+            )
           `);
 
         if (error) {
@@ -305,7 +356,7 @@ export default function Feed() {
               avatar_url,
               selected_title
             ),
-            post_comments (
+            post_comments!post_comments_post_id_fkey (
               id,
               content,
               created_at,
@@ -316,7 +367,7 @@ export default function Feed() {
                 avatar_url
               )
             ),
-            post_reactions (
+            post_reactions!post_reactions_post_hub_id_fkey (
               id,
               reaction_type,
               user_id

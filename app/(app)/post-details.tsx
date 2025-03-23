@@ -31,7 +31,7 @@ const PostDetails = () => {
         const { data: commentsData, error: commentsError } = await supabase
           .from('post_comments')
           .select('*, profiles (first_name, last_name, avatar_url)')
-          .or(`hub_post.eq.${postId},stop_post.eq.${stopPostId}`);
+          .or(`hub_post.eq.${postHubId},stop_post.eq.${stopPostId}`);
 
         if (commentsError) throw commentsError;
         setComments(commentsData || []);
@@ -43,8 +43,8 @@ const PostDetails = () => {
     };
 
     fetchPostDetails();
-  }, [postId, stopPostId]);
-  
+  }, [postHubId, stopPostId]);
+
   const handleCommentSubmit = async () => {
     if (!newComment.trim()) return;
 
@@ -60,7 +60,7 @@ const PostDetails = () => {
         .insert([
           { 
             content: newComment, 
-            hub_post: postId || null, 
+            hub_post: postHubId || null, 
             stop_post: stopPostId || null, 
             user_id: user.user.id 
           }

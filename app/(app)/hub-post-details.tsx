@@ -70,35 +70,37 @@ export default function HubPostDetailsScreen() {
     }
   }, [comments]);
 
-  const handleAddComment = async () => {
+const handleCommentSubmit = async () => {
     if (!newComment.trim()) return;
 
-    if (!profile) {
-      Alert.alert('Error', 'You must be logged in to add a comment.');
-      return;
-    }
-
     try {
-      const { data, error } = await supabase
+      const { data: user, error: userError } = await supabase.auth.getUser();
+      if (userError || !user?.user) {
+        Alert.alert('Error', 'You must be logged in to comment.');
+        return;
+      }
+
+      const { data: newCommentData, error } = await supabase
         .from('post_comments')
         .insert([
-          {
-            post_id: postId,
-            user_id: profile.id,
-            content: newComment,
-          },
+          { 
+            content: newComment, 
+            hub_post: postId || null, 
+            user_id: user.user.id 
+          }
         ])
-        .select();
+        .select('*, profiles (first_name, last_name, avatar_url)')
+        .single();
 
       if (error) throw error;
 
-      setComments([...comments, data[0]]);
+      setComments([...comments, newCommentData]);
       setNewComment('');
     } catch (error) {
-      console.error('Error adding comment:', error);
-      Alert.alert('Error', 'Failed to add comment. Please try again.');
+      Alert.alert('Error submitting comment', error.message);
     }
   };
+
 
   if (loading || profileLoading) {
     return (
@@ -192,7 +194,7 @@ export default function HubPostDetailsScreen() {
           />
           <Pressable
             style={[styles.commentButton, { backgroundColor: colors.primary }]}
-            onPress={handleAddComment}
+            onPress={handleCommentSubmit}
           >
             <MaterialCommunityIcons name="send" size={20} color={colors.text} />
           </Pressable>
