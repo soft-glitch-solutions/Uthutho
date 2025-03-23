@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext';
 import StopBlock from '../../../components/stop/StopBlock';
 import LoginStreakTracker from '@/components/LoginStreakTracker';
+import { AdMobBanner, setTestDeviceIDAsync } from 'expo-ads-admob';
 
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from 'expo-router';
@@ -99,6 +100,12 @@ export default function HomeScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [favoriteDetails, setFavoriteDetails] = useState([]); // State to store favorite details
   const navigation = useNavigation();
+
+
+  useEffect(() => {
+    // Initialize AdMob for testing
+    setTestDeviceIDAsync('EMULATOR');
+  }, []);
 
   // Fetch the user's profile
   useEffect(() => {
@@ -297,6 +304,15 @@ export default function HomeScreen() {
         <View style={styles.pointsContainer}>
           <Text style={[styles.pointsText, { color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
         </View>
+      </View>
+
+      <View style={styles.bannerContainer}>
+        <AdMobBanner
+          bannerSize="smartBannerPortrait"
+          adUnitID="ca-app-pub-3940256099942544/6300978111" // Test ID for Android
+          servePersonalizedAds
+          onDidFailToReceiveAdWithError={(error) => console.log(error)}
+        />
       </View>
 
       {/* Personalized Greeting */}
@@ -568,6 +584,11 @@ const styles = StyleSheet.create({
     width: '30%',
     borderRadius: 4,
     marginTop: 8,
+  },
+  bannerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   emptyFavoritesContainer: {
     flexDirection: 'row',

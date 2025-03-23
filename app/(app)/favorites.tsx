@@ -85,10 +85,12 @@ export default function FavoritesScreen() {
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [userFavorites, setUserFavorites] = useState([]);
+  const [suggestedHubs, setSuggestedHubs] = useState([]);
+  const [suggestedStops, setSuggestedStops] = useState([]);
   const { width } = useWindowDimensions(); // Get screen width
 
   // Calculate card width based on screen size
-  const cardWidth = width / 2 - 24; // 2 columns with 12px gap on each side
+  const cardWidth = width / 3 - 16; // 3 columns with 8px gap on each side
 
   useEffect(() => {
     const fetchFavorites = async () => {
@@ -103,6 +105,31 @@ export default function FavoritesScreen() {
       }
     };
     fetchFavorites();
+  }, []);
+
+  useEffect(() => {
+    const fetchSuggestedLocations = async () => {
+      try {
+        // Fetch 3 nearest hubs
+        const { data: hubs } = await supabase
+          .from('hubs')
+          .select('*')
+          .limit(3);
+
+        // Fetch 3 nearest stops
+        const { data: stops } = await supabase
+          .from('stops')
+          .select('*')
+          .limit(3);
+
+        setSuggestedHubs(hubs || []);
+        setSuggestedStops(stops || []);
+      } catch (error) {
+        console.error('Error fetching suggested locations:', error);
+      }
+    };
+
+    fetchSuggestedLocations();
   }, []);
 
   const handleSearch = async () => {
@@ -178,19 +205,17 @@ export default function FavoritesScreen() {
   const renderItem = ({ item }) => {
     const isFavorited = userFavorites.includes(item.id);
 
-    // Get image URL (assuming images are stored in Supabase Storage)
-
     return (
       <Pressable onPress={() => handleItemPress(item)}>
         <View style={[styles.card, { backgroundColor: colors.card, width: cardWidth }]}>
           {/* Display image if available */}
-          {item.image && ( // Check if item.image exists
-          <Image
-            source={{ uri: item.image }} // Use item.image as the source
-            style={styles.image}
-            resizeMode="cover"
-          />
-        )}
+          {item.image && (
+            <Image
+              source={{ uri: item.image }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+          )}
           <Text style={[styles.cardTitle, { color: colors.text }]}>{item.name}</Text>
           <Text style={[styles.cardType, { color: colors.primary }]}>
             {item.type.toUpperCase()}
@@ -220,17 +245,56 @@ export default function FavoritesScreen() {
         onChangeText={setSearchQuery}
         onSubmitEditing={handleSearch}
       />
-      {loading ? (
-        <SearchResultSkeleton colors={colors} />
-      ) : (
-        <FlatList
-          data={searchResults}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          numColumns={2} // Display items in a grid
-          contentContainerStyle={styles.grid}
-          columnWrapperStyle={styles.columnWrapper} // Add spacing between columns
-        />
+
+      {/* Display suggested hubs and stops if searchQuery is empty */}
+      {!searchQuery && (
+        <View>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Suggested Hubs</Text>
+          <View style={styles.grid}>
+            {suggestedHubs.map((hub) => (
+              <Pressable
+                key={hub.id}
+                onPress={() => handleItemPress({ ...hub, type: 'hub' })}
+              >
+                <View style={[styles.card, { backgroundColor: colors.card, width: cardWidth }]}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{hub.name}</Text>
+                  <Text style={[styles.cardType, { color: colors.primary }]}>HUB</Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 16 }]}>Suggested Stops</Text>
+          <View style={styles.grid}>
+            {suggestedStops.map((stop) => (
+              <Pressable
+                key={stop.id}
+                onPress={() => handleItemPress({ ...stop, type: 'stop' })}
+              >
+                <View style={[styles.card, { backgroundColor: colors.card, width: cardWidth }]}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{stop.name}</Text>
+                  <Text style={[styles.cardType, { color: colors.primary }]}>STOP</Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Display search results if searchQuery is not empty */}
+      {searchQuery && (
+        loading ? (
+          <SearchResultSkeleton colors={colors} />
+        ) : (
+          <FlatList
+            data={searchResults}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            numColumns={3} // Display items in a 3-column grid
+            contentContainerStyle={styles.grid}
+            columnWrapperStyle={styles.columnWrapper} // Add spacing between columns
+          />
+        )
       )}
     </View>
   );
@@ -291,5 +355,10 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 4,
     marginVertical: 4,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
   },
 });

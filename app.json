@@ -18,6 +18,13 @@
     "plugins": [
       "expo-router",
       "expo-localization"
+      [
+        "expo-ads-admob",
+        {
+          "androidAppId": "ca-app-pub-1853756758292263~5421703281",
+          "iosAppId": "ca-app-pub-1853756758292263~5421703281"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
