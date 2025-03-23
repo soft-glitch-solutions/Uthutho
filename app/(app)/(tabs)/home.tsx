@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Image, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Image, Alert, Animated, Platform  } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { Flag, MapPin, Route,  } from 'lucide-react-native'; // Import lucide-react-native icons
@@ -103,10 +103,11 @@ export default function HomeScreen() {
 
 
   useEffect(() => {
-    // Initialize AdMob for testing
-    setTestDeviceIDAsync('EMULATOR');
+    // Initialize AdMob for testing (only on mobile)
+    if (Platform.OS !== 'web') {
+      setTestDeviceIDAsync('EMULATOR');
+    }
   }, []);
-
   // Fetch the user's profile
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -306,14 +307,21 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <View style={styles.bannerContainer}>
-        <AdMobBanner
-          bannerSize="smartBannerPortrait"
-          adUnitID="ca-app-pub-3940256099942544/6300978111" // Test ID for Android
-          servePersonalizedAds
-          onDidFailToReceiveAdWithError={(error) => console.log(error)}
-        />
-      </View>
+      {/* Banner Ad (only on mobile) */}
+      {Platform.OS !== 'web' ? (
+        <View style={styles.bannerContainer}>
+          <AdMobBanner
+            bannerSize="smartBannerPortrait"
+            adUnitID="ca-app-pub-3940256099942544/6300978111" // Test ID for Android
+            servePersonalizedAds
+            onDidFailToReceiveAdWithError={(error) => console.log(error)}
+          />
+        </View>
+      ) : (
+        <View style={styles.bannerPlaceholder}>
+          <Text style={styles.bannerPlaceholderText}>Ad placeholder for web</Text>
+        </View>
+      )}
 
       {/* Personalized Greeting */}
       <View style={styles.header}>
