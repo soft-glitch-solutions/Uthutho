@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, Pressable, TextInput } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, Pressable, TextInput, Alert } from 'react-native';
+import { useLocalSearchParams, router  } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../context/ThemeContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useProfile } from '@/hook/useProfile';
 
 export default function HubPostDetailsScreen() {
   const { postId } = useLocalSearchParams();
@@ -12,6 +13,7 @@ export default function HubPostDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
+  const { profile, loading: profileLoading, error: profileError } = useProfile();
 
   useEffect(() => {
     const fetchPostDetails = async () => {
@@ -21,6 +23,7 @@ export default function HubPostDetailsScreen() {
           .select(`
             *,
             profiles (
+              id,
               first_name,
               last_name,
               avatar_url,
@@ -32,6 +35,7 @@ export default function HubPostDetailsScreen() {
               created_at,
               user_id,
               profiles (
+                id,
                 first_name,
                 last_name,
                 avatar_url
@@ -60,19 +64,27 @@ export default function HubPostDetailsScreen() {
     fetchPostDetails();
   }, [postId]);
 
+  useEffect(() => {
+    if (comments.length > 0) {
+      console.log('Comments data:', comments);
+    }
+  }, [comments]);
+
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
 
-    try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.user) throw new Error('User not logged in');
+    if (!profile) {
+      Alert.alert('Error', 'You must be logged in to add a comment.');
+      return;
+    }
 
+    try {
       const { data, error } = await supabase
         .from('post_comments')
         .insert([
           {
             post_id: postId,
-            user_id: session.user.id,
+            user_id: profile.id,
             content: newComment,
           },
         ])
@@ -84,10 +96,11 @@ export default function HubPostDetailsScreen() {
       setNewComment('');
     } catch (error) {
       console.error('Error adding comment:', error);
+      Alert.alert('Error', 'Failed to add comment. Please try again.');
     }
   };
 
-  if (loading) {
+  if (loading || profileLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -136,22 +149,37 @@ export default function HubPostDetailsScreen() {
         <Text style={[styles.commentsTitle, { color: colors.text }]}>
           Comments ({comments.length})
         </Text>
-        {comments.map((comment) => (
-          <View key={comment.id} style={styles.commentContainer}>
-            <Image
-              source={{ uri: comment.profiles.avatar_url || 'https://via.placeholder.com/50' }}
-              style={styles.commentAvatar}
-            />
-            <View style={styles.commentContent}>
-              <Text style={[styles.commentUserName, { color: colors.text }]}>
-                {comment.profiles.first_name} {comment.profiles.last_name}
-              </Text>
-              <Text style={[styles.commentText, { color: colors.text }]}>
-                {comment.content}
-              </Text>
+        {comments.map((comment) => {
+          const commentProfile = comment.profiles || {
+            first_name: 'Unknown',
+            last_name: 'User',
+            avatar_url: 'https://via.placeholder.com/50',
+          };
+
+          return (
+            <View key={comment.id} style={styles.commentContainer}>
+
+              <Image
+                source={{ uri: commentProfile.avatar_url }}
+                style={styles.commentAvatar}
+              />
+              <View style={styles.commentContent}>
+              <Pressable onPress={() => router.push(`/social-profile?id=${commentProfile.id}`)}>
+                <Text style={[styles.commentUserName, { color: colors.text }]}>
+                  {commentProfile.first_name} {commentProfile.last_name}
+                </Text>
+                </Pressable>
+                <Text style={[styles.selectedTitle, { color: colors.primary }]}>
+                    {commentProfile.selected_title}
+                 </Text>
+                <Text style={[styles.commentText, { color: colors.text }]}>
+                  {comment.content}
+                </Text>
+              </View>
+
             </View>
-          </View>
-        ))}
+          );
+        })}
 
         {/* Add Comment */}
         <View style={styles.addCommentContainer}>

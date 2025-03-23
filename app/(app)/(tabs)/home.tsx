@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, Animated, FlatList, RefreshControl, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Image, Alert, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { MaterialIcons } from '@expo/vector-icons';
+import { House, MapPin, Route } from 'lucide-react-native'; // Import lucide-react-native icons
 import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext';
-import StopBlock from '../../../components/stop/StopBlock'; // Import the StopBlock component
+import StopBlock from '../../../components/stop/StopBlock';
 import LoginStreakTracker from '@/components/LoginStreakTracker';
+
+import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from 'expo-router';
 
 const Shimmer = ({ children, colors }) => {
@@ -90,15 +92,12 @@ export default function HomeScreen() {
   const { colors } = useTheme();
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [favoriteInput, setFavoriteInput] = useState('');
   const [userProfile, setUserProfile] = useState(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [nearestLocations, setNearestLocations] = useState(null);
   const [isNearestLoading, setIsNearestLoading] = useState(false);
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null); // State to store the user ID
+  const [userId, setUserId] = useState<string | null>(null);
+  const [favoriteDetails, setFavoriteDetails] = useState([]); // State to store favorite details
   const navigation = useNavigation();
 
   // Fetch the user's profile
@@ -106,14 +105,14 @@ export default function HomeScreen() {
     const fetchUserProfile = async () => {
       try {
         const session = await supabase.auth.getSession();
-        const userId = session.data.session?.user.id; // Get the user ID
+        const userId = session.data.session?.user.id;
 
         if (!userId) {
           router.replace('/auth');
           return;
         }
 
-        setUserId(userId); // Set the user ID
+        setUserId(userId);
         const { data, error } = await supabase
           .from('profiles')
           .select('first_name, selected_title, favorites, points')
@@ -122,6 +121,17 @@ export default function HomeScreen() {
 
         if (error) throw error;
         setUserProfile(data);
+
+        // Fetch favorite details after profile is loaded
+        if (data?.favorites?.length) {
+          const details = await Promise.all(
+            data.favorites.map(async (favorite) => {
+              const details = await handleFavoritePress(favorite);
+              return { name: favorite, ...details };
+            })
+          );
+          setFavoriteDetails(details);
+        }
       } catch (error) {
         router.replace('/auth');
       } finally {
@@ -213,7 +223,7 @@ export default function HomeScreen() {
   };
 
   const openSidebar = () => {
-    navigation.toggleDrawer(); // Toggle the sidebar
+    navigation.toggleDrawer();
   };
 
   // Navigate to favorite details based on type
@@ -223,43 +233,42 @@ export default function HomeScreen() {
       const { data: hubData, error: hubError } = await supabase
         .from('hubs')
         .select('id')
-        .eq('name', favoriteName) // Look up by name
+        .eq('name', favoriteName)
         .single();
-  
+
       if (hubData && !hubError) {
-        router.push(`/hub-details?hubId=${hubData.id}`);
-        return;
+        return { type: 'hub', id: hubData.id };
       }
-  
+
       // Check if the favorite is a stop
       const { data: stopData, error: stopError } = await supabase
         .from('stops')
         .select('id')
-        .eq('name', favoriteName) // Look up by name
+        .eq('name', favoriteName)
         .single();
-  
+
       if (stopData && !stopError) {
-        router.push(`/stop-details?stopId=${stopData.id}`);
-        return;
+        return { type: 'stop', id: stopData.id };
       }
-  
+
       // Check if the favorite is a route
       const { data: routeData, error: routeError } = await supabase
         .from('routes')
         .select('id')
-        .eq('name', favoriteName) // Look up by name
+        .eq('name', favoriteName)
         .single();
-  
+
       if (routeData && !routeError) {
-        router.push(`/route-details?routeId=${routeData.id}`);
-        return;
+        return { type: 'route', id: routeData.id };
       }
-  
+
       // If the favorite type is unknown, show an error
       Alert.alert('Error', 'Favorite type not recognized.');
+      return null;
     } catch (error) {
       console.error('Error fetching favorite details:', error);
       Alert.alert('Error', 'Failed to fetch favorite details.');
+      return null;
     }
   };
 
@@ -273,28 +282,9 @@ export default function HomeScreen() {
     router.push(`/hub-details?hubId=${hubId}`);
   };
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const { data: fetchedData, error } = await supabase.from('your_table_name').select('*'); // Replace with your table name
-      if (error) throw error;
-      setData(fetchedData);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchData(); // Fetch data again
-    setRefreshing(false); // Reset refreshing state
-  };
-
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.topHeader}>
+<View style={styles.topHeader}>
         {/* Left Side: Logo and UTHUTHO Text */}
         <Pressable onPress={openSidebar} style={styles.logoContainer}>
           <Image
@@ -407,22 +397,41 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {userId && <LoginStreakTracker userId={userId} />}
-
       {/* Favorites List */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Favorites</Text>
         {isProfileLoading ? (
           <FavoritesSkeleton colors={colors} />
-        ) : userProfile?.favorites?.length ? (
+        ) : favoriteDetails.length ? (
           <View style={styles.grid}>
-            {userProfile.favorites.map((favorite, index) => (
+            {favoriteDetails.map((favorite, index) => (
               <Pressable
                 key={index}
                 style={[styles.card, { backgroundColor: colors.card }]}
-                onPress={() => handleFavoritePress(favorite)}
+                onPress={() => {
+                  if (favorite.type === 'hub') {
+                    router.push(`/hub-details?hubId=${favorite.id}`);
+                  } else if (favorite.type === 'stop') {
+                    router.push(`/stop-details?stopId=${favorite.id}`);
+                  } else if (favorite.type === 'route') {
+                    router.push(`/route-details?routeId=${favorite.id}`);
+                  }
+                }}
               >
-                <Text style={[styles.cardText, { color: colors.text }]}>{favorite}</Text>
+                <View style={styles.favoriteItem}>
+                  {favorite.type === 'hub' && (
+                    <House size={24} color={colors.text} /> // Use House icon for hubs
+                  )}
+                  {favorite.type === 'stop' && (
+                    <MapPin size={24} color={colors.text} /> // Use MapPin icon for stops
+                  )}
+                  {favorite.type === 'route' && (
+                    <Route size={24} color={colors.text} /> // Use Route icon for routes
+                  )}
+                  <Text style={[styles.cardText, { color: colors.text, marginLeft: 8 }]}>
+                    {favorite.name}
+                  </Text>
+                </View>
               </Pressable>
             ))}
           </View>
@@ -559,6 +568,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 10,
+  },
+  favoriteItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   addButton: {
     padding: 10,

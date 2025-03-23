@@ -256,7 +256,6 @@ function EkSeWall({ hubId, hub, colors }) {
     const now = new Date();
     const postDate = new Date(timestamp);
     const timeDiff = now.getTime() - postDate.getTime();
-    const [hub, setHub] = useState(null);
 
     const seconds = Math.floor(timeDiff / 1000);
     const minutes = Math.floor(seconds / 60);
