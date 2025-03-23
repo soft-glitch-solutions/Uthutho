@@ -16,52 +16,25 @@ const PostDetails = () => {
   useEffect(() => {
     const fetchPostDetails = async () => {
       try {
-        // Fetch post details
+        const postType = postId ? 'hub_posts' : 'stop_posts';
+        const postKey = postId || stopPostId;
+
         const { data: postData, error: postError } = await supabase
-          .from('hub_posts')
-          .select(`
-            *,
-            profiles (
-              first_name,
-              last_name,
-              avatar_url
-            )
-          `)
-          .eq('id', postId)
+          .from(postType)
+          .select('*, profiles (first_name, last_name, avatar_url)')
+          .eq('id', postKey)
           .single();
 
         if (postError) throw postError;
-
         setPost(postData);
 
-        // Fetch related hub details
-        if (postData.related_type === 'hub' && postData.related_id) {
-          const { data: hubData, error: hubError } = await supabase
-            .from('hubs')
-            .select('name')
-            .eq('id', postData.related_id)
-            .single();
-
-          if (hubError) throw hubError;
-          setRelatedHub(hubData);
-        }
-
-        // Fetch comments
         const { data: commentsData, error: commentsError } = await supabase
           .from('post_comments')
-          .select(`
-            *,
-            profiles (
-              first_name,
-              last_name,
-              avatar_url
-            )
-          `)
-          .eq('post_id', postId);
+          .select('*, profiles (first_name, last_name, avatar_url)')
+          .or(`hub_post.eq.${postId},stop_post.eq.${stopPostId}`);
 
         if (commentsError) throw commentsError;
-
-        setComments(commentsData);
+        setComments(commentsData || []);
       } catch (error) {
         Alert.alert('Error fetching post details', error.message);
       } finally {
@@ -70,35 +43,32 @@ const PostDetails = () => {
     };
 
     fetchPostDetails();
-  }, [postId]);
-
+  }, [postId, stopPostId]);
+  
   const handleCommentSubmit = async () => {
     if (!newComment.trim()) return;
 
     try {
-      const { error } = await supabase
+      const { data: user, error: userError } = await supabase.auth.getUser();
+      if (userError || !user?.user) {
+        Alert.alert('Error', 'You must be logged in to comment.');
+        return;
+      }
+
+      const { data: newCommentData, error } = await supabase
         .from('post_comments')
         .insert([
-          { content: newComment, post_id: postId, user_id: supabase.auth.user()?.id }
-        ]);
-
-      if (error) throw error;
-
-      // Add the new comment to the list
-      const { data: newCommentData, error: newCommentError } = await supabase
-        .from('post_comments')
-        .select(`
-          *,
-          profiles (
-            first_name,
-            last_name,
-            avatar_url
-          )
-        `)
-        .eq('id', postId)
+          { 
+            content: newComment, 
+            hub_post: postId || null, 
+            stop_post: stopPostId || null, 
+            user_id: user.user.id 
+          }
+        ])
+        .select('*, profiles (first_name, last_name, avatar_url)')
         .single();
 
-      if (newCommentError) throw newCommentError;
+      if (error) throw error;
 
       setComments([...comments, newCommentData]);
       setNewComment('');
@@ -106,6 +76,7 @@ const PostDetails = () => {
       Alert.alert('Error submitting comment', error.message);
     }
   };
+
 
   if (loading) {
     return (

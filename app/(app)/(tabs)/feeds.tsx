@@ -155,7 +155,7 @@ export default function Feed() {
         .from('profiles')
         .select('favorites') // Assuming 'favorites' contains the hub IDs
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 

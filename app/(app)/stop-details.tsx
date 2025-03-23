@@ -28,9 +28,11 @@ export default function StopDetailsScreen() {
   const [newPostContent, setNewPostContent] = useState('');
   const [showAddPost, setShowAddPost] = useState(false); // State to control visibility of the "Add Post" section
   const router = useRouter();
+  const [nearbyStops, setNearbyStops] = useState([]);
 
   useEffect(() => {
     fetchStopDetails();
+    fetchNearbyStops(); 
   }, [stopId]);
 
   const fetchStopDetails = async () => {
@@ -87,6 +89,23 @@ export default function StopDetailsScreen() {
   const handlePostPress = (postId) => {
     router.push(`/stop-post-details?postId=${postId}`); // Navigate to stop post details
   };
+
+  const fetchNearbyStops = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('nearby_spots')
+        .select('*')
+        .eq('stop_id', stopId);
+  
+      if (error) throw error;
+  
+      setNearbyStops(data);
+    } catch (error) {
+      console.error('Error fetching nearby stops:', error);
+      Alert.alert('Error', 'Failed to fetch nearby stops.');
+    }
+  };
+  
 
   const handleSharePost = async (postContent) => {
     try {
@@ -166,6 +185,7 @@ export default function StopDetailsScreen() {
           <Text style={[styles.waitingCount, { color: colors.text }]}>
             People waiting: {stopDetails.stop_posts.length}
           </Text>
+
           <TouchableOpacity
             onPress={openMap}
             style={[styles.mapButton, { backgroundColor: colors.primary }]}
@@ -174,6 +194,7 @@ export default function StopDetailsScreen() {
           </TouchableOpacity>
         </View>
 
+
         <StopBlock
           stopId={stopId}
           stopName={stopDetails.name}
@@ -181,6 +202,33 @@ export default function StopDetailsScreen() {
           colors={colors}
           radius={0.5}
         />
+
+<View style={styles.section}>
+  <Text style={[styles.sectionTitle, { color: colors.text }]}>Nearby Spots</Text>
+  {nearbyStops.length > 0 ? (
+    nearbyStops.map((stop) => (
+      <View key={stop.id} style={[styles.nearbyStopContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.nearbyStopName, { color: colors.text }]}>{stop.name}</Text>
+        {stop.description && (
+          <Text style={[styles.nearbyStopDescription, { color: colors.textSecondary }]}>
+            {stop.description}
+          </Text>
+        )}
+        {stop.distance_meters && (
+          <Text style={[styles.nearbyStopDistance, { color: colors.textSecondary }]}>
+            {stop.distance_meters} meters away
+          </Text>
+        )}
+      </View>
+    ))
+  ) : (
+    <View style={styles.noNearbyStopsContainer}>
+      <Text style={[styles.noNearbyStopsText, { color: colors.text }]}>
+        No nearby stops found.
+      </Text>
+    </View>
+  )}
+</View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -300,6 +348,40 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 5,
     elevation: 3,
+  },
+  nearbyStopContainer: {
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  nearbyStopName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  nearbyStopDescription: {
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  nearbyStopDistance: {
+    fontSize: 12,
+    color: '#666',
+  },
+  noNearbyStopsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 20,
+  },
+  noNearbyStopsText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 10,
   },
   postHeader: {
     flexDirection: 'row',

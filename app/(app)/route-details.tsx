@@ -335,9 +335,11 @@ export default function RouteDetailsScreen() {
               <Text style={[styles.requestText, { color: colors.text }]}>
                 Status: {request.status}
               </Text>
+            <Pressable onPress={() => router.push(`/social-profile?id=${request.profiles.id}`)}>
               <Text style={[styles.requestText, { color: colors.text }]}>
                 Requested by: {request.profiles.first_name} {request.profiles.last_name}
               </Text>
+              </Pressable>
             </View>
           ))
         ) : (

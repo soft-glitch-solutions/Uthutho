@@ -7,91 +7,52 @@ import {
   FlatList,
   Pressable,
   Image,
-  Animated,
+  ActivityIndicator,
   useWindowDimensions,
+  Animated,
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import { Ionicons } from '@expo/vector-icons'; // Import icons
-import { useRouter } from 'expo-router'; // Import router for navigation
-
-// Add the Shimmer component
-const Shimmer = ({ children, colors }) => {
-  const animatedValue = new Animated.Value(0);
-
-  React.useEffect(() => {
-    const shimmerAnimation = () => {
-      Animated.sequence([
-        Animated.timing(animatedValue, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(animatedValue, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ]).start(() => shimmerAnimation());
-    };
-
-    shimmerAnimation();
-  }, []);
-
-  const translateX = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-100, 100],
-  });
-
-  return (
-    <View style={{ overflow: 'hidden' }}>
-      {children}
-      <Animated.View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: colors.text,
-          opacity: 0.1,
-          transform: [{ translateX }],
-        }}
-      />
-    </View>
-  );
-};
-
-// Add skeleton components
-const SearchResultSkeleton = ({ colors }) => {
-  return (
-    <View style={styles.grid}>
-      {[1, 2, 3].map((i) => (
-        <Shimmer key={i} colors={colors}>
-          <View style={[styles.card, { backgroundColor: colors.card }]}>
-            <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '60%' }]} />
-            <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '80%' }]} />
-          </View>
-        </Shimmer>
-      ))}
-    </View>
-  );
-};
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import * as Location from 'expo-location';
 
 export default function FavoritesScreen() {
   const { colors } = useTheme();
-  const router = useRouter(); // Initialize router
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [userFavorites, setUserFavorites] = useState([]);
   const [suggestedHubs, setSuggestedHubs] = useState([]);
   const [suggestedStops, setSuggestedStops] = useState([]);
-  const { width } = useWindowDimensions(); // Get screen width
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationError, setLocationError] = useState(null);
+  const { width } = useWindowDimensions();
+  const cardWidth = width / 2 - 16; // 3 columns with 8px gap on each side
 
-  // Calculate card width based on screen size
-  const cardWidth = width / 3 - 16; // 3 columns with 8px gap on each side
+  // Fetch user location
+  useEffect(() => {
+    const fetchUserLocation = async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setLocationError('Permission to access location was denied');
+          return;
+        }
 
+        let location = await Location.getCurrentPositionAsync({});
+        setUserLocation(location.coords);
+      } catch (error) {
+        console.error('Error fetching location:', error);
+        setLocationError('Unable to fetch location');
+      }
+    };
+
+    fetchUserLocation();
+  }, []);
+
+  // Fetch user favorites
   useEffect(() => {
     const fetchFavorites = async () => {
       const userId = (await supabase.auth.getSession()).data.session?.user.id;
@@ -107,56 +68,80 @@ export default function FavoritesScreen() {
     fetchFavorites();
   }, []);
 
+  // Fetch suggested hubs and stops
   useEffect(() => {
     const fetchSuggestedLocations = async () => {
+      if (!userLocation) return;
+
       try {
-        // Fetch 3 nearest hubs
-        const { data: hubs } = await supabase
-          .from('hubs')
-          .select('*')
-          .limit(3);
+        const { data: hubs } = await supabase.from('hubs').select('*');
+        const { data: stops } = await supabase.from('stops').select('*');
 
-        // Fetch 3 nearest stops
-        const { data: stops } = await supabase
-          .from('stops')
-          .select('*')
-          .limit(3);
+        const calculateDistance = (lat1, lon1, lat2, lon2) => {
+          const toRadians = (degrees) => (degrees * Math.PI) / 180;
+          const R = 6371; // Earth's radius in km
+          const dLat = toRadians(lat2 - lat1);
+          const dLon = toRadians(lon2 - lon1);
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRadians(lat1)) *
+              Math.cos(toRadians(lat2)) *
+              Math.sin(dLon / 2) *
+              Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          return R * c * 1000; // Distance in meters
+        };
 
-        setSuggestedHubs(hubs || []);
-        setSuggestedStops(stops || []);
+        const hubsWithDistance = hubs.map((hub) => ({
+          ...hub,
+          type: 'hub',
+          distance: calculateDistance(
+            userLocation.latitude,
+            userLocation.longitude,
+            hub.latitude,
+            hub.longitude
+          ),
+        }));
+
+        const stopsWithDistance = stops.map((stop) => ({
+          ...stop,
+          type: 'stop',
+          distance: calculateDistance(
+            userLocation.latitude,
+            userLocation.longitude,
+            stop.latitude,
+            stop.longitude
+          ),
+        }));
+
+        const sortedHubs = hubsWithDistance.sort((a, b) => a.distance - b.distance);
+        const sortedStops = stopsWithDistance.sort((a, b) => a.distance - b.distance);
+
+        setSuggestedHubs(sortedHubs.slice(0, 2));
+        setSuggestedStops(sortedStops.slice(0, 2));
       } catch (error) {
         console.error('Error fetching suggested locations:', error);
       }
     };
 
     fetchSuggestedLocations();
-  }, []);
+  }, [userLocation]);
 
   const handleSearch = async () => {
     setLoading(true);
     try {
-      // Fetch hubs
       const { data: hubs } = await supabase
         .from('hubs')
         .select('*')
         .ilike('name', `%${searchQuery}%`);
 
-      // Fetch routes
-      const { data: routes } = await supabase
-        .from('routes')
-        .select('*')
-        .ilike('name', `%${searchQuery}%`);
-
-      // Fetch stops
       const { data: stops } = await supabase
         .from('stops')
         .select('*')
         .ilike('name', `%${searchQuery}%`);
 
-      // Combine results into a single array
       const combinedResults = [
         ...(hubs ? hubs.map((hub) => ({ ...hub, type: 'hub' })) : []),
-        ...(routes ? routes.map((route) => ({ ...route, type: 'route' })) : []),
         ...(stops ? stops.map((stop) => ({ ...stop, type: 'stop' })) : []),
       ];
 
@@ -192,11 +177,8 @@ export default function FavoritesScreen() {
   };
 
   const handleItemPress = (item) => {
-    // Navigate to the respective details screen based on the item type
     if (item.type === 'hub') {
       router.push(`/hub-details?hubId=${item.id}`);
-    } else if (item.type === 'route') {
-      router.push(`/route-details?routeId=${item.id}`);
     } else if (item.type === 'stop') {
       router.push(`/stop-details?stopId=${item.id}`);
     }
@@ -208,7 +190,6 @@ export default function FavoritesScreen() {
     return (
       <Pressable onPress={() => handleItemPress(item)}>
         <View style={[styles.card, { backgroundColor: colors.card, width: cardWidth }]}>
-          {/* Display image if available */}
           {item.image && (
             <Image
               source={{ uri: item.image }}
@@ -219,6 +200,9 @@ export default function FavoritesScreen() {
           <Text style={[styles.cardTitle, { color: colors.text }]}>{item.name}</Text>
           <Text style={[styles.cardType, { color: colors.primary }]}>
             {item.type.toUpperCase()}
+          </Text>
+          <Text style={[styles.distanceText, { color: colors.textSecondary }]}>
+            {item.distance.toFixed(0)} meters away
           </Text>
           <Pressable
             onPress={() => toggleFavorite(item)}
@@ -246,7 +230,6 @@ export default function FavoritesScreen() {
         onSubmitEditing={handleSearch}
       />
 
-      {/* Display suggested hubs and stops if searchQuery is empty */}
       {!searchQuery && (
         <View>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Suggested Hubs</Text>
@@ -259,6 +242,19 @@ export default function FavoritesScreen() {
                 <View style={[styles.card, { backgroundColor: colors.card, width: cardWidth }]}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{hub.name}</Text>
                   <Text style={[styles.cardType, { color: colors.primary }]}>HUB</Text>
+                  <Text style={[styles.distanceText, { color: colors.textSecondary }]}>
+                    {hub.distance.toFixed(0)} meters away
+                  </Text>
+                  <Pressable
+                    onPress={() => toggleFavorite(hub)}
+                    style={styles.favoriteButton}
+                  >
+                    <Ionicons
+                      name={userFavorites.includes(hub.id) ? 'heart' : 'heart-outline'}
+                      size={24}
+                      color={userFavorites.includes(hub.id) ? colors.primary : colors.text}
+                    />
+                  </Pressable>
                 </View>
               </Pressable>
             ))}
@@ -274,6 +270,19 @@ export default function FavoritesScreen() {
                 <View style={[styles.card, { backgroundColor: colors.card, width: cardWidth }]}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{stop.name}</Text>
                   <Text style={[styles.cardType, { color: colors.primary }]}>STOP</Text>
+                  <Text style={[styles.distanceText, { color: colors.textSecondary }]}>
+                    {stop.distance.toFixed(0)} meters away
+                  </Text>
+                  <Pressable
+                    onPress={() => toggleFavorite(stop)}
+                    style={styles.favoriteButton}
+                  >
+                    <Ionicons
+                      name={userFavorites.includes(stop.id) ? 'heart' : 'heart-outline'}
+                      size={24}
+                      color={userFavorites.includes(stop.id) ? colors.primary : colors.text}
+                    />
+                  </Pressable>
                 </View>
               </Pressable>
             ))}
@@ -281,18 +290,16 @@ export default function FavoritesScreen() {
         </View>
       )}
 
-      {/* Display search results if searchQuery is not empty */}
       {searchQuery && (
         loading ? (
-          <SearchResultSkeleton colors={colors} />
+          <ActivityIndicator size="large" color={colors.primary} />
         ) : (
           <FlatList
             data={searchResults}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
-            numColumns={3} // Display items in a 3-column grid
+            numColumns={2}
             contentContainerStyle={styles.grid}
-            columnWrapperStyle={styles.columnWrapper} // Add spacing between columns
           />
         )
       )}
@@ -317,10 +324,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  columnWrapper: {
-    justifyContent: 'space-between', // Add spacing between columns
-    marginBottom: 16, // Add vertical spacing between rows
-  },
   card: {
     borderRadius: 8,
     padding: 16,
@@ -330,7 +333,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
     marginBottom: 10,
-    marginLeft: 5,
   },
   cardTitle: {
     fontSize: 16,
@@ -342,6 +344,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
   },
+  distanceText: {
+    fontSize: 12,
+    marginBottom: 8,
+  },
   image: {
     width: '100%',
     height: 100,
@@ -350,11 +356,6 @@ const styles = StyleSheet.create({
   },
   favoriteButton: {
     alignSelf: 'flex-end',
-  },
-  skeletonText: {
-    height: 14,
-    borderRadius: 4,
-    marginVertical: 4,
   },
   sectionTitle: {
     fontSize: 18,
