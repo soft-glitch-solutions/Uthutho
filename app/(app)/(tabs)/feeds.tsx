@@ -15,15 +15,14 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native';
-import { supabase } from '../../../lib/supabase'; // Adjust the path
+import { supabase } from '../../../lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
-import { useTheme } from '../../../context/ThemeContext'; // Import useTheme
-import { useRouter } from 'expo-router'; // Ensure you have this import
+import { useTheme } from '../../../context/ThemeContext';
+import { useRouter } from 'expo-router';
 import * as Animatable from 'react-native-animatable';
-import { Picker } from '@react-native-picker/picker'; // Import Picker
-import { MaterialCommunityIcons } from '@expo/vector-icons'; // Importing Expo vector icons
+import { Picker } from '@react-native-picker/picker';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-// Add this component above your PostSkeleton component
 const Shimmer = ({ children, colors }) => {
   const animatedValue = new Animated.Value(0);
 
@@ -70,7 +69,6 @@ const Shimmer = ({ children, colors }) => {
   );
 };
 
-// Add this new component for the skeleton
 const PostSkeleton = ({ colors }) => {
   return (
     <Shimmer colors={colors}>
@@ -99,28 +97,19 @@ const PostSkeleton = ({ colors }) => {
   );
 };
 
-// Define the emoji reactions
-const reactions = [
-  { id: 'heart', emoji: '❤️' },
-  { id: 'laugh', emoji: '😂' },
-  { id: 'shit', emoji: '💩' },
-  { id: 'middleFinger', emoji: '🖕' },
-  { id: 'angry', emoji: '😡' },
-];
-
 export default function Feed() {
-  const { colors } = useTheme(); // Get theme colors
+  const { colors } = useTheme();
   const [selectedPost, setSelectedPost] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
   const [posts, setPosts] = useState([]);
   const [selectedPostDetails, setSelectedPostDetails] = useState(null);
   const [isPostsLoading, setIsPostsLoading] = useState(true);
-  const [profiles, setProfiles] = useState(null); // State to hold user profile data
+  const [profiles, setProfiles] = useState(null);
   const [isPostDetailsLoading, setIsPostDetailsLoading] = useState(false);
   const [isCreatingComment, setIsCreatingComment] = useState(false);
-  const [isCommentDialogVisible, setIsCommentDialogVisible] = useState(false); // For comment dialog
-  const [refreshing, setRefreshing] = useState(false); // State for refreshing
-  const router = useRouter(); // Initialize the router
+  const [isCommentDialogVisible, setIsCommentDialogVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const router = useRouter();
   const [selectedPostId, setSelectedPostId] = useState(null);
   const [selectedReaction, setSelectedReaction] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -129,7 +118,7 @@ export default function Feed() {
   const [hubPosts, setHubPosts] = useState([]);
   const [stopPosts, setStopPosts] = useState([]);
   const [reactionModalVisible, setReactionModalVisible] = useState(false);
-  const [showReactions, setShowReactions] = useState({}); // Track which post's reactions are shown
+  const [showReactions, setShowReactions] = useState({});
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -144,7 +133,7 @@ export default function Feed() {
         if (error) {
           console.error('Error fetching user profile:', error);
         } else {
-          setProfiles(data); // Store the user profile data
+          setProfiles(data);
         }
       }
     };
@@ -165,7 +154,7 @@ export default function Feed() {
       return;
     }
 
-    const userId = session?.session?.user.id; // Get the userId from the session
+    const userId = session?.session?.user.id;
 
     if (!userId) {
       console.error('User ID not found in session.');
@@ -176,13 +165,12 @@ export default function Feed() {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('favorites') // Assuming 'favorites' contains the hub IDs
+        .select('favorites')
         .eq('id', userId)
         .maybeSingle();
 
       if (error) throw error;
 
-      // Assuming favorites is an array of hub IDs
       setFavoriteHubs(profile.favorites || []);
     } catch (error) {
       console.error('Error fetching favorites:', error);
@@ -190,202 +178,183 @@ export default function Feed() {
     }
   };
 
-  useEffect(() => {
-    const fetchHubPosts = async () => {
-      try {
-        const { data: postsData, error } = await supabase
-          .from('hub_posts')
-          .select(`
-            *,
-            profiles (
-              id,
-              first_name,
-              last_name,
-              avatar_url,
-              selected_title
-            ),
-            hubs (
-              id,
-              name
-            ),
-            post_reactions!post_reactions_post_hub_id_fkey (
-              id,
-              reaction_type,
-              user_id
-            )
-          `);
-
-        if (error) {
-          console.error('Error fetching hub posts:', error.message);
-          Alert.alert('Error fetching hub posts', error.message);
-          return;
-        }
-
-        // Filter and delete posts older than a day
-        const now = new Date();
-        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-        for (const post of postsData) {
-          const postDate = new Date(post.created_at);
-          if (postDate < oneDayAgo) {
-            const { error: deleteError } = await supabase
-              .from('hub_posts')
-              .delete()
-              .eq('id', post.id);
-
-            if (deleteError) {
-              console.error('Error deleting post:', deleteError);
-              Alert.alert('Error', 'Failed to delete old hub post.');
-            }
-          }
-        }
-
-        // Filter out deleted posts
-        const filteredPosts = postsData.filter(post => new Date(post.created_at) >= oneDayAgo);
-        setHubPosts(filteredPosts);
-      } catch (error) {
-        console.error('Error fetching hub posts:', error);
-      }
-    };
-
-    const fetchStopPosts = async () => {
-      try {
-        const { data: postsData, error } = await supabase
-          .from('stop_posts')
-          .select(`
-            *,
-            profiles (
-              id,
-              first_name,
-              last_name,
-              avatar_url,
-              selected_title
-            ),
-            stops (
-              id,
-              name,
-              routes (
-                name
-              )
-            ),
-        
-            post_reactions!post_reactions_post_stop_id_fkey (
-              id,
-              reaction_type,
-              user_id
-            )
-          `);
-
-        if (error) {
-          console.error('Error fetching stop posts:', error.message);
-          Alert.alert('Error fetching stop posts', error.message);
-          return;
-        }
-
-        // Filter and delete posts older than a day
-        const now = new Date();
-        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-        for (const post of postsData) {
-          const postDate = new Date(post.created_at);
-          if (postDate < oneDayAgo) {
-            const { error: deleteError } = await supabase
-              .from('stop_posts')
-              .delete()
-              .eq('id', post.id);
-
-            if (deleteError) {
-              console.error('Error deleting post:', deleteError);
-              Alert.alert('Error', 'Failed to delete old stop post.');
-            }
-          }
-        }
-
-        // Filter out deleted posts
-        const filteredPosts = postsData.filter(post => new Date(post.created_at) >= oneDayAgo);
-        setStopPosts(filteredPosts);
-      } catch (error) {
-        console.error('Error fetching stop posts:', error);
-      }
-    };
-
-    const fetchPosts = async () => {
-      setIsPostsLoading(true);
-      await Promise.all([fetchHubPosts(), fetchStopPosts()]);
-      setIsPostsLoading(false);
-    };
-
-    fetchPosts();
-  }, []);
-
-  // Fetch selected post details
-  useEffect(() => {
-    const fetchPostDetails = async () => {
-      if (!selectedPost) return;
-
-      setIsPostDetailsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('hub_posts')
-          .select(`
-            *,
-            profiles (
-              first_name,
-              last_name,
-              avatar_url,
-              selected_title
-            ),
-            post_reactions!post_reactions_post_hub_id_fkey (
-              id,
-              reaction_type,
-              user_id
-            )
-          `)
-          .eq('id', selectedPost)
-          .single();
-
-        if (error) {
-          throw error;
-        }
-        setSelectedPostDetails(data);
-      } catch (error) {
-        console.error(`Error fetching post ${selectedPost} details:`, error);
-        alert('Failed to fetch post details');
-      } finally {
-        setIsPostDetailsLoading(false);
-      }
-    };
-
-    fetchPostDetails();
-  }, [selectedPost]);
-
-
-
-  // Share post
-  const handleSharePost = async (post) => {
+  const fetchCommentCounts = async (postIds: string[], postType: 'hub' | 'stop') => {
     try {
-      const shareContent = {
-        message: `Check out this post from ${post.profiles?.first_name} ${post.profiles?.last_name}:\n\n"${post.content}"\n\nPosted at ${post.stop_name || 'Unknown Stop'}`,
-      };
+      const columnName = postType === 'hub' ? 'hub_post' : 'stop_post';
+      const { data, error } = await supabase
+        .from('post_comments')
+        .select(columnName)
+        .in(columnName, postIds);
 
-      await Share.share(shareContent);
+      if (error) throw error;
+
+      const counts = {};
+      data.forEach(comment => {
+        const postId = comment[columnName];
+        counts[postId] = (counts[postId] || 0) + 1;
+      });
+
+      return counts;
     } catch (error) {
-      console.error('Error sharing post:', error);
-      alert('Failed to share post');
+      console.error('Error fetching comment counts:', error);
+      return {};
     }
   };
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchPosts(); // Fetch posts again
-    setRefreshing(false); // Reset refreshing state
+  const fetchHubPosts = async () => {
+    try {
+      const { data: postsData, error } = await supabase
+        .from('hub_posts')
+        .select(`
+          *,
+          profiles (
+            id,
+            first_name,
+            last_name,
+            avatar_url,
+            selected_title
+          ),
+          hubs (
+            id,
+            name
+          ),
+          post_reactions!post_reactions_post_hub_id_fkey (
+            id,
+            reaction_type,
+            user_id
+          )
+        `);
+
+      if (error) {
+        console.error('Error fetching hub posts:', error.message);
+        Alert.alert('Error fetching hub posts', error.message);
+        return;
+      }
+
+      const now = new Date();
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      for (const post of postsData) {
+        const postDate = new Date(post.created_at);
+        if (postDate < oneDayAgo) {
+          const { error: deleteError } = await supabase
+            .from('hub_posts')
+            .delete()
+            .eq('id', post.id);
+
+          if (deleteError) {
+            console.error('Error deleting post:', deleteError);
+            Alert.alert('Error', 'Failed to delete old hub post.');
+          }
+        }
+      }
+
+      const filteredPosts = postsData.filter(post => new Date(post.created_at) >= oneDayAgo);
+      const hubPostIds = filteredPosts.map(post => post.id);
+      const hubCommentCounts = await fetchCommentCounts(hubPostIds, 'hub');
+
+      return filteredPosts.map(post => ({
+        ...post,
+        commentCount: hubCommentCounts[post.id] || 0,
+        type: 'hub'
+      }));
+    } catch (error) {
+      console.error('Error fetching hub posts:', error);
+      return [];
+    }
   };
 
+  const fetchStopPosts = async () => {
+    try {
+      const { data: postsData, error } = await supabase
+        .from('stop_posts')
+        .select(`
+          *,
+          profiles (
+            id,
+            first_name,
+            last_name,
+            avatar_url,
+            selected_title
+          ),
+          stops (
+            id,
+            name,
+            routes (
+              name
+            )
+          ),
+          post_reactions!post_reactions_post_stop_id_fkey (
+            id,
+            reaction_type,
+            user_id
+          )
+        `);
+
+      if (error) {
+        console.error('Error fetching stop posts:', error.message);
+        Alert.alert('Error fetching stop posts', error.message);
+        return;
+      }
+
+      const now = new Date();
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      for (const post of postsData) {
+        const postDate = new Date(post.created_at);
+        if (postDate < oneDayAgo) {
+          const { error: deleteError } = await supabase
+            .from('stop_posts')
+            .delete()
+            .eq('id', post.id);
+
+          if (deleteError) {
+            console.error('Error deleting post:', deleteError);
+            Alert.alert('Error', 'Failed to delete old stop post.');
+          }
+        }
+      }
+
+      const filteredPosts = postsData.filter(post => new Date(post.created_at) >= oneDayAgo);
+      const stopPostIds = filteredPosts.map(post => post.id);
+      const stopCommentCounts = await fetchCommentCounts(stopPostIds, 'stop');
+
+      return filteredPosts.map(post => ({
+        ...post,
+        commentCount: stopCommentCounts[post.id] || 0,
+        type: 'stop'
+      }));
+    } catch (error) {
+      console.error('Error fetching stop posts:', error);
+      return [];
+    }
+  };
+
+  const fetchPosts = async () => {
+    setIsPostsLoading(true);
+    try {
+      const [hubPostsData, stopPostsData] = await Promise.all([
+        fetchHubPosts(),
+        fetchStopPosts()
+      ]);
+      
+      setHubPosts(hubPostsData);
+      setStopPosts(stopPostsData);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+    } finally {
+      setIsPostsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
   const handleReactionPress = (postId) => {
-    console.log(`Toggling reactions for post ID: ${postId}`);
     setShowReactions((prev) => ({
       ...prev,
-      [postId]: !prev[postId], // Toggle the visibility of reactions for the selected post
+      [postId]: !prev[postId],
     }));
   };
 
@@ -397,7 +366,6 @@ export default function Feed() {
     }
   
     try {
-      // Check if the post exists in hub_posts
       const { data: hubPost, error: hubPostError } = await supabase
         .from('hub_posts')
         .select('id')
@@ -408,7 +376,6 @@ export default function Feed() {
       if (hubPost && !hubPostError) {
         postType = 'hub';
       } else {
-        // Check if the post exists in stop_posts
         const { data: stopPost, error: stopPostError } = await supabase
           .from('stop_posts')
           .select('id')
@@ -424,7 +391,6 @@ export default function Feed() {
         }
       }
   
-      // Determine which column to use based on the post type
       const reactionData = {
         user_id: userSession.session.user.id,
         reaction_type: reactionType,
@@ -437,7 +403,6 @@ export default function Feed() {
         reactionData.post_stop_id = postId;
       }
   
-      // Check for existing reaction
       const { data: existingReaction, error: fetchError } = await supabase
         .from('post_reactions')
         .select('id')
@@ -452,7 +417,6 @@ export default function Feed() {
       }
   
       if (existingReaction) {
-        // Update existing reaction
         const { error: updateError } = await supabase
           .from('post_reactions')
           .update({ reaction_type: reactionType })
@@ -461,11 +425,8 @@ export default function Feed() {
         if (updateError) {
           console.error('Error updating existing reaction:', updateError.message);
           Alert.alert('Error', 'Failed to update existing reaction.');
-        } else {
-          console.log(`Updated existing reaction to ${reactionType} for post ID: ${postId}`);
         }
       } else {
-        // Insert new reaction
         const { error: insertError } = await supabase
           .from('post_reactions')
           .insert(reactionData);
@@ -473,18 +434,16 @@ export default function Feed() {
         if (insertError) {
           console.error('Error inserting new reaction:', insertError.message);
           Alert.alert('Error', 'Failed to insert new reaction.');
-        } else {
-          console.log(`Inserted new ${reactionType} reaction for post ID: ${postId}`);
         }
       }
   
-      // Refresh posts to show updated reactions
       fetchPosts();
     } catch (error) {
       console.error('Error handling reaction:', error);
       Alert.alert('Error', 'Failed to react to the post.');
     }
   };
+
   const formatTimeAgo = (timestamp) => {
     const now = new Date();
     const postDate = new Date(timestamp);
@@ -503,31 +462,43 @@ export default function Feed() {
 
   const handlePostPress = async (post) => {
     if (post.type === 'hub') {
-      router.push(`/hub-post-details?postId=${post.id}`); // Navigate to hub post details
+      router.push({
+        pathname: '/hub-post-details',
+        params: { 
+          postId: post.id,
+          commentCount: post.commentCount || 0 
+        }
+      });
     } else if (post.type === 'stop') {
-      router.push(`/stop-post-details?postId=${post.id}`); // Navigate to stop post details
+      router.push({
+        pathname: '/stop-post-details',
+        params: { 
+          postId: post.id,
+          commentCount: post.commentCount || 0 
+        }
+      });
     }
   };
 
-  const renderReactionOptions = (postId, postType) => (
+  const renderReactionOptions = (postId) => (
     <View style={styles.reactionOptions}>
-      <Pressable onPress={() => handleReactionSelect('like', postId, postType)}>
+      <Pressable onPress={() => handleReactionSelect('like', postId)}>
         <MaterialCommunityIcons name="thumb-up" size={24} color={colors.text} />
       </Pressable>
-      <Pressable onPress={() => handleReactionSelect('love', postId, postType)}>
+      <Pressable onPress={() => handleReactionSelect('love', postId)}>
         <MaterialCommunityIcons name="heart" size={24} color={colors.text} />
       </Pressable>
-      <Pressable onPress={() => handleReactionSelect('laugh', postId, postType)}>
+      <Pressable onPress={() => handleReactionSelect('laugh', postId)}>
         <MaterialCommunityIcons name="emoticon-happy" size={24} color={colors.text} />
       </Pressable>
-      <Pressable onPress={() => handleReactionSelect('sad', postId, postType)}>
+      <Pressable onPress={() => handleReactionSelect('sad', postId)}>
         <MaterialCommunityIcons name="emoticon-sad" size={24} color={colors.text} />
       </Pressable>
-      <Pressable onPress={() => handleReactionSelect('angry', postId, postType)}>
+      <Pressable onPress={() => handleReactionSelect('angry', postId)}>
         <MaterialCommunityIcons name="emoticon-angry" size={24} color={colors.text} />
       </Pressable>
     </View>
-);
+  );
 
   const renderPost = ({ item }) => (
     <TouchableOpacity onPress={() => handlePostPress(item)} style={[styles.postContainer, { backgroundColor: colors.card }]}>
@@ -537,11 +508,11 @@ export default function Feed() {
           style={styles.avatar}
         />
         <View style={styles.postHeaderText}>
-        <Pressable onPress={() => router.push(`/social-profile?id=${item.profiles.id}`)}>
-        <Text style={[styles.userName, { color: colors.text }]}>
-          {item.profiles.first_name} {item.profiles.last_name}
-        </Text>
-      </Pressable>
+          <Pressable onPress={() => router.push(`/social-profile?id=${item.profiles.id}`)}>
+            <Text style={[styles.userName, { color: colors.text }]}>
+              {item.profiles.first_name} {item.profiles.last_name}
+            </Text>
+          </Pressable>
           {item.profiles.selected_title && (
             <Text style={[styles.selectedTitle, { color: colors.primary }]}>
               {item.profiles.selected_title}
@@ -575,18 +546,41 @@ export default function Feed() {
           </Text>
         </View>
       )}
-      <TouchableOpacity onPress={() => handleReactionPress(item.id)} style={styles.reactionButton}>
-        <MaterialCommunityIcons name="emoticon-happy-outline" size={24} color={colors.text} />
-      </TouchableOpacity>
-      {showReactions[item.id] && renderReactionOptions(item.id)}
+      
+      <View style={styles.postFooter}>
+        <View style={styles.actionContainer}>
+          <TouchableOpacity 
+            onPress={() => handleReactionPress(item.id)} 
+            style={styles.reactionButton}
+          >
+            <MaterialCommunityIcons name="emoticon-happy-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
+          {showReactions[item.id] && renderReactionOptions(item.id)}
+        </View>
+        
+        <TouchableOpacity 
+          onPress={() => handlePostPress(item)}
+          style={styles.commentCounter}
+        >
+          <MaterialCommunityIcons name="comment-outline" size={20} color={colors.text} />
+          <Text style={[styles.commentCountText, { color: colors.text }]}>
+            {item.commentCount || 0}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchPosts();
+    setRefreshing(false);
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Posts Feed */}
       <FlatList
-        data={[...hubPosts.map(post => ({ ...post, type: 'hub' })), ...stopPosts.map(post => ({ ...post, type: 'stop' }))]}
+        data={[...hubPosts, ...stopPosts]}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderPost}
         ListEmptyComponent={
@@ -608,7 +602,7 @@ export default function Feed() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={[colors.primary]} // Customize the color of the spinner
+            colors={[colors.primary]}
           />
         }
       />
@@ -713,22 +707,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 15,
   },
-  reactionSection: {
+  reactionOptions: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     marginTop: 5,
   },
   reactionButton: {
     padding: 5,
-  },
-  reactionEmojiContainer: {
-    padding: 5,
-  },
-  reactionEmoji: {
-    fontSize: 30,
-  },
-  reactionText: {
-    fontSize: 24,
-    marginTop: 5,
   },
   closeButton: {
     marginTop: 20,
@@ -739,38 +724,6 @@ const styles = StyleSheet.create({
   closeButtonText: {
     color: 'white',
     fontWeight: 'bold',
-  },
-  commentInput: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 8,
-  },
-  commentButton: {
-    padding: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  commentButtonText: {
-    fontWeight: 'bold',
-  },
-  commentContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  commentAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 8,
-  },
-  commentUserName: {
-    fontWeight: 'bold',
-  },
-  commentContent: {
-    color: '#333',
   },
   skeletonAvatar: {
     width: 40,
@@ -796,21 +749,23 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 4,
   },
-  reactionCounts: {
-    flexDirection: 'row',
-    marginTop: 5,
-  },
-  reactionCountText: {
-    marginRight: 10,
-    fontSize: 16,
-  },
-  reactionOptions: {
+  postFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 5,
+    alignItems: 'center',
+    marginTop: 10,
   },
-  reactionOption: {
+  actionContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  commentCounter: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 5,
-    marginHorizontal: 5,
+  },
+  commentCountText: {
+    marginLeft: 5,
+    fontSize: 14,
   },
 });

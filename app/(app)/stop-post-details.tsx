@@ -1,77 +1,109 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator, FlatList } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useTheme } from '../../context/ThemeContext';
+import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, Pressable, TextInput, Alert } from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../context/ThemeContext';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useProfile } from '@/hook/useProfile';
 
-export default function StopPostDetails() {
+export default function StopPostDetailsScreen() {
   const { postId } = useLocalSearchParams();
   const { colors } = useTheme();
-  const router = useRouter();
-  const [postDetails, setPostDetails] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [post, setPost] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
+  const { profile, loading: profileLoading, error: profileError } = useProfile();
 
   useEffect(() => {
+    const fetchPostDetails = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('stop_posts')
+          .select(`
+            *,
+            profiles (
+              id,
+              first_name,
+              last_name,
+              avatar_url,
+              selected_title
+            ),
+            stops (
+              id,
+              name,
+              routes (
+                name
+              )
+            ),
+            post_comments (
+              id,
+              content,
+              created_at,
+              user_id,
+              profiles (
+                id,
+                first_name,
+                last_name,
+                avatar_url,
+                selected_title
+              )
+            ),
+            post_reactions (
+              id,
+              reaction_type,
+              user_id
+            )
+          `)
+          .eq('id', postId)
+          .single();
+
+        if (error) throw error;
+
+        setPost(data);
+        setComments(data.post_comments || []);
+      } catch (error) {
+        console.error('Error fetching post details:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchPostDetails();
   }, [postId]);
 
-  const fetchPostDetails = async () => {
+  const handleCommentSubmit = async () => {
+    if (!newComment.trim()) return;
+
     try {
-      const { data, error } = await supabase
-        .from('stop_posts')
-        .select('*, profiles(*), post_comments(*, profiles(*)), post_reactions(*)')
-        .eq('id', postId)
+      const { data: user, error: userError } = await supabase.auth.getUser();
+      if (userError || !user?.user) {
+        Alert.alert('Error', 'You must be logged in to comment.');
+        return;
+      }
+
+      const { data: newCommentData, error } = await supabase
+        .from('post_comments')
+        .insert([
+          { 
+            content: newComment, 
+            stop_post: postId, 
+            user_id: user.user.id 
+          }
+        ])
+        .select('*, profiles (first_name, last_name, avatar_url, selected_title)')
         .single();
 
       if (error) throw error;
-      setPostDetails(data);
-    } catch (error) {
-      console.error('Error fetching post details:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  const handleAddComment = async () => {
-    try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.user) return;
-
-      const { error } = await supabase
-        .from('post_comments')
-        .insert({
-          post_id: postId,
-          user_id: session.user.id,
-          content: newComment,
-        });
-
-      if (error) throw error;
-      alert('Comment added!');
+      setComments([...comments, newCommentData]);
       setNewComment('');
-      fetchPostDetails(); // Refresh data
     } catch (error) {
-      console.error('Error adding comment:', error);
-      alert('Failed to add comment');
+      Alert.alert('Error submitting comment', error.message);
     }
   };
 
-  const renderComment = ({ item }) => (
-    <View style={[styles.commentContainer, { backgroundColor: colors.card }]}>
-      <Image
-        source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
-        style={styles.avatar}
-      />
-      <View style={styles.commentContent}>
-        <Text style={[styles.userName, { color: colors.text }]}>
-          {item.profiles.first_name} {item.profiles.last_name}
-        </Text>
-        <Text style={[styles.commentText, { color: colors.text }]}>{item.content}</Text>
-      </View>
-    </View>
-  );
-
-  if (isLoading) {
+  if (loading || profileLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -79,61 +111,109 @@ export default function StopPostDetails() {
     );
   }
 
+  if (!post) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={{ color: colors.text }}>Post not found</Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.content}>
-        {/* Post Details */}
-        <View style={[styles.postContainer, { backgroundColor: colors.card }]}>
-          <Image
-            source={{ uri: postDetails.profiles.avatar_url || 'https://via.placeholder.com/50' }}
-            style={styles.avatar}
-          />
-          <View style={styles.postHeader}>
+      {/* Post Header */}
+      <View style={styles.postHeader}>
+        <Image
+          source={{ uri: post.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+          style={styles.avatar}
+        />
+        <View style={styles.postHeaderText}>
+          <Pressable onPress={() => router.push(`/social-profile?id=${post.profiles.id}`)}>
             <Text style={[styles.userName, { color: colors.text }]}>
-              {postDetails.profiles.first_name} {postDetails.profiles.last_name}
+              {post.profiles.first_name} {post.profiles.last_name}
             </Text>
-            <Text style={[styles.userTitle, { color: colors.text }]}>
-              {postDetails.profiles.selected_title}
+          </Pressable>
+          {post.profiles.selected_title && (
+            <Text style={[styles.selectedTitle, { color: colors.primary }]}>
+              {post.profiles.selected_title}
             </Text>
-          </View>
-          <Text style={[styles.postContent, { color: colors.text }]}>{postDetails.content}</Text>
-          <View style={styles.postFooter}>
-            <Text style={[styles.footerText, { color: colors.text }]}>
-              {postDetails.post_comments.length} Comments
-            </Text>
-            <Text style={[styles.footerText, { color: colors.text }]}>
-              {postDetails.post_reactions.length} Reactions
-            </Text>
-          </View>
+          )}
+          <Text style={[styles.postTime, { color: colors.textSecondary }]}>
+            {new Date(post.created_at).toLocaleString()}
+          </Text>
         </View>
+      </View>
 
-        {/* Comments Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Comments</Text>
-          <FlatList
-            data={postDetails.post_comments}
-            renderItem={renderComment}
-            keyExtractor={(item) => item.id.toString()}
-            ListEmptyComponent={<Text style={{ color: colors.text }}>No comments available.</Text>}
-          />
-        </View>
+      {/* Post Content */}
+      <Text style={[styles.postContent, { color: colors.text }]}>
+        {post.content}
+      </Text>
 
-        {/* Add a Comment */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Add a Comment</Text>
+      {/* Stop Information */}
+      <Pressable 
+        onPress={() => router.push(`/stop-details?stopId=${post.stops?.id}`)}
+        style={styles.stopInfo}
+      >
+        <Text style={[styles.stopName, { color: colors.primary }]}>
+          Stop: {post.stops?.name || 'Unknown Stop'}
+        </Text>
+        <Text style={[styles.routeName, { color: colors.primary }]}>
+          Route: {post.stops?.routes?.name || 'Unknown Route'}
+        </Text>
+      </Pressable>
+
+      {/* Comments Section */}
+      <View style={styles.commentsSection}>
+        <Text style={[styles.commentsTitle, { color: colors.text }]}>
+          Comments ({comments.length})
+        </Text>
+        {comments.map((comment) => {
+          const commentProfile = comment.profiles || {
+            first_name: 'Unknown',
+            last_name: 'User',
+            avatar_url: 'https://via.placeholder.com/50',
+          };
+
+          return (
+            <View key={comment.id} style={styles.commentContainer}>
+              <Image
+                source={{ uri: commentProfile.avatar_url }}
+                style={styles.commentAvatar}
+              />
+              <View style={styles.commentContent}>
+                <Pressable onPress={() => router.push(`/social-profile?id=${commentProfile.id}`)}>
+                  <Text style={[styles.commentUserName, { color: colors.text }]}>
+                    {commentProfile.first_name} {commentProfile.last_name}
+                  </Text>
+                </Pressable>
+                {commentProfile.selected_title && (
+                  <Text style={[styles.selectedTitle, { color: colors.primary }]}>
+                    {commentProfile.selected_title}
+                  </Text>
+                )}
+                <Text style={[styles.commentText, { color: colors.text }]}>
+                  {comment.content}
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+
+        {/* Add Comment */}
+        <View style={styles.addCommentContainer}>
           <TextInput
-            style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-            placeholder="Write a comment..."
-            placeholderTextColor={colors.text}
+            style={[styles.commentInput, { backgroundColor: colors.card, color: colors.text }]}
+            placeholder="Add a comment..."
+            placeholderTextColor={colors.textSecondary}
             value={newComment}
             onChangeText={setNewComment}
           />
-          <TouchableOpacity
+          <Pressable
             style={[styles.commentButton, { backgroundColor: colors.primary }]}
-            onPress={handleAddComment}
+            onPress={handleCommentSubmit}
           >
-            <Text style={styles.commentButtonText}>Post Comment</Text>
-          </TouchableOpacity>
+            <MaterialCommunityIcons name="send" size={20} color={colors.text} />
+          </Pressable>
         </View>
       </View>
     </ScrollView>
@@ -143,82 +223,95 @@ export default function StopPostDetails() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  content: {
-    padding: 20,
-  },
-  postContainer: {
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
+    padding: 16,
   },
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 16,
   },
   avatar: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    marginRight: 10,
+    marginRight: 8,
+  },
+  postHeaderText: {
+    flex: 1,
   },
   userName: {
     fontSize: 16,
     fontWeight: 'bold',
   },
-  userTitle: {
+  selectedTitle: {
     fontSize: 14,
-    marginLeft: 10,
-    opacity: 0.7,
+    fontStyle: 'italic',
   },
-  postContent: {
-    fontSize: 14,
-    marginBottom: 10,
-  },
-  postFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-  },
-  footerText: {
+  postTime: {
     fontSize: 12,
   },
-  section: {
-    marginTop: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-  },
-  commentButton: {
-    padding: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  commentButtonText: {
-    color: 'white',
+  postContent: {
     fontSize: 16,
-    fontWeight: '600',
+    marginBottom: 16,
+  },
+  stopInfo: {
+    marginBottom: 16,
+  },
+  stopName: {
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  routeName: {
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  commentsSection: {
+    marginTop: 16,
+  },
+  commentsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
   },
   commentContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  commentAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 8,
   },
   commentContent: {
     flex: 1,
   },
+  commentUserName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
   commentText: {
     fontSize: 14,
+    marginTop: 4,
+  },
+  addCommentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  commentInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 8,
+    marginRight: 8,
+  },
+  commentButton: {
+    padding: 8,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

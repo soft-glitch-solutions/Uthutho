@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, ActivityIndicator, Alert, Pressable, ScrollView, FlatList } from 'react-native';
+import { View, Text, StyleSheet, Image, ActivityIndicator, Alert, Pressable, ScrollView, FlatList, Modal, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../context/ThemeContext';
@@ -16,11 +16,12 @@ const SkeletonLoader = () => (
 
 export default function SocialProfile() {
   const router = useRouter();
-  const { id } = useLocalSearchParams(); // Get the user ID from the route parameters
+  const { id } = useLocalSearchParams();
   const [profile, setProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { colors } = useTheme(); // Get theme colors
-  const [stopTitles, setStopTitles] = useState<string[]>([]); // State to store stop titles
+  const { colors } = useTheme();
+  const [stopTitles, setStopTitles] = useState<string[]>([]);
+  const [isAvatarModalVisible, setIsAvatarModalVisible] = useState(false); // State for avatar modal
 
   // Fetch stop titles
   useEffect(() => {
@@ -28,11 +29,10 @@ export default function SocialProfile() {
       try {
         const { data, error } = await supabase
           .from('stops')
-          .select('name'); // Assuming the column is 'name'
+          .select('name');
 
         if (error) throw error;
 
-        // Extract stop titles from the data
         const titles = data.map((stop) => stop.name);
         setStopTitles(titles);
       } catch (error) {
@@ -49,7 +49,7 @@ export default function SocialProfile() {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, avatar_url, selected_title, favorites, points') // Ensure the ID and other fields are selected
+          .select('id, first_name, last_name, avatar_url, selected_title, favorites, points')
           .eq('id', id)
           .single();
 
@@ -93,7 +93,12 @@ export default function SocialProfile() {
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Profile Header */}
       <View style={styles.profileHeader}>
-        <Image source={{ uri: profile.avatar_url }} style={styles.profileAvatar} />
+        <Pressable onPress={() => setIsAvatarModalVisible(true)}>
+          <Image 
+            source={{ uri: profile.avatar_url }} 
+            style={styles.profileAvatar} 
+          />
+        </Pressable>
         <View style={styles.profileInfo}>
           <Text style={[styles.profileName, { color: colors.text }]}>{profile.first_name} {profile.last_name}</Text>
           {profile.selected_title && (
@@ -123,6 +128,30 @@ export default function SocialProfile() {
           />
         </View>
       )}
+
+      {/* Avatar Modal */}
+      <Modal
+        visible={isAvatarModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsAvatarModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <Image 
+              source={{ uri: profile.avatar_url }} 
+              style={styles.modalAvatar} 
+              resizeMode="contain"
+            />
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setIsAvatarModalVisible(false)}
+            >
+              <MaterialIcons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -215,5 +244,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
     marginVertical: 5,
     borderRadius: 4,
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  modalContent: {
+    width: '90%',
+    padding: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  modalAvatar: {
+    width: '100%',
+    height: 300,
+    borderRadius: 10,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: 5,
   },
 });
