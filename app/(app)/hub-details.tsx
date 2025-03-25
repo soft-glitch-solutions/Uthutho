@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
+  Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
@@ -612,6 +613,10 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     minHeight: 50,
+  },
+  mapButton: {
+    padding: 10,
+    borderRadius: 5,
   },
   postButton: {
     padding: 10,
