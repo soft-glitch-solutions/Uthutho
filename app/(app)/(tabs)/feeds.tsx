@@ -22,6 +22,7 @@ import { useRouter } from 'expo-router';
 import * as Animatable from 'react-native-animatable';
 import { Picker } from '@react-native-picker/picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Flag, MapPin, Route } from 'lucide-react-native';
 
 const Shimmer = ({ children, colors }) => {
   const animatedValue = new Animated.Value(0);
@@ -502,6 +503,16 @@ export default function Feed() {
 
   const renderPost = ({ item }) => (
     <TouchableOpacity onPress={() => handlePostPress(item)} style={[styles.postContainer, { backgroundColor: colors.card }]}>
+          <View style={styles.postTypeIndicator}>
+      {item.type === 'hub' ? (
+        <MapPin size={20} color={colors.primary} />
+      ) : item.type === 'stop' ? (
+        <Flag size={20} color={colors.primary} />
+      ) : (
+        <Route size={20} color={colors.primary} />
+      )}
+    </View>
+      
       <View style={styles.postHeader}>
         <Image
           source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
@@ -739,6 +750,11 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 4,
     marginVertical: 4,
+  },
+  postTypeIndicator: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
   },
   skeletonContent: {
     marginVertical: 12,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, Pressable, TextInput, Alert } from 'react-native';
-import { useLocalSearchParams, router  } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../context/ThemeContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -29,6 +29,10 @@ export default function HubPostDetailsScreen() {
               avatar_url,
               selected_title
             ),
+            hubs (
+              id,
+              name
+            ),
             post_comments (
               id,
               content,
@@ -38,7 +42,8 @@ export default function HubPostDetailsScreen() {
                 id,
                 first_name,
                 last_name,
-                avatar_url
+                avatar_url,
+                selected_title
               )
             ),
             post_reactions (
@@ -64,13 +69,7 @@ export default function HubPostDetailsScreen() {
     fetchPostDetails();
   }, [postId]);
 
-  useEffect(() => {
-    if (comments.length > 0) {
-      console.log('Comments data:', comments);
-    }
-  }, [comments]);
-
-const handleCommentSubmit = async () => {
+  const handleCommentSubmit = async () => {
     if (!newComment.trim()) return;
 
     try {
@@ -85,11 +84,11 @@ const handleCommentSubmit = async () => {
         .insert([
           { 
             content: newComment, 
-            hub_post: postId || null, 
+            hub_post: postId, 
             user_id: user.user.id 
           }
         ])
-        .select('*, profiles (first_name, last_name, avatar_url)')
+        .select('*, profiles (first_name, last_name, avatar_url, selected_title)')
         .single();
 
       if (error) throw error;
@@ -100,7 +99,6 @@ const handleCommentSubmit = async () => {
       Alert.alert('Error submitting comment', error.message);
     }
   };
-
 
   if (loading || profileLoading) {
     return (
@@ -127,9 +125,11 @@ const handleCommentSubmit = async () => {
           style={styles.avatar}
         />
         <View style={styles.postHeaderText}>
-          <Text style={[styles.userName, { color: colors.text }]}>
-            {post.profiles.first_name} {post.profiles.last_name}
-          </Text>
+          <Pressable onPress={() => router.push(`/social-profile?id=${post.profiles.id}`)}>
+            <Text style={[styles.userName, { color: colors.text }]}>
+              {post.profiles.first_name} {post.profiles.last_name}
+            </Text>
+          </Pressable>
           {post.profiles.selected_title && (
             <Text style={[styles.selectedTitle, { color: colors.primary }]}>
               {post.profiles.selected_title}
@@ -146,6 +146,16 @@ const handleCommentSubmit = async () => {
         {post.content}
       </Text>
 
+      {/* Hub Information */}
+      <Pressable 
+        onPress={() => router.push(`/hub-details?hubId=${post.hubs?.id}`)}
+        style={styles.hubInfo}
+      >
+        <Text style={[styles.hubName, { color: colors.primary }]}>
+          Hub: {post.hubs?.name || 'Unknown Hub'}
+        </Text>
+      </Pressable>
+
       {/* Comments Section */}
       <View style={styles.commentsSection}>
         <Text style={[styles.commentsTitle, { color: colors.text }]}>
@@ -160,25 +170,25 @@ const handleCommentSubmit = async () => {
 
           return (
             <View key={comment.id} style={styles.commentContainer}>
-
               <Image
                 source={{ uri: commentProfile.avatar_url }}
                 style={styles.commentAvatar}
               />
               <View style={styles.commentContent}>
-              <Pressable onPress={() => router.push(`/social-profile?id=${commentProfile.id}`)}>
-                <Text style={[styles.commentUserName, { color: colors.text }]}>
-                  {commentProfile.first_name} {commentProfile.last_name}
-                </Text>
+                <Pressable onPress={() => router.push(`/social-profile?id=${commentProfile.id}`)}>
+                  <Text style={[styles.commentUserName, { color: colors.text }]}>
+                    {commentProfile.first_name} {commentProfile.last_name}
+                  </Text>
                 </Pressable>
-                <Text style={[styles.selectedTitle, { color: colors.primary }]}>
+                {commentProfile.selected_title && (
+                  <Text style={[styles.selectedTitle, { color: colors.primary }]}>
                     {commentProfile.selected_title}
-                 </Text>
+                  </Text>
+                )}
                 <Text style={[styles.commentText, { color: colors.text }]}>
                   {comment.content}
                 </Text>
               </View>
-
             </View>
           );
         })}
@@ -238,6 +248,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 16,
   },
+  hubInfo: {
+    marginBottom: 16,
+  },
+  hubName: {
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
   commentsSection: {
     marginTop: 16,
   },
@@ -248,8 +265,8 @@ const styles = StyleSheet.create({
   },
   commentContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
   commentAvatar: {
     width: 40,
@@ -266,6 +283,7 @@ const styles = StyleSheet.create({
   },
   commentText: {
     fontSize: 14,
+    marginTop: 4,
   },
   addCommentContainer: {
     flexDirection: 'row',

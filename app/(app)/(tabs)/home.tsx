@@ -450,10 +450,10 @@ export default function HomeScreen() {
               >
                 <View style={styles.favoriteItem}>
                   {favorite.type === 'hub' && (
-                    <MapPin size={24} color={colors.text} /> // Use House icon for hubs
+                    <MapPin size={24} color={colors.text} /> 
                   )}
                   {favorite.type === 'stop' && (
-                    <Flag size={24} color={colors.text} /> // Use MapPin icon for stops
+                    <Flag size={24} color={colors.text} /> // 
                   )}
                   {favorite.type === 'route' && (
                     <Route size={24} color={colors.text} /> // Use Route icon for routes
