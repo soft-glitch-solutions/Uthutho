@@ -208,17 +208,6 @@ export default function Feed() {
               id,
               name
             ),
-            post_comments!post_comments_post_id_fkey (
-              id,
-              content,
-              created_at,
-              user_id,
-              profiles (
-                first_name,
-                last_name,
-                avatar_url
-              )
-            ),
             post_reactions!post_reactions_post_hub_id_fkey (
               id,
               reaction_type,
@@ -279,17 +268,7 @@ export default function Feed() {
                 name
               )
             ),
-            post_comments!post_comments_post_id_fkey (
-              id,
-              content,
-              created_at,
-              user_id,
-              profiles (
-                first_name,
-                last_name,
-                avatar_url
-              )
-            ),
+        
             post_reactions!post_reactions_post_stop_id_fkey (
               id,
               reaction_type,
@@ -356,17 +335,6 @@ export default function Feed() {
               avatar_url,
               selected_title
             ),
-            post_comments!post_comments_post_id_fkey (
-              id,
-              content,
-              created_at,
-              user_id,
-              profiles (
-                first_name,
-                last_name,
-                avatar_url
-              )
-            ),
             post_reactions!post_reactions_post_hub_id_fkey (
               id,
               reaction_type,
@@ -391,42 +359,7 @@ export default function Feed() {
     fetchPostDetails();
   }, [selectedPost]);
 
-  // Create comment
-  const handleCreateComment = async () => {
-    if (!newComment.trim() || !selectedPost) return;
 
-    setIsCreatingComment(true);
-    try {
-      const { data: userSession } = await supabase.auth.getSession();
-      if (!userSession?.session?.user.id) throw new Error('Not authenticated');
-
-      const { data, error } = await supabase
-        .from('post_comments')
-        .insert({
-          content: newComment,
-          user_id: userSession.session.user.id,
-          post_id: selectedPost,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      setSelectedPostDetails((prevDetails) => ({
-        ...prevDetails,
-        post_comments: [data, ...prevDetails.post_comments],
-      }));
-      setNewComment('');
-      alert('Comment added successfully!');
-    } catch (error) {
-      console.error('Error creating comment:', error);
-      alert(`Error adding comment: ${error.message}`);
-    } finally {
-      setIsCreatingComment(false);
-    }
-  };
 
   // Share post
   const handleSharePost = async (post) => {
@@ -440,18 +373,6 @@ export default function Feed() {
       console.error('Error sharing post:', error);
       alert('Failed to share post');
     }
-  };
-
-  // Open comment dialog
-  const openCommentDialog = (postId) => {
-    setSelectedPost(postId);
-    setIsCommentDialogVisible(true);
-  };
-
-  // Close comment dialog
-  const closeCommentDialog = () => {
-    setIsCommentDialogVisible(false);
-    setSelectedPost(null);
   };
 
   const onRefresh = async () => {
@@ -691,65 +612,6 @@ export default function Feed() {
           />
         }
       />
-
-      {/* Comment Dialog */}
-      <Modal
-        visible={isCommentDialogVisible}
-        animationType="slide"
-        onRequestClose={closeCommentDialog}
-        transparent
-      >
-        <View style={[styles.modalOverlay, { backgroundColor: colors.modalOverlay }]}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Comments</Text>
-            <Pressable onPress={closeCommentDialog} style={styles.closeButton}>
-              <Text style={[styles.closeButtonText, { color: colors.text }]}>×</Text>
-            </Pressable>
-            {isPostDetailsLoading ? (
-              <ActivityIndicator size="large" color={colors.primary} />
-            ) : (
-              selectedPostDetails && (
-                <>
-                  <TextInput
-                    value={newComment}
-                    onChangeText={setNewComment}
-                    placeholder="Write a comment..."
-                    placeholderTextColor={colors.text}
-                    style={[styles.commentInput, { color: colors.text }]}
-                    multiline
-                  />
-                  <Pressable
-                    onPress={handleCreateComment}
-                    style={[styles.commentButton, { backgroundColor: colors.primary }]}
-                    disabled={isCreatingComment}
-                  >
-                    <Text style={[styles.commentButtonText, { color: colors.buttonText }]}>Add Comment</Text>
-                  </Pressable>
-
-                  <FlatList
-                    data={selectedPostDetails.post_comments}
-                    keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => (
-                      <View style={styles.commentContainer}>
-                        <Image
-                          source={{ uri: item.profiles?.avatar_url }}
-                          style={styles.commentAvatar}
-                        />
-                        <View>
-                          <Text style={[styles.commentUserName, { color: colors.text }]}>
-                            {item.profiles?.first_name} {item.profiles?.last_name}
-                          </Text>
-                          <Text style={[styles.commentContent, { color: colors.text }]}>{item.content}</Text>
-                        </View>
-                      </View>
-                    )}
-                  />
-                </>
-              )
-            )}
-          </View>
-        </View>
-      </Modal>
 
       <Modal
         visible={reactionModalVisible}
