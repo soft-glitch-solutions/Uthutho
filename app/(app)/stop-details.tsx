@@ -16,9 +16,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import StopBlock from '../../components/stop/StopBlock';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons'; // Import Ionicons for the "+" icon
-import * as Sharing from 'expo-sharing'; // For sharing functionality
-import { formatTimeAgo } from '../../components/utils'; // Ensure you have this utility function
+import { Plus, Map, Share2 } from 'lucide-react-native';
+import * as Sharing from 'expo-sharing';
+import { formatTimeAgo } from '../../components/utils';
 
 export default function StopDetailsScreen() {
   const { stopId } = useLocalSearchParams();
@@ -26,7 +26,7 @@ export default function StopDetailsScreen() {
   const [stopDetails, setStopDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [newPostContent, setNewPostContent] = useState('');
-  const [showAddPost, setShowAddPost] = useState(false); // State to control visibility of the "Add Post" section
+  const [showAddPost, setShowAddPost] = useState(false);
   const router = useRouter();
   const [nearbyStops, setNearbyStops] = useState([]);
 
@@ -45,12 +45,11 @@ export default function StopDetailsScreen() {
 
       if (error) throw error;
 
-      // Filter out posts older than a day
       const filteredPosts = data.stop_posts.filter((post) => {
         const postDate = new Date(post.created_at);
         const now = new Date();
         const timeDiff = now - postDate;
-        return timeDiff < 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+        return timeDiff < 24 * 60 * 60 * 1000;
       });
 
       setStopDetails({ ...data, stop_posts: filteredPosts });
@@ -78,8 +77,8 @@ export default function StopDetailsScreen() {
       if (error) throw error;
       Alert.alert('Success', 'Post added!');
       setNewPostContent('');
-      setShowAddPost(false); // Hide the "Add Post" section after posting
-      fetchStopDetails(); // Refresh data
+      setShowAddPost(false);
+      fetchStopDetails();
     } catch (error) {
       console.error('Error adding post:', error);
       Alert.alert('Error', 'Failed to add post');
@@ -87,7 +86,7 @@ export default function StopDetailsScreen() {
   };
 
   const handlePostPress = (postId) => {
-    router.push(`/stop-post-details?postId=${postId}`); // Navigate to stop post details
+    router.push(`/stop-post-details?postId=${postId}`);
   };
 
   const fetchNearbyStops = async () => {
@@ -105,7 +104,6 @@ export default function StopDetailsScreen() {
       Alert.alert('Error', 'Failed to fetch nearby stops.');
     }
   };
-  
 
   const handleSharePost = async (postContent) => {
     try {
@@ -143,13 +141,14 @@ export default function StopDetailsScreen() {
         style={styles.shareButton}
         onPress={() => handleSharePost(item.content)}
       >
+        <Share2 size={18} color={colors.primary} />
         <Text style={[styles.shareButtonText, { color: colors.primary }]}>Share</Text>
       </TouchableOpacity>
     </TouchableOpacity>
   );
 
   const openMap = () => {
-    if (!stopDetails) return; // Guard clause to prevent errors
+    if (!stopDetails) return;
     const lat = stopDetails.latitude;
     const long = stopDetails.longitude;
     const url = `https://www.google.com/maps/search/?api=1&query=${lat},${long}`;
@@ -181,6 +180,7 @@ export default function StopDetailsScreen() {
           resizeMode="cover"
         />
         <Text style={[styles.title, { color: colors.text }]}>{stopDetails.name}</Text>
+        
         <View style={styles.waitingCountContainer}>
           <Text style={[styles.waitingCount, { color: colors.text }]}>
             People waiting: {stopDetails.stop_posts.length}
@@ -190,10 +190,9 @@ export default function StopDetailsScreen() {
             onPress={openMap}
             style={[styles.mapButton, { backgroundColor: colors.primary }]}
           >
-            <MaterialIcons name="map" size={24} color="white" />
+            <Map size={24} color="white" />
           </TouchableOpacity>
         </View>
-
 
         <StopBlock
           stopId={stopId}
@@ -203,43 +202,44 @@ export default function StopDetailsScreen() {
           radius={0.5}
         />
 
-<View style={styles.section}>
-  <Text style={[styles.sectionTitle, { color: colors.text }]}>Nearby Spots</Text>
-  {nearbyStops.length > 0 ? (
-    nearbyStops.map((stop) => (
-      <View key={stop.id} style={[styles.nearbyStopContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.nearbyStopName, { color: colors.text }]}>{stop.name}</Text>
-        {stop.description && (
-          <Text style={[styles.nearbyStopDescription, { color: colors.textSecondary }]}>
-            {stop.description}
-          </Text>
-        )}
-        {stop.distance_meters && (
-          <Text style={[styles.nearbyStopDistance, { color: colors.textSecondary }]}>
-            {stop.distance_meters} meters away
-          </Text>
-        )}
-      </View>
-    ))
-  ) : (
-    <View style={styles.noNearbyStopsContainer}>
-      <Text style={[styles.noNearbyStopsText, { color: colors.text }]}>
-        No nearby stops found.
-      </Text>
-    </View>
-  )}
-</View>
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Nearby Spots</Text>
+          {nearbyStops.length > 0 ? (
+            nearbyStops.map((stop) => (
+              <View key={stop.id} style={[styles.nearbyStopContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.nearbyStopName, { color: colors.text }]}>{stop.name}</Text>
+                {stop.description && (
+                  <Text style={[styles.nearbyStopDescription, { color: colors.textSecondary }]}>
+                    {stop.description}
+                  </Text>
+                )}
+                {stop.distance_meters && (
+                  <Text style={[styles.nearbyStopDistance, { color: colors.textSecondary }]}>
+                    {stop.distance_meters} meters away
+                  </Text>
+                )}
+              </View>
+            ))
+          ) : (
+            <View style={styles.noNearbyStopsContainer}>
+              <Text style={[styles.noNearbyStopsText, { color: colors.text }]}>
+                No nearby stops found.
+              </Text>
+            </View>
+          )}
+        </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Posts</Text>
             <TouchableOpacity
-              onPress={() => setShowAddPost(!showAddPost)} // Toggle visibility of the "Add Post" section
+              onPress={() => setShowAddPost(!showAddPost)}
               style={styles.addPostButton}
             >
-              <Ionicons name="add" size={24} color={colors.primary} />
+              <Plus size={24} color={colors.primary} />
             </TouchableOpacity>
           </View>
+          
           <FlatList
             data={stopDetails.stop_posts}
             renderItem={renderPost}
@@ -254,7 +254,6 @@ export default function StopDetailsScreen() {
           />
         </View>
 
-        {/* Conditionally render the "Add Post" section */}
         {showAddPost && (
           <View style={styles.section}>
             <TextInput
@@ -410,7 +409,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   shareButton: {
+    flexDirection: 'row',
     alignSelf: 'flex-end',
+    alignItems: 'center',
+    gap: 4,
   },
   shareButtonText: {
     fontSize: 14,
@@ -430,10 +432,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 10,
-  },
-  addPostButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
