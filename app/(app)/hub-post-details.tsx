@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, Pressable
 import { useLocalSearchParams, router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../context/ThemeContext';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Send, MapPin, User } from 'lucide-react-native';
 import { useProfile } from '@/hook/useProfile';
 
 export default function HubPostDetailsScreen() {
@@ -149,10 +149,11 @@ export default function HubPostDetailsScreen() {
       {/* Hub Information */}
       <Pressable 
         onPress={() => router.push(`/hub-details?hubId=${post.hubs?.id}`)}
-        style={styles.hubInfo}
+        style={[styles.hubInfo, { backgroundColor: colors.card }]}
       >
+        <MapPin size={16} color={colors.primary} />
         <Text style={[styles.hubName, { color: colors.primary }]}>
-          Hub: {post.hubs?.name || 'Unknown Hub'}
+          {post.hubs?.name || 'Unknown Hub'}
         </Text>
       </Pressable>
 
@@ -161,52 +162,67 @@ export default function HubPostDetailsScreen() {
         <Text style={[styles.commentsTitle, { color: colors.text }]}>
           Comments ({comments.length})
         </Text>
-        {comments.map((comment) => {
-          const commentProfile = comment.profiles || {
-            first_name: 'Unknown',
-            last_name: 'User',
-            avatar_url: 'https://via.placeholder.com/50',
-          };
+        
+        {comments.length === 0 ? (
+          <View style={styles.noCommentsContainer}>
+            <User size={24} color={colors.textSecondary} />
+            <Text style={[styles.noCommentsText, { color: colors.textSecondary }]}>
+              No comments yet. Be the first to comment!
+            </Text>
+          </View>
+        ) : (
+          comments.map((comment) => {
+            const commentProfile = comment.profiles || {
+              first_name: 'Unknown',
+              last_name: 'User',
+              avatar_url: 'https://via.placeholder.com/50',
+            };
 
-          return (
-            <View key={comment.id} style={styles.commentContainer}>
-              <Image
-                source={{ uri: commentProfile.avatar_url }}
-                style={styles.commentAvatar}
-              />
-              <View style={styles.commentContent}>
-                <Pressable onPress={() => router.push(`/social-profile?id=${commentProfile.id}`)}>
-                  <Text style={[styles.commentUserName, { color: colors.text }]}>
-                    {commentProfile.first_name} {commentProfile.last_name}
+            return (
+              <View key={comment.id} style={[styles.commentContainer, { backgroundColor: colors.card }]}>
+                <Image
+                  source={{ uri: commentProfile.avatar_url }}
+                  style={styles.commentAvatar}
+                />
+                <View style={styles.commentContent}>
+                  <Pressable onPress={() => router.push(`/social-profile?id=${commentProfile.id}`)}>
+                    <Text style={[styles.commentUserName, { color: colors.text }]}>
+                      {commentProfile.first_name} {commentProfile.last_name}
+                    </Text>
+                  </Pressable>
+                  {commentProfile.selected_title && (
+                    <Text style={[styles.selectedTitle, { color: colors.primary }]}>
+                      {commentProfile.selected_title}
+                    </Text>
+                  )}
+                  <Text style={[styles.commentText, { color: colors.text }]}>
+                    {comment.content}
                   </Text>
-                </Pressable>
-                {commentProfile.selected_title && (
-                  <Text style={[styles.selectedTitle, { color: colors.primary }]}>
-                    {commentProfile.selected_title}
+                  <Text style={[styles.commentTime, { color: colors.textSecondary }]}>
+                    {new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </Text>
-                )}
-                <Text style={[styles.commentText, { color: colors.text }]}>
-                  {comment.content}
-                </Text>
+                </View>
               </View>
-            </View>
-          );
-        })}
+            );
+          })
+        )}
 
         {/* Add Comment */}
-        <View style={styles.addCommentContainer}>
+        <View style={[styles.addCommentContainer, { backgroundColor: colors.card }]}>
           <TextInput
-            style={[styles.commentInput, { backgroundColor: colors.card, color: colors.text }]}
+            style={[styles.commentInput, { color: colors.text }]}
             placeholder="Add a comment..."
             placeholderTextColor={colors.textSecondary}
             value={newComment}
             onChangeText={setNewComment}
+            multiline
           />
           <Pressable
             style={[styles.commentButton, { backgroundColor: colors.primary }]}
             onPress={handleCommentSubmit}
+            disabled={!newComment.trim()}
           >
-            <MaterialCommunityIcons name="send" size={20} color={colors.text} />
+            <Send size={20} color="white" />
           </Pressable>
         </View>
       </View>
@@ -228,7 +244,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    marginRight: 8,
+    marginRight: 12,
   },
   postHeaderText: {
     flex: 1,
@@ -240,67 +256,96 @@ const styles = StyleSheet.create({
   selectedTitle: {
     fontSize: 14,
     fontStyle: 'italic',
+    marginTop: 2,
   },
   postTime: {
     fontSize: 12,
+    marginTop: 4,
   },
   postContent: {
     fontSize: 16,
+    lineHeight: 24,
     marginBottom: 16,
   },
   hubInfo: {
-    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 24,
+    gap: 8,
   },
   hubName: {
     fontSize: 14,
-    fontStyle: 'italic',
+    fontWeight: '600',
   },
   commentsSection: {
-    marginTop: 16,
+    marginTop: 8,
   },
   commentsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 16,
+  },
+  noCommentsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  noCommentsText: {
+    fontSize: 14,
+    textAlign: 'center',
   },
   commentContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
   },
   commentAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: 8,
+    marginRight: 12,
   },
   commentContent: {
     flex: 1,
   },
   commentUserName: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   commentText: {
     fontSize: 14,
     marginTop: 4,
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  commentTime: {
+    fontSize: 12,
   },
   addCommentContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
     marginTop: 16,
+    gap: 8,
   },
   commentInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 8,
-    marginRight: 8,
+    fontSize: 14,
+    maxHeight: 100,
   },
   commentButton: {
-    padding: 8,
-    borderRadius: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
