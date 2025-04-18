@@ -12,17 +12,18 @@ import {
 import { router } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons'; // Import the icon library
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
-  const [isLogin, setIsLogin] = useState(true); // Track if the user is logging in or signing up
+  const [isLogin, setIsLogin] = useState(true);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [preferredTransport, setPreferredTransport] = useState('');
-  const [passwordVisible, setPasswordVisible] = useState(false); // State for password visibility
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const { colors } = useTheme();
 
   const handleSignIn = async () => {
@@ -36,7 +37,7 @@ export default function Auth() {
       if (error) throw error;
 
       Alert.alert('Success', 'Successfully signed in!');
-      router.replace('/(app)/(tabs)/home'); // Navigate to home
+      router.replace('/(app)/(tabs)/home');
     } catch (error) {
       Alert.alert('Error', error.message);
     } finally {
@@ -65,7 +66,6 @@ export default function Auth() {
 
       if (error) throw error;
 
-      // Automatically log in the user after sign-up
       const { error: loginError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -73,7 +73,33 @@ export default function Auth() {
       if (loginError) throw loginError;
 
       Alert.alert('Success', 'Registration successful! Please check your email.');
-      router.replace('/(app)/(tabs)/home'); // Navigate to home
+      router.replace('/(app)/(tabs)/home');
+    } catch (error) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert('Error', 'Please enter your email');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'myapp://reset-password', // Replace with your app's password reset URL
+      });
+
+      if (error) throw error;
+
+      Alert.alert(
+        'Password Reset',
+        'If an account exists with this email, you will receive a password reset link.'
+      );
+      setShowForgotPassword(false);
     } catch (error) {
       Alert.alert('Error', error.message);
     } finally {
@@ -88,7 +114,7 @@ export default function Auth() {
       {/* Logo */}
       <View style={styles.logoContainer}>
         <Image
-          source={require('../../assets/images/icon.png')} // Adjust the path to your logo
+          source={require('../../assets/images/icon.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -96,12 +122,12 @@ export default function Auth() {
 
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>
-          {isLogin ? 'Welcome' : 'Create Account'}
+          {showForgotPassword ? 'Reset Password' : isLogin ? 'Welcome' : 'Create Account'}
         </Text>
       </View>
 
       <View style={styles.form}>
-        {!isLogin && (
+        {!isLogin && !showForgotPassword && (
           <>
             <TextInput
               style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
@@ -119,56 +145,91 @@ export default function Auth() {
             />
           </>
         )}
+
         <View style={[styles.emailContainer, { backgroundColor: colors.card, borderRadius: 10 }]}>
-        <TextInput
-          style={[styles.input, { flex: 1, color: colors.text }]}
-          placeholder="Email"
-          placeholderTextColor={colors.text}
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
+          <TextInput
+            style={[styles.input, { flex: 1, color: colors.text }]}
+            placeholder="Email"
+            placeholderTextColor={colors.text}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
         </View>
 
-        <View style={[styles.passwordContainer, { backgroundColor: colors.card, borderRadius: 10 }]}>
-        <TextInput
-          style={[styles.input, { flex: 1, color: colors.text }]}
-          placeholder="Password"
-          placeholderTextColor={colors.text}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={!passwordVisible} // Toggle visibility
-        />
-        <TouchableOpacity
-          onPress={() => setPasswordVisible(!passwordVisible)}
-          style={{ padding: 10 }}
-        >
-          <Icon
-            name={passwordVisible ? 'eye-off' : 'eye'}
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-      </View>
+        {!showForgotPassword && (
+          <View style={[styles.passwordContainer, { backgroundColor: colors.card, borderRadius: 10 }]}>
+            <TextInput
+              style={[styles.input, { flex: 1, color: colors.text }]}
+              placeholder="Password"
+              placeholderTextColor={colors.text}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!passwordVisible}
+            />
+            <TouchableOpacity
+              onPress={() => setPasswordVisible(!passwordVisible)}
+              style={{ padding: 10 }}
+            >
+              <Icon
+                name={passwordVisible ? 'eye-off' : 'eye'}
+                size={24}
+                color={colors.text}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isLogin && !showForgotPassword && (
+          <TouchableOpacity
+            onPress={() => setShowForgotPassword(true)}
+            style={styles.forgotPasswordButton}
+          >
+            <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
+              Forgot Password?
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={[styles.button, { backgroundColor: colors.primary }]}
-          onPress={isLogin ? handleSignIn : handleSignUp}
+          onPress={
+            showForgotPassword 
+              ? handleForgotPassword 
+              : isLogin 
+                ? handleSignIn 
+                : handleSignUp
+          }
           disabled={isLoading}>
           <Text style={styles.buttonText}>
-            {isLoading ? 'Loading...' : isLogin ? 'Sign In' : 'Create Account'}
+            {isLoading 
+              ? 'Loading...' 
+              : showForgotPassword 
+                ? 'Send Reset Link' 
+                : isLogin 
+                  ? 'Sign In' 
+                  : 'Create Account'}
           </Text>
         </TouchableOpacity>
       </View>
 
       <TouchableOpacity
         style={styles.switchButton}
-        onPress={() => setIsLogin(!isLogin)}
+        onPress={() => {
+          if (showForgotPassword) {
+            setShowForgotPassword(false);
+          } else {
+            setIsLogin(!isLogin);
+          }
+        }}
         disabled={isLoading}>
         <Text style={[styles.switchText, { color: colors.text }]}>
-          {isLogin
-            ? "Don't have an account? Sign Up"
-            : 'Already have an account? Sign In'}
+          {showForgotPassword
+            ? 'Back to Sign In'
+            : isLogin
+              ? "Don't have an account? Sign Up"
+              : 'Already have an account? Sign In'}
         </Text>
       </TouchableOpacity>
 
@@ -196,8 +257,8 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   logo: {
-    width: 150, // Adjust the size as needed
-    height: 150, // Adjust the size as needed
+    width: 150,
+    height: 150,
   },
   header: {
     marginBottom: 40,
@@ -250,5 +311,11 @@ const styles = StyleSheet.create({
   input: {
     padding: 15,
     fontSize: 16,
+  },
+  forgotPasswordButton: {
+    alignSelf: 'flex-end',
+  },
+  forgotPasswordText: {
+    fontSize: 14,
   },
 });

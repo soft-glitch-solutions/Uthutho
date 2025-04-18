@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext'; // Adjust the path
 import { useRouter } from 'expo-router'; // For navigation
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons'; // Updated icon library
+import { Car, Bus, Train, ArrowRight } from 'lucide-react-native'; // Updated icon imports
 
 const { width } = Dimensions.get('window');
 
@@ -18,21 +18,21 @@ const slides = [
     id: '1',
     title: 'Welcome to Uthutho',
     description: 'For commuters, by commuters',
-    icon: 'car', // Using MaterialCommunityIcons
+    icon: Car, // Using Lucide icon component
     color: '#FF6B6B', // Custom color for taxi
   },
   {
     id: '2',
     title: 'Plan Your Journey',
     description: 'Find the best routes and transport options',
-    icon: 'bus', // Using MaterialCommunityIcons
+    icon: Bus, // Using Lucide icon component
     color: '#4ECDC4', // Custom color for bus
   },
   {
     id: '3',
     title: 'Stay Connected',
     description: 'Get real-time updates and travel insights',
-    icon: 'train', // Using MaterialCommunityIcons
+    icon: Train, // Using Lucide icon component
     color: '#6B5B95', // Custom color for train
   },
 ];
@@ -49,6 +49,8 @@ export default function Onboarding() {
       setCurrentSlide((prev) => prev + 1);
     }
   };
+
+  const CurrentIcon = slides[currentSlide].icon;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -89,8 +91,7 @@ export default function Onboarding() {
           {/* Slide Content */}
           <View style={styles.slideContent}>
             <View style={styles.iconContainer}>
-              <Icon
-                name={slides[currentSlide].icon}
+              <CurrentIcon
                 size={64}
                 color={slides[currentSlide].color}
               />
@@ -110,7 +111,7 @@ export default function Onboarding() {
             <Text style={styles.buttonText}>
               {currentSlide === slides.length - 1 ? 'Get Started' : 'Next'}
             </Text>
-            <Icon name="arrow-right" size={20} color="white" />
+            <ArrowRight size={20} color="white" />
           </TouchableOpacity>
         </View>
 
