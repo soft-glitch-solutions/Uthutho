@@ -9,11 +9,10 @@ import {
   Image,
   ActivityIndicator,
   useWindowDimensions,
-  Animated,
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import { Ionicons } from '@expo/vector-icons';
+import { Heart, Search, MapPin, Flag } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 
@@ -29,9 +28,8 @@ export default function FavoritesScreen() {
   const [userLocation, setUserLocation] = useState(null);
   const [locationError, setLocationError] = useState(null);
   const { width } = useWindowDimensions();
-  const cardWidth = width / 2 - 16; // 3 columns with 8px gap on each side
+  const cardWidth = width / 2 - 16;
 
-  // Fetch user location
   useEffect(() => {
     const fetchUserLocation = async () => {
       try {
@@ -52,7 +50,6 @@ export default function FavoritesScreen() {
     fetchUserLocation();
   }, []);
 
-  // Fetch user favorites
   useEffect(() => {
     const fetchFavorites = async () => {
       const userId = (await supabase.auth.getSession()).data.session?.user.id;
@@ -68,7 +65,6 @@ export default function FavoritesScreen() {
     fetchFavorites();
   }, []);
 
-  // Fetch suggested hubs and stops
   useEffect(() => {
     const fetchSuggestedLocations = async () => {
       if (!userLocation) return;
@@ -79,7 +75,7 @@ export default function FavoritesScreen() {
 
         const calculateDistance = (lat1, lon1, lat2, lon2) => {
           const toRadians = (degrees) => (degrees * Math.PI) / 180;
-          const R = 6371; // Earth's radius in km
+          const R = 6371;
           const dLat = toRadians(lat2 - lat1);
           const dLon = toRadians(lon2 - lon1);
           const a =
@@ -89,7 +85,7 @@ export default function FavoritesScreen() {
               Math.sin(dLon / 2) *
               Math.sin(dLon / 2);
           const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          return R * c * 1000; // Distance in meters
+          return R * c * 1000;
         };
 
         const hubsWithDistance = hubs.map((hub) => ({
@@ -190,28 +186,28 @@ export default function FavoritesScreen() {
     return (
       <Pressable onPress={() => handleItemPress(item)}>
         <View style={[styles.card, { backgroundColor: colors.card, width: cardWidth }]}>
-          {item.image && (
-            <Image
-              source={{ uri: item.image }}
-              style={styles.image}
-              resizeMode="cover"
-            />
+          {item.type === 'hub' ? (
+            <MapPin size={24} color={colors.primary} style={styles.icon} />
+          ) : (
+            <Flag size={24} color={colors.primary} style={styles.icon} />
           )}
           <Text style={[styles.cardTitle, { color: colors.text }]}>{item.name}</Text>
           <Text style={[styles.cardType, { color: colors.primary }]}>
             {item.type.toUpperCase()}
           </Text>
-          <Text style={[styles.distanceText, { color: colors.textSecondary }]}>
-            {item.distance.toFixed(0)} meters away
-          </Text>
+          {item.distance && (
+            <Text style={[styles.distanceText, { color: colors.textSecondary }]}>
+              {item.distance.toFixed(0)} meters away
+            </Text>
+          )}
           <Pressable
             onPress={() => toggleFavorite(item)}
             style={styles.favoriteButton}
           >
-            <Ionicons
-              name={isFavorited ? 'heart' : 'heart-outline'}
+            <Heart
               size={24}
               color={isFavorited ? colors.primary : colors.text}
+              fill={isFavorited ? colors.primary : 'transparent'}
             />
           </Pressable>
         </View>
@@ -221,87 +217,63 @@ export default function FavoritesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <TextInput
-        style={[styles.searchBar, { borderColor: colors.border, color: colors.text }]}
-        placeholder="Search hubs, routes, or stops"
-        placeholderTextColor={colors.text}
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        onSubmitEditing={handleSearch}
-      />
+      <View style={[styles.searchContainer, { borderColor: colors.border }]}>
+        <Search size={20} color={colors.text} style={styles.searchIcon} />
+        <TextInput
+          style={[styles.searchBar, { color: colors.text }]}
+          placeholder="Search hubs or stops"
+          placeholderTextColor={colors.textSecondary}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onSubmitEditing={handleSearch}
+        />
+      </View>
 
-      {!searchQuery && (
+      {!searchQuery ? (
         <View>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Suggested Hubs</Text>
-          <View style={styles.grid}>
-            {suggestedHubs.map((hub) => (
-              <Pressable
-                key={hub.id}
-                onPress={() => handleItemPress({ ...hub, type: 'hub' })}
-              >
-                <View style={[styles.card, { backgroundColor: colors.card, width: cardWidth }]}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{hub.name}</Text>
-                  <Text style={[styles.cardType, { color: colors.primary }]}>HUB</Text>
-                  <Text style={[styles.distanceText, { color: colors.textSecondary }]}>
-                    {hub.distance.toFixed(0)} meters away
-                  </Text>
-                  <Pressable
-                    onPress={() => toggleFavorite(hub)}
-                    style={styles.favoriteButton}
-                  >
-                    <Ionicons
-                      name={userFavorites.includes(hub.id) ? 'heart' : 'heart-outline'}
-                      size={24}
-                      color={userFavorites.includes(hub.id) ? colors.primary : colors.text}
-                    />
-                  </Pressable>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 16 }]}>Suggested Stops</Text>
-          <View style={styles.grid}>
-            {suggestedStops.map((stop) => (
-              <Pressable
-                key={stop.id}
-                onPress={() => handleItemPress({ ...stop, type: 'stop' })}
-              >
-                <View style={[styles.card, { backgroundColor: colors.card, width: cardWidth }]}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{stop.name}</Text>
-                  <Text style={[styles.cardType, { color: colors.primary }]}>STOP</Text>
-                  <Text style={[styles.distanceText, { color: colors.textSecondary }]}>
-                    {stop.distance.toFixed(0)} meters away
-                  </Text>
-                  <Pressable
-                    onPress={() => toggleFavorite(stop)}
-                    style={styles.favoriteButton}
-                  >
-                    <Ionicons
-                      name={userFavorites.includes(stop.id) ? 'heart' : 'heart-outline'}
-                      size={24}
-                      color={userFavorites.includes(stop.id) ? colors.primary : colors.text}
-                    />
-                  </Pressable>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {searchQuery && (
-        loading ? (
-          <ActivityIndicator size="large" color={colors.primary} />
-        ) : (
           <FlatList
-            data={searchResults}
-            keyExtractor={(item) => item.id}
+            data={suggestedHubs}
             renderItem={renderItem}
+            keyExtractor={(item) => item.id}
             numColumns={2}
             contentContainerStyle={styles.grid}
+            ListEmptyComponent={
+              <Text style={[styles.emptyText, { color: colors.text }]}>
+                No hubs found near you
+              </Text>
+            }
           />
-        )
+
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Suggested Stops</Text>
+          <FlatList
+            data={suggestedStops}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            contentContainerStyle={styles.grid}
+            ListEmptyComponent={
+              <Text style={[styles.emptyText, { color: colors.text }]}>
+                No stops found near you
+              </Text>
+            }
+          />
+        </View>
+      ) : loading ? (
+        <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
+      ) : (
+        <FlatList
+          data={searchResults}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          contentContainerStyle={styles.grid}
+          ListEmptyComponent={
+            <Text style={[styles.emptyText, { color: colors.text }]}>
+              No results found for "{searchQuery}"
+            </Text>
+          }
+        />
       )}
     </View>
   );
@@ -312,11 +284,20 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  searchBar: {
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderRadius: 8,
-    padding: 12,
+    paddingHorizontal: 12,
     marginBottom: 16,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchBar: {
+    flex: 1,
+    paddingVertical: 12,
     fontSize: 16,
   },
   grid: {
@@ -334,10 +315,13 @@ const styles = StyleSheet.create({
     elevation: 2,
     marginBottom: 10,
   },
+  icon: {
+    marginBottom: 8,
+  },
   cardTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   cardType: {
     fontSize: 12,
@@ -348,18 +332,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 8,
   },
-  image: {
-    width: '100%',
-    height: 100,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
   favoriteButton: {
-    alignSelf: 'flex-end',
+    position: 'absolute',
+    top: 16,
+    right: 16,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 12,
+    marginTop: 8,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 16,
+  },
+  loader: {
+    marginTop: 40,
   },
 });
