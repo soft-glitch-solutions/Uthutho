@@ -12,7 +12,7 @@ import {
 import { router } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react-native'; // Updated icon imports
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
@@ -172,11 +172,11 @@ export default function Auth() {
               onPress={() => setPasswordVisible(!passwordVisible)}
               style={{ padding: 10 }}
             >
-              <Icon
-                name={passwordVisible ? 'eye-off' : 'eye'}
-                size={24}
-                color={colors.text}
-              />
+              {passwordVisible ? (
+                <EyeOff size={24} color={colors.text} />
+              ) : (
+                <Eye size={24} color={colors.text} />
+              )}
             </TouchableOpacity>
           </View>
         )}
