@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Image, Alert, Animated, Platform  } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { Flag, MapPin, Route,  } from 'lucide-react-native'; // Import lucide-react-native icons
+import { Flag, MapPin, Route, Search, Plus, ChevronRight } from 'lucide-react-native'; // Updated icon imports
 import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext';
 import StopBlock from '../../../components/stop/StopBlock';
@@ -334,7 +334,7 @@ export default function HomeScreen() {
               </Text>
             </Pressable>
             <Pressable onPress={() => router.push('/favorites')} style={styles.addButton}>
-              <MaterialIcons name="search" size={24} color={colors.text} />
+              <Search size={24} color={colors.text} />
             </Pressable>
           </View>
           {/* Second Row: Selected Title */}
@@ -472,7 +472,7 @@ export default function HomeScreen() {
               onPress={() => router.push('/favorites')}
               style={[styles.addButton, { backgroundColor: colors.primary }]}
             >
-              <MaterialIcons name="add" size={24} color="white" />
+              <Plus size={24} color="white" />
             </Pressable>
           </View>
         )}
