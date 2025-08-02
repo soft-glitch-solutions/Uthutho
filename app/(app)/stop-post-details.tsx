@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, Pressable
 import { useLocalSearchParams, router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../context/ThemeContext';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Send } from "lucide-react-native";
 import { useProfile } from '@/hook/useProfile';
 
 export default function StopPostDetailsScreen() {
@@ -212,7 +212,7 @@ export default function StopPostDetailsScreen() {
             style={[styles.commentButton, { backgroundColor: colors.primary }]}
             onPress={handleCommentSubmit}
           >
-            <MaterialCommunityIcons name="send" size={20} color={colors.text} />
+          <Send size={20} color={colors.text} />
           </Pressable>
         </View>
       </View>

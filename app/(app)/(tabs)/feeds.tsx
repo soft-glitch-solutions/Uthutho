@@ -21,8 +21,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { useRouter } from 'expo-router';
 import * as Animatable from 'react-native-animatable';
 import { Picker } from '@react-native-picker/picker';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Flag, MapPin, Route , ThumbsUp, Heart, Smile, Frown, AlertTriangle } from 'lucide-react-native';
+import { Flag, MapPin, Route , ThumbsUp, Heart, Smile, Frown, AlertTriangle , Smile, MessageCircle} from 'lucide-react-native';
 
 const Shimmer = ({ children, colors }) => {
   const animatedValue = new Animated.Value(0);
@@ -564,7 +563,7 @@ const renderReactionOptions = (postId) => (
             onPress={() => handleReactionPress(item.id)} 
             style={styles.reactionButton}
           >
-            <MaterialCommunityIcons name="emoticon-happy-outline" size={24} color={colors.text} />
+          <Smile size={24} color={colors.text} />
           </TouchableOpacity>
           {showReactions[item.id] && renderReactionOptions(item.id)}
         </View>
@@ -573,7 +572,7 @@ const renderReactionOptions = (postId) => (
           onPress={() => handlePostPress(item)}
           style={styles.commentCounter}
         >
-          <MaterialCommunityIcons name="comment-outline" size={20} color={colors.text} />
+          <MessageCircle size={20} color={colors.text} />
           <Text style={[styles.commentCountText, { color: colors.text }]}>
             {item.commentCount || 0}
           </Text>

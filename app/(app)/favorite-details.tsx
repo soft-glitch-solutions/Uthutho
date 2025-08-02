@@ -5,7 +5,6 @@ import { useTheme } from '../../context/ThemeContext';
 import { MapPin, Clock, Users, ThumbsUp } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 import StopBlock from '../../components/stop/StopBlock'; 
-import { MaterialCommunityIcons } from '@expo/vector-icons'; // Importing Expo vector icons
 // Import the StopBlock component
 
 export default function FavoriteDetailsScreen() {
