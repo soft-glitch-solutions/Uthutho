@@ -1,9 +1,9 @@
-name: Deploy via SFTP
+name: Deploy via FTP
 
 on:
   push:
     branches:
-      - main  # Trigger deploy on push to main
+      - main  # Deploy when pushing to the main branch
 
 jobs:
   deploy:
@@ -16,22 +16,24 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '18'  # ✅ Upgrade to Node.js 18+ for ReadableStream support
 
       - name: Install dependencies
         run: npm install
 
       - name: Build the app
-        run: npm run build
+        run: |
+          npm install undici@5.22.1 --save-exact  # ✅ Downgrade undici if needed
+          npx expo export -p web
 
-      - name: Deploy via SCP (no rsync)
-        uses: appleboy/scp-action@v0.1.3
+      - name: Deploy to cPanel via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
-          host: ${{ secrets.FTP_SERVER }}
+          server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
-          key: ${{ secrets.SFTP_SSH_KEY }}
-          port: ${{ secrets.FTP_PORT || 22 }}
-          source: "dist/*"
-          target: "/public_html/"
-      
-
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          port: ${{ secrets.FTP_PORT }}
+          local-dir: dist/  # This is your build directory
+          server-dir: /mobile.uthutho.co.za/  # Change this if needed
+          cleanup: true  # Remove old files before uploading
