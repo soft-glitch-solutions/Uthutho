@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useWaiting } from '../../context/WaitingContext'; // Import the global state
-import { Square } from "lucide-react-native";
+import { Square , Hand } from "lucide-react-native";
 
 const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => {
   const {
@@ -208,7 +207,7 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
           style={[styles.button, { backgroundColor: '#10b981' }]} // Green color
           onPress={handleMarkAsWaiting}
         >
-          <FontAwesome name="hand-stop-o" size={20} color="white" /> {/* Hand icon */}
+          <Hand size={20} color="white" />
           <Text style={styles.buttonText}>Mark as Waiting</Text>
         </TouchableOpacity>
       )}
