@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import * as Location from 'expo-location';
-import { useWaiting } from '../../context/WaitingContext';
-import { Square, Hand } from 'lucide-react-native';
+import { useWaiting } from '../../context/WaitingContext'; // Import the global state
+import { Square , Hand } from "lucide-react-native";
 
 const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => {
   const {
@@ -13,13 +13,12 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
     setCountdown,
     autoDeleteCountdown,
     setAutoDeleteCountdown,
-  } = useWaiting();
+  } = useWaiting(); // Use the global state
 
-  const [isClose, setIsClose] = useState(false);
-  const [userLocation, setUserLocation] = useState(null);
-  const [showRouteSelector, setShowRouteSelector] = useState(false);
-  const [availableRoutes, setAvailableRoutes] = useState(['A1', 'B3', 'C5']);
+  const [isClose, setIsClose] = useState(false); // Track if the user is close to the stop
+  const [userLocation, setUserLocation] = useState(null); // Track the user's current location
 
+  // Get the user's current location
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
@@ -33,6 +32,7 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
     })();
   }, []);
 
+  // Check if the user is close to the stop
   useEffect(() => {
     if (userLocation && stopLocation) {
       const distance = calculateDistance(
@@ -41,31 +41,33 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
         stopLocation.latitude,
         stopLocation.longitude
       );
-      setIsClose(distance <= radius);
+      setIsClose(distance <= radius); // Check if the user is within the radius
     }
   }, [userLocation, stopLocation, radius]);
 
+  // Check if the user is already waiting at this stop
   const checkIfUserIsWaiting = async () => {
     const userId = (await supabase.auth.getSession()).data.session?.user.id;
     if (!userId) return;
 
     const { data, error } = await supabase
       .from('stop_waiting')
-      .select('created_at')
+      .select('created_at') // Fetch the creation time
       .eq('stop_id', stopId)
       .eq('user_id', userId)
-      .maybeSingle();
+      .maybeSingle(); // Use maybeSingle instead of single
 
     if (error) {
       console.error('Error checking waiting status:', error);
       Alert.alert('Error', 'Failed to check waiting status.');
     } else if (data) {
-      setWaitingStatus({ stopId, createdAt: data.created_at });
-      startAutoDeleteTimer(data.created_at);
+      setWaitingStatus({ stopId, createdAt: data.created_at }); // Update global state
+      startAutoDeleteTimer(data.created_at); // Start the 5-minute timer
     }
   };
 
-  const handleRouteSelect = async (routeName) => {
+  // Handle "Mark as Waiting" button press
+  const handleMarkAsWaiting = async () => {
     const userId = (await supabase.auth.getSession()).data.session?.user.id;
     if (!userId) return;
 
@@ -75,49 +77,52 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
         stop_id: stopId,
         user_id: userId,
         transport_type: 'bus',
-        route: routeName,
       })
-      .select('created_at')
+      .select('created_at') // Fetch the creation time
       .single();
 
     if (error) {
       console.error('Error marking as waiting:', error);
       Alert.alert('Error', 'Failed to mark as waiting.');
     } else {
-      setWaitingStatus({ stopId, createdAt: data.created_at });
-      startAutoDeleteTimer(data.created_at);
-      setShowRouteSelector(false);
-      Alert.alert('Marked', `You are now marked as waiting for route ${routeName}.`);
+      setWaitingStatus({ stopId, createdAt: data.created_at }); // Update global state
+      Alert.alert('Success', 'You are now marked as waiting.');
+      startAutoDeleteTimer(data.created_at); // Start the 5-minute timer
     }
   };
 
+  // Start the 5-minute auto-delete timer
   const startAutoDeleteTimer = (createdAt) => {
     const creationTime = new Date(createdAt).getTime();
     const currentTime = new Date().getTime();
-    const elapsedTime = (currentTime - creationTime) / 1000;
-    const remainingTime = 300 - elapsedTime;
+    const elapsedTime = (currentTime - creationTime) / 1000; // Elapsed time in seconds
+    const remainingTime = 300 - elapsedTime; // 5 minutes in seconds
 
     if (remainingTime > 0) {
-      setAutoDeleteCountdown(Math.floor(remainingTime));
+      setAutoDeleteCountdown(Math.floor(remainingTime)); // Set the remaining time
 
       const timer = setTimeout(() => {
-        deleteWaitingStatus();
-      }, remainingTime * 1000);
+        deleteWaitingStatus(); // Automatically delete the waiting status after 5 minutes
+      }, remainingTime * 1000); // Remaining time in milliseconds
 
+      // Start the countdown
       const countdownInterval = setInterval(() => {
         setAutoDeleteCountdown((prev) => prev - 1);
       }, 1000);
 
+      // Clear the interval when the component unmounts
       return () => clearInterval(countdownInterval);
     } else {
-      deleteWaitingStatus();
+      deleteWaitingStatus(); // Delete the waiting status if the time has already passed
     }
   };
 
+  // Handle "Picked Up" button press
   const handlePickedUp = async () => {
     const userId = (await supabase.auth.getSession()).data.session?.user.id;
     if (!userId) return;
 
+    // Start the 5-second countdown
     let timer = 5;
     const interval = setInterval(() => {
       setCountdown((prev) => prev - 1);
@@ -130,6 +135,7 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
     }, 1000);
   };
 
+  // Delete the waiting status
   const deleteWaitingStatus = async () => {
     const userId = (await supabase.auth.getSession()).data.session?.user.id;
     if (!userId) return;
@@ -144,15 +150,16 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
       console.error('Error deleting waiting:', error);
       Alert.alert('Error', 'Failed to mark as picked up.');
     } else {
-      setWaitingStatus(null);
-      setCountdown(5);
-      setAutoDeleteCountdown(300);
+      setWaitingStatus(null); // Clear the global state
+      setCountdown(5); // Reset the countdown
+      setAutoDeleteCountdown(300); // Reset the 5-minute countdown
       Alert.alert('Success', 'You have been marked as picked up.');
     }
   };
 
+  // Calculate the distance between two coordinates (in kilometers)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371;
+    const R = 6371; // Radius of the Earth in km
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLon = (lon2 - lon1) * (Math.PI / 180);
     const a =
@@ -162,27 +169,34 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
         Math.sin(dLon / 2) *
         Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    return R * c; // Distance in km
   };
 
+  // Format the 5-minute countdown into minutes and seconds
   const formatCountdown = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
   };
 
-  if (!isClose) return null;
+  // Only render the block if the user is close to the stop
+  if (!isClose) {
+    return null;
+  }
 
+  // Check if the user is waiting at this stop
   const isWaiting = waitingStatus?.stopId === stopId;
 
   return (
     <View style={styles.container}>
       {isWaiting && (
-        <Text style={[styles.countdownText, { color: colors.text }]}>Stop will be removed in {formatCountdown(autoDeleteCountdown)}</Text>
+        <Text style={[styles.countdownText, { color: colors.text }]}>
+          Stop will be removed in {formatCountdown(autoDeleteCountdown)}
+        </Text>
       )}
       {isWaiting ? (
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: '#ef4444' }]}
+          style={[styles.button, { backgroundColor: '#ef4444' }]} // Red color
           onPress={handlePickedUp}
         >
           <Square size={20} color="white" />
@@ -190,36 +204,11 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
         </TouchableOpacity>
       ) : (
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: '#10b981' }]}
-          onPress={() => setShowRouteSelector(true)}
+          style={[styles.button, { backgroundColor: '#10b981' }]} // Green color
+          onPress={handleMarkAsWaiting}
         >
           <Hand size={20} color="white" />
           <Text style={styles.buttonText}>Mark as Waiting</Text>
-        </TouchableOpacity>
-      )}
-
-      {showRouteSelector && (
-        <TouchableOpacity
-          style={styles.overlayBackground}
-          activeOpacity={1}
-          onPress={() => setShowRouteSelector(false)}
-        >
-          <TouchableOpacity
-            style={styles.overlayDrawer}
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <Text style={styles.overlayTitle}>Select Your Route</Text>
-            {availableRoutes.map((route) => (
-              <TouchableOpacity
-                key={route}
-                style={styles.routeButton}
-                onPress={() => handleRouteSelect(route)}
-              >
-                <Text style={styles.routeButtonText}>{route}</Text>
-              </TouchableOpacity>
-            ))}
-          </TouchableOpacity>
         </TouchableOpacity>
       )}
     </View>
@@ -227,7 +216,9 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
 };
 
 const styles = StyleSheet.create({
-  container: { marginTop: 10 },
+  container: {
+    marginTop: 10,
+  },
   countdownText: {
     fontSize: 14,
     marginBottom: 10,
@@ -244,39 +235,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 10,
-  },
-  overlayBackground: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-    zIndex: 999,
-  },
-  overlayDrawer: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    height: '50%',
-  },
-  overlayTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  routeButton: {
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: '#f3f4f6',
-    marginBottom: 10,
-  },
-  routeButtonText: {
-    fontSize: 16,
-    color: '#111827',
+    marginLeft: 10, // Space between icon and text
   },
 });
 
