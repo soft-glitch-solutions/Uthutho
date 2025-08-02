@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { House, MapPin, Newspaper, Flag, Route } from 'lucide-react-native';
+import { House, User, Newspaper, Flag, Route } from 'lucide-react-native';
 import { useTheme } from '../../../context/ThemeContext';
 
 export default function TabLayout() {
@@ -27,13 +27,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="hubs"
-        options={{
-          title: 'Hubs',
-          tabBarIcon: ({ color, size }) => <MapPin color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
         name="feeds"
         options={{
           title: 'Feeds',
@@ -54,6 +47,14 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <Route color={color} size={size} />,
         }}
       />
+            <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
+        }}
+      />
     </Tabs>
+    
   );
 }

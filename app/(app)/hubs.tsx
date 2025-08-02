@@ -9,9 +9,9 @@ import {
   RefreshControl,
   TextInput,
 } from 'react-native';
-import { useTheme } from '../../../context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 import { MapPin, PlusCircle, Heart } from 'lucide-react-native';
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { useRouter } from 'expo-router';
 
 export default function HubsScreen() {

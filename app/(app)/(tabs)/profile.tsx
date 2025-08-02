@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Platform } from 'react-native';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from '../../../context/ThemeContext';
 import { router } from 'expo-router';
 import { Settings, LogOut, Camera, Captions, Edit, Badge } from 'lucide-react-native';
 import { useProfile } from '@/hook/useProfile';

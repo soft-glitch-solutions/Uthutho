@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
-import { ActivityIndicator, View, Platform } from 'react-native';
+import { ActivityIndicator, View, Platform, Text, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Index() {
@@ -48,8 +48,9 @@ export default function Index() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+      <View style={styles.container}>
+        <Text style={styles.logo}>Uthutho</Text>
+        <Text style={styles.tagline}>Transform Your Daily Commute</Text>
       </View>
     );
   }
@@ -60,3 +61,23 @@ export default function Index() {
 
   return <Redirect href="/onboarding" />; // Default to onboarding
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logo: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#1ea2b1',
+    marginBottom: 16,
+  },
+  tagline: {
+    fontSize: 16,
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+});
