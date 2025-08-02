@@ -21,7 +21,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { useRouter } from 'expo-router';
 import * as Animatable from 'react-native-animatable';
 import { Picker } from '@react-native-picker/picker';
-import { Flag, MapPin, Route , ThumbsUp, Heart, Smile, Frown, AlertTriangle , Smile, MessageCircle} from 'lucide-react-native';
+import { Flag, MapPin, Route , ThumbsUp, Heart,  Frown, AlertTriangle , Smile, MessageCircle} from 'lucide-react-native';
 
 const Shimmer = ({ children, colors }) => {
   const animatedValue = new Animated.Value(0);
