@@ -22,7 +22,7 @@ import { useRouter } from 'expo-router';
 import * as Animatable from 'react-native-animatable';
 import { Picker } from '@react-native-picker/picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Flag, MapPin, Route } from 'lucide-react-native';
+import { Flag, MapPin, Route , ThumbsUp, Heart, Smile, Frown, AlertTriangle } from 'lucide-react-native';
 
 const Shimmer = ({ children, colors }) => {
   const animatedValue = new Animated.Value(0);
@@ -481,25 +481,25 @@ export default function Feed() {
     }
   };
 
-  const renderReactionOptions = (postId) => (
-    <View style={styles.reactionOptions}>
-      <Pressable onPress={() => handleReactionSelect('like', postId)}>
-        <MaterialCommunityIcons name="thumb-up" size={24} color={colors.text} />
-      </Pressable>
-      <Pressable onPress={() => handleReactionSelect('love', postId)}>
-        <MaterialCommunityIcons name="heart" size={24} color={colors.text} />
-      </Pressable>
-      <Pressable onPress={() => handleReactionSelect('laugh', postId)}>
-        <MaterialCommunityIcons name="emoticon-happy" size={24} color={colors.text} />
-      </Pressable>
-      <Pressable onPress={() => handleReactionSelect('sad', postId)}>
-        <MaterialCommunityIcons name="emoticon-sad" size={24} color={colors.text} />
-      </Pressable>
-      <Pressable onPress={() => handleReactionSelect('angry', postId)}>
-        <MaterialCommunityIcons name="emoticon-angry" size={24} color={colors.text} />
-      </Pressable>
-    </View>
-  );
+const renderReactionOptions = (postId) => (
+  <View style={styles.reactionOptions}>
+    <Pressable onPress={() => handleReactionSelect('like', postId)}>
+      <ThumbsUp size={24} color={colors.text} />
+    </Pressable>
+    <Pressable onPress={() => handleReactionSelect('love', postId)}>
+      <Heart size={24} color={colors.text} />
+    </Pressable>
+    <Pressable onPress={() => handleReactionSelect('laugh', postId)}>
+      <Smile size={24} color={colors.text} />
+    </Pressable>
+    <Pressable onPress={() => handleReactionSelect('sad', postId)}>
+      <Frown size={24} color={colors.text} />
+    </Pressable>
+    <Pressable onPress={() => handleReactionSelect('angry', postId)}>
+      <AlertTriangle size={24} color={colors.text} />
+    </Pressable>
+  </View>
+);
 
   const renderPost = ({ item }) => (
     <TouchableOpacity onPress={() => handlePostPress(item)} style={[styles.postContainer, { backgroundColor: colors.card }]}>

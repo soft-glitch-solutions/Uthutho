@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useWaiting } from '../../context/WaitingContext'; // Import the global state
+import { Square } from "lucide-react-native";
 
 const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => {
   const {
@@ -199,7 +200,7 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
           style={[styles.button, { backgroundColor: '#ef4444' }]} // Red color
           onPress={handlePickedUp}
         >
-          <MaterialIcons name="stop" size={20} color="white" /> {/* Stop icon */}
+          <Square size={20} color="white" />
           <Text style={styles.buttonText}>Picked Up ({countdown}s)</Text>
         </TouchableOpacity>
       ) : (
