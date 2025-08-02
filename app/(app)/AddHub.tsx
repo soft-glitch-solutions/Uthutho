@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
 import { Picker } from '@react-native-picker/picker';
-import { MaterialIcons } from '@expo/vector-icons';
+import { AlertTriangle , CheckCircle } from "lucide-react-native";
 
 // New Warning Component
 const Warning = ({ visible, onAccept, onReject, colors }) => {
@@ -16,7 +16,7 @@ const Warning = ({ visible, onAccept, onReject, colors }) => {
     >
       <View style={styles.modalOverlay}>
         <View style={[styles.warningContent, { backgroundColor: colors.card }]}>
-          <MaterialIcons name="warning" size={50} color="#FFA500" style={styles.warningIcon} />
+          <AlertTriangle size={50} color="#FFA500" style={styles.warningIcon} />
           <Text style={[styles.warningTitle, { color: colors.text }]}>Important Notice</Text>
           
           <ScrollView style={styles.warningTextContainer}>
@@ -229,7 +229,7 @@ export default function AddHub() {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <MaterialIcons name="check-circle" size={60} color="#4BB543" style={styles.successIcon} />
+            <CheckCircle size={60} color="#4BB543" style={styles.successIcon} />
             <Text style={[styles.modalTitle, { color: colors.text }]}>Thank You!</Text>
             <Text style={[styles.modalText, { color: colors.text }]}>
               Your hub submission has been received for review. Our team will verify the information.

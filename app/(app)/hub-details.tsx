@@ -14,10 +14,8 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
-import { MapPin, Bus, Clock, Plus, Heart } from 'lucide-react-native';
+import { MapPin, Bus, Clock, Plus, Heart , CheckCircle } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
-
 // Shimmer component for loading state
 const Shimmer = ({ children, colors }) => {
   const animatedValue = new Animated.Value(0);
@@ -193,7 +191,7 @@ export default function HubDetailsScreen() {
             onPress={openMap}
             style={[styles.mapButton, { backgroundColor: colors.primary }]}
           >
-            <MaterialIcons name="map" size={24} color="white" />
+            <CheckCircle size={60} color="#4BB543" style={styles.successIcon} />
           </TouchableOpacity>
         </View>
         <View style={styles.infoRow}>
