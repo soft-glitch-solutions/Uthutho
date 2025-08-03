@@ -12,7 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
-import { PlusCircle, Heart, Search, X } from 'lucide-react-native'; // Icons
+import { PlusCircle, Heart, Search, X , CircleAlert as AlertCircle } from 'lucide-react-native'; // Icons
 import { supabase } from '../../../lib/supabase'; // Adjust the path
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
@@ -177,7 +177,8 @@ export default function StopsScreen() {
     >
       {/* Header Section */}
       <View style={styles.header}>
-        <Text style={[styles.headerText, { color: colors.text }]}>Transport Stops</Text>
+        <Text style={[styles.headerText, { color: colors.text }]}>Nearby Stops</Text>
+
         <TouchableOpacity
           onPress={() => router.push('/AddStop')}
           style={[styles.addButton, { backgroundColor: colors.primary }]}
@@ -186,6 +187,12 @@ export default function StopsScreen() {
           <Text style={[styles.addButtonText, { color: colors.text }]}>Add Stop</Text>
         </TouchableOpacity>
       </View>
+
+      <View>
+      <Text style={styles.subtitle}>Mark yourself as waiting to help others</Text>
+        </View>
+
+
 
       <View style={[styles.searchBarContainer, { borderColor: colors.border }]}>
         <Search size={20} color={colors.text} />
@@ -201,6 +208,14 @@ export default function StopsScreen() {
             <X size={20} color={colors.text} />
           </TouchableOpacity>
         )}
+      </View>
+
+                    {/* Info Card */}
+      <View style={styles.infoCard}>
+        <AlertCircle size={20} color="#1ea2b1" />
+        <Text style={styles.infoText}>
+          Help other travelers by marking when you're waiting at a stop. This creates real-time crowding information for the community.
+        </Text>
       </View>
 
       {/* Loading State */}
@@ -292,6 +307,32 @@ const styles = StyleSheet.create({
   addButtonText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+    subtitle: {
+    fontSize: 16,
+    color: '#cccccc',
+    marginTop: 4,
+  },
+   infoCard: {
+    backgroundColor: '#1a1a1a',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#1ea2b150',
+  },
+  infoText: {
+    flex: 1,
+    color: '#cccccc',
+    fontSize: 14,
+    lineHeight: 20,
+    marginLeft: 12,
+  },
+  section: {
+    paddingHorizontal: 20,
   },
   searchBarContainer: {
     flexDirection: 'row',

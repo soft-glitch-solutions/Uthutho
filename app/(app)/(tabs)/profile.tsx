@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
 import { router } from 'expo-router';
-import { Settings, LogOut, Camera, Captions, Edit, Badge } from 'lucide-react-native';
+import { Settings, LogOut, Camera, Captions, Edit, Badge , Star } from 'lucide-react-native';
 import { useProfile } from '@/hook/useProfile';
 
 export default function ProfileScreen() {
@@ -259,8 +259,11 @@ export default function ProfileScreen() {
         </View>
       )}
 
-{selectedTab === 'awards' && (
-        <View style={styles.menuContainer}>
+        {selectedTab === 'awards' && (
+                <View style={styles.menuContainer}>
+
+
+
           {awardMenuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
@@ -282,6 +285,27 @@ export default function ProfileScreen() {
               </View>
             </TouchableOpacity>
           ))}
+                            {/* Achievement Banner - Eco Warrior */}
+        <View style={styles.achievementBanner}>
+          <Star size={24} color="#fbbf24" />
+          <View style={styles.achievementText}>
+            <Text style={styles.achievementTitle}>Eco Warrior</Text>
+            <Text style={styles.achievementDescription}>
+              You've helped reduce carbon emissions by using public transport!
+            </Text>
+          </View>
+        </View>
+
+        {/* Achievement Banner - Early Adopter */}
+        <View style={styles.achievementBanner}>
+          <Star size={24} color="#34d399" /> {/* green-ish for variety */}
+          <View style={styles.achievementText}>
+            <Text style={styles.achievementTitle}>Early Adopter</Text>
+            <Text style={styles.achievementDescription}>
+              Thanks for being one of the first to try Uthutho!
+            </Text>
+          </View>
+        </View>
         </View>
       )}
 
@@ -293,6 +317,15 @@ export default function ProfileScreen() {
         <LogOut size={24} color="white" />
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
+
+            <View style={styles.bottomSpace} />
+
+            {/* App Info */}
+      <View style={styles.appInfo}>
+        <Text style={styles.appInfoText}>Uthutho v1.0.0</Text>
+        <Text style={styles.motto}>"Izindlela zakho ziqinisekisa impumelelo!"</Text>
+      </View>
+
     </ScrollView>
   );
 }
@@ -392,9 +425,53 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 20,
   },
+   appInfo: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  appInfoText: {
+    color: '#666666',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  motto: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
   signOutText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+    bottomSpace: {
+    height: 20,
+  },
+    achievementBanner: {
+    backgroundColor: '#1a1a1a',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#fbbf2450',
+  },
+  achievementText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  achievementTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fbbf24',
+    marginBottom: 4,
+  },
+  achievementDescription: {
+    fontSize: 14,
+    color: '#cccccc',
   },
 });

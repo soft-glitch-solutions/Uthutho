@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { Flag, MapPin, Route, Search, Plus } from 'lucide-react-native';
+import { Flag, MapPin, Route, Search, Plus , Award , Trophy } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext';
 import StopBlock from '../../../components/stop/StopBlock';
@@ -124,6 +124,12 @@ export default function HomeScreen() {
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [nearestLocations, setNearestLocations] = useState(null);
   const [isNearestLoading, setIsNearestLoading] = useState(false);
+    const [userStats, setUserStats] = useState({
+    points: 0,
+    level: 1,
+    streak: 0,
+    title: 'Newbie Explorer'
+  });
   const [userId, setUserId] = useState(null);
   const [favoriteDetails, setFavoriteDetails] = useState([]);
   const navigation = useNavigation();
@@ -236,6 +242,34 @@ export default function HomeScreen() {
     return nearestLocation;
   };
 
+
+    useEffect(() => {
+    loadUserStats();
+  }, []);
+    const loadUserStats = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('points, selected_title')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile) {
+          setUserStats({
+            points: profile.points || 0,
+            level: Math.floor((profile.points || 0) / 100) + 1,
+            streak: 5, // This would come from login_streaks table
+            title: profile.selected_title || 'Newbie Explorer'
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user stats:', error);
+    }
+  };
+
   const openSidebar = () => {
     navigation.toggleDrawer();
   };
@@ -298,20 +332,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {Platform.OS !== 'web' ? (
-        <View style={styles.bannerContainer}>
-          <AdMobBanner
-            bannerSize="smartBannerPortrait"
-            adUnitID="ca-app-pub-3940256099942544/6300978111"
-            servePersonalizedAds
-            onDidFailToReceiveAdWithError={(error) => console.log(error)}
-          />
-        </View>
-      ) : (
-        <View style={styles.bannerPlaceholder}>
-          <Text style={styles.bannerPlaceholderText}>Ad placeholder for web</Text>
-        </View>
-      )}
 
       <View style={styles.header}>
         <View>
@@ -332,6 +352,22 @@ export default function HomeScreen() {
           )}
         </View>
       </View>
+
+            {Platform.OS !== 'web' ? (
+        <View style={styles.bannerContainer}>
+          <AdMobBanner
+            bannerSize="smartBannerPortrait"
+            adUnitID="ca-app-pub-3940256099942544/6300978111"
+            servePersonalizedAds
+            onDidFailToReceiveAdWithError={(error) => console.log(error)}
+          />
+        </View>
+      ) : (
+        <View style={styles.bannerPlaceholder}>
+          <Text style={styles.bannerPlaceholderText}>Ad placeholder for web</Text>
+        </View>
+      )}
+
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Nearby You</Text>
@@ -452,6 +488,34 @@ export default function HomeScreen() {
             </Pressable>
           </View>
         )}
+      </View>
+
+
+       {/* Gamification Section */}
+      <View style={styles.gamificationCard}>
+        <View style={styles.gamificationHeader}>
+          <Text style={styles.gamificationTitle}>Your Progress</Text>
+        </View>
+        
+        <View style={styles.statsRow}>
+          <View style={styles.statBox}>
+            <Text style={styles.statNumber}>{userStats.points}</Text>
+            <Text style={styles.statLabel}>Points</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statNumber}>Level {userStats.level}</Text>
+            <Text style={styles.statLabel}>Explorer</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statNumber}>{userStats.streak} days</Text>
+            <Text style={styles.statLabel}>Streak</Text>
+          </View>
+        </View>
+
+        <View style={styles.titleBadge}>
+          <Award size={16} color="#1ea2b1" />
+          <Text style={styles.titleText}>{userStats.title}</Text>
+        </View>
       </View>
     </ScrollView>
   );
@@ -591,5 +655,59 @@ const styles = StyleSheet.create({
   },
   bannerPlaceholderText: {
     color: '#666',
+  },
+
+    gamificationTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginLeft: 8,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  statBox: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fbbf24',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666666',
+  },
+  titleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1ea2b120',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  titleText: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+    gamificationCard: {
+    backgroundColor: '#1a1a1a',
+    marginHorizontal: 20,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#fbbf2450',
+  },
+  gamificationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
   },
 });
