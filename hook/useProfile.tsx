@@ -4,8 +4,10 @@ import { Title } from "@/types/title";
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 
 export function useProfile() {
+  const router = useRouter();
   const [loading, setLoading] = useState<boolean>(true);
   const [uploading, setUploading] = useState<boolean>(false);
   const [session, setSession] = useState<Session | null>(null);
@@ -17,7 +19,7 @@ export function useProfile() {
     const fetchSession = async () => {
       const { data: session, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !session?.session) {
-        throw new Error('No user session found. Please log in.');
+          router.replace('/auth');
       }
       setSession(session.session);
     };
@@ -240,6 +242,7 @@ export function useProfile() {
       }
       setSession(null);
       setProfile(null);
+      router.replace('/auth');
     } catch (error: any) {
       throw error;
     } finally {

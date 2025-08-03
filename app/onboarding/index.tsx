@@ -223,7 +223,6 @@ const styles = StyleSheet.create({
   },
   slideContent: {
     alignItems: 'center',
-    marginBottom: 24,
   },
   iconContainer: {
     marginBottom: 16,
@@ -247,7 +246,7 @@ const styles = StyleSheet.create({
     color: '#cccccc',
     textAlign: 'center',
     lineHeight: 24,
-    marginBottom: 60,
+    marginBottom: 20,
   },
   button: {
     flexDirection: 'row',
