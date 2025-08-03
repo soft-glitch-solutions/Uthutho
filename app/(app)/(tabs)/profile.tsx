@@ -322,7 +322,7 @@ export default function ProfileScreen() {
 
             {/* App Info */}
       <View style={styles.appInfo}>
-        <Text style={styles.appInfoText}>Uthutho v1.0.0</Text>
+        <Text style={styles.appInfoText}>Uthutho v0.0.1</Text>
         <Text style={styles.motto}>"Izindlela zakho ziqinisekisa impumelelo!"</Text>
       </View>
 
