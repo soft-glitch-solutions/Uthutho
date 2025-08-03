@@ -124,7 +124,7 @@ export default function HomeScreen() {
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [nearestLocations, setNearestLocations] = useState(null);
   const [isNearestLoading, setIsNearestLoading] = useState(false);
-    const [userStats, setUserStats] = useState({
+  const [userStats, setUserStats] = useState({
     points: 0,
     level: 1,
     streak: 0,
@@ -165,10 +165,10 @@ export default function HomeScreen() {
           const details = await Promise.all(
             data.favorites.map(async (favorite) => {
               const details = await handleFavoritePress(favorite);
-              return { name: favorite, ...details };
+              return details ? { name: favorite, ...details } : null;
             })
           );
-          setFavoriteDetails(details);
+          setFavoriteDetails(details.filter(Boolean)); // Remove nulls
         }
       } catch (error) {
         router.replace('/auth');

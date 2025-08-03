@@ -1,234 +1,278 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, Platform } from 'react-native';
-import { useTheme } from '../../context/ThemeContext';
-import { supabase } from '../../lib/supabase';
-import { router } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
-import { useProfile } from '@/hook/useProfile';
-import { Camera } from 'lucide-react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { useRouter, Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { User, Mail, MapPin, ArrowLeft, Save, Globe } from 'lucide-react-native';
+import { supabase } from '@/lib/supabase';
+
+interface UserProfile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  preferred_transport?: string;
+  home?: string;
+  preferred_language?: string;
+  points?: number;
+  selected_title?: string;
+}
 
 export default function EditProfileScreen() {
-  const { colors } = useTheme();
-  const {
-    profile,
-    loading: profileLoading,
-    updateProfile,
-    uploadAvatar,
-  } = useProfile();
+  const router = useRouter();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [preferredTransport, setPreferredTransport] = useState('');
+  const [homeLocation, setHomeLocation] = useState('');
+  const [preferredLanguage, setPreferredLanguage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const [firstName, setFirstName] = useState(profile?.first_name || '');
-  const [lastName, setLastName] = useState(profile?.last_name || '');
-  const [email, setEmail] = useState(profile?.email || '');
-  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || null);
-  const [uploading, setUploading] = useState(false);
+  const transportOptions = ['Taxi', 'Bus', 'Train', 'Uber', 'Walking', 'Mixed'];
+  const languageOptions = ['English', 'Zulu', 'Afrikaans', 'Xhosa', 'Sotho'];
 
-  // Ref for file input (web only)
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Update local state when profile data changes
   useEffect(() => {
-    if (profile) {
-      setFirstName(profile.first_name || '');
-      setLastName(profile.last_name || '');
-      setEmail(profile.email || '');
-      setAvatarUrl(profile.avatar_url || null);
-    }
-  }, [profile]);
+    loadProfile();
+  }, []);
 
-  // Handle saving profile changes
-  const handleSave = async () => {
+  const loadProfile = async () => {
     try {
-      const updates = {
-        first_name: firstName,
-        last_name: lastName,
-        email: email,
-        avatar_url: avatarUrl,
-      };
-
-      await updateProfile(updates);
-      alert('Profile updated successfully!');
-      router.back();
-    } catch (error) {
-      console.error('Error updating profile:', error.message);
-      alert('Failed to update profile. Please try again.');
-    }
-  };
-
-  // Handle image picker for avatar upload (mobile)
-  const handleImagePickerMobile = async () => {
-    try {
-      setUploading(true);
-
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        alert('Sorry, we need camera roll permissions to make this work!');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.replace('/auth');
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 1,
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error loading profile:', error);
+        return;
+      }
+
+      setProfile({
+        ...profileData,
+        email: user.email || '',
       });
 
-      if (!result.canceled) {
-        const selectedImage = result.assets[0].uri;
-        const publicUrl = await uploadAvatar(selectedImage);
-        setAvatarUrl(publicUrl);
-      }
+      // Set form values
+      setFirstName(profileData.first_name || '');
+      setLastName(profileData.last_name || '');
+      setPreferredTransport(profileData.preferred_transport || '');
+      setHomeLocation(profileData.home || '');
+      setPreferredLanguage(profileData.preferred_language || 'English');
     } catch (error) {
-      console.error('Error picking or uploading image:', error);
-      alert('Failed to pick or upload image. Please try again.');
-    } finally {
-      setUploading(false);
+      console.error('Error loading profile:', error);
     }
+    setLoading(false);
   };
 
-  // Handle file input change for avatar upload (web)
-  const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const saveProfile = async () => {
+    if (!profile) return;
+
+    setSaving(true);
     try {
-      setUploading(true);
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: firstName,
+          last_name: lastName,
+          preferred_transport: preferredTransport,
+          home: homeLocation,
+          preferred_language: preferredLanguage,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', profile.id);
 
-      const file = event.target.files?.[0];
-      if (!file || !file.type.startsWith('image/')) {
-        alert('Please select a valid image file.');
-        return;
+      if (error) {
+        Alert.alert('Error', 'Failed to update profile. Please try again.');
+        console.error('Error updating profile:', error);
+      } else {
+        Alert.alert('Success', 'Profile updated successfully!', [
+          { text: 'OK', onPress: () => router.back() }
+        ]);
       }
-
-      const publicUrl = await uploadAvatar(file);
-      setAvatarUrl(publicUrl);
     } catch (error) {
-      console.error('Error uploading image:', error);
-    } finally {
-      setUploading(false);
+      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      console.error('Error updating profile:', error);
     }
+    setSaving(false);
   };
 
-  // Handle image picker (mobile) or file input (web)
-  const handleImagePicker = () => {
-    if (Platform.OS === 'web') {
-      fileInputRef.current?.click();
-    } else {
-      handleImagePickerMobile();
-    }
-  };
-
-  if (profileLoading) {
+  if (loading) {
     return (
-      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.formContainer}>
-          {/* Avatar Skeleton */}
-          <View style={styles.avatarContainer}>
-            <View style={[styles.avatarSkeleton, { backgroundColor: colors.card }]} />
-          </View>
-
-          {/* Points Skeleton */}
-          <View style={styles.pointsContainer}>
-            <View style={[styles.pointsSkeleton, { backgroundColor: colors.card }]} />
-          </View>
-
-          {/* First Name Skeleton */}
-          <View style={styles.inputSkeleton}>
-            <View style={[styles.skeleton, { backgroundColor: colors.card }]} />
-          </View>
-
-          {/* Last Name Skeleton */}
-          <View style={styles.inputSkeleton}>
-            <View style={[styles.skeleton, { backgroundColor: colors.card }]} />
-          </View>
-
-          {/* Email Skeleton */}
-          <View style={styles.inputSkeleton}>
-            <View style={[styles.skeleton, { backgroundColor: colors.card }]} />
-          </View>
-
-          {/* Save Button Skeleton */}
-          <View style={styles.saveButtonSkeleton}>
-            <View style={[styles.skeleton, { backgroundColor: colors.card }]} />
-          </View>
-        </View>
-      </ScrollView>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
     );
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.formContainer}>
-        {/* Hidden file input for web */}
-        {Platform.OS === 'web' && (
-          <input
-            type="file"
-            ref={fileInputRef}
-            style={{ display: 'none' }}
-            accept="image/*"
-            onChange={handleFileInputChange}
-          />
-        )}
-
-        {/* Avatar Upload Section */}
-        <TouchableOpacity onPress={handleImagePicker} style={styles.avatarContainer} disabled={uploading}>
-          {uploading ? (
-            <View style={[styles.avatarSkeleton, { backgroundColor: colors.card }]} />
-          ) : avatarUrl ? (
-            <View style={{ position: 'relative' }}>
-              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-              <View style={[styles.cameraButton, { backgroundColor: colors.primary }]}>
-                <Camera size={16} color="white" />
-              </View>
-            </View>
-          ) : (
-            <View style={[styles.avatarPlaceholder, { backgroundColor: colors.card }]}>
-              <Text style={{ color: colors.text }}>Select Profile Picture</Text>
-            </View>
-          )}
+    <ScrollView style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <StatusBar style="light" backgroundColor="#000000" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <ArrowLeft size={24} color="#ffffff" />
         </TouchableOpacity>
-
-        {/* Points Display */}
-        <View style={styles.pointsContainer}>
-          <Text style={[styles.pointsText, { color: colors.text }]}>Points: {profile?.points || 0}</Text>
-        </View>
-
-        {/* First Name Input */}
-        <Text style={[styles.label, { color: colors.text }]}>First Name</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-          value={firstName}
-          onChangeText={setFirstName}
-          placeholder="Enter your first name"
-          placeholderTextColor={colors.textSecondary}
-        />
-
-        {/* Last Name Input */}
-        <Text style={[styles.label, { color: colors.text }]}>Last Name</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-          value={lastName}
-          onChangeText={setLastName}
-          placeholder="Enter your last name"
-          placeholderTextColor={colors.textSecondary}
-        />
-
-        {/* Email Input */}
-        <Text style={[styles.label, { color: colors.text }]}>Email</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="Enter your email"
-          placeholderTextColor={colors.textSecondary}
-          keyboardType="email-address"
-        />
-
-        {/* Save Button */}
-        <TouchableOpacity
-          style={[styles.saveButton, { backgroundColor: colors.primary }]}
-          onPress={handleSave}
-          disabled={uploading}
+        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <TouchableOpacity 
+          style={[styles.saveButton, saving && styles.saveButtonDisabled]} 
+          onPress={saveProfile}
+          disabled={saving}
         >
-          <Text style={styles.saveButtonText}>Save Changes</Text>
+          <Save size={20} color="#ffffff" />
         </TouchableOpacity>
       </View>
+
+      {/* Profile Form */}
+      <View style={styles.form}>
+        {/* Personal Information */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Personal Information</Text>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>First Name</Text>
+            <View style={styles.inputContainer}>
+              <User size={20} color="#1ea2b1" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your first name"
+                placeholderTextColor="#666666"
+                value={firstName}
+                onChangeText={setFirstName}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Last Name</Text>
+            <View style={styles.inputContainer}>
+              <User size={20} color="#1ea2b1" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your last name"
+                placeholderTextColor="#666666"
+                value={lastName}
+                onChangeText={setLastName}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email Address</Text>
+            <View style={[styles.inputContainer, styles.disabledInput]}>
+              <Mail size={20} color="#666666" style={styles.inputIcon} />
+              <TextInput
+                style={[styles.input, styles.disabledInputText]}
+                value={profile?.email}
+                editable={false}
+              />
+            </View>
+            <Text style={styles.helperText}>Email cannot be changed</Text>
+          </View>
+        </View>
+
+        {/* Preferences */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Preferred Transport</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsScroll}>
+              {transportOptions.map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.optionButton,
+                    preferredTransport === option && styles.optionButtonActive
+                  ]}
+                  onPress={() => setPreferredTransport(option)}
+                >
+                  <Text style={[
+                    styles.optionButtonText,
+                    preferredTransport === option && styles.optionButtonTextActive
+                  ]}>
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Home Location</Text>
+            <View style={styles.inputContainer}>
+              <MapPin size={20} color="#1ea2b1" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your home area (e.g., Sandton, Johannesburg)"
+                placeholderTextColor="#666666"
+                value={homeLocation}
+                onChangeText={setHomeLocation}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Preferred Language</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsScroll}>
+              {languageOptions.map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.optionButton,
+                    preferredLanguage === option && styles.optionButtonActive
+                  ]}
+                  onPress={() => setPreferredLanguage(option)}
+                >
+                  <Text style={[
+                    styles.optionButtonText,
+                    preferredLanguage === option && styles.optionButtonTextActive
+                  ]}>
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+
+        {/* Account Stats */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account Information</Text>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{profile?.points || 0}</Text>
+              <Text style={styles.statLabel}>Points Earned</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{profile?.selected_title || 'Newbie Explorer'}</Text>
+              <Text style={styles.statLabel}>Current Title</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Save Button */}
+        <TouchableOpacity 
+          style={[styles.saveButtonLarge, saving && styles.saveButtonDisabled]} 
+          onPress={saveProfile}
+          disabled={saving}
+        >
+          <Save size={20} color="#ffffff" style={styles.saveButtonIcon} />
+          <Text style={styles.saveButtonText}>
+            {saving ? 'Saving...' : 'Save Changes'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.bottomSpace} />
     </ScrollView>
   );
 }
@@ -236,85 +280,167 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    backgroundColor: '#000000',
   },
-  formContainer: {
-    gap: 16,
-  },
-  avatarContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
-  avatarPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarSkeleton: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
-  pointsContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  pointsText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  pointsSkeleton: {
-    width: 100,
-    height: 20,
-    borderRadius: 4,
-  },
-  label: {
+  loadingText: {
+    color: '#ffffff',
     fontSize: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+  },
+  backButton: {
+    backgroundColor: '#1a1a1a',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
-  },
-  input: {
-    height: 40,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-  },
-  inputSkeleton: {
-    marginBottom: 16,
-  },
-  skeleton: {
-    width: '100%',
-    height: 40,
-    borderRadius: 8,
+    color: '#ffffff',
   },
   saveButton: {
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  saveButtonSkeleton: {
-    marginTop: 20,
-  },
-  saveButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  cameraButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    backgroundColor: '#1ea2b1',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#666666',
+  },
+  form: {
+    paddingHorizontal: 20,
+  },
+  section: {
+    marginBottom: 30,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 16,
+    color: '#ffffff',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  disabledInput: {
+    backgroundColor: '#0a0a0a',
+    borderColor: '#222222',
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    color: '#ffffff',
+    fontSize: 16,
+    paddingVertical: 16,
+  },
+  disabledInputText: {
+    color: '#666666',
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 4,
+  },
+  optionsScroll: {
+    marginTop: 8,
+  },
+  optionButton: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  optionButtonActive: {
+    backgroundColor: '#1ea2b1',
+    borderColor: '#1ea2b1',
+  },
+  optionButtonText: {
+    color: '#cccccc',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  optionButtonTextActive: {
+    color: '#ffffff',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  statItem: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1ea2b1',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666666',
+    textAlign: 'center',
+  },
+  saveButtonLarge: {
+    backgroundColor: '#1ea2b1',
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  saveButtonIcon: {
+    marginRight: 8,
+  },
+  saveButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  bottomSpace: {
+    height: 40,
   },
 });
