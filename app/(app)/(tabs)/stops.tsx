@@ -314,7 +314,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
    infoCard: {
-    backgroundColor: '#1a1a1a',
     marginHorizontal: 20,
     marginBottom: 20,
     borderRadius: 12,
