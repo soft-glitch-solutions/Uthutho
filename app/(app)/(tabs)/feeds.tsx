@@ -695,6 +695,7 @@ const renderReactionOptions = (postId) => (
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      
 
        {/* Search Form */}
       <View style={styles.searchCard}>
