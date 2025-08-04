@@ -883,25 +883,19 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   searchCard: {
-    backgroundColor: '#1a1a1a',
-    marginHorizontal: 20,
-    marginBottom: 30,
     borderRadius: 16,
-    padding: 20,
+    paddingBottom: 20,
     borderWidth: 1,
-    borderColor: '#333333',
   },
   inputGroup: {
     marginBottom: 16,
   },
   inputLabel: {
-    color: '#ffffff',
     fontSize: 14,
     fontWeight: '500',
     marginBottom: 8,
   },
   searchButtonDisabled: {
-    backgroundColor: '#333333',
   },
   searchButton: {
     backgroundColor: '#1ea2b1',
