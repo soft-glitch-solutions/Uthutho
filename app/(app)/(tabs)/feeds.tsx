@@ -21,7 +21,8 @@ import { useTheme } from '../../../context/ThemeContext';
 import { useRouter } from 'expo-router';
 import * as Animatable from 'react-native-animatable';
 import { Picker } from '@react-native-picker/picker';
-import { Flag, MapPin, Route , ThumbsUp, Heart,  Frown, AlertTriangle , Smile, MessageCircle} from 'lucide-react-native';
+import { Flag, MapPin, Route , ThumbsUp, Heart,  Frown, AlertTriangle , Smile, MessageCircle, Search} from 'lucide-react-native';
+import LocationAutocomplete from '@/components/LocationAutocomplete';
 
 const Shimmer = ({ children, colors }) => {
   const animatedValue = new Animated.Value(0);
@@ -97,6 +98,13 @@ const PostSkeleton = ({ colors }) => {
   );
 };
 
+interface Location {
+  display_name: string;
+  lat: string;
+  lon: string;
+  place_id: string;
+}
+
 export default function Feed() {
   const { colors } = useTheme();
   const [selectedPost, setSelectedPost] = useState<string | null>(null);
@@ -119,6 +127,14 @@ export default function Feed() {
   const [stopPosts, setStopPosts] = useState([]);
   const [reactionModalVisible, setReactionModalVisible] = useState(false);
   const [showReactions, setShowReactions] = useState({});
+
+  const [routeInstructions, setRouteInstructions] = useState(null);
+  const [searchingRoute, setSearchingRoute] = useState(false);
+
+  const [fromText, setFromText] = useState('');
+  const [toText, setToText] = useState('');
+  const [fromLocation, setFromLocation] = useState<Location | null>(null);
+  const [toLocation, setToLocation] = useState<Location | null>(null);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -460,6 +476,95 @@ export default function Feed() {
     return `${seconds}s ago`;
   };
 
+    const findRoute = async () => {
+    if (!fromLocation || !toLocation) return;
+    
+    setSearchingRoute(true);
+    try {
+      // Find matching routes from database
+      const { data: matchingRoutes, error } = await supabase
+        .from('routes')
+        .select('*')
+        .ilike('start_point', `%${fromLocation.display_name.split(',')[0]}%`)
+        .ilike('end_point', `%${toLocation.display_name.split(',')[0]}%`);
+
+      if (matchingRoutes && matchingRoutes.length > 0) {
+        // Generate route instructions based on found routes
+        const instructions = generateRouteInstructions(fromLocation, toLocation, matchingRoutes);
+        setRouteInstructions(instructions);
+      } else {
+        // Generate general instructions if no exact routes found
+        const generalInstructions = generateGeneralInstructions(fromLocation, toLocation);
+        setRouteInstructions(generalInstructions);
+      }
+    } catch (error) {
+      console.error('Error finding route:', error);
+    }
+    setSearchingRoute(false);
+  };
+
+  const generateRouteInstructions = (from: Location, to: Location, routes: Route[]) => {
+    const bestRoute = routes[0]; // Use first matching route
+    return {
+      fromLocation: from.display_name.split(',')[0],
+      toLocation: to.display_name.split(',')[0],
+      totalDuration: '45-60 min',
+      totalCost: bestRoute.cost,
+      steps: [
+        {
+          instruction: `Walk to the nearest ${bestRoute.transport_type} stop`,
+          transport_type: 'Walking',
+          duration: '5-10 min',
+        },
+        {
+          instruction: `Take ${bestRoute.name} from ${bestRoute.start_point} to ${bestRoute.end_point}`,
+          transport_type: bestRoute.transport_type,
+          duration: '30-45 min',
+          cost: bestRoute.cost,
+        },
+        {
+          instruction: `Walk to your destination`,
+          transport_type: 'Walking',
+          duration: '5-10 min',
+        },
+      ],
+    };
+  };
+
+  const generateGeneralInstructions = (from: Location, to: Location) => {
+    return {
+      fromLocation: from.display_name.split(',')[0],
+      toLocation: to.display_name.split(',')[0],
+      totalDuration: '60-90 min',
+      totalCost: 25,
+      steps: [
+        {
+          instruction: 'Walk to the nearest taxi rank or bus stop',
+          transport_type: 'Walking',
+          duration: '10-15 min',
+        },
+        {
+          instruction: 'Take a taxi or bus towards your destination area',
+          transport_type: 'Taxi/Bus',
+          duration: '40-60 min',
+          cost: 20,
+        },
+        {
+          instruction: 'Transfer to local transport if needed',
+          transport_type: 'Local Transport',
+          duration: '10-15 min',
+          cost: 5,
+        },
+        {
+          instruction: 'Walk to your final destination',
+          transport_type: 'Walking',
+          duration: '5-10 min',
+        },
+      ],
+    };
+  };
+
+
   const handlePostPress = async (post) => {
     if (post.type === 'hub') {
       router.push({
@@ -580,6 +685,7 @@ const renderReactionOptions = (postId) => (
       </View>
     </TouchableOpacity>
   );
+  
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -589,6 +695,41 @@ const renderReactionOptions = (postId) => (
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+
+       {/* Search Form */}
+      <View style={styles.searchCard}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>From</Text>
+          <LocationAutocomplete
+            placeholder="Your current location"
+            value={fromText}
+            onChangeText={setFromText}
+            onLocationSelect={setFromLocation}
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>To</Text>
+          <LocationAutocomplete
+            placeholder="Your destination"
+            value={toText}
+            onChangeText={setToText}
+            onLocationSelect={setToLocation}
+          />
+        </View>
+
+        <TouchableOpacity 
+          style={[styles.searchButton, (!fromLocation || !toLocation) && styles.searchButtonDisabled]}
+          onPress={findRoute}
+          disabled={!fromLocation || !toLocation || searchingRoute}
+        >
+          <Search size={20} color="#ffffff" style={styles.searchIcon} />
+          <Text style={styles.searchButtonText}>
+            {searchingRoute ? 'Finding Route...' : 'Find Route'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <FlatList
         data={[...hubPosts, ...stopPosts]}
         keyExtractor={(item) => item.id.toString()}
@@ -740,6 +881,56 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     marginRight: 8,
+  },
+  searchCard: {
+    backgroundColor: '#1a1a1a',
+    marginHorizontal: 20,
+    marginBottom: 30,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  searchButtonDisabled: {
+    backgroundColor: '#333333',
+  },
+  searchButton: {
+    backgroundColor: '#1ea2b1',
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  instructionsContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  section: {
+    paddingHorizontal: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 16,
   },
   skeletonHeaderContent: {
     flex: 1,
