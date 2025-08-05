@@ -124,20 +124,23 @@ export default function SettingsScreen() {
           />
         </View>
 
-        {/* Language Settings */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{text.language}</Text>
-        <TouchableOpacity
-          style={styles.settingOption}
-          onPress={() => router.push('/ChangeLanguage')}> {/* Use router.push for navigation */}
-          <View style={styles.settingLeft}>
-            <Globe color={colors.text} />
-            <Text style={[styles.settingText, { color: colors.text }]}>{text.changeLanguage}</Text>
-          </View>
-        </TouchableOpacity>
 
         {/* Privacy Settings */}
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{text.privacy}</Text>
-        <TouchableOpacity style={styles.settingOption}>
+      <TouchableOpacity
+          style={styles.settingOption}
+          onPress={() => router.push('/PrivacyScreen')}>
+          <View style={styles.settingLeft}>
+            <Lock color={colors.text} />
+            <Text style={[styles.settingText, { color: colors.text }]}>{text.privacyPolicy}</Text>
+          </View>
+        </TouchableOpacity>
+
+                {/* Security Settings */}
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{text.privacy}</Text>
+      <TouchableOpacity
+          style={styles.settingOption}
+          onPress={() => router.push('/PrivacyScreen')}>
           <View style={styles.settingLeft}>
             <Lock color={colors.text} />
             <Text style={[styles.settingText, { color: colors.text }]}>{text.privacyPolicy}</Text>
