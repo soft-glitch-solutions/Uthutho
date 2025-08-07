@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { House, User, Newspaper, Flag, Route } from 'lucide-react-native';
+import { House, User, Rss, Flag, Route } from 'lucide-react-native';
 import { useTheme } from '../../../context/ThemeContext';
 
 export default function TabLayout() {
@@ -30,7 +30,7 @@ export default function TabLayout() {
         name="feeds"
         options={{
           title: 'Feeds',
-          tabBarIcon: ({ color, size }) => <Newspaper color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <Rss color={color} size={size} />,
         }}
       />
       <Tabs.Screen

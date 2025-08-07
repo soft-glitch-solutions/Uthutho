@@ -380,7 +380,7 @@ export default function HomeScreen() {
         ) : (
           <View style={styles.grid}>
             <Pressable
-              style={[styles.card, { backgroundColor: colors.card }]}
+              style={[styles.card, { backgroundColor: colors.primary }]}
               onPress={() => nearestLocations?.nearestStop && handleNearestStopPress(nearestLocations.nearestStop.id)}
             >
               <View style={styles.favoriteItem}>
@@ -417,7 +417,7 @@ export default function HomeScreen() {
             </Pressable>
 
             <Pressable
-              style={[styles.card, { backgroundColor: colors.card }]}
+              style={[styles.card, { backgroundColor: colors.primary }]}
               onPress={() => nearestLocations?.nearestHub && handleNearestHubPress(nearestLocations.nearestHub.id)}
             >
               <View style={styles.favoriteItem}>
@@ -704,6 +704,7 @@ const styles = StyleSheet.create({
   },
   gamificationHeader: {
     flexDirection: 'row',
+    color: '#1ea2b1',
     alignItems: 'center',
     marginBottom: 16,
   },
