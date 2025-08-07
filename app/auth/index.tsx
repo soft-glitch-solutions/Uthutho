@@ -12,7 +12,7 @@ import {
 import { router } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import { Eye, EyeOff, ArrowLeft } from 'lucide-react-native'; // Updated icon imports
+import { Eye, EyeOff, ArrowLeft , Mail , Lock} from 'lucide-react-native'; // Updated icon imports
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
@@ -121,8 +121,13 @@ export default function Auth() {
       </View>
 
       <View style={styles.header}>
+        <Text style={styles.logoText}>Uthutho</Text>
+      </View>
+
+
+      <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>
-          {showForgotPassword ? 'Reset Password' : isLogin ? 'Welcome' : 'Create Account'}
+          {showForgotPassword ? 'Reset Password' : isLogin ? 'Your journey to success starts here' : 'Create Account'}
         </Text>
       </View>
 
@@ -147,6 +152,7 @@ export default function Auth() {
         )}
 
         <View style={[styles.emailContainer, { backgroundColor: colors.card, borderRadius: 10 }]}>
+         <Mail size={20} color="#1ea2b1" style={styles.inputIcon} />
           <TextInput
             style={[styles.input, { flex: 1, color: colors.text }]}
             placeholder="Email"
@@ -160,6 +166,7 @@ export default function Auth() {
 
         {!showForgotPassword && (
           <View style={[styles.passwordContainer, { backgroundColor: colors.card, borderRadius: 10 }]}>
+            <Lock size={20} color="#1ea2b1" style={styles.inputIcon} />
             <TextInput
               style={[styles.input, { flex: 1, color: colors.text }]}
               placeholder="Password"
@@ -170,7 +177,6 @@ export default function Auth() {
             />
             <TouchableOpacity
               onPress={() => setPasswordVisible(!passwordVisible)}
-              style={{ padding: 10 }}
             >
               {passwordVisible ? (
                 <EyeOff size={24} color={colors.text} />
@@ -256,17 +262,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 30,
   },
+  inputIcon: {
+    marginRight: 12,
+  },
   logo: {
     width: 150,
     height: 150,
   },
+  logoText:{
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#1ea2b1',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  taglineText: {
+    fontSize: 16,
+    color: '#cccccc',
+    textAlign: 'center',
+  },
   header: {
-    marginBottom: 40,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 32,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 20,
     textAlign: 'center',
   },
   form: {
@@ -301,12 +322,22 @@ const styles = StyleSheet.create({
   emailContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '100%',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    marginBottom: 20,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#333333',
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '100%',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    marginBottom: 20,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#333333',
   },
   input: {
     padding: 15,
