@@ -392,7 +392,29 @@ export default function RouteDetailsScreen() {
           </View>
         </View>
 
-        {/* Price Change Button */}
+
+
+        {/* Stops Section */}
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Stops</Text>
+        {stops.length > 0 ? (
+          stops.map((stop) => (
+            <Pressable
+              key={stop.id}
+              style={[styles.stopItem, { backgroundColor: colors.card }]}
+              onPress={() => router.push(`/stop-details?stopId=${stop.id}`)}>
+              <Text style={[styles.stopName, { color: colors.text }]}>{stop.name}</Text>
+              <Text style={[styles.stopDetails, { color: colors.text }]}>
+                People Waiting: {stop.waitingCount}
+              </Text>
+            </Pressable>
+          ))
+        ) : (
+          <Text style={[styles.noStopsText, { color: colors.text }]}>
+            No stops available for this route.
+          </Text>
+        )}
+
+                {/* Price Change Button */}
         <Pressable
           style={[styles.priceChangeButton, { backgroundColor: colors.primary }]}
           onPress={openPriceChangeModal}>
@@ -473,26 +495,6 @@ export default function RouteDetailsScreen() {
         ) : (
           <Text style={[styles.noRequestsText, { color: colors.text }]}>
             No price change requests available.
-          </Text>
-        )}
-
-        {/* Stops Section */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Stops</Text>
-        {stops.length > 0 ? (
-          stops.map((stop) => (
-            <Pressable
-              key={stop.id}
-              style={[styles.stopItem, { backgroundColor: colors.card }]}
-              onPress={() => router.push(`/stop-details?stopId=${stop.id}`)}>
-              <Text style={[styles.stopName, { color: colors.text }]}>{stop.name}</Text>
-              <Text style={[styles.stopDetails, { color: colors.text }]}>
-                People Waiting: {stop.waitingCount}
-              </Text>
-            </Pressable>
-          ))
-        ) : (
-          <Text style={[styles.noStopsText, { color: colors.text }]}>
-            No stops available for this route.
           </Text>
         )}
       </View>

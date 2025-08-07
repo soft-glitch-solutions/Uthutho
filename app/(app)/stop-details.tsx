@@ -20,6 +20,7 @@ import { Plus, Map, Share2 , MapPin, Clock, Users, Heart, HeartOff, ArrowLeft, N
 import * as Sharing from 'expo-sharing';
 import { formatTimeAgo } from '../../components/utils';
 
+
 interface StopInfo {
   last_updated: string;
   avg_wait_time: string;
@@ -32,6 +33,7 @@ export default function StopDetailsScreen() {
   const { colors } = useTheme();
   const [stopDetails, setStopDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFavorite, setIsFavorite] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
   const [showAddPost, setShowAddPost] = useState(false);
   const [stopInfo, setStopInfo] = useState<StopInfo | null>(null);
@@ -77,6 +79,43 @@ export default function StopDetailsScreen() {
       }
     } catch (error) {
       console.error('Error loading stop info:', error);
+    }
+  };
+
+    const toggleFavorite = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !stop) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('favorites')
+        .eq('id', user.id)
+        .single();
+
+      let favorites = profile?.favorites || [];
+      const favoriteItem = {
+        id: stop.id,
+        name: stop.name,
+        type: 'stop' as const,
+      };
+
+      if (isFavorite) {
+        favorites = favorites.filter((fav: any) => !(fav.id === stop.id && fav.type === 'stop'));
+      } else {
+        favorites = [...favorites, favoriteItem];
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ favorites })
+        .eq('id', user.id);
+
+      if (!error) {
+        setIsFavorite(!isFavorite);
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
     }
   };
 
@@ -163,6 +202,7 @@ export default function StopDetailsScreen() {
   const renderPost = ({ item }) => (
     <TouchableOpacity onPress={() => handlePostPress(item.id)} style={[styles.postContainer, { backgroundColor: colors.card }]}>
       <View style={styles.postHeader}>
+      
         <Image
           source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
           style={styles.avatar}
@@ -218,6 +258,21 @@ export default function StopDetailsScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+
+          {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <ArrowLeft size={24} color="#ffffff" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
+          {isFavorite ? (
+            <Heart size={24} color="#1ea2b1" fill="#1ea2b1" />
+          ) : (
+            <HeartOff size={24} color="#ffffff" />
+          )}
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.content}>
         <Image
           source={{ uri: stopDetails?.image_url }}
@@ -362,6 +417,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
   },
+    header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
+  },
   waitingCountContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -473,6 +536,27 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+    backButton: {
+    backgroundColor: '#1a1a1a',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backButtonText: {
+    color: '#1ea2b1',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  favoriteButton: {
+    backgroundColor: '#1a1a1a',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   postTime: {
     fontSize: 12,
