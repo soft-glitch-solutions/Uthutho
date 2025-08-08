@@ -89,6 +89,17 @@ export default function PostDetailScreen() {
     setLoading(false);
   };
 
+    const PostSkeleton = () => (
+    <View style={styles.skeletonContainer}>
+      <View style={styles.skeletonAvatar} />
+      <View style={styles.skeletonLineShort} />
+      <View style={styles.skeletonLine} />
+      <View style={styles.skeletonLine} />
+      <View style={styles.skeletonCommentBlock} />
+      <View style={styles.skeletonCommentBlock} />
+    </View>
+  );
+
   const toggleReaction = async (reactionType: string) => {
     if (!post) return;
 
@@ -175,9 +186,10 @@ export default function PostDetailScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading post...</Text>
-      </View>
+      <ScrollView style={styles.container}>
+        <StatusBar style="light" backgroundColor="#000000" />
+        <PostSkeleton />
+      </ScrollView>
     );
   }
 
@@ -520,5 +532,36 @@ const styles = StyleSheet.create({
   },
   bottomSpace: {
     height: 20,
+  },
+
+  // 💀 Skeleton styles
+  skeletonContainer: {
+    padding: 20,
+  },
+  skeletonAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#333',
+    marginBottom: 16,
+  },
+  skeletonLine: {
+    height: 16,
+    backgroundColor: '#333',
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  skeletonLineShort: {
+    width: '60%',
+    height: 16,
+    backgroundColor: '#333',
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  skeletonCommentBlock: {
+    height: 60,
+    backgroundColor: '#222',
+    borderRadius: 12,
+    marginTop: 12,
   },
 });

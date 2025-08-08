@@ -90,17 +90,17 @@ export default function ProfileScreen() {
 
   const basicMenuItems = [
     {
-      icon: <Edit size={24} color={colors.text} />,
+      icon: <Edit size={24} color={colors.primary} />,
       title: 'Edit Profile',
       subtitle: 'Update your profile details',
     },
     {
-      icon: <Captions size={24} color={colors.text} />,
+      icon: <Captions size={24} color={colors.primary} />,
       title: 'Request',
       subtitle: 'The request you submitted',
     },
     {
-      icon: <Settings size={24} color={colors.text} />,
+      icon: <Settings size={24} color={colors.primary} />,
       title: 'Settings',
       subtitle: 'App settings and preferences',
     },
@@ -168,8 +168,7 @@ export default function ProfileScreen() {
         <Text style={[styles.name, { color: colors.text }]}>
           {profile?.first_name} {profile?.last_name}
         </Text>
-        <Text style={[styles.title, { color: colors.text }]}>{profile?.selected_title}</Text>
-        <Text style={[styles.email, { color: colors.text }]}>{profile?.email}</Text>
+        <Text style={[styles.userTitle, { color: colors.primary }]}>{profile?.selected_title}</Text>
       </View>
 
       {/* Tabs */}
@@ -463,6 +462,9 @@ const styles = StyleSheet.create({
   achievementText: {
     marginLeft: 12,
     flex: 1,
+  },
+  userTitle: {
+    fontSize: 16,
   },
   achievementTitle: {
     fontSize: 16,

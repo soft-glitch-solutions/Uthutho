@@ -9,9 +9,9 @@ import {
   RefreshControl,
   TextInput,
 } from 'react-native';
-import { useTheme } from '../../../context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 import { PlusCircle, Heart } from 'lucide-react-native'; // Icons
-import { supabase } from '../../../lib/supabase'; // Adjust the path
+import { supabase } from '../../lib/supabase'; // Adjust the path
 import { useRouter } from 'expo-router'; // Use useRouter for navigation
 
 export default function RoutesScreen() {

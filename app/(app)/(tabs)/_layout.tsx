@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { House, User, Rss, Flag, Route } from 'lucide-react-native';
+import { House, User, Rss, Flag ,MessageCircle } from 'lucide-react-native';
 import { useTheme } from '../../../context/ThemeContext';
 
 export default function TabLayout() {
@@ -34,17 +34,19 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="ai"
+        options={{
+          title: 'AI Assistant',
+          tabBarIcon: ({ size, color }) => (
+            <MessageCircle size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="stops"
         options={{
           title: 'Stops',
           tabBarIcon: ({ color, size }) => <Flag color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="routes"
-        options={{
-          title: 'Route',
-          tabBarIcon: ({ color, size }) => <Route color={color} size={size} />,
         }}
       />
             <Tabs.Screen
