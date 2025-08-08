@@ -234,6 +234,26 @@ export default function FeedsScreen() {
     return post.post_reactions.some(r => r.user_id === currentUserId && r.reaction_type === reactionType);
   };
 
+    // Skeleton component
+  const PostSkeleton = () => (
+    <View style={styles.postCard}>
+      <View style={styles.postHeader}>
+        <View style={styles.userInfo}>
+          <View style={[styles.avatar, styles.skeletonBg]} />
+          <View>
+            <View style={[styles.skeletonLine, { width: 100, height: 14 }]} />
+            <View style={[styles.skeletonLine, { width: 80, height: 12, marginTop: 4 }]} />
+          </View>
+        </View>
+        <View style={[styles.skeletonLine, { width: 60, height: 10 }]} />
+      </View>
+      <View style={[styles.skeletonLine, { width: '100%', height: 16, marginBottom: 8 }]} />
+      <View style={[styles.skeletonLine, { width: '90%', height: 16, marginBottom: 8 }]} />
+      <View style={[styles.skeletonLine, { width: '70%', height: 16, marginBottom: 16 }]} />
+      <View style={[styles.skeletonLine, { width: '60%', height: 14 }]} />
+    </View>
+  );
+
   return (
     <ScrollView style={styles.container}>
       <StatusBar style="light" backgroundColor="#000000" />
@@ -312,8 +332,12 @@ export default function FeedsScreen() {
       {/* Posts Feed */}
       <View style={styles.feedContainer}>
         {loading ? (
-          <Text style={styles.loadingText}>Loading posts...</Text>
-        ) : posts.length === 0 ? (
+  <>
+    {[...Array(3)].map((_, index) => (
+      <PostSkeleton key={index} />
+    ))}
+  </>
+): posts.length === 0 ? (
           <Text style={styles.noPostsText}>No posts yet. Be the first to share!</Text>
         ) : (
           posts.map((post) => (
@@ -457,6 +481,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'flex-end',
   },
+  skeletonBg: {
+  backgroundColor: '#2a2a2a',
+},
+skeletonLine: {
+  backgroundColor: '#2a2a2a',
+  borderRadius: 6,
+  marginBottom: 4,
+},
+
   postButtonDisabled: {
     backgroundColor: '#333333',
   },
