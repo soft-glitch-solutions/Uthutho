@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, Modal, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { MessageSquare, Heart, Flame, Send, MapPin, User, Plus, X } from 'lucide-react-native';
@@ -15,6 +15,8 @@ interface Post {
   profiles: {
     first_name: string;
     last_name: string;
+    avatar_url: string;
+
   };
   hubs?: {
     name: string;
@@ -35,6 +37,7 @@ interface Post {
     profiles: {
       first_name: string;
       last_name: string;
+      avatar_url: string;
     };
   }>;
 }
@@ -89,12 +92,12 @@ export default function FeedsScreen() {
         .from('hub_posts')
         .select(`
           *,
-          profiles (first_name, last_name),
+          profiles (first_name, last_name, avatar_url),
           hubs (name),
           post_reactions (id, user_id, reaction_type),
           post_comments (
             id, content, user_id, created_at,
-            profiles (first_name, last_name)
+            profiles (first_name, last_name, avatar_url)
           )
         `)
         .order('created_at', { ascending: false })
@@ -326,6 +329,10 @@ export default function FeedsScreen() {
                   onPress={() => navigateToUserProfile(post.user_id)}
                 >
                   <View style={styles.avatar}>
+                    <Image
+                      source={{ uri: post.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+                      style={styles.avatar}
+                    />
                     <User size={20} color="#1ea2b1" />
                   </View>
                   <View>
