@@ -357,7 +357,6 @@ export default function FeedsScreen() {
                       source={{ uri: post.profiles.avatar_url || 'https://via.placeholder.com/50' }}
                       style={styles.avatar}
                     />
-                    <User size={20} color="#1ea2b1" />
                   </View>
                   <View>
                     <Text style={styles.userName}>

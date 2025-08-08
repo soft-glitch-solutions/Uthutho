@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert , Image } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, Heart, Flame, Send, MapPin, User, Clock } from 'lucide-react-native';
@@ -15,6 +15,7 @@ interface Post {
   profiles: {
     first_name: string;
     last_name: string;
+    avatar_url: string;
   };
   hubs?: {
     name: string;
@@ -35,6 +36,7 @@ interface Post {
     profiles: {
       first_name: string;
       last_name: string;
+      avatar_url: string;
     };
   }>;
 }
@@ -67,7 +69,7 @@ export default function PostDetailScreen() {
         .from('hub_posts')
         .select(`
           *,
-          profiles (first_name, last_name),
+          profiles (first_name, last_name, avatar_url),
           hubs (name),
           post_reactions (id, user_id, reaction_type),
           post_comments (
@@ -213,7 +215,10 @@ export default function PostDetailScreen() {
             onPress={() => navigateToUserProfile(post.user_id)}
           >
             <View style={styles.avatar}>
-              <User size={20} color="#1ea2b1" />
+                    <Image
+                      source={{ uri: post.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+                      style={styles.avatar}
+                    />
             </View>
             <View>
               <Text style={styles.userName}>
@@ -260,7 +265,10 @@ export default function PostDetailScreen() {
               onPress={() => navigateToUserProfile(comment.user_id)}
             >
               <View style={styles.commentAvatar}>
-                <User size={16} color="#1ea2b1" />
+                    <Image
+                      source={{ uri: post.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+                      style={styles.avatar}
+                    />
               </View>
               <Text style={styles.commentAuthor}>
                 {comment.profiles.first_name} {comment.profiles.last_name}

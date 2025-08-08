@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity , Image } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, User, Flame, MapPin, Calendar, Award, Trophy } from 'lucide-react-native';
@@ -14,6 +14,7 @@ interface UserProfile {
   preferred_transport?: string;
   home?: string;
   fire_count?: number;
+  avatar_url: string;
 }
 
 interface UserPost {
@@ -156,7 +157,10 @@ export default function UserProfileScreen() {
       <View style={styles.profileCard}>
         <View style={styles.profileHeader}>
           <View style={styles.profileIcon}>
-            <User size={32} color="#1ea2b1" />
+                    <Image
+                      source={{ uri: profile.avatar_url || 'https://via.placeholder.com/50' }}
+                      style={styles.profileIcon}
+                    />
           </View>
           <Text style={styles.profileName}>
             {profile.first_name} {profile.last_name}
