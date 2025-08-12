@@ -1,166 +1,162 @@
-import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { Mail, Lock, User } from 'lucide-react-native';
-import { supabase } from '@/lib/supabase';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  Image,
+} from 'react-native';
+import { router } from 'expo-router';
+import { useTheme } from '../../context/ThemeContext';
+import { supabase } from '../../lib/supabase';
+import { Eye, EyeOff, ArrowLeft , Mail , Lock} from 'lucide-react-native'; // Updated icon imports
 
-export default function AuthScreen() {
+export default function Auth() {
+  const [isLoading, setIsLoading] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [preferredTransport, setPreferredTransport] = useState('');
-  const [preferredLanguage, setPreferredLanguage] = useState('English');
-  const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const { colors } = useTheme();
 
-  const transportOptions = ['Taxi', 'Bus', 'Train', 'Uber', 'Walking', 'Mixed'];
-  const languageOptions = ['English', 'Zulu', 'Afrikaans', 'Xhosa', 'Sotho'];
+  const handleSignIn = async () => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-  const handleAuth = async () => {
-    if (!email || !password || (!isLogin && (!name || !preferredTransport || !preferredLanguage))) {
-      Alert.alert('Error', 'Please fill in all fields');
+      if (error) throw error;
+
+      Alert.alert('Success', 'Successfully signed in!');
+      router.replace('/(app)/(tabs)/home');
+    } catch (error) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignUp = async () => {
+    setIsLoading(true);
+    try {
+      if (!firstName.trim()) {
+        throw new Error('First name is required');
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            preferred_transport: preferredTransport || null,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (loginError) throw loginError;
+
+      Alert.alert('Success', 'Registration successful! Please check your email.');
+      router.replace('/(app)/(tabs)/home');
+    } catch (error) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert('Error', 'Please enter your email');
       return;
     }
 
     setIsLoading(true);
-
     try {
-      if (isLogin) {
-        // Sign in
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'myapp://reset-password', // Replace with your app's password reset URL
+      });
 
-        if (error) {
-          Alert.alert('Error', error.message);
-          return;
-        }
+      if (error) throw error;
 
-        router.replace('/(app)/(tabs)/home');
-      } else {
-        // Sign up
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-
-        if (error) {
-          Alert.alert('Error', error.message);
-          return;
-        }
-
-        // Create profile
-        if (data.user) {
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert([
-              {
-                id: data.user.id,
-                first_name: name.split(' ')[0],
-                last_name: name.split(' ').slice(1).join(' ') || '',
-                preferred_transport: preferredTransport,
-                preferred_language: preferredLanguage,
-              },
-            ]);
-
-          if (profileError) {
-            console.error('Profile creation error:', profileError);
-          }
-        }
-
-        Alert.alert('Success', 'Account created successfully! Please sign in.');
-        setIsLogin(true);
-      }
+      Alert.alert(
+        'Password Reset',
+        'If an account exists with this email, you will receive a password reset link.'
+      );
+      setShowForgotPassword(false);
     } catch (error) {
-      Alert.alert('Error', 'Authentication failed. Please try again.');
+      Alert.alert('Error', error.message);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" backgroundColor="#000000" />
-      
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.contentContainer}>
+      {/* Logo */}
+      <View style={styles.logoContainer}>
+        <Image
+          source={require('../../assets/images/icon.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </View>
+
       <View style={styles.header}>
-        <Text style={styles.logo}>Uthutho</Text>
-        <Text style={styles.tagline}>Your journey to success starts here</Text>
+        <Text style={styles.logoText}>Uthutho</Text>
+      </View>
+
+
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: colors.text }]}>
+          {showForgotPassword ? 'Reset Password' : isLogin ? 'Your journey to success starts here' : 'Create Account'}
+        </Text>
       </View>
 
       <View style={styles.form}>
-        <Text style={styles.formTitle}>
-          {isLogin ? 'Welcome Back' : 'Create Account'}
-        </Text>
-
-        {!isLogin && (
+        {!isLogin && !showForgotPassword && (
           <>
-            <View style={styles.inputContainer}>
-              <User size={20} color="#1ea2b1" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Full Name"
-                placeholderTextColor="#666666"
-                value={name}
-                onChangeText={setName}
-              />
-            </View>
-
-            <View >
-              <Text style={styles.sectionLabel}>Preferred Transport</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsScroll}>
-              {transportOptions.map((option) => (
-                <TouchableOpacity
-                  key={option}
-                  style={[
-                    styles.optionButton,
-                    preferredTransport === option && styles.optionButtonActive
-                  ]}
-                  onPress={() => setPreferredTransport(option)}
-                >
-                  <Text style={[
-                    styles.optionButtonText,
-                    preferredTransport === option && styles.optionButtonTextActive
-                  ]}>
-                    {option}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <View >
-              <Text style={styles.sectionLabel}>Preferred Language</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsScroll}>
-              {languageOptions.map((option) => (
-                <TouchableOpacity
-                  key={option}
-                  style={[
-                    styles.optionButton,
-                    preferredLanguage === option && styles.optionButtonActive
-                  ]}
-                  onPress={() => setPreferredLanguage(option)}
-                >
-                  <Text style={[
-                    styles.optionButtonText,
-                    preferredLanguage === option && styles.optionButtonTextActive
-                  ]}>
-                    {option}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              placeholder="First Name"
+              placeholderTextColor={colors.text}
+              value={firstName}
+              onChangeText={setFirstName}
+            />
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              placeholder="Last Name"
+              placeholderTextColor={colors.text}
+              value={lastName}
+              onChangeText={setLastName}
+            />
           </>
         )}
 
-        <View style={styles.inputContainer}>
-          <Mail size={20} color="#1ea2b1" style={styles.inputIcon} />
+        <View style={[styles.emailContainer, { backgroundColor: colors.card, borderRadius: 10 }]}>
+         <Mail size={20} color="#1ea2b1" style={styles.inputIcon} />
           <TextInput
-            style={styles.input}
-            placeholder="Email Address"
-            placeholderTextColor="#666666"
+            style={[styles.input, { flex: 1, color: colors.text }]}
+            placeholder="Email"
+            placeholderTextColor={colors.text}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -168,85 +164,162 @@ export default function AuthScreen() {
           />
         </View>
 
-        <View style={styles.inputContainer}>
-          <Lock size={20} color="#1ea2b1" style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#666666"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-        </View>
+        {!showForgotPassword && (
+          <View style={[styles.passwordContainer, { backgroundColor: colors.card, borderRadius: 10 }]}>
+            <Lock size={20} color="#1ea2b1" style={styles.inputIcon} />
+            <TextInput
+              style={[styles.input, { flex: 1, color: colors.text }]}
+              placeholder="Password"
+              placeholderTextColor={colors.text}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!passwordVisible}
+            />
+            <TouchableOpacity
+              onPress={() => setPasswordVisible(!passwordVisible)}
+            >
+              {passwordVisible ? (
+                <EyeOff size={24} color={colors.text} />
+              ) : (
+                <Eye size={24} color={colors.text} />
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
 
-        <TouchableOpacity
-          style={[styles.authButton, isLoading && styles.disabledButton]}
-          onPress={handleAuth}
-          disabled={isLoading}
-        >
-          <Text style={styles.authButtonText}>
-            {isLoading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.switchButton}
-          onPress={() => setIsLogin(!isLogin)}
-        >
-          <Text style={styles.switchText}>
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-            <Text style={styles.switchTextBold}>
-              {isLogin ? 'Sign Up' : 'Sign In'}
+        {isLogin && !showForgotPassword && (
+          <TouchableOpacity
+            onPress={() => setShowForgotPassword(true)}
+            style={styles.forgotPasswordButton}
+          >
+            <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
+              Forgot Password?
             </Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: colors.primary }]}
+          onPress={
+            showForgotPassword 
+              ? handleForgotPassword 
+              : isLogin 
+                ? handleSignIn 
+                : handleSignUp
+          }
+          disabled={isLoading}>
+          <Text style={styles.buttonText}>
+            {isLoading 
+              ? 'Loading...' 
+              : showForgotPassword 
+                ? 'Send Reset Link' 
+                : isLogin 
+                  ? 'Sign In' 
+                  : 'Create Account'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.bottomMotto}>
-        "Izindlela zakho ziqinisekisa impumelelo!"
-      </Text>
+      <TouchableOpacity
+        style={styles.switchButton}
+        onPress={() => {
+          if (showForgotPassword) {
+            setShowForgotPassword(false);
+          } else {
+            setIsLogin(!isLogin);
+          }
+        }}
+        disabled={isLoading}>
+        <Text style={[styles.switchText, { color: colors.text }]}>
+          {showForgotPassword
+            ? 'Back to Sign In'
+            : isLogin
+              ? "Don't have an account? Sign Up"
+              : 'Already have an account? Sign In'}
+        </Text>
+      </TouchableOpacity>
 
+      {/* Footer Section */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Developed by Soft Glitch Solutions</Text>
+        <Text style={[styles.footerText, { color: colors.text }]}>
+          Developed by Soft Glitch Solutions
+        </Text>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
-    paddingHorizontal: 20,
   },
-  header: {
+  contentContainer: {
+    padding: 20,
+    justifyContent: 'center',
+    minHeight: '100%',
+  },
+  logoContainer: {
     alignItems: 'center',
-    marginTop: 80,
-    marginBottom: 60,
+    marginBottom: 30,
+  },
+  inputIcon: {
+    marginRight: 12,
   },
   logo: {
+    width: 150,
+    height: 150,
+  },
+  logoText:{
     fontSize: 48,
     fontWeight: 'bold',
     color: '#1ea2b1',
     marginBottom: 8,
+    textAlign: 'center',
   },
-  tagline: {
+  taglineText: {
     fontSize: 16,
     color: '#cccccc',
     textAlign: 'center',
   },
-  form: {
-    flex: 1,
+  header: {
+    marginBottom: 20,
   },
-  formTitle: {
-    fontSize: 28,
+  title: {
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#ffffff',
+    marginBottom: 20,
     textAlign: 'center',
-    marginBottom: 40,
   },
-  inputContainer: {
+  form: {
+    gap: 15,
+  },
+  button: {
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  switchButton: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  switchText: {
+    fontSize: 14,
+  },
+  footer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 12,
+    opacity: 0.6,
+  },
+  emailContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1a1a1a',
@@ -256,88 +329,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
   },
-  inputIcon: {
-    marginRight: 12,
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    marginBottom: 20,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#333333',
   },
   input: {
-    flex: 1,
-    color: '#ffffff',
-    fontSize: 16,
-    paddingVertical: 16,
-  },
-  authButton: {
-    backgroundColor: '#1ea2b1',
-    borderRadius: 12,
-    paddingVertical: 16,
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  authButtonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  switchButton: {
-    alignItems: 'center',
-  },
-  switchText: {
-    color: '#cccccc',
+    padding: 15,
     fontSize: 16,
   },
-  switchTextBold: {
-    color: '#1ea2b1',
-    fontWeight: '600',
+  forgotPasswordButton: {
+    alignSelf: 'flex-end',
   },
-  bottomMotto: {
-    color: '#1ea2b1',
+  forgotPasswordText: {
     fontSize: 14,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginBottom: 40,
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  footerText: {
-    color: '#666666',
-    fontSize: 12,
-  },
-  sectionLabel: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  optionsScroll: {
-    marginBottom: 16,
-  },
-  optionButton: {
-    backgroundColor: '#333333',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#555555',
-  },
-  optionButtonActive: {
-    backgroundColor: '#1ea2b1',
-    borderColor: '#1ea2b1',
-  },
-  optionButtonText: {
-    color: '#cccccc',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  optionButtonTextActive: {
-    color: '#ffffff',
   },
 });
