@@ -9,16 +9,25 @@ import {
   Image,
   Alert,
   Animated,
+  TouchableOpacity,
   Platform
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { Flag, MapPin, Route, Search, Plus , Award , Trophy } from 'lucide-react-native';
+import { Flag, MapPin, Route, Search, Plus , Award , Trophy , Heart} from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext';
 import StopBlock from '../../../components/stop/StopBlock';
 import { AdMobBanner, setTestDeviceIDAsync } from 'expo-ads-admob';
 import { useNavigation } from 'expo-router';
+
+interface FavoriteItem {
+  id: string;
+  name: string;
+  type: 'stop' | 'route' | 'hub';
+  distance?: string;
+}
+
 
 const Shimmer = ({ children, colors }) => {
   const animatedValue = new Animated.Value(0);
@@ -65,6 +74,8 @@ const Shimmer = ({ children, colors }) => {
     </View>
   );
 };
+
+
 
 const FavoritesSkeleton = ({ colors }) => {
   return (
@@ -124,6 +135,7 @@ export default function HomeScreen() {
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [nearestLocations, setNearestLocations] = useState(null);
   const [isNearestLoading, setIsNearestLoading] = useState(false);
+    const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [userStats, setUserStats] = useState({
     points: 0,
     level: 1,
@@ -139,6 +151,33 @@ export default function HomeScreen() {
       setTestDeviceIDAsync('EMULATOR');
     }
   }, []);
+
+    const toggleFavorite = async (item: FavoriteItem) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const isFavorite = favorites.some(fav => fav.id === item.id);
+      let newFavorites;
+
+      if (isFavorite) {
+        newFavorites = favorites.filter(fav => fav.id !== item.id);
+      } else {
+        newFavorites = [...favorites, item];
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ favorites: newFavorites })
+        .eq('id', user.id);
+
+      if (!error) {
+        setFavorites(newFavorites);
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -448,6 +487,27 @@ export default function HomeScreen() {
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Favorites</Text>
+
+              {/* Favorites */}
+      {favorites.length > 0 && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Your Favorites</Text>
+          {favorites.map((favorite) => (
+            <View key={favorite.id} style={styles.favoriteItem}>
+              <View style={styles.favoriteInfo}>
+                <Text style={styles.favoriteName}>{favorite.name}</Text>
+                <Text style={styles.favoriteType}>{favorite.type} {favorite.distance && `• ${favorite.distance}`}</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.favoriteButton}
+                onPress={() => toggleFavorite(favorite)}
+              >
+                <Heart size={20} color="#1ea2b1" fill="#1ea2b1" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
         {isProfileLoading ? (
           <FavoritesSkeleton colors={colors} />
         ) : favoriteDetails.length ? (
