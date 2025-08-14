@@ -278,7 +278,7 @@ export default function PostDetailScreen() {
             >
               <View style={styles.commentAvatar}>
                     <Image
-                      source={{ uri: post.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+                      source={{ uri: comment.profiles.avatar_url || 'https://via.placeholder.com/50' }}
                       style={styles.avatar}
                     />
               </View>
