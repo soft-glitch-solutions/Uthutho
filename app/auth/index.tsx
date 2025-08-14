@@ -64,6 +64,8 @@ export default function Auth() {
         },
       });
 
+      router.replace('/confirmation');
+
       if (error) throw error;
 
       const { error: loginError } = await supabase.auth.signInWithPassword({
@@ -72,7 +74,6 @@ export default function Auth() {
       });
       if (loginError) throw loginError;
 
-      Alert.alert('Success', 'Registration successful! Please check your email.');
       router.replace('/(app)/(tabs)/home');
     } catch (error) {
       Alert.alert('Error', error.message);
