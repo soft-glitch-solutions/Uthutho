@@ -310,10 +310,10 @@ export default function ProfileScreen() {
 
       {/* Sign Out Button */}
       <TouchableOpacity
-        style={[styles.signOutButton, { backgroundColor: colors.primary }]}
+        style={styles.signOutButton}
         onPress={handleSignOut}
       >
-        <LogOut size={24} color="white" />
+        <LogOut size={24} color="#ef4444" />
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
 
@@ -418,11 +418,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 15,
     marginHorizontal: 20,
-    borderRadius: 10,
-    gap: 10,
-    marginTop: 20,
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    marginBottom: 30,
   },
    appInfo: {
     alignItems: 'center',
@@ -441,9 +442,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   signOutText: {
-    color: 'white',
+    color: '#ef4444',
     fontSize: 16,
     fontWeight: '600',
+    marginLeft: 8,
   },
     bottomSpace: {
     height: 20,

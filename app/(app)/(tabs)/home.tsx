@@ -554,7 +554,7 @@ export default function HomeScreen() {
        {/* Gamification Section */}
       <View style={styles.gamificationCard}>
         <View style={styles.gamificationHeader}>
-          <Text style={styles.gamificationTitle}>Your Progress</Text>
+          <Text style={[styles.gamificationTitle, { color: colors.text }]}>Your Progress</Text>
         </View>
         
         <View style={styles.statsRow}>
