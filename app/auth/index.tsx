@@ -27,15 +27,17 @@ export default function Auth() {
   const [preferredLanguage, setPreferredLanguage] = useState('English');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const { colors } = useTheme();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // New state for error messages
 
   const transportOptions = ['Taxi', 'Bus', 'Train', 'Uber', 'Walking', 'Mixed'];
   const languageOptions = ['English', 'Zulu', 'Afrikaans', 'Xhosa', 'Sotho'];
   const { width } = Dimensions.get('window');
   const isMobile = width < 768;
 
-  const handleSignIn = async () => {
+const handleSignIn = async () => {
+    setErrorMessage(null); // Clear previous errors
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password');
+      setErrorMessage('Please enter both email and password');
       return;
     }
 
@@ -49,53 +51,50 @@ export default function Auth() {
       if (error) {
         console.error('Sign-in error details:', error);
         
-        // Handle specific error cases
-        if (error.status === 400) {
-          if (error.message.includes('Invalid login credentials')) {
-            throw new Error('The email or password you entered is incorrect');
-          } else if (error.message.includes('Email not confirmed')) {
-            throw new Error('Please confirm your email before signing in. Check your inbox for the confirmation link.');
-          } else {
-            throw new Error('Invalid request. Please check your details and try again.');
-          }
+        // Human-readable error messages
+        if (error.message.includes('Invalid login credentials')) {
+          setErrorMessage('The email or password you entered is incorrect');
+        } else if (error.message.includes('Email not confirmed')) {
+          setErrorMessage('Please confirm your email first. Check your inbox for the confirmation link.');
+        } else if (error.status === 400) {
+          setErrorMessage('Invalid request. Please check your details.');
         } else if (error.status === 429) {
-          throw new Error('Too many attempts. Please wait a moment and try again.');
+          setErrorMessage('Too many attempts. Please wait a moment.');
         } else {
-          throw new Error('Unable to sign in. Please check your connection and try again.');
+          setErrorMessage('Sign in failed. Please try again.');
         }
+        return;
       }
 
       Alert.alert('Success', 'Successfully signed in!');
       router.replace('/(app)/(tabs)/home');
     } catch (error) {
-      Alert.alert(
-        'Sign In Failed',
-        error.message || 'An unexpected error occurred. Please try again.'
-      );
+      setErrorMessage('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSignUp = async () => {
+ const handleSignUp = async () => {
+    setErrorMessage(null); // Clear previous errors
     if (!firstName.trim()) {
-      Alert.alert('Error', 'First name is required');
+      setErrorMessage('First name is required');
       return;
     }
     if (!email.includes('@')) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      setErrorMessage('Please enter a valid email address');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      setErrorMessage('Password must be at least 6 characters');
       return;
     }
     if (!preferredTransport) {
-      Alert.alert('Error', 'Please select your preferred transport');
+      setErrorMessage('Please select your preferred transport');
       return;
     }
     if (!preferredLanguage) {
-      Alert.alert('Error', 'Please select your preferred language');
+      setErrorMessage('Please select your preferred language');
       return;
     }
 
@@ -119,14 +118,15 @@ export default function Auth() {
         console.error('Sign-up error details:', error);
         
         if (error.message.includes('User already registered')) {
-          throw new Error('This email is already registered. Please sign in instead.');
+          setErrorMessage('This email is already registered. Please sign in.');
         } else if (error.status === 400) {
-          throw new Error('Invalid registration details. Please check your information.');
+          setErrorMessage('Invalid registration details. Please check your information.');
         } else if (error.status === 429) {
-          throw new Error('Too many attempts. Please wait a moment and try again.');
+          setErrorMessage('Too many attempts. Please wait a moment.');
         } else {
-          throw new Error('Registration failed. Please try again later.');
+          setErrorMessage('Registration failed. Please try again later.');
         }
+        return;
       }
 
       router.push({
@@ -142,10 +142,7 @@ export default function Auth() {
       setPreferredTransport('');
       setPreferredLanguage('English');
     } catch (error) {
-      Alert.alert(
-        'Registration Failed',
-        error.message || 'Could not create account. Please try again.'
-      );
+      setErrorMessage('Could not create account. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -229,6 +226,13 @@ export default function Auth() {
           {showForgotPassword ? 'Reset Password' : isLogin ? 'Your journey to success starts here' : 'Create Account'}
         </Text>
       </View>
+
+      {errorMessage && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        </View>
+      )}
+
 
       <View style={styles.form}>
         {!isLogin && !showForgotPassword && (
@@ -356,6 +360,7 @@ export default function Auth() {
           </Text>
         </Text>
       </TouchableOpacity>
+
 
       {/* Footer Section */}
       <View style={styles.footer}>
@@ -504,4 +509,18 @@ const styles = StyleSheet.create({
   optionTextActive: {
     color: '#ffffff',
   },
+
+   errorContainer: {
+    backgroundColor: '#FFEBEE',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#F44336',
+  },
+  errorText: {
+    color: '#D32F2F',
+    fontSize: 14,
+  },
+
 });
