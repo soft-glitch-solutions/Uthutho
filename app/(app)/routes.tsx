@@ -149,7 +149,7 @@ export default function RoutesScreen() {
           onPress={() => router.push('/AddRoutes')}
         >
           <PlusCircle size={24} color={colors.text} />
-          <Text style={[styles.addButtonText , { color: colors.text }]}>Add Route</Text>
+          {/* <Text style={[styles.addButtonText , { color: colors.text }]}>Add Route</Text> */}
         </TouchableOpacity>
       </View>
 

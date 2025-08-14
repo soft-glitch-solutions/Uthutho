@@ -135,7 +135,7 @@ export default function HubsScreen() {
           style={[styles.requestButton, { backgroundColor: colors.primary }]}
         >
           <PlusCircle size={20} color={colors.text} />
-          <Text style={[styles.requestButtonText, { color: colors.text }]}>Request Hub</Text>
+          {/* <Text style={[styles.requestButtonText, { color: colors.text }]}>Request Hub</Text>*/}
         </TouchableOpacity>
       </View>
 
