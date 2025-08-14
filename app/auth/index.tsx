@@ -47,12 +47,21 @@ export default function Auth() {
       });
 
       if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          throw new Error('Invalid email or password');
-        } else if (error.message.includes('Email not confirmed')) {
-          throw new Error('Please confirm your email before signing in. Check your inbox.');
+        console.error('Sign-in error details:', error);
+        
+        // Handle specific error cases
+        if (error.status === 400) {
+          if (error.message.includes('Invalid login credentials')) {
+            throw new Error('The email or password you entered is incorrect');
+          } else if (error.message.includes('Email not confirmed')) {
+            throw new Error('Please confirm your email before signing in. Check your inbox for the confirmation link.');
+          } else {
+            throw new Error('Invalid request. Please check your details and try again.');
+          }
+        } else if (error.status === 429) {
+          throw new Error('Too many attempts. Please wait a moment and try again.');
         } else {
-          throw error;
+          throw new Error('Unable to sign in. Please check your connection and try again.');
         }
       }
 
@@ -61,7 +70,7 @@ export default function Auth() {
     } catch (error) {
       Alert.alert(
         'Sign In Failed',
-        error.message || 'An error occurred during sign in'
+        error.message || 'An unexpected error occurred. Please try again.'
       );
     } finally {
       setIsLoading(false);
@@ -107,10 +116,16 @@ export default function Auth() {
       });
 
       if (error) {
+        console.error('Sign-up error details:', error);
+        
         if (error.message.includes('User already registered')) {
           throw new Error('This email is already registered. Please sign in instead.');
+        } else if (error.status === 400) {
+          throw new Error('Invalid registration details. Please check your information.');
+        } else if (error.status === 429) {
+          throw new Error('Too many attempts. Please wait a moment and try again.');
         } else {
-          throw error;
+          throw new Error('Registration failed. Please try again later.');
         }
       }
 
@@ -148,7 +163,10 @@ export default function Auth() {
         redirectTo: 'myapp://reset-password',
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Password reset error:', error);
+        throw new Error(error.message || 'Failed to send password reset email');
+      }
 
       Alert.alert(
         'Email Sent',
@@ -158,7 +176,7 @@ export default function Auth() {
     } catch (error) {
       Alert.alert(
         'Error',
-        error.message || 'Failed to send password reset email'
+        error.message || 'Failed to send password reset email. Please try again.'
       );
     } finally {
       setIsLoading(false);
@@ -167,14 +185,13 @@ export default function Auth() {
 
   const renderOptionButtons = (options: string[], selected: string, setSelected: (value: string) => void) => {
     return (
-      <View style={isMobile ? styles.mobileOptionsContainer : styles.optionsContainer}>
+      <View style={styles.optionsContainer}>
         {options.map((option) => (
           <TouchableOpacity
             key={option}
             style={[
               styles.optionButton,
               selected === option && styles.optionButtonActive,
-              isMobile && styles.mobileOptionButton
             ]}
             onPress={() => setSelected(option)}
           >
@@ -231,11 +248,17 @@ export default function Auth() {
               onChangeText={setLastName}
             />
             
-            <Text style={[styles.sectionLabel, { color: colors.text }]}>Preferred Transport</Text>
-            {renderOptionButtons(transportOptions, preferredTransport, setPreferredTransport)}
-            
-            <Text style={[styles.sectionLabel, { color: colors.text }]}>Preferred Language</Text>
-            {renderOptionButtons(languageOptions, preferredLanguage, setPreferredLanguage)}
+            <View style={styles.optionsRow}>
+              <View style={styles.optionsColumn}>
+                <Text style={[styles.sectionLabel, { color: colors.text }]}>Preferred Transport</Text>
+                {renderOptionButtons(transportOptions, preferredTransport, setPreferredTransport)}
+              </View>
+              
+              <View style={styles.optionsColumn}>
+                <Text style={[styles.sectionLabel, { color: colors.text }]}>Preferred Language</Text>
+                {renderOptionButtons(languageOptions, preferredLanguage, setPreferredLanguage)}
+              </View>
+            </View>
           </>
         )}
 
@@ -322,8 +345,15 @@ export default function Auth() {
           {showForgotPassword
             ? 'Back to Sign In'
             : isLogin
-              ? "Don't have an account? Sign Up"
-              : 'Already have an account? Sign In'}
+              ? "Don't have an account? "
+              : 'Already have an account? '}
+          <Text style={[styles.switchActionText, { color: '#1ea2b1' }]}>
+            {showForgotPassword
+              ? ''
+              : isLogin
+                ? 'Sign Up'
+                : 'Sign In'}
+          </Text>
         </Text>
       </TouchableOpacity>
 
@@ -394,6 +424,9 @@ const styles = StyleSheet.create({
   switchText: {
     fontSize: 14,
   },
+  switchActionText: {
+    fontWeight: 'bold',
+  },
   footer: {
     marginTop: 20,
     alignItems: 'center',
@@ -437,28 +470,27 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 8,
   },
+  optionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  optionsColumn: {
+    width: '48%',
+  },
   optionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 20,
-  },
-  mobileOptionsContainer: {
-    flexDirection: 'column',
-    gap: 10,
-    marginBottom: 20,
+    gap: 8,
   },
   optionButton: {
     backgroundColor: '#333333',
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: '#555555',
-  },
-  mobileOptionButton: {
-    width: '100%',
-    alignItems: 'center',
+    marginBottom: 8,
   },
   optionButtonActive: {
     backgroundColor: '#1ea2b1',
