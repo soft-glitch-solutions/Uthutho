@@ -167,7 +167,7 @@ const loadRoutesForStop = async () => {
             <View style={styles.handle} />
             <View style={styles.headerContent}>
               <Text style={styles.title}>
-                {isCountingDown ? `Confirming... ${countdown}` : 'Mark as Waiting'}
+                {isCountingDown ? `Confirming... ` : 'Mark as Waiting'}
               </Text>
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                 <X size={24} color="#ffffff" />
