@@ -108,12 +108,12 @@ export default function ProfileScreen() {
 
   const rankMenuItems = [
     {
-      icon: <Badge size={24} color={colors.text} />,
+      icon: <Badge size={24} color={colors.primary} />,
       title: 'Change Title',
       subtitle: 'Change your profile title',
     },
     {
-      icon: <Edit size={24} color={colors.text} />,
+      icon: <Edit size={24} color={colors.primary} />,
       title: 'Title To Earn',
       subtitle: 'Look at what title to earn',
     },

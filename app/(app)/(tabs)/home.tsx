@@ -527,9 +527,9 @@ export default function HomeScreen() {
                 }}
               >
                 <View style={styles.favoriteItem}>
-                  {favorite.type === 'hub' && <MapPin size={24} color={colors.text} />}
-                  {favorite.type === 'stop' && <Flag size={24} color={colors.text} />}
-                  {favorite.type === 'route' && <Route size={24} color={colors.text} />}
+                  {favorite.type === 'hub' && <MapPin size={24} color={colors.primary} />}
+                  {favorite.type === 'stop' && <Flag size={24} color={colors.primary} />}
+                  {favorite.type === 'route' && <Route size={24} color={colors.primary} />}
                   <Text style={[styles.cardText, { color: colors.text, marginLeft: 8 }]}>
                     {favorite.name}
                   </Text>
