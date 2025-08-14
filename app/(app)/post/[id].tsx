@@ -74,7 +74,7 @@ export default function PostDetailScreen() {
           post_reactions (id, user_id, reaction_type),
           post_comments (
             id, content, user_id, created_at,
-            profiles (first_name, last_name)
+            profiles (first_name, last_name, avatar_url)
           )
         `)
         .eq('id', id)
