@@ -1,11 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
-import { useWaiting } from '../../context/WaitingContext'; // Import the global state
-import { Square , Hand } from "lucide-react-native";
+import { useWaiting } from '@/context/WaitingContext';
+import { Square, Hand } from "lucide-react-native";
+import WaitingDrawer from '@/components/WaitingDrawer';
 
-const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => {
+interface StopBlockProps {
+  stopId: string;
+  stopName: string;
+  stopLocation: {
+    latitude: number;
+    longitude: number;
+  };
+  colors: {
+    text: string;
+    background: string;
+  };
+  radius?: number;
+}
+
+const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: StopBlockProps) => {
   const {
     waitingStatus,
     setWaitingStatus,
@@ -13,12 +28,12 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
     setCountdown,
     autoDeleteCountdown,
     setAutoDeleteCountdown,
-  } = useWaiting(); // Use the global state
+  } = useWaiting();
 
-  const [isClose, setIsClose] = useState(false); // Track if the user is close to the stop
-  const [userLocation, setUserLocation] = useState(null); // Track the user's current location
+  const [isClose, setIsClose] = useState(false);
+  const [userLocation, setUserLocation] = useState<Location.LocationObjectCoords | null>(null);
+  const [showDrawer, setShowDrawer] = useState(false);
 
-  // Get the user's current location
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
@@ -32,7 +47,6 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
     })();
   }, []);
 
-  // Check if the user is close to the stop
   useEffect(() => {
     if (userLocation && stopLocation) {
       const distance = calculateDistance(
@@ -41,33 +55,29 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
         stopLocation.latitude,
         stopLocation.longitude
       );
-      setIsClose(distance <= radius); // Check if the user is within the radius
+      setIsClose(distance <= radius);
     }
   }, [userLocation, stopLocation, radius]);
 
-  // Check if the user is already waiting at this stop
-  const checkIfUserIsWaiting = async () => {
-    const userId = (await supabase.auth.getSession()).data.session?.user.id;
-    if (!userId) return;
-
-    const { data, error } = await supabase
-      .from('stop_waiting')
-      .select('created_at') // Fetch the creation time
-      .eq('stop_id', stopId)
-      .eq('user_id', userId)
-      .maybeSingle(); // Use maybeSingle instead of single
-
-    if (error) {
-      console.error('Error checking waiting status:', error);
-      Alert.alert('Error', 'Failed to check waiting status.');
-    } else if (data) {
-      setWaitingStatus({ stopId, createdAt: data.created_at }); // Update global state
-      startAutoDeleteTimer(data.created_at); // Start the 5-minute timer
-    }
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) *
+        Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   };
 
-  // Handle "Mark as Waiting" button press
-  const handleMarkAsWaiting = async () => {
+  const handleMarkAsWaiting = () => {
+    setShowDrawer(true);
+  };
+
+  const handleWaitingSet = async (routeId: string, transportType: string) => {
     const userId = (await supabase.auth.getSession()).data.session?.user.id;
     if (!userId) return;
 
@@ -76,66 +86,50 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
       .insert({
         stop_id: stopId,
         user_id: userId,
-        transport_type: 'bus',
+        route_id: routeId,
+        transport_type: transportType,
       })
-      .select('created_at') // Fetch the creation time
+      .select('created_at')
       .single();
 
     if (error) {
-      console.error('Error marking as waiting:', error);
       Alert.alert('Error', 'Failed to mark as waiting.');
     } else {
-      setWaitingStatus({ stopId, createdAt: data.created_at }); // Update global state
-      Alert.alert('Success', 'You are now marked as waiting.');
-      startAutoDeleteTimer(data.created_at); // Start the 5-minute timer
+      setWaitingStatus({ 
+        stopId, 
+        createdAt: data.created_at,
+        routeId,
+        transportType
+      });
+      startAutoDeleteTimer(data.created_at);
     }
   };
 
-  // Start the 5-minute auto-delete timer
-  const startAutoDeleteTimer = (createdAt) => {
+  const startAutoDeleteTimer = (createdAt: string) => {
     const creationTime = new Date(createdAt).getTime();
     const currentTime = new Date().getTime();
-    const elapsedTime = (currentTime - creationTime) / 1000; // Elapsed time in seconds
-    const remainingTime = 300 - elapsedTime; // 5 minutes in seconds
+    const elapsedTime = (currentTime - creationTime) / 1000;
+    const remainingTime = 300 - elapsedTime;
 
     if (remainingTime > 0) {
-      setAutoDeleteCountdown(Math.floor(remainingTime)); // Set the remaining time
-
+      setAutoDeleteCountdown(Math.floor(remainingTime));
       const timer = setTimeout(() => {
-        deleteWaitingStatus(); // Automatically delete the waiting status after 5 minutes
-      }, remainingTime * 1000); // Remaining time in milliseconds
+        deleteWaitingStatus();
+      }, remainingTime * 1000);
 
-      // Start the countdown
       const countdownInterval = setInterval(() => {
         setAutoDeleteCountdown((prev) => prev - 1);
       }, 1000);
 
-      // Clear the interval when the component unmounts
-      return () => clearInterval(countdownInterval);
+      return () => {
+        clearTimeout(timer);
+        clearInterval(countdownInterval);
+      };
     } else {
-      deleteWaitingStatus(); // Delete the waiting status if the time has already passed
+      deleteWaitingStatus();
     }
   };
 
-  // Handle "Picked Up" button press
-  const handlePickedUp = async () => {
-    const userId = (await supabase.auth.getSession()).data.session?.user.id;
-    if (!userId) return;
-
-    // Start the 5-second countdown
-    let timer = 5;
-    const interval = setInterval(() => {
-      setCountdown((prev) => prev - 1);
-      timer -= 1;
-
-      if (timer === 0) {
-        clearInterval(interval);
-        deleteWaitingStatus();
-      }
-    }, 1000);
-  };
-
-  // Delete the waiting status
   const deleteWaitingStatus = async () => {
     const userId = (await supabase.auth.getSession()).data.session?.user.id;
     if (!userId) return;
@@ -146,45 +140,36 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
       .eq('stop_id', stopId)
       .eq('user_id', userId);
 
-    if (error) {
-      console.error('Error deleting waiting:', error);
-      Alert.alert('Error', 'Failed to mark as picked up.');
-    } else {
-      setWaitingStatus(null); // Clear the global state
-      setCountdown(5); // Reset the countdown
-      setAutoDeleteCountdown(300); // Reset the 5-minute countdown
-      Alert.alert('Success', 'You have been marked as picked up.');
+    if (!error) {
+      setWaitingStatus(null);
+      setCountdown(5);
+      setAutoDeleteCountdown(300);
     }
   };
 
-  // Calculate the distance between two coordinates (in kilometers)
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // Radius of the Earth in km
-    const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLon = (lon2 - lon1) * (Math.PI / 180);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * (Math.PI / 180)) *
-        Math.cos(lat2 * (Math.PI / 180)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in km
+  const handlePickedUp = () => {
+    let timer = 5;
+    setCountdown(timer);
+    const interval = setInterval(() => {
+      setCountdown((prev) => prev - 1);
+      timer -= 1;
+      if (timer === 0) {
+        clearInterval(interval);
+        deleteWaitingStatus();
+      }
+    }, 1000);
   };
 
-  // Format the 5-minute countdown into minutes and seconds
-  const formatCountdown = (seconds) => {
+  const formatCountdown = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
   };
 
-  // Only render the block if the user is close to the stop
   if (!isClose) {
     return null;
   }
 
-  // Check if the user is waiting at this stop
   const isWaiting = waitingStatus?.stopId === stopId;
 
   return (
@@ -194,22 +179,33 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }) => 
           Stop will be removed in {formatCountdown(autoDeleteCountdown)}
         </Text>
       )}
+      
       {isWaiting ? (
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: '#ef4444' }]} // Red color
+          style={[styles.button, { backgroundColor: '#ef4444' }]}
           onPress={handlePickedUp}
         >
           <Square size={20} color="white" />
           <Text style={styles.buttonText}>Picked Up ({countdown}s)</Text>
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: '#10b981' }]} // Green color
-          onPress={handleMarkAsWaiting}
-        >
-          <Hand size={20} color="white" />
-          <Text style={styles.buttonText}>Mark as Waiting</Text>
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: '#10b981' }]}
+            onPress={handleMarkAsWaiting}
+          >
+            <Hand size={20} color="white" />
+            <Text style={styles.buttonText}>Mark as Waiting</Text>
+          </TouchableOpacity>
+          
+          <WaitingDrawer
+            visible={showDrawer}
+            onClose={() => setShowDrawer(false)}
+            stopId={stopId}
+            stopName={stopName}
+            onWaitingSet={handleWaitingSet}
+          />
+        </>
       )}
     </View>
   );
@@ -235,7 +231,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 10, // Space between icon and text
+    marginLeft: 10,
   },
 });
 

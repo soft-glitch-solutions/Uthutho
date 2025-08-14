@@ -17,7 +17,7 @@ interface WaitingDrawerProps {
   onClose: () => void;
   stopId: string;
   stopName: string;
-  onWaitingSet: () => void;
+  onWaitingSet: (routeId: string, transportType: string) => void; // Updated prop
 }
 
 export default function WaitingDrawer({ 
@@ -25,7 +25,7 @@ export default function WaitingDrawer({
   onClose, 
   stopId, 
   stopName, 
-  onWaitingSet 
+  onWaitingSet // Add this prop
 }: WaitingDrawerProps) {
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(false);
@@ -95,7 +95,7 @@ const loadRoutesForStop = async () => {
     setIsCountingDown(true);
   };
 
-  const completeWaiting = async () => {
+ const completeWaiting = async () => {
     if (!selectedRoute) return;
 
     try {
@@ -114,7 +114,7 @@ const loadRoutesForStop = async () => {
       if (!error) {
         // Award 2 points for marking as waiting
         await awardPoints(2);
-        onWaitingSet();
+        onWaitingSet(selectedRoute.id, selectedRoute.transport_type); // Call the callback
         onClose();
       }
     } catch (error) {
