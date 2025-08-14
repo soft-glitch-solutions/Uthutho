@@ -8,11 +8,12 @@ import {
   ScrollView,
   Alert,
   Image,
+  Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import { Eye, EyeOff, ArrowLeft , Mail , Lock} from 'lucide-react-native'; // Updated icon imports
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
@@ -23,35 +24,74 @@ export default function Auth() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [preferredTransport, setPreferredTransport] = useState('');
+  const [preferredLanguage, setPreferredLanguage] = useState('English');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const { colors } = useTheme();
 
+  const transportOptions = ['Taxi', 'Bus', 'Train', 'Uber', 'Walking', 'Mixed'];
+  const languageOptions = ['English', 'Zulu', 'Afrikaans', 'Xhosa', 'Sotho'];
+  const { width } = Dimensions.get('window');
+  const isMobile = width < 768;
+
   const handleSignIn = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter both email and password');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Invalid email or password');
+        } else if (error.message.includes('Email not confirmed')) {
+          throw new Error('Please confirm your email before signing in. Check your inbox.');
+        } else {
+          throw error;
+        }
+      }
 
       Alert.alert('Success', 'Successfully signed in!');
       router.replace('/(app)/(tabs)/home');
     } catch (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert(
+        'Sign In Failed',
+        error.message || 'An error occurred during sign in'
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleSignUp = async () => {
+    if (!firstName.trim()) {
+      Alert.alert('Error', 'First name is required');
+      return;
+    }
+    if (!email.includes('@')) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+    if (!preferredTransport) {
+      Alert.alert('Error', 'Please select your preferred transport');
+      return;
+    }
+    if (!preferredLanguage) {
+      Alert.alert('Error', 'Please select your preferred language');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      if (!firstName.trim()) {
-        throw new Error('First name is required');
-      }
-
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -59,24 +99,38 @@ export default function Auth() {
           data: {
             first_name: firstName,
             last_name: lastName,
-            preferred_transport: preferredTransport || null,
+            preferred_transport: preferredTransport,
+            preferred_language: preferredLanguage,
           },
+          emailRedirectTo: 'myapp://welcome'
         },
       });
 
-      router.replace('/confirmation');
+      if (error) {
+        if (error.message.includes('User already registered')) {
+          throw new Error('This email is already registered. Please sign in instead.');
+        } else {
+          throw error;
+        }
+      }
 
-      if (error) throw error;
-
-      const { error: loginError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      router.push({
+        pathname: '/confirmation',
+        params: { email }
       });
-      if (loginError) throw loginError;
 
-      router.replace('/(app)/(tabs)/home');
+      // Clear form fields
+      setEmail('');
+      setPassword('');
+      setFirstName('');
+      setLastName('');
+      setPreferredTransport('');
+      setPreferredLanguage('English');
     } catch (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert(
+        'Registration Failed',
+        error.message || 'Could not create account. Please try again.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -84,28 +138,56 @@ export default function Auth() {
 
   const handleForgotPassword = async () => {
     if (!email) {
-      Alert.alert('Error', 'Please enter your email');
+      Alert.alert('Error', 'Please enter your email address');
       return;
     }
 
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'myapp://reset-password', // Replace with your app's password reset URL
+        redirectTo: 'myapp://reset-password',
       });
 
       if (error) throw error;
 
       Alert.alert(
-        'Password Reset',
+        'Email Sent',
         'If an account exists with this email, you will receive a password reset link.'
       );
       setShowForgotPassword(false);
     } catch (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to send password reset email'
+      );
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const renderOptionButtons = (options: string[], selected: string, setSelected: (value: string) => void) => {
+    return (
+      <View style={isMobile ? styles.mobileOptionsContainer : styles.optionsContainer}>
+        {options.map((option) => (
+          <TouchableOpacity
+            key={option}
+            style={[
+              styles.optionButton,
+              selected === option && styles.optionButtonActive,
+              isMobile && styles.mobileOptionButton
+            ]}
+            onPress={() => setSelected(option)}
+          >
+            <Text style={[
+              styles.optionText,
+              selected === option && styles.optionTextActive
+            ]}>
+              {option}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
   };
 
   return (
@@ -124,7 +206,6 @@ export default function Auth() {
       <View style={styles.header}>
         <Text style={styles.logoText}>Uthutho</Text>
       </View>
-
 
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>
@@ -149,11 +230,17 @@ export default function Auth() {
               value={lastName}
               onChangeText={setLastName}
             />
+            
+            <Text style={[styles.sectionLabel, { color: colors.text }]}>Preferred Transport</Text>
+            {renderOptionButtons(transportOptions, preferredTransport, setPreferredTransport)}
+            
+            <Text style={[styles.sectionLabel, { color: colors.text }]}>Preferred Language</Text>
+            {renderOptionButtons(languageOptions, preferredLanguage, setPreferredLanguage)}
           </>
         )}
 
         <View style={[styles.emailContainer, { backgroundColor: colors.card, borderRadius: 10 }]}>
-         <Mail size={20} color="#1ea2b1" style={styles.inputIcon} />
+          <Mail size={20} color="#1ea2b1" style={styles.inputIcon} />
           <TextInput
             style={[styles.input, { flex: 1, color: colors.text }]}
             placeholder="Email"
@@ -277,11 +364,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
   },
-  taglineText: {
-    fontSize: 16,
-    color: '#cccccc',
-    textAlign: 'center',
-  },
   header: {
     marginBottom: 20,
   },
@@ -349,5 +431,45 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 14,
+  },
+  sectionLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  optionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 20,
+  },
+  mobileOptionsContainer: {
+    flexDirection: 'column',
+    gap: 10,
+    marginBottom: 20,
+  },
+  optionButton: {
+    backgroundColor: '#333333',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#555555',
+  },
+  mobileOptionButton: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  optionButtonActive: {
+    backgroundColor: '#1ea2b1',
+    borderColor: '#1ea2b1',
+  },
+  optionText: {
+    color: '#cccccc',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  optionTextActive: {
+    color: '#ffffff',
   },
 });
