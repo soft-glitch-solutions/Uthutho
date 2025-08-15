@@ -392,7 +392,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-            {Platform.OS !== 'web' ? (
+    {Platform.OS !== 'web' ? (
         <View style={styles.bannerContainer}>
           <AdMobBanner
             bannerSize="smartBannerPortrait"
@@ -403,7 +403,27 @@ export default function HomeScreen() {
         </View>
       ) : (
         <View style={styles.bannerPlaceholder}>
-          <Text style={styles.bannerPlaceholderText}>Ad placeholder for web</Text>
+          <div 
+            dangerouslySetInnerHTML={{
+              __html: `
+              <div style="width:100%;height:50px;background:#eee;display:flex;justify-content:center;align-items:center;">
+                <!-- AdSense Script -->
+                <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-YOUR_PUBLISHER_ID"
+                  crossorigin="anonymous"></script>
+                <!-- Ad Unit -->
+                <ins class="adsbygoogle"
+                  style="display:block"
+                  data-ad-client="ca-pub-1853756758292263"
+                  data-ad-slot="YOUR_AD_SLOT_ID"
+                  data-ad-format="auto"
+                  data-full-width-responsive="true"></ins>
+                <script>
+                  (adsbygoogle = window.adsbygoogle || []).push({});
+                </script>
+              </div>
+              `
+            }}
+          />
         </View>
       )}
 
