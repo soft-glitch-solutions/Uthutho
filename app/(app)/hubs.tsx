@@ -130,13 +130,13 @@ export default function HubsScreen() {
       {/* Header Section */}
       <View style={styles.header}>
         <Text style={[styles.headerText, { color: colors.text }]}>Transport Hubs</Text>
-        <TouchableOpacity
+       {/* <TouchableOpacity
           onPress={() => router.push('/AddHub')}
           style={[styles.requestButton, { backgroundColor: colors.primary }]}
         >
           <PlusCircle size={20} color={colors.text} />
-          {/* <Text style={[styles.requestButtonText, { color: colors.text }]}>Request Hub</Text>*/}
-        </TouchableOpacity>
+           <Text style={[styles.requestButtonText, { color: colors.text }]}>Request Hub</Text>
+        </TouchableOpacity> */}
       </View>
 
       {/* Search Bar */}

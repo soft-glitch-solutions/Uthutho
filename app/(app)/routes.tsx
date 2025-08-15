@@ -144,13 +144,13 @@ export default function RoutesScreen() {
       {/* Header Section */}
       <View style={styles.header}>
         <Text style={[styles.headerText, { color: colors.text }]}>Routes</Text>
-        <TouchableOpacity
+       {/* <TouchableOpacity
           style={[styles.addButton , { backgroundColor: colors.primary }]}
           onPress={() => router.push('/AddRoutes')}
         >
           <PlusCircle size={24} color={colors.text} />
-          {/* <Text style={[styles.addButtonText , { color: colors.text }]}>Add Route</Text> */}
-        </TouchableOpacity>
+ <Text style={[styles.addButtonText , { color: colors.text }]}>Add Route</Text>
+        </TouchableOpacity> */}
       </View>
 
       {/* Search Bar */}

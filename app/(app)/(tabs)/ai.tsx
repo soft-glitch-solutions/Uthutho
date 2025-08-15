@@ -1,150 +1,271 @@
-
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import { Send, Bot, User, MapPin, Clock, Route } from 'lucide-react-native';
-import { supabase } from '@/lib/supabase';
+import { MessageSquare, Zap, MapPin, Clock, CloudRain, Sun, Navigation, Users , Bot } from 'lucide-react-native';
+import { getNearbyHubs, getNearbyRoutes, getNearbyStops, Hub, Route, Stop } from '../../../services/locationService';
+import { getWeatherData, getWeatherAdvice, WeatherData } from '../../../services/weatherService';
 
 interface Message {
-  id: number;
+  id: string;
   text: string;
   isUser: boolean;
   timestamp: Date;
 }
 
-interface UserLocation {
-  latitude: number;
-  longitude: number;
-  address?: string;
+interface QuickQuestion {
+  id: string;
+  text: string;
+  icon: React.ReactNode;
+  category: 'location' | 'weather' | 'routes' | 'stops';
 }
 
 export default function AIScreen() {
-  const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: 1,
-      text: "Sawubona! I'm your Uthutho AI assistant. How can I help you with your transport needs today?",
+      id: '1',
+      text: 'Sawubona! I\'m your Uthutho AI Assistant. I can help you find nearby transport options, check the weather for your journey, and provide travel tips based on your current location.',
       isUser: false,
       timestamp: new Date(),
     },
   ]);
-  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
-  const [locationQuestions, setLocationQuestions] = useState<string[]>([]);
+  
+  const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [nearbyHubs, setNearbyHubs] = useState<Hub[]>([]);
+  const [nearbyRoutes, setNearbyRoutes] = useState<Route[]>([]);
+  const [nearbyStops, setNearbyStops] = useState<Stop[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const defaultQuestions = [
-    "What's the fastest route to OR Tambo?",
-    "Show me nearby taxi ranks",
-    "When is the next train to Pretoria?",
-    "How much does it cost to get to Cape Town?",
+  const quickQuestions: QuickQuestion[] = [
+    {
+      id: 'nearby-hubs',
+      text: 'Show me nearby transport hubs',
+      icon: <MapPin color="#1ea2b1" size={20} />,
+      category: 'location',
+    },
+    {
+      id: 'nearby-routes',
+      text: 'What routes are available near me?',
+      icon: <Navigation color="#1ea2b1" size={20} />,
+      category: 'routes',
+    },
+    {
+      id: 'weather-advice',
+      text: 'How\'s the weather for traveling?',
+      icon: <Sun color="#1ea2b1" size={20} />,
+      category: 'weather',
+    },
+    {
+      id: 'nearby-stops',
+      text: 'Find stops close to my location',
+      icon: <Clock color="#1ea2b1" size={20} />,
+      category: 'stops',
+    },
+    {
+      id: 'travel-tips',
+      text: 'Give me travel tips for today',
+      icon: <Users color="#1ea2b1" size={20} />,
+      category: 'weather',
+    },
+    {
+      id: 'best-routes',
+      text: 'What\'s the best route from here?',
+      icon: <Zap color="#1ea2b1" size={20} />,
+      category: 'routes',
+    },
   ];
 
   useEffect(() => {
-    getUserLocation();
+    initializeData();
   }, []);
 
-  const getUserLocation = async () => {
+  const initializeData = async () => {
     try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
+      // Get location permission and current location
+      const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required for personalized assistance.');
+        setLoading(false);
         return;
       }
 
-      let location = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = location.coords;
-      
-      // Get address from coordinates
-      let addressData = await Location.reverseGeocodeAsync({
-        latitude,
-        longitude,
-      });
+      const currentLocation = await Location.getCurrentPositionAsync({});
+      setLocation(currentLocation);
 
-      if (addressData.length > 0) {
-        const address = `${addressData[0].city || addressData[0].district || ''}, ${addressData[0].region || ''}`.trim();
-        setUserLocation({
-          latitude,
-          longitude,
-          address,
-        });
-        generateLocationQuestions(address);
-      }
+      const { latitude, longitude } = currentLocation.coords;
+
+      // Fetch weather data
+      const weatherData = await getWeatherData(latitude, longitude);
+      setWeather(weatherData);
+
+      // Fetch nearby transport data
+      const [hubs, routes, stops] = await Promise.all([
+        getNearbyHubs(latitude, longitude),
+        getNearbyRoutes(latitude, longitude),
+        getNearbyStops(latitude, longitude),
+      ]);
+
+      setNearbyHubs(hubs);
+      setNearbyRoutes(routes);
+      setNearbyStops(stops);
     } catch (error) {
-      console.error('Error getting location:', error);
+      console.error('Error initializing data:', error);
+      Alert.alert('Error', 'Failed to load location data. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const generateLocationQuestions = (address: string) => {
-    const area = address.split(',')[0].trim();
-    const questions = [
-      `What transport options are available in ${area}?`,
-      `How do I get from ${area} to Sandton?`,
-      `What's the cheapest way to travel from ${area}?`,
-      `Show me taxi routes near ${area}`,
-    ];
-    setLocationQuestions(questions);
-  };
-
-  const sendMessage = () => {
-    if (!message.trim()) return;
-
-    const newMessage: Message = {
-      id: messages.length + 1,
-      text: message,
+  const handleQuestionPress = async (question: QuickQuestion) => {
+    // Add user message
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      text: question.text,
       isUser: true,
       timestamp: new Date(),
     };
 
-    setMessages([...messages, newMessage]);
-    setMessage('');
+    setMessages(prev => [...prev, userMessage]);
 
-    // Simulate AI response
+    // Generate AI response based on question category
+    let aiResponseText = '';
+
+    switch (question.category) {
+      case 'location':
+        if (question.id === 'nearby-hubs') {
+          if (nearbyHubs.length > 0) {
+            aiResponseText = `I found ${nearbyHubs.length} transport hubs near you:\n\n`;
+            nearbyHubs.forEach((hub, index) => {
+              aiResponseText += `${index + 1}. ${hub.name}\n`;
+              if (hub.address) aiResponseText += `   📍 ${hub.address}\n`;
+              if (hub.transport_type) aiResponseText += `   🚌 ${hub.transport_type}\n`;
+              aiResponseText += '\n';
+            });
+          } else {
+            aiResponseText = 'I couldn\'t find any transport hubs very close to your current location. You might need to travel a bit further to reach the nearest hub.';
+          }
+        }
+        break;
+
+      case 'routes':
+        if (question.id === 'nearby-routes') {
+          if (nearbyRoutes.length > 0) {
+            aiResponseText = `Here are ${nearbyRoutes.length} routes available near you:\n\n`;
+            nearbyRoutes.forEach((route, index) => {
+              aiResponseText += `${index + 1}. ${route.name}\n`;
+              aiResponseText += `   🚌 ${route.transport_type}\n`;
+              aiResponseText += `   💰 R${route.cost}\n`;
+              aiResponseText += `   📍 ${route.start_point} → ${route.end_point}\n\n`;
+            });
+          } else {
+            aiResponseText = 'No routes found in your immediate area. Try checking the Routes tab for more options or move closer to a transport hub.';
+          }
+        } else if (question.id === 'best-routes') {
+          if (nearbyRoutes.length > 0) {
+            const cheapestRoute = nearbyRoutes.reduce((prev, current) => 
+              prev.cost < current.cost ? prev : current
+            );
+            aiResponseText = `Based on your location, I recommend the "${cheapestRoute.name}" route:\n\n`;
+            aiResponseText += `🚌 Transport: ${cheapestRoute.transport_type}\n`;
+            aiResponseText += `💰 Cost: R${cheapestRoute.cost}\n`;
+            aiResponseText += `📍 From: ${cheapestRoute.start_point}\n`;
+            aiResponseText += `📍 To: ${cheapestRoute.end_point}\n\n`;
+            aiResponseText += 'This is the most cost-effective option near you!';
+          } else {
+            aiResponseText = 'I need to know your destination to recommend the best route. Please check the Routes tab for more detailed planning.';
+          }
+        }
+        break;
+
+      case 'weather':
+        if (weather) {
+          const advice = getWeatherAdvice(weather);
+          if (question.id === 'weather-advice') {
+            aiResponseText = `Current weather conditions:\n\n`;
+            aiResponseText += `🌡️ Temperature: ${weather.temperature}°C (feels like ${weather.feelsLike}°C)\n`;
+            aiResponseText += `☁️ Conditions: ${weather.description}\n`;
+            aiResponseText += `💧 Humidity: ${weather.humidity}%\n`;
+            aiResponseText += `💨 Wind: ${weather.windSpeed} km/h\n\n`;
+            aiResponseText += `Travel Advice: ${advice}`;
+          } else if (question.id === 'travel-tips') {
+            aiResponseText = `Here are today's travel tips based on current conditions:\n\n`;
+            aiResponseText += `${advice}\n\n`;
+            aiResponseText += `🚌 General Tips:\n`;
+            aiResponseText += `• Check stop status before leaving\n`;
+            aiResponseText += `• Keep your phone charged for updates\n`;
+            aiResponseText += `• Have exact change ready\n`;
+            aiResponseText += `• Stay aware of your surroundings\n`;
+            aiResponseText += `• Plan for potential delays during peak hours`;
+          }
+        } else {
+          aiResponseText = 'I\'m still loading weather data for your location. Please try again in a moment.';
+        }
+        break;
+
+      case 'stops':
+        if (nearbyStops.length > 0) {
+          aiResponseText = `I found ${nearbyStops.length} stops near your location:\n\n`;
+          nearbyStops.forEach((stop, index) => {
+            aiResponseText += `${index + 1}. ${stop.name}\n`;
+            if (stop.cost) aiResponseText += `   💰 Cost: R${stop.cost}\n`;
+            aiResponseText += `   📍 Stop #${stop.order_number}\n\n`;
+          });
+          aiResponseText += 'Check the Stops tab to mark yourself as waiting and see real-time updates!';
+        } else {
+          aiResponseText = 'No stops found very close to your current location. You might need to walk to the nearest transport hub.';
+        }
+        break;
+
+      default:
+        aiResponseText = 'I\'m here to help with transport information! Try asking about nearby hubs, routes, or weather conditions.';
+    }
+
+    // Add AI response
+    const aiMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      text: aiResponseText,
+      isUser: false,
+      timestamp: new Date(),
+    };
+
     setTimeout(() => {
-      const aiResponse: Message = {
-        id: messages.length + 2,
-        text: getAIResponse(message),
-        isUser: false,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, aiResponse]);
+      setMessages(prev => [...prev, aiMessage]);
     }, 1000);
   };
 
-  const getAIResponse = (userMessage: string): string => {
-    const responses = {
-      'tambo': "The fastest route to OR Tambo International Airport is via Gautrain from Sandton (25 min, R170) or from Johannesburg Park Station (15 min, R165). Both run every 10-15 minutes.",
-      'taxi': "Here are nearby taxi ranks:\n• Gandhi Square (0.8km) - City to City routes\n• Bree Street Rank (1.2km) - Local routes\n• Park Station Rank (0.3km) - Various destinations",
-      'pretoria': "Next trains to Pretoria:\n• 14:30 - Gautrain (R95, 35 min)\n• 15:15 - Metro Rail (R18, 1h 45min)\n• 16:00 - Gautrain (R95, 35 min)",
-      'cape town': "Transport to Cape Town:\n• Flight: From R800 (2h)\n• Bus: Intercape R450 (18h)\n• Train: Shosholoza Meyl R280 (24h)\nRecommended: Book flights in advance for better prices.",
-      'sandton': "Routes to Sandton:\n• Gautrain from OR Tambo (13 min, R170)\n• Gautrain from Johannesburg (20 min, R95)\n• Bus Rapid Transit (BRT) from various points\n• Taxi from Johannesburg CBD (30-45 min, R25)",
-      'cheapest': "Budget transport options:\n• Minibus taxis (R8-R25 for most routes)\n• Metro Rail trains (R5-R18)\n• Walking + public transport combinations\n• Off-peak Gautrain discounts available",
-    };
+  const QuickQuestion = ({ question }: { question: QuickQuestion }) => (
+    <TouchableOpacity
+      style={styles.questionCard}
+      onPress={() => handleQuestionPress(question)}
+    >
+      <View style={styles.questionIcon}>
+        {question.icon}
+      </View>
+      <Text style={styles.questionText}>{question.text}</Text>
+    </TouchableOpacity>
+  );
 
-    const lowerMessage = userMessage.toLowerCase();
-    for (const [key, response] of Object.entries(responses)) {
-      if (lowerMessage.includes(key)) {
-        return response;
-      }
-    }
-
-    // Location-specific responses
-    if (userLocation?.address) {
-      const userArea = userLocation.address.split(',')[0].toLowerCase();
-      if (lowerMessage.includes(userArea)) {
-        return `Based on your location in ${userLocation.address}, I can help you find the best transport options. What's your destination?`;
-      }
-    }
-
-    return "I'm here to help with transport information! You can ask me about routes, schedules, costs, or nearby transport options. What would you like to know?";
-  };
-
-  const handleQuickQuestion = (question: string) => {
-    setMessage(question);
-  };
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LinearGradient colors={['#000000', '#111111']} style={styles.gradient}>
+          <View style={styles.loadingContainer}>
+            <Zap color="#1ea2b1" size={48} />
+            <Text style={styles.loadingText}>Loading your personalized assistant...</Text>
+          </View>
+        </LinearGradient>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" backgroundColor="#000000" />
-      
+    <SafeAreaView style={styles.container}>
+      <LinearGradient
+        colors={['#000000', '#111111']}
+        style={styles.gradient}
+      >
       <View style={styles.header}>
         <Bot size={28} color="#1ea2b1" />
         <View style={styles.headerText}>
@@ -153,79 +274,53 @@ export default function AIScreen() {
         </View>
       </View>
 
-      {/* Quick Questions */}
-      <View style={styles.quickQuestions}>
-        <Text style={styles.quickTitle}>Quick Questions:</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {(locationQuestions.length > 0 ? locationQuestions : defaultQuestions).map((question, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.quickButton}
-              onPress={() => handleQuickQuestion(question)}
+        <ScrollView style={styles.chatContainer} showsVerticalScrollIndicator={false}>
+          {messages.map((message) => (
+            <View
+              key={message.id}
+              style={[
+                styles.messageContainer,
+                message.isUser ? styles.userMessage : styles.aiMessage,
+              ]}
             >
-              <Text style={styles.quickButtonText}>{question}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Location Info */}
-      {userLocation && (
-        <View style={styles.locationCard}>
-          <MapPin size={16} color="#1ea2b1" />
-          <Text style={styles.locationText}>
-            Your location: {userLocation.address || 'Location detected'}
-          </Text>
-        </View>
-      )}
-
-      {/* Chat Messages */}
-      <ScrollView style={styles.chatContainer}>
-        {messages.map((msg) => (
-          <View
-            key={msg.id}
-            style={[
-              styles.messageContainer,
-              msg.isUser ? styles.userMessage : styles.aiMessage,
-            ]}
-          >
-            <View style={styles.messageIcon}>
-              {msg.isUser ? (
-                <User size={16} color="#ffffff" />
-              ) : (
-                <Bot size={16} color="#1ea2b1" />
-              )}
-            </View>
-            <View style={styles.messageContent}>
-              <Text style={styles.messageText}>{msg.text}</Text>
+              <Text style={styles.messageText}>{message.text}</Text>
               <Text style={styles.messageTime}>
-                {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </Text>
             </View>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+        </ScrollView>
 
-      {/* Input Area */}
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Ask about routes, schedules, or transport options..."
-          placeholderTextColor="#666666"
-          value={message}
-          onChangeText={setMessage}
-          multiline
-          maxLength={500}
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
-          onPress={sendMessage}
-          disabled={!message.trim()}
-        >
-          <Send size={20} color="#ffffff" />
-        </TouchableOpacity>
-      </View>
-    </View>
+        <View style={styles.questionsContainer}>
+          <Text style={styles.questionsTitle}>What can I help you with?</Text>
+          <View style={styles.questionsGrid}>
+            {quickQuestions.map((question) => (
+              <QuickQuestion key={question.id} question={question} />
+            ))}
+          </View>
+        </View>
+
+        {/* Status Bar */}
+        <View style={styles.statusBar}>
+          <View style={styles.statusItem}>
+            <MapPin color="#1ea2b1" size={16} />
+            <Text style={styles.statusText}>
+              {location ? 'Location Active' : 'Location Disabled'}
+            </Text>
+          </View>
+          {weather && (
+            <View style={styles.statusItem}>
+              {weather.description.toLowerCase().includes('rain') ? (
+                <CloudRain color="#1ea2b1" size={16} />
+              ) : (
+                <Sun color="#1ea2b1" size={16} />
+              )}
+              <Text style={styles.statusText}>{weather.temperature}°C</Text>
+            </View>
+          )}
+        </View>
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 
@@ -233,6 +328,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  gradient: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    color: '#ffffff',
+    fontSize: 16,
+    marginTop: 16,
+    textAlign: 'center',
   },
   header: {
     flexDirection: 'row',
@@ -248,123 +358,104 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#ffffff',
+    marginLeft: 12,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#cccccc',
-    marginTop: 2,
-  },
-  quickQuestions: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  quickTitle: {
     fontSize: 16,
-    color: '#ffffff',
-    marginBottom: 12,
-    fontWeight: '500',
-  },
-  quickButton: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  quickButtonText: {
-    color: '#1ea2b1',
-    fontSize: 14,
-  },
-  locationCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#1ea2b150',
-  },
-  locationText: {
-    color: '#1ea2b1',
-    fontSize: 12,
-    marginLeft: 8,
+    color: '#cccccc',
   },
   chatContainer: {
     flex: 1,
     paddingHorizontal: 20,
+    maxHeight: '60%',
   },
   messageContainer: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    alignItems: 'flex-start',
+    maxWidth: '90%',
+    padding: 12,
+    borderRadius: 16,
+    marginBottom: 12,
   },
   userMessage: {
-    justifyContent: 'flex-end',
+    alignSelf: 'flex-end',
+    backgroundColor: '#1ea2b1',
   },
   aiMessage: {
-    justifyContent: 'flex-start',
-  },
-  messageIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    alignSelf: 'flex-start',
     backgroundColor: '#1a1a1a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  messageContent: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    padding: 12,
     borderWidth: 1,
     borderColor: '#333333',
   },
   messageText: {
     color: '#ffffff',
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 18,
   },
   messageTime: {
-    color: '#666666',
-    fontSize: 12,
-    marginTop: 8,
+    color: '#cccccc',
+    fontSize: 11,
+    marginTop: 4,
+    opacity: 0.7,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+  questionsContainer: {
+    padding: 8,          // Reduced from 12
+    paddingTop: 4,       // Reduced from 8
+    backgroundColor: '#000000',
     borderTopWidth: 1,
     borderTopColor: '#333333',
   },
-  textInput: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  questionsTitle: {
+    fontSize: 12,        // Reduced from 14
+    fontWeight: '600',
     color: '#ffffff',
-    fontSize: 16,
-    maxHeight: 100,
+    marginBottom: 4,     // Reduced from 8
+    textAlign: 'center',
+  },
+  questionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+ questionCard: {
+    backgroundColor: '#1a1a1a',
+    width: '48%',
+    borderRadius: 6,      // Reduced from 8
+    padding: 8,          // Reduced from 12
+    alignItems: 'center',
+    marginBottom: 6,     // Reduced from 8
     borderWidth: 1,
     borderColor: '#333333',
-  },
-  sendButton: {
-    backgroundColor: '#1ea2b1',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    minHeight: 50,       // Reduced from 60
     justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 12,
   },
-  sendButtonDisabled: {
-    backgroundColor: '#333333',
+
+
+  questionIcon: {
+    marginBottom: 8,
+    size: 12,
+  },
+  questionText: {
+    fontSize: 10,        // Reduced from 11
+    fontWeight: '500',
+    color: '#ffffff',
+    textAlign: 'center',
+    lineHeight: 12,      // Reduced from 14
+  },
+  statusBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#1a1a1a',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
+  },
+  statusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusText: {
+    color: '#cccccc',
+    fontSize: 12,
+    marginLeft: 6,
   },
 });
