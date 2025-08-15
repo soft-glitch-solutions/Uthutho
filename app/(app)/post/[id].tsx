@@ -12,6 +12,7 @@ interface Post {
   user_id: string;
   hub_id?: string;
   stop_id?: string;
+  post_type: 'hub' | 'stop';
   profiles: {
     first_name: string;
     last_name: string;
@@ -65,7 +66,8 @@ export default function PostDetailScreen() {
 
   const loadPost = async () => {
     try {
-      const { data, error } = await supabase
+      // First try to load as hub post
+      let { data, error } = await supabase
         .from('hub_posts')
         .select(`
           *,
@@ -80,9 +82,37 @@ export default function PostDetailScreen() {
         .eq('id', id)
         .single();
 
-      if (!error) {
-        setPost(data);
+      if (error || !data) {
+        // If not found as hub post, try as stop post
+        const stopPostResponse = await supabase
+          .from('stop_posts')
+          .select(`
+            *,
+            profiles (first_name, last_name, avatar_url),
+            stops (name),
+            post_reactions (id, user_id, reaction_type),
+            post_comments (
+              id, content, user_id, created_at,
+              profiles (first_name, last_name, avatar_url)
+            )
+          `)
+          .eq('id', id)
+          .single();
+
+        if (stopPostResponse.error) throw stopPostResponse.error;
+        
+        data = {
+          ...stopPostResponse.data,
+          post_type: 'stop'
+        };
+      } else {
+        data = {
+          ...data,
+          post_type: 'hub'
+        };
       }
+
+      setPost(data);
     } catch (error) {
       console.error('Error loading post:', error);
     }
@@ -116,7 +146,7 @@ export default function PostDetailScreen() {
         await supabase
           .from('post_reactions')
           .insert([{
-            post_hub_id: post.id,
+            [post.post_type === 'hub' ? 'post_hub_id' : 'post_stop_id']: post.id,
             user_id: currentUserId,
             reaction_type: reactionType,
           }]);
@@ -135,13 +165,12 @@ export default function PostDetailScreen() {
       const { error } = await supabase
         .from('post_comments')
         .insert([{
-          hub_post: post.id,
+          [post.post_type === 'hub' ? 'hub_post' : 'stop_post']: post.id,
           user_id: currentUserId,
           content: newComment,
         }]);
 
       if (!error) {
-        // Award 1 point for commenting
         await awardPoints(1);
         setNewComment('');
         loadPost();
@@ -239,7 +268,7 @@ export default function PostDetailScreen() {
               <View style={styles.locationInfo}>
                 <MapPin size={12} color="#666666" />
                 <Text style={styles.locationText}>
-                  {post.hubs?.name || post.stops?.name || 'Unknown Location'}
+                  {post.post_type === 'hub' ? post.hubs?.name : post.stops?.name || 'Unknown Location'}
                 </Text>
               </View>
             </View>

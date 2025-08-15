@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert,
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { MessageSquare, Heart, Flame, Send, MapPin, User, Plus, X } from 'lucide-react-native';
+import * as Location from 'expo-location';
 import { supabase } from '@/lib/supabase';
 
 interface Post {
@@ -12,17 +13,21 @@ interface Post {
   user_id: string;
   hub_id?: string;
   stop_id?: string;
+  post_type: 'hub' | 'stop';
   profiles: {
     first_name: string;
     last_name: string;
     avatar_url: string;
-
   };
   hubs?: {
     name: string;
+    latitude: number;
+    longitude: number;
   };
   stops?: {
     name: string;
+    latitude: number;
+    longitude: number;
   };
   post_reactions: Array<{
     id: string;
@@ -53,11 +58,14 @@ export default function FeedsScreen() {
   const [selectedLocation, setSelectedLocation] = useState<{id: string, name: string, type: 'hub' | 'stop'} | null>(null);
   const [hubs, setHubs] = useState<any[]>([]);
   const [stops, setStops] = useState<any[]>([]);
+  const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
 
   useEffect(() => {
     getCurrentUser();
     loadPosts();
     loadLocations();
+    requestLocationPermission();
   }, []);
 
   const getCurrentUser = async () => {
@@ -67,11 +75,32 @@ export default function FeedsScreen() {
     }
   };
 
+  const requestLocationPermission = async () => {
+    setLocationLoading(true);
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Permission to access location was denied');
+        setLocationLoading(false);
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      setUserLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      });
+    } catch (error) {
+      console.error('Error getting location:', error);
+    }
+    setLocationLoading(false);
+  };
+
   const loadLocations = async () => {
     try {
       const [hubsData, stopsData] = await Promise.all([
-        supabase.from('hubs').select('id, name').limit(10),
-        supabase.from('stops').select('id, name').limit(10)
+        supabase.from('hubs').select('id, name, latitude, longitude'),
+        supabase.from('stops').select('id, name, latitude, longitude')
       ]);
 
       if (hubsData.data) setHubs(hubsData.data);
@@ -81,69 +110,246 @@ export default function FeedsScreen() {
     }
   };
 
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // Radius of the earth in km
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1); 
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2)
+      ; 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    const d = R * c; // Distance in km
+    return d;
+  };
+
+  const deg2rad = (deg: number) => {
+    return deg * (Math.PI/180);
+  };
+
+  const findNearestLocation = () => {
+    if (!userLocation || (hubs.length === 0 && stops.length === 0)) return null;
+
+    let nearestLocation: {id: string, name: string, type: 'hub' | 'stop'} | null = null;
+    let minDistance = Infinity;
+
+    // Check hubs
+    hubs.forEach(hub => {
+      if (hub.latitude && hub.longitude) {
+        const distance = calculateDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          hub.latitude,
+          hub.longitude
+        );
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestLocation = {
+            id: hub.id,
+            name: hub.name,
+            type: 'hub'
+          };
+        }
+      }
+    });
+
+    // Check stops
+    stops.forEach(stop => {
+      if (stop.latitude && stop.longitude) {
+        const distance = calculateDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          stop.latitude,
+          stop.longitude
+        );
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestLocation = {
+            id: stop.id,
+            name: stop.name,
+            type: 'stop'
+          };
+        }
+      }
+    });
+
+    return nearestLocation;
+  };
+
   const openCreatePost = () => {
+    const nearest = findNearestLocation();
+    if (nearest) {
+      setSelectedLocation(nearest);
+    }
     setShowLocationModal(true);
   };
 
-  const loadPosts = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
+const loadPosts = async () => {
+  setLoading(true);
+  try {
+    // Fetch both hub_posts and stop_posts
+    const [
+      { data: hubPostsData, error: hubPostsError },
+      { data: stopPostsData, error: stopPostsError }
+    ] = await Promise.all([
+      supabase
         .from('hub_posts')
-        .select(`
-          *,
-          profiles (first_name, last_name, avatar_url),
-          hubs (name),
-          post_reactions (id, user_id, reaction_type),
-          post_comments (
-            id, content, user_id, created_at,
-            profiles (first_name, last_name, avatar_url)
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(20),
+      supabase
+        .from('stop_posts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20)
+    ]);
 
-      if (!error) {
-        setPosts(data || []);
-      }
-    } catch (error) {
-      console.error('Error loading posts:', error);
+    if (hubPostsError || stopPostsError) throw hubPostsError || stopPostsError;
+
+    // Combine all posts
+    const allPosts = [
+      ...(hubPostsData || []).map(p => ({ ...p, post_type: 'hub' })),
+      ...(stopPostsData || []).map(p => ({ ...p, post_type: 'stop' }))
+    ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    // Then get all the related data in separate queries
+    if (allPosts.length > 0) {
+      // Get user profiles
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, avatar_url')
+        .in('id', allPosts.map(p => p.user_id));
+
+      // Get hubs data
+      const hubIds = allPosts.filter(p => p.hub_id).map(p => p.hub_id);
+      const { data: hubsData } = hubIds.length > 0 ? await supabase
+        .from('hubs')
+        .select('id, name, latitude, longitude')
+        .in('id', hubIds) : { data: [] };
+
+      // Get stops data
+      const stopIds = allPosts.filter(p => p.stop_id).map(p => p.stop_id);
+      const { data: stopsData } = stopIds.length > 0 ? await supabase
+        .from('stops')
+        .select('id, name, latitude, longitude')
+        .in('id', stopIds) : { data: [] };
+
+      // Get reactions for both types of posts
+      const { data: reactionsData } = await supabase
+        .from('post_reactions')
+        .select('*')
+        .or(`post_hub_id.in.(${allPosts.filter(p => p.post_type === 'hub').map(p => p.id).join(',')}),post_stop_id.in.(${allPosts.filter(p => p.post_type === 'stop').map(p => p.id).join(',')})`);
+
+      // Get comments for both types of posts
+      const { data: commentsData } = await supabase
+        .from('post_comments')
+        .select('id, content, user_id, created_at, hub_post, stop_post')
+        .or(`hub_post.in.(${allPosts.filter(p => p.post_type === 'hub').map(p => p.id).join(',')}),stop_post.in.(${allPosts.filter(p => p.post_type === 'stop').map(p => p.id).join(',')})`);
+
+      // Get commenter profiles
+      const commenterIds = commentsData?.map(c => c.user_id) || [];
+      const { data: commenterProfiles } = commenterIds.length > 0 ? await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, avatar_url')
+        .in('id', commenterIds) : { data: [] };
+
+      // Combine all the data
+      const combinedPosts = allPosts.map(post => ({
+        ...post,
+        profiles: profilesData?.find(p => p.id === post.user_id) || {},
+        hubs: hubsData?.find(h => h.id === post.hub_id) || null,
+        stops: stopsData?.find(s => s.id === post.stop_id) || null,
+        post_reactions: reactionsData?.filter(r => 
+          (post.post_type === 'hub' && r.post_hub_id === post.id) ||
+          (post.post_type === 'stop' && r.post_stop_id === post.id)
+        ) || [],
+        post_comments: commentsData
+          ?.filter(c => 
+            (post.post_type === 'hub' && c.hub_post === post.id) ||
+            (post.post_type === 'stop' && c.stop_post === post.id)
+          )
+          .map(comment => ({
+            ...comment,
+            profiles: commenterProfiles?.find(p => p.id === comment.user_id) || {}
+          })) || []
+      }));
+
+      setPosts(combinedPosts);
+    } else {
+      setPosts([]);
     }
+  } catch (error) {
+    console.error('Error loading posts:', error);
+    Alert.alert('Error', 'Failed to load posts');
+  } finally {
     setLoading(false);
-  };
+  }
+};
 
-  const createPost = async (location: {id: string, name: string, type: 'hub' | 'stop'}) => {
-    if (!newPost.trim() || !location) return;
+const createPost = async () => {
+  if (!newPost.trim()) return;
 
-    try {
-      const postData: any = {
-        content: newPost,
-        user_id: currentUserId,
-      };
+  try {
+    const nearestLocation = findNearestLocation();
+    
+    const postData: any = {
+      content: newPost,
+      user_id: currentUserId,
+    };
 
+    // Determine which table to insert into based on location type
+    const location = selectedLocation || nearestLocation;
+    let tableName = 'hub_posts'; // default
+    
+    if (location) {
       if (location.type === 'hub') {
         postData.hub_id = location.id;
-      } else {
+        tableName = 'hub_posts';
+      } else if (location.type === 'stop') {
         postData.stop_id = location.id;
+        tableName = 'stop_posts';
       }
-
-      const { error } = await supabase
-        .from('hub_posts')
-        .insert([postData]);
-
-      if (!error) {
-        // Award 1 point for posting
-        await awardPoints(1);
-        setNewPost('');
-        setSelectedLocation(null);
-        setShowLocationModal(false);
-        loadPosts();
-      }
-    } catch (error) {
-      console.error('Error creating post:', error);
     }
-  };
 
+    const { data, error } = await supabase
+      .from(tableName)
+      .insert(postData)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Award points and refresh
+    await awardPoints(1);
+    setNewPost('');
+    setSelectedLocation(null);
+    setShowLocationModal(false);
+    
+    if (data) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, avatar_url')
+        .eq('id', currentUserId)
+        .single();
+
+      setPosts(prev => [{
+        ...data,
+        post_type: location?.type === 'stop' ? 'stop' : 'hub',
+        profiles: profile || {},
+        hubs: location?.type === 'hub' ? 
+          hubs.find(h => h.id === location.id) : null,
+        stops: location?.type === 'stop' ? 
+          stops.find(s => s.id === location.id) : null,
+        post_reactions: [],
+        post_comments: []
+      }, ...prev]);
+    }
+  } catch (error) {
+    console.error('Error creating post:', error);
+    Alert.alert('Error', 'Failed to create post');
+  }
+};
   const navigateToPost = (postId: string) => {
     router.push(`/post/${postId}`);
   };
@@ -152,36 +358,37 @@ export default function FeedsScreen() {
     router.push(`/user/${userId}`);
   };
 
-  const toggleReaction = async (postId: string, reactionType: string) => {
-    try {
-      // Check if user already reacted
-      const existingReaction = posts
-        .find(p => p.id === postId)
-        ?.post_reactions
-        .find(r => r.user_id === currentUserId && r.reaction_type === reactionType);
+const toggleReaction = async (postId: string, reactionType: string, postType: 'hub' | 'stop') => {
+  try {
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
 
-      if (existingReaction) {
-        // Remove reaction
-        await supabase
-          .from('post_reactions')
-          .delete()
-          .eq('id', existingReaction.id);
-      } else {
-        // Add reaction
-        await supabase
-          .from('post_reactions')
-          .insert([{
-            post_hub_id: postId,
-            user_id: currentUserId,
-            reaction_type: reactionType,
-          }]);
-      }
+    // Check if user already reacted
+    const existingReaction = post.post_reactions
+      .find(r => r.user_id === currentUserId && r.reaction_type === reactionType);
 
-      loadPosts();
-    } catch (error) {
-      console.error('Error toggling reaction:', error);
+    if (existingReaction) {
+      // Remove reaction
+      await supabase
+        .from('post_reactions')
+        .delete()
+        .eq('id', existingReaction.id);
+    } else {
+      // Add reaction
+      await supabase
+        .from('post_reactions')
+        .insert([{
+          [postType === 'hub' ? 'post_hub_id' : 'post_stop_id']: postId,
+          user_id: currentUserId,
+          reaction_type: reactionType,
+        }]);
     }
-  };
+
+    loadPosts();
+  } catch (error) {
+    console.error('Error toggling reaction:', error);
+  }
+};
 
   const addComment = async (postId: string) => {
     const comment = commentInputs[postId];
@@ -234,7 +441,7 @@ export default function FeedsScreen() {
     return post.post_reactions.some(r => r.user_id === currentUserId && r.reaction_type === reactionType);
   };
 
-    // Skeleton component
+  // Skeleton component
   const PostSkeleton = () => (
     <View style={styles.postCard}>
       <View style={styles.postHeader}>
@@ -253,6 +460,8 @@ export default function FeedsScreen() {
       <View style={[styles.skeletonLine, { width: '60%', height: 14 }]} />
     </View>
   );
+
+  const nearestLocation = findNearestLocation();
 
   return (
     <ScrollView style={styles.container}>
@@ -274,14 +483,24 @@ export default function FeedsScreen() {
           multiline
           maxLength={500}
         />
-        <TouchableOpacity
-          style={[styles.postButton, !newPost.trim() && styles.postButtonDisabled]}
-          onPress={openCreatePost}
-          disabled={!newPost.trim()}
-        >
-          <Send size={20} color="#ffffff" />
-          <Text style={styles.postButtonText}>Post</Text>
-        </TouchableOpacity>
+        <View style={styles.postActions}>
+          <TouchableOpacity
+            style={styles.locationButton}
+            onPress={openCreatePost}
+          >
+            <MapPin size={20} color="#1ea2b1" />
+            <Text style={styles.locationButtonText}>
+              {selectedLocation?.name || nearestLocation?.name || 'Select location'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.postButton, !newPost.trim() && styles.postButtonDisabled]}
+            onPress={createPost}
+            disabled={!newPost.trim()}
+          >
+            <Send size={20} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Location Selection Modal */}
@@ -305,11 +524,31 @@ export default function FeedsScreen() {
               {hubs.map((hub) => (
                 <TouchableOpacity
                   key={hub.id}
-                  style={styles.locationItem}
-                  onPress={() => createPost({id: hub.id, name: hub.name, type: 'hub'})}
+                  style={[
+                    styles.locationItem,
+                    selectedLocation?.id === hub.id && styles.selectedLocationItem
+                  ]}
+                  onPress={() => {
+                    setSelectedLocation({
+                      id: hub.id,
+                      name: hub.name,
+                      type: 'hub'
+                    });
+                    setShowLocationModal(false);
+                  }}
                 >
                   <MapPin size={20} color="#1ea2b1" />
                   <Text style={styles.locationName}>{hub.name}</Text>
+                  {userLocation && hub.latitude && hub.longitude && (
+                    <Text style={styles.locationDistance}>
+                      {calculateDistance(
+                        userLocation.latitude,
+                        userLocation.longitude,
+                        hub.latitude,
+                        hub.longitude
+                      ).toFixed(1)} km
+                    </Text>
+                  )}
                 </TouchableOpacity>
               ))}
               
@@ -317,11 +556,31 @@ export default function FeedsScreen() {
               {stops.map((stop) => (
                 <TouchableOpacity
                   key={stop.id}
-                  style={styles.locationItem}
-                  onPress={() => createPost({id: stop.id, name: stop.name, type: 'stop'})}
+                  style={[
+                    styles.locationItem,
+                    selectedLocation?.id === stop.id && styles.selectedLocationItem
+                  ]}
+                  onPress={() => {
+                    setSelectedLocation({
+                      id: stop.id,
+                      name: stop.name,
+                      type: 'stop'
+                    });
+                    setShowLocationModal(false);
+                  }}
                 >
                   <MapPin size={20} color="#666666" />
                   <Text style={styles.locationName}>{stop.name}</Text>
+                  {userLocation && stop.latitude && stop.longitude && (
+                    <Text style={styles.locationDistance}>
+                      {calculateDistance(
+                        userLocation.latitude,
+                        userLocation.longitude,
+                        stop.latitude,
+                        stop.longitude
+                      ).toFixed(1)} km
+                    </Text>
+                  )}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -332,12 +591,12 @@ export default function FeedsScreen() {
       {/* Posts Feed */}
       <View style={styles.feedContainer}>
         {loading ? (
-  <>
-    {[...Array(3)].map((_, index) => (
-      <PostSkeleton key={index} />
-    ))}
-  </>
-): posts.length === 0 ? (
+          <>
+            {[...Array(3)].map((_, index) => (
+              <PostSkeleton key={index} />
+            ))}
+          </>
+        ) : posts.length === 0 ? (
           <Text style={styles.noPostsText}>No posts yet. Be the first to share!</Text>
         ) : (
           posts.map((post) => (
@@ -394,7 +653,7 @@ export default function FeedsScreen() {
               <View style={styles.reactionsContainer}>
                 <TouchableOpacity
                   style={[styles.reactionButton, hasUserReacted(post, 'fire') && styles.reactionActive]}
-                  onPress={() => toggleReaction(post.id, 'fire')}
+                    onPress={() => toggleReaction(post.id, 'fire', post.post_type)}
                 >
                   <Flame size={20} color={hasUserReacted(post, 'fire') ? '#ff6b35' : '#666666'} />
                   <Text style={[styles.reactionCount, hasUserReacted(post, 'fire') && styles.reactionCountActive]}>
@@ -419,7 +678,7 @@ export default function FeedsScreen() {
                 />
                 <TouchableOpacity
                   style={styles.commentButton}
-                  onPress={() => addComment(post.id)}
+                    onPress={() => addComment(post.id, post.post_type)}
                 >
                   <Send size={16} color="#1ea2b1" />
                 </TouchableOpacity>
@@ -470,33 +729,42 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     marginBottom: 16,
   },
+  postActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  locationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: '#0a0a0a',
+  },
+  locationButtonText: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    marginLeft: 8,
+  },
   postButton: {
     backgroundColor: '#1ea2b1',
     borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    padding: 12,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
-    alignSelf: 'flex-end',
+    alignItems: 'center',
   },
   skeletonBg: {
-  backgroundColor: '#2a2a2a',
-},
-skeletonLine: {
-  backgroundColor: '#2a2a2a',
-  borderRadius: 6,
-  marginBottom: 4,
-},
-
+    backgroundColor: '#2a2a2a',
+  },
+  skeletonLine: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 6,
+    marginBottom: 4,
+  },
   postButtonDisabled: {
     backgroundColor: '#333333',
-  },
-  postButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
   },
   modalOverlay: {
     flex: 1,
@@ -545,10 +813,19 @@ skeletonLine: {
     borderWidth: 1,
     borderColor: '#333333',
   },
+  selectedLocationItem: {
+    borderColor: '#1ea2b1',
+    backgroundColor: '#1ea2b120',
+  },
   locationName: {
     color: '#ffffff',
     fontSize: 16,
     marginLeft: 12,
+    flex: 1,
+  },
+  locationDistance: {
+    color: '#666666',
+    fontSize: 14,
   },
   feedContainer: {
     paddingHorizontal: 20,
