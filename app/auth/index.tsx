@@ -18,6 +18,7 @@ import { Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [facebookLoading, setFacebookLoading] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -32,8 +33,6 @@ export default function Auth() {
 
   const transportOptions = ['Taxi', 'Bus', 'Train', 'Uber', 'Walking', 'Mixed'];
   const languageOptions = ['English', 'Zulu', 'Afrikaans', 'Xhosa', 'Sotho'];
-  const { width } = Dimensions.get('window');
-  const isMobile = width < 768;
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
@@ -50,12 +49,32 @@ export default function Auth() {
           },
         },
       });
-  
+
       if (error) throw error;
     } catch (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(error.message || 'Google sign-in failed');
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleFacebookSignIn = async () => {
+    setFacebookLoading(true);
+    setErrorMessage(null);
+    
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'facebook',
+        options: {
+          redirectTo: 'https://www.mobile.uthutho.co.za/auth/callback',
+        },
+      });
+
+      if (error) throw error;
+    } catch (error) {
+      setErrorMessage(error.message || 'Facebook sign-in failed');
+    } finally {
+      setFacebookLoading(false);
     }
   };
 
@@ -74,23 +93,16 @@ export default function Auth() {
       });
 
       if (error) {
-        console.error('Sign-in error details:', error);
-        
         if (error.message.includes('Invalid login credentials')) {
           setErrorMessage('The email or password you entered is incorrect');
         } else if (error.message.includes('Email not confirmed')) {
-          setErrorMessage('Please confirm your email first. Check your inbox for the confirmation link.');
-        } else if (error.status === 400) {
-          setErrorMessage('Invalid request. Please check your details.');
-        } else if (error.status === 429) {
-          setErrorMessage('Too many attempts. Please wait a moment.');
+          setErrorMessage('Please confirm your email first. Check your inbox.');
         } else {
           setErrorMessage('Sign in failed. Please try again.');
         }
         return;
       }
 
-      Alert.alert('Success', 'Successfully signed in!');
       router.replace('/(app)/(tabs)/home');
     } catch (error) {
       setErrorMessage('An unexpected error occurred. Please try again.');
@@ -139,14 +151,8 @@ export default function Auth() {
       });
 
       if (error) {
-        console.error('Sign-up error details:', error);
-        
         if (error.message.includes('User already registered')) {
           setErrorMessage('This email is already registered. Please sign in.');
-        } else if (error.status === 400) {
-          setErrorMessage('Invalid registration details. Please check your information.');
-        } else if (error.status === 429) {
-          setErrorMessage('Too many attempts. Please wait a moment.');
         } else {
           setErrorMessage('Registration failed. Please try again later.');
         }
@@ -183,10 +189,7 @@ export default function Auth() {
         redirectTo: 'myapp://reset-password',
       });
 
-      if (error) {
-        console.error('Password reset error:', error);
-        throw new Error(error.message || 'Failed to send password reset email');
-      }
+      if (error) throw error;
 
       Alert.alert(
         'Email Sent',
@@ -194,10 +197,7 @@ export default function Auth() {
       );
       setShowForgotPassword(false);
     } catch (error) {
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to send password reset email. Please try again.'
-      );
+      Alert.alert('Error', 'Failed to send password reset email. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -230,7 +230,9 @@ export default function Auth() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.contentContainer}>
+      contentContainerStyle={styles.contentContainer}
+    >
+      {/* Logo */}
       <View style={styles.logoContainer}>
         <Image
           source={require('../../assets/images/icon.png')}
@@ -255,31 +257,7 @@ export default function Auth() {
         </View>
       )}
 
-      {isLogin && !showForgotPassword && (
-        <TouchableOpacity
-          style={[styles.googleButton, { backgroundColor: '#4285F4' }]}
-          onPress={handleGoogleSignIn}
-          disabled={googleLoading}>
-          <View style={styles.googleButtonContent}>
-            <Image
-              source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg' }}
-              style={styles.googleIcon}
-            />
-            <Text style={styles.googleButtonText}>
-              {googleLoading ? 'Signing in...' : 'Continue with Google'}
-            </Text>
-          </View>
-        </TouchableOpacity>
-      )}
-
-      {isLogin && !showForgotPassword && (
-        <View style={styles.dividerContainer}>
-          <View style={styles.dividerLine} />
-          <Text style={[styles.dividerText, { color: colors.text }]}>or</Text>
-          <View style={styles.dividerLine} />
-        </View>
-      )}
-
+      {/* Email/Password Form */}
       <View style={styles.form}>
         {!isLogin && !showForgotPassword && (
           <>
@@ -368,7 +346,8 @@ export default function Auth() {
                 ? handleSignIn 
                 : handleSignUp
           }
-          disabled={isLoading}>
+          disabled={isLoading || googleLoading || facebookLoading}
+        >
           <Text style={styles.buttonText}>
             {isLoading 
               ? 'Loading...' 
@@ -381,6 +360,38 @@ export default function Auth() {
         </TouchableOpacity>
       </View>
 
+      {/* Social Login Section */}
+      <View style={styles.socialLoginContainer}>
+        <Text style={[styles.socialLoginText, { color: colors.text }]}>
+          {isLogin ? 'Continue with' : 'Sign up with'}
+        </Text>
+        
+        <View style={styles.socialButtonsRow}>
+          <TouchableOpacity
+            style={[styles.socialButton, { backgroundColor: colors.card }]}
+            onPress={handleGoogleSignIn}
+            disabled={googleLoading}
+          >
+            <Image
+              source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg' }}
+              style={styles.socialIcon}
+            />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.socialButton, { backgroundColor: colors.card }]}
+            onPress={handleFacebookSignIn}
+            disabled={facebookLoading}
+          >
+            <Image
+              source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg' }}
+              style={styles.socialIcon}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Switch between Login/Signup */}
       <TouchableOpacity
         style={styles.switchButton}
         onPress={() => {
@@ -390,7 +401,8 @@ export default function Auth() {
             setIsLogin(!isLogin);
           }
         }}
-        disabled={isLoading}>
+        disabled={isLoading || googleLoading || facebookLoading}
+      >
         <Text style={[styles.switchText, { color: colors.text }]}>
           {showForgotPassword
             ? 'Back to Sign In'
@@ -428,9 +440,6 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     marginBottom: 30,
-  },
-  inputIcon: {
-    marginRight: 12,
   },
   logo: {
     width: 150,
@@ -487,7 +496,6 @@ const styles = StyleSheet.create({
   emailContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
     borderRadius: 12,
     marginBottom: 20,
     paddingHorizontal: 16,
@@ -497,7 +505,6 @@ const styles = StyleSheet.create({
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
     borderRadius: 12,
     marginBottom: 20,
     paddingHorizontal: 16,
@@ -507,6 +514,9 @@ const styles = StyleSheet.create({
   input: {
     padding: 15,
     fontSize: 16,
+  },
+  inputIcon: {
+    marginRight: 12,
   },
   forgotPasswordButton: {
     alignSelf: 'flex-end',
@@ -533,7 +543,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   optionButton: {
-    backgroundColor: '#333333',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -546,7 +555,6 @@ const styles = StyleSheet.create({
     borderColor: '#1ea2b1',
   },
   optionText: {
-    color: '#cccccc',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -565,38 +573,34 @@ const styles = StyleSheet.create({
     color: '#D32F2F',
     fontSize: 14,
   },
-  googleButton: {
-    padding: 15,
-    borderRadius: 10,
+  socialLoginContainer: {
+    marginTop: 30,
     alignItems: 'center',
+  },
+  socialLoginText: {
+    fontSize: 14,
     marginBottom: 15,
+    color: '#666',
   },
-  googleButtonContent: {
+  socialButtonsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
   },
-  googleIcon: {
+  socialButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  socialIcon: {
     width: 24,
     height: 24,
-    marginRight: 12,
-  },
-  googleButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 15,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#ccc',
-  },
-  dividerText: {
-    marginHorizontal: 10,
-    fontSize: 14,
   },
 });
