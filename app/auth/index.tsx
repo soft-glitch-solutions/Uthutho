@@ -17,6 +17,7 @@ import { Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -27,15 +28,39 @@ export default function Auth() {
   const [preferredLanguage, setPreferredLanguage] = useState('English');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const { colors } = useTheme();
-  const [errorMessage, setErrorMessage] = useState<string | null>(null); // New state for error messages
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const transportOptions = ['Taxi', 'Bus', 'Train', 'Uber', 'Walking', 'Mixed'];
   const languageOptions = ['English', 'Zulu', 'Afrikaans', 'Xhosa', 'Sotho'];
   const { width } = Dimensions.get('window');
   const isMobile = width < 768;
 
-const handleSignIn = async () => {
-    setErrorMessage(null); // Clear previous errors
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    setErrorMessage(null);
+    
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: 'https://www.mobile.uthutho.co.za/auth/callback',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+  
+      if (error) throw error;
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleSignIn = async () => {
+    setErrorMessage(null);
     if (!email || !password) {
       setErrorMessage('Please enter both email and password');
       return;
@@ -51,7 +76,6 @@ const handleSignIn = async () => {
       if (error) {
         console.error('Sign-in error details:', error);
         
-        // Human-readable error messages
         if (error.message.includes('Invalid login credentials')) {
           setErrorMessage('The email or password you entered is incorrect');
         } else if (error.message.includes('Email not confirmed')) {
@@ -75,8 +99,8 @@ const handleSignIn = async () => {
     }
   };
 
- const handleSignUp = async () => {
-    setErrorMessage(null); // Clear previous errors
+  const handleSignUp = async () => {
+    setErrorMessage(null);
     if (!firstName.trim()) {
       setErrorMessage('First name is required');
       return;
@@ -134,7 +158,6 @@ const handleSignIn = async () => {
         params: { email }
       });
 
-      // Clear form fields
       setEmail('');
       setPassword('');
       setFirstName('');
@@ -208,7 +231,6 @@ const handleSignIn = async () => {
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.contentContainer}>
-      {/* Logo */}
       <View style={styles.logoContainer}>
         <Image
           source={require('../../assets/images/icon.png')}
@@ -233,6 +255,30 @@ const handleSignIn = async () => {
         </View>
       )}
 
+      {isLogin && !showForgotPassword && (
+        <TouchableOpacity
+          style={[styles.googleButton, { backgroundColor: '#4285F4' }]}
+          onPress={handleGoogleSignIn}
+          disabled={googleLoading}>
+          <View style={styles.googleButtonContent}>
+            <Image
+              source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg' }}
+              style={styles.googleIcon}
+            />
+            <Text style={styles.googleButtonText}>
+              {googleLoading ? 'Signing in...' : 'Continue with Google'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {isLogin && !showForgotPassword && (
+        <View style={styles.dividerContainer}>
+          <View style={styles.dividerLine} />
+          <Text style={[styles.dividerText, { color: colors.text }]}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+      )}
 
       <View style={styles.form}>
         {!isLogin && !showForgotPassword && (
@@ -361,8 +407,6 @@ const handleSignIn = async () => {
         </Text>
       </TouchableOpacity>
 
-
-      {/* Footer Section */}
       <View style={styles.footer}>
         <Text style={[styles.footerText, { color: colors.text }]}>
           Developed by Soft Glitch Solutions
@@ -392,7 +436,7 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
   },
-  logoText:{
+  logoText: {
     fontSize: 48,
     fontWeight: 'bold',
     color: '#1ea2b1',
@@ -509,8 +553,7 @@ const styles = StyleSheet.create({
   optionTextActive: {
     color: '#ffffff',
   },
-
-   errorContainer: {
+  errorContainer: {
     backgroundColor: '#FFEBEE',
     padding: 15,
     borderRadius: 8,
@@ -522,5 +565,38 @@ const styles = StyleSheet.create({
     color: '#D32F2F',
     fontSize: 14,
   },
-
+  googleButton: {
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  googleButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  googleIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 12,
+  },
+  googleButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 15,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ccc',
+  },
+  dividerText: {
+    marginHorizontal: 10,
+    fontSize: 14,
+  },
 });

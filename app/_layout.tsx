@@ -19,6 +19,7 @@ export default function RootLayout() {
             <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
             <Stack.Screen name="confirmation" options={{ gestureEnabled: false }} />
             <Stack.Screen name="auth" options={{ gestureEnabled: false }} />
+            <Stack.Screen name="auth/callback" options={{ gestureEnabled: false }} />
             <Stack.Screen name="(app)" options={{ gestureEnabled: false }} />
           </Stack>
         </LanguageProvider>
