@@ -28,7 +28,7 @@ interface FavoriteItem {
   distance?: string;
 }
 
-
+// Skeleton Loading Components
 const Shimmer = ({ children, colors }) => {
   const animatedValue = new Animated.Value(0);
 
@@ -75,37 +75,125 @@ const Shimmer = ({ children, colors }) => {
   );
 };
 
-
-
-const FavoritesSkeleton = ({ colors }) => {
-  return (
-    <View style={styles.grid}>
-      {[1, 2, 3].map((i) => (
-        <Shimmer key={i} colors={colors}>
-          <View style={[styles.card, { backgroundColor: colors.card }]}>
-            <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '60%' }]} />
-          </View>
-        </Shimmer>
-      ))}
+const HeaderSkeleton = ({ colors }) => (
+  <View style={styles.header}>
+    <View style={styles.firstRow}>
+      <Shimmer colors={colors}>
+        <View style={[styles.skeletonTitle, { 
+          backgroundColor: colors.border,
+          width: 150,
+          height: 30 
+        }]} />
+      </Shimmer>
+      <Shimmer colors={colors}>
+        <View style={[styles.skeletonIcon, { 
+          backgroundColor: colors.border,
+          width: 30,
+          height: 30 
+        }]} />
+      </Shimmer>
     </View>
-  );
-};
+    <Shimmer colors={colors}>
+      <View style={[styles.skeletonSubtitle, { 
+        backgroundColor: colors.border,
+        width: 100,
+        height: 20,
+        marginTop: 8
+      }]} />
+    </Shimmer>
+  </View>
+);
 
-const NearestLocationsSkeleton = ({ colors }) => {
-  return (
-    <View style={styles.grid}>
-      {[1, 2].map((i) => (
-        <Shimmer key={i} colors={colors}>
-          <View style={[styles.card, { backgroundColor: colors.card }]}>
-            <View style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
-            <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '80%' }]} />
-            <View style={[styles.skeletonDistance, { backgroundColor: colors.border }]} />
+const FavoritesSkeleton = ({ colors }) => (
+  <View style={styles.grid}>
+    {[1, 2].map((i) => (
+      <Shimmer key={i} colors={colors}>
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
+          <View style={styles.favoriteItemSkeleton}>
+            <View style={[styles.skeletonIcon, { backgroundColor: colors.border }]} />
+            <View style={{ flex: 1 }}>
+              <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '70%' }]} />
+              <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '50%', marginTop: 4 }]} />
+            </View>
+            <View style={[styles.skeletonIcon, { backgroundColor: colors.border }]} />
           </View>
-        </Shimmer>
-      ))}
+        </View>
+      </Shimmer>
+    ))}
+  </View>
+);
+
+const NearestLocationsSkeleton = ({ colors }) => (
+  <View style={styles.grid}>
+    {[1, 2].map((i) => (
+      <Shimmer key={i} colors={colors}>
+        <View style={[styles.card, { backgroundColor: colors.primary }]}>
+          <View style={styles.favoriteItemSkeleton}>
+            <View style={[styles.skeletonIcon, { backgroundColor: colors.text }]} />
+            <View style={[styles.skeletonTitle, { 
+              backgroundColor: colors.text,
+              width: 100,
+              marginLeft: 8
+            }]} />
+          </View>
+          <View style={[styles.skeletonText, { 
+            backgroundColor: colors.text,
+            width: '80%',
+            marginTop: 8
+          }]} />
+          <View style={[styles.skeletonText, { 
+            backgroundColor: colors.text,
+            width: '60%',
+            marginTop: 8
+          }]} />
+          <View style={{ height: 40, marginTop: 12 }} />
+        </View>
+      </Shimmer>
+    ))}
+  </View>
+);
+
+const GamificationSkeleton = ({ colors }) => (
+  <Shimmer colors={colors}>
+    <View style={[styles.gamificationCard, { borderColor: colors.border }]}>
+      <View style={styles.gamificationHeader}>
+        <View style={[styles.skeletonIcon, { backgroundColor: colors.border }]} />
+        <View style={[styles.skeletonTitle, { 
+          backgroundColor: colors.border,
+          width: 100,
+          marginLeft: 8
+        }]} />
+      </View>
+      
+      <View style={styles.statsRow}>
+        {[1, 2, 3].map((i) => (
+          <View key={i} style={styles.statBox}>
+            <View style={[styles.skeletonText, { 
+              backgroundColor: colors.border,
+              width: 60,
+              height: 20,
+              marginBottom: 4
+            }]} />
+            <View style={[styles.skeletonText, { 
+              backgroundColor: colors.border,
+              width: 40,
+              height: 12
+            }]} />
+          </View>
+        ))}
+      </View>
+
+      <View style={[styles.titleBadge, { backgroundColor: colors.border }]}>
+        <View style={[styles.skeletonIcon, { backgroundColor: colors.text }]} />
+        <View style={[styles.skeletonText, { 
+          backgroundColor: colors.text,
+          width: 80,
+          marginLeft: 4
+        }]} />
+      </View>
     </View>
-  );
-};
+  </Shimmer>
+);
 
 const calculateWalkingTime = (lat1, lng1, lat2, lng2) => {
   const R = 6371; // Earth radius in km
@@ -135,7 +223,7 @@ export default function HomeScreen() {
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [nearestLocations, setNearestLocations] = useState(null);
   const [isNearestLoading, setIsNearestLoading] = useState(false);
-    const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [userStats, setUserStats] = useState({
     points: 0,
     level: 1,
@@ -144,6 +232,7 @@ export default function HomeScreen() {
   });
   const [userId, setUserId] = useState(null);
   const [favoriteDetails, setFavoriteDetails] = useState([]);
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -163,7 +252,6 @@ export default function HomeScreen() {
       if (isFavorite) {
         newFavorites = favorites.filter(fav => fav.id !== item.id);
       } else {
-        // Ensure new favorite has proper structure
         newFavorites = [...favorites, {
           id: item.id,
           name: item.name,
@@ -179,7 +267,6 @@ export default function HomeScreen() {
   
       if (!error) {
         setFavorites(newFavorites);
-        // Update favorite details as well
         if (!isFavorite) {
           const details = await handleFavoritePress(item.name || item.id);
           if (details) {
@@ -215,33 +302,28 @@ export default function HomeScreen() {
         if (error) throw error;
         setUserProfile(data);
     
-        // Process favorites to ensure consistent structure
         if (data?.favorites?.length) {
           const processedFavorites = data.favorites.map(fav => {
-            // If favorite is already in correct object format, return it
             if (typeof fav === 'object' && fav.id && fav.name && fav.type) {
               return fav;
             }
             
-            // If favorite is just a string (legacy format), create a basic object
             if (typeof fav === 'string') {
               return {
-                id: fav, // Use the string as ID
-                name: fav, // Use the string as name
-                type: 'stop' // Default type
+                id: fav,
+                name: fav,
+                type: 'stop'
               };
             }
             
-            // If favorite is an object but missing required fields
             if (typeof fav === 'object') {
               return {
-                id: fav.id || String(Math.random()), // Generate ID if missing
+                id: fav.id || String(Math.random()),
                 name: fav.name || 'Unknown',
                 type: fav.type || 'stop'
               };
             }
             
-            // Fallback for any other case
             return {
               id: String(Math.random()),
               name: 'Unknown',
@@ -251,7 +333,6 @@ export default function HomeScreen() {
     
           setFavorites(processedFavorites);
     
-          // Fetch additional details for each favorite
           const details = await Promise.all(
             processedFavorites.map(async (favorite) => {
               try {
@@ -340,11 +421,8 @@ export default function HomeScreen() {
     return nearestLocation;
   };
 
-
-    useEffect(() => {
-    loadUserStats();
-  }, []);
-    const loadUserStats = async () => {
+  const loadUserStats = async () => {
+    setIsStatsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -365,8 +443,14 @@ export default function HomeScreen() {
       }
     } catch (error) {
       console.error('Error loading user stats:', error);
+    } finally {
+      setIsStatsLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadUserStats();
+  }, []);
 
   const openSidebar = () => {
     navigation.toggleDrawer();
@@ -417,6 +501,7 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Top Header */}
       <View style={styles.topHeader}>
         <Pressable onPress={openSidebar} style={styles.logoContainer}>
           <Image
@@ -425,33 +510,49 @@ export default function HomeScreen() {
           />
           <Text style={[styles.uthuthoText, { color: colors.text }]}>Uthutho</Text>
         </Pressable>
-        <View style={styles.pointsContainer}>
-          <Text style={[styles.pointsText, { color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
-        </View>
-      </View>
-
-
-      <View style={styles.header}>
-        <View>
-          <View style={styles.firstRow}>
-            <Pressable onPress={() => router.push('/profile')}>
-              <Text style={[styles.title, { color: colors.text }]}>
-                 Hi {isProfileLoading ? '.......' :  userProfile?.first_name || 'User'}
-              </Text>
-            </Pressable>
-            <Pressable onPress={() => router.push('/favorites')} style={styles.addButton}>
-              <Search size={24} color={colors.text} />
-            </Pressable>
+        {isProfileLoading ? (
+          <Shimmer colors={colors}>
+            <View style={[styles.pointsContainer, { 
+              backgroundColor: colors.border,
+              width: 80,
+              height: 30,
+              borderRadius: 15
+            }]} />
+          </Shimmer>
+        ) : (
+          <View style={styles.pointsContainer}>
+            <Text style={[styles.pointsText, { color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
           </View>
-          {!isProfileLoading && userProfile?.selected_title && (
-            <Text style={[styles.selectedTitle, { color: colors.primary }]}>
-              {userProfile.selected_title}
-            </Text>
-          )}
-        </View>
+        )}
       </View>
 
-    {Platform.OS !== 'web' ? (
+      {/* User Header */}
+      {isProfileLoading ? (
+        <HeaderSkeleton colors={colors} />
+      ) : (
+        <View style={styles.header}>
+          <View>
+            <View style={styles.firstRow}>
+              <Pressable onPress={() => router.push('/profile')}>
+                <Text style={[styles.title, { color: colors.text }]}>
+                  Hi {userProfile?.first_name || 'User'}
+                </Text>
+              </Pressable>
+              <Pressable onPress={() => router.push('/favorites')} style={styles.addButton}>
+                <Search size={24} color={colors.text} />
+              </Pressable>
+            </View>
+            {userProfile?.selected_title && (
+              <Text style={[styles.selectedTitle, { color: colors.primary }]}>
+                {userProfile.selected_title}
+              </Text>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Ad Banner */}
+      {Platform.OS !== 'web' ? (
         <View style={styles.bannerContainer}>
           <AdMobBanner
             bannerSize="smartBannerPortrait"
@@ -486,7 +587,7 @@ export default function HomeScreen() {
         </View>
       )}
 
-
+      {/* Nearby Locations Section */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Nearby You</Text>
         {locationError ? (
@@ -564,104 +665,106 @@ export default function HomeScreen() {
         )}
       </View>
 
-{/* Favorites Section */}
-<View style={styles.section}>
-  <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Favorites</Text>
-  
-  {isProfileLoading ? (
-    <FavoritesSkeleton colors={colors} />
-  ) : favorites.length > 0 ? (
-    <View style={styles.grid}>
-      {favorites.map((favorite, index) => {
-        // Find corresponding details if available
-        const details = favoriteDetails.find(d => d.id === favorite.id) || {};
+      {/* Favorites Section */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Favorites</Text>
         
-        return (
-          <Pressable
-            key={`${favorite.id}-${index}`}
-            style={[styles.card, { backgroundColor: colors.card }]}
-            onPress={() => {
-              if (details.type === 'hub') {
-                router.push(`/hub-details?hubId=${details.id}`);
-              } else if (details.type === 'stop') {
-                router.push(`/stop-details?stopId=${details.id}`);
-              } else if (details.type === 'route') {
-                router.push(`/route-details?routeId=${details.id}`);
-              } else {
-                // Fallback for favorites without details
-                Alert.alert('Info', `Favorite: ${favorite.name}`);
-              }
-            }}
-          >
-            <View style={styles.favoriteItem}>
-              {details.type === 'hub' && <MapPin size={24} color={colors.primary} />}
-              {details.type === 'stop' && <Flag size={24} color={colors.primary} />}
-              {details.type === 'route' && <Route size={24} color={colors.primary} />}
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.cardText, { color: colors.text }]}>
-                  {favorite.name}
-                </Text>
-                {favorite.distance && (
-                  <Text style={[styles.distanceText, { color: colors.text }]}>
-                    {favorite.distance} away
-                  </Text>
-                )}
-              </View>
-              <TouchableOpacity
-                onPress={() => toggleFavorite(favorite)}
-                style={{ padding: 4 }}
-              >
-                <Heart
-                  size={20}
-                  color={colors.primary}
-                  fill={colors.primary}
-                />
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        );
-      })}
-    </View>
-  ) : (
-    <View style={styles.emptyFavoritesContainer}>
-      <Text style={[styles.emptyText, { color: colors.text }]}>No favorites added yet.</Text>
-      <Pressable
-        onPress={() => router.push('/favorites')}
-        style={[styles.addButton, { backgroundColor: colors.primary }]}
-      >
-        <Plus size={24} color="white" />
-      </Pressable>
-    </View>
-  )}
-</View>
-
-
-       {/* Gamification Section */}
-      <View style={styles.gamificationCard}>
-        <View style={styles.gamificationHeader}>
-          <Text style={[styles.gamificationTitle, { color: colors.text }]}>Your Progress</Text>
-        </View>
-        
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{userStats.points}</Text>
-            <Text style={styles.statLabel}>Points</Text>
+        {isProfileLoading ? (
+          <FavoritesSkeleton colors={colors} />
+        ) : favorites.length > 0 ? (
+          <View style={styles.grid}>
+            {favorites.map((favorite, index) => {
+              const details = favoriteDetails.find(d => d.id === favorite.id) || {};
+              
+              return (
+                <Pressable
+                  key={`${favorite.id}-${index}`}
+                  style={[styles.card, { backgroundColor: colors.card }]}
+                  onPress={() => {
+                    if (details.type === 'hub') {
+                      router.push(`/hub-details?hubId=${details.id}`);
+                    } else if (details.type === 'stop') {
+                      router.push(`/stop-details?stopId=${details.id}`);
+                    } else if (details.type === 'route') {
+                      router.push(`/route-details?routeId=${details.id}`);
+                    } else {
+                      Alert.alert('Info', `Favorite: ${favorite.name}`);
+                    }
+                  }}
+                >
+                  <View style={styles.favoriteItem}>
+                    {details.type === 'hub' && <MapPin size={24} color={colors.primary} />}
+                    {details.type === 'stop' && <Flag size={24} color={colors.primary} />}
+                    {details.type === 'route' && <Route size={24} color={colors.primary} />}
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.cardText, { color: colors.text }]}>
+                        {favorite.name}
+                      </Text>
+                      {favorite.distance && (
+                        <Text style={[styles.distanceText, { color: colors.text }]}>
+                          {favorite.distance} away
+                        </Text>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => toggleFavorite(favorite)}
+                      style={{ padding: 4 }}
+                    >
+                      <Heart
+                        size={20}
+                        color={colors.primary}
+                        fill={colors.primary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </Pressable>
+              );
+            })}
           </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>Level {userStats.level}</Text>
-            <Text style={styles.statLabel}>Explorer</Text>
+        ) : (
+          <View style={styles.emptyFavoritesContainer}>
+            <Text style={[styles.emptyText, { color: colors.text }]}>No favorites added yet.</Text>
+            <Pressable
+              onPress={() => router.push('/favorites')}
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+            >
+              <Plus size={24} color="white" />
+            </Pressable>
           </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{userStats.streak} days</Text>
-            <Text style={styles.statLabel}>Streak</Text>
-          </View>
-        </View>
-
-        <View style={styles.titleBadge}>
-          <Award size={16} color="#1ea2b1" />
-          <Text style={styles.titleText}>{userStats.title}</Text>
-        </View>
+        )}
       </View>
+
+      {/* Gamification Section */}
+      {isStatsLoading ? (
+        <GamificationSkeleton colors={colors} />
+      ) : (
+        <View style={styles.gamificationCard}>
+          <View style={styles.gamificationHeader}>
+            <Trophy size={24} color="#fbbf24" />
+            <Text style={[styles.gamificationTitle, { color: colors.text }]}>Your Progress</Text>
+          </View>
+          
+          <View style={styles.statsRow}>
+            <View style={styles.statBox}>
+              <Text style={styles.statNumber}>{userStats.points}</Text>
+              <Text style={styles.statLabel}>Points</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statNumber}>Level {userStats.level}</Text>
+              <Text style={styles.statLabel}>Explorer</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statNumber}>{userStats.streak} days</Text>
+              <Text style={styles.statLabel}>Streak</Text>
+            </View>
+          </View>
+
+          <View style={styles.titleBadge}>
+            <Award size={16} color="#1ea2b1" />
+            <Text style={styles.titleText}>{userStats.title}</Text>
+          </View>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -766,9 +869,17 @@ const styles = StyleSheet.create({
   },
   skeletonTitle: {
     height: 18,
-    width: '40%',
     borderRadius: 4,
     marginBottom: 8,
+  },
+  skeletonSubtitle: {
+    height: 16,
+    borderRadius: 4,
+  },
+  skeletonIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
   },
   skeletonDistance: {
     height: 12,
@@ -791,6 +902,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  favoriteItemSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   bannerPlaceholder: {
     height: 50,
     justifyContent: 'center',
@@ -798,11 +914,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#eee',
     marginBottom: 16,
   },
-  bannerPlaceholderText: {
-    color: '#666',
-  },
-
-    gamificationTitle: {
+  gamificationTitle: {
     fontSize: 18,
     fontWeight: '600',
     marginLeft: 8,
@@ -841,7 +953,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: 4,
   },
-    gamificationCard: {
+  gamificationCard: {
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
