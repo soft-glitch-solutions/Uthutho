@@ -55,6 +55,8 @@ export function useProfile() {
         .eq('id', userId)
         .single();
 
+      console.log('Fetched profile data:', data);
+      console.log('Profile fetch error:', error);
       if (error && status !== 406) {
         throw error;
       }
