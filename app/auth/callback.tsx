@@ -7,27 +7,18 @@ export default function AuthCallback() {
   const router = useRouter();
 
   useEffect(() => {
-    // Extract token from URL fragment if needed
-    const handleAuth = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
         router.replace('/auth?error=Authentication failed');
-        return;
       }
-
-      if (session) {
-        // Add a 2-second delay before navigating to the home screen
-        const timer = setTimeout(() => {
+ else if (event === 'SIGNED_IN' && session) {
           router.replace('/(app)/(tabs)/home');
-        }, 2000); // 2000 milliseconds = 2 seconds
-
-        // Clean up the timer if the component unmounts
-        return () => clearTimeout(timer);
       }
-    };
+    });
 
-    handleAuth();
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   return (
