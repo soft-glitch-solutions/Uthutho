@@ -95,11 +95,6 @@ export default function ProfileScreen() {
       subtitle: 'Update your profile details',
     },
     {
-      icon: <Captions size={24} color={colors.primary} />,
-      title: 'Request',
-      subtitle: 'The request you submitted',
-    },
-    {
       icon: <Settings size={24} color={colors.primary} />,
       title: 'Settings',
       subtitle: 'App settings and preferences',
@@ -203,9 +198,6 @@ export default function ProfileScreen() {
               onPress={() => {
                 if (item.title === 'Settings') {
                   router.push('/settings');
-                }
-                if (item.title === 'Request') {
-                  router.push('/request');
                 }
                 if (item.title === 'Edit Profile') {
                   router.push('/EditProfileScreen');
