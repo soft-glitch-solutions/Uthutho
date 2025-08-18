@@ -17,7 +17,13 @@ export default function AuthCallback() {
       }
 
       if (session) {
-        router.replace('/(app)/(tabs)/home');
+        // Add a 2-second delay before navigating to the home screen
+        const timer = setTimeout(() => {
+          router.replace('/(app)/(tabs)/home');
+        }, 2000); // 2000 milliseconds = 2 seconds
+
+        // Clean up the timer if the component unmounts
+        return () => clearTimeout(timer);
       }
     };
 

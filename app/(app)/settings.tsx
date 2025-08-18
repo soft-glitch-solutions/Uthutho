@@ -2,7 +2,7 @@ import React, { useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { LanguageContext } from '../../context/LanguageContext';
-import { Sun, Moon, Smartphone, Bell, Lock, Globe, Info } from 'lucide-react-native';
+import { Sun, Moon, Smartphone, Bell, Lock, Globe, Info , Shield  } from 'lucide-react-native';
 import { useRouter } from 'expo-router'; // Import useRouter from expo-router
 
 export default function SettingsScreen() {
@@ -140,10 +140,10 @@ export default function SettingsScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{text.privacy}</Text>
       <TouchableOpacity
           style={styles.settingOption}
-          onPress={() => router.push('/PrivacyScreen')}>
+          onPress={() => router.push('/SecurityScreen')}>
           <View style={styles.settingLeft}>
-            <Lock color={colors.text} />
-            <Text style={[styles.settingText, { color: colors.text }]}>{text.privacyPolicy}</Text>
+            <Shield color={colors.text} />
+            <Text style={[styles.settingText, { color: colors.text }]}>Security Settings</Text>
           </View>
         </TouchableOpacity>
 
