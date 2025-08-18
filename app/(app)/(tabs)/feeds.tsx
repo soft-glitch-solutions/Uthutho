@@ -9,11 +9,11 @@ import {
   Alert,
   Modal,
   Image,
-  Platform,
+  Platform, ViewStyle,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { MessageSquare, Heart, Flame, Send, MapPin, User, Plus, X, MoreVertical } from 'lucide-react-native';
+import { MessageSquare, Heart, Flame, Send, MapPin, Bell, User, Plus, X, MoreVertical } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { supabase } from '@/lib/supabase';
 
@@ -539,10 +539,19 @@ export default function FeedsScreen() {
     <ScrollView style={styles.container}>
       <StatusBar style="light" backgroundColor="#000000" />
 
-      <View style={styles.header}>
-        <Text style={styles.title}>Community Feeds</Text>
-        <Text style={styles.subtitle}>Share your transport experiences</Text>
+      <View style={styles.headerContainer}>
+        <View style={styles.headerTextContainer}>
+          <Text style={styles.title}>Community Feeds</Text>
+          <Text style={styles.subtitle}>Share your transport experiences</Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.notificationButton}
+          onPress={() => router.push('/notification')}
+        >
+          <Bell size={24} color="#cccccc" />
+        </TouchableOpacity>
       </View>
+
 
       {/* Create Post */}
       <View style={styles.createPostCard}>
@@ -797,9 +806,32 @@ export default function FeedsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000' },
-  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#ffffff' },
-  subtitle: { fontSize: 16, color: '#cccccc', marginTop: 4 },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
+  title: { 
+    fontSize: 28, 
+    fontWeight: 'bold', 
+    color: '#ffffff' 
+  },
+  subtitle: { 
+    fontSize: 16, 
+    color: '#cccccc', 
+    marginTop: 4 
+  },
+  notificationButton: {
+    padding: 8,
+    marginLeft: 16,
+  },
+
 
   createPostCard: {
     backgroundColor: '#1a1a1a',

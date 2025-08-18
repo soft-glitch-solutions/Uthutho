@@ -2,8 +2,94 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
 import { router } from 'expo-router';
-import { Settings, LogOut, Camera, Captions, Edit, Badge , Star } from 'lucide-react-native';
+import { Settings, LogOut, Camera, Captions, Edit, Badge, Star } from 'lucide-react-native';
 import { useProfile } from '@/hook/useProfile';
+import { Animated } from 'react-native';
+
+// Skeleton Loading Components
+const Shimmer = ({ children, colors }) => {
+  const animatedValue = new Animated.Value(0);
+
+  React.useEffect(() => {
+    const shimmerAnimation = () => {
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => shimmerAnimation());
+    };
+
+    shimmerAnimation();
+  }, []);
+
+  const translateX = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-100, 100],
+  });
+
+  return (
+    <View style={{ overflow: 'hidden' }}>
+      {children}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.text,
+          opacity: 0.1,
+          transform: [{ translateX }],
+        }}
+      />
+    </View>
+  );
+};
+
+const ProfileHeaderSkeleton = ({ colors }) => (
+  <View style={[styles.header, { backgroundColor: colors.card }]}>
+    <Shimmer colors={colors}>
+      <View style={[styles.avatar, { backgroundColor: colors.border }]} />
+    </Shimmer>
+    <Shimmer colors={colors}>
+      <View style={[styles.skeletonName, { backgroundColor: colors.border }]} />
+    </Shimmer>
+    <Shimmer colors={colors}>
+      <View style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
+    </Shimmer>
+  </View>
+);
+
+const MenuItemSkeleton = ({ colors }) => (
+  <Shimmer colors={colors}>
+    <View style={[styles.menuItem, { backgroundColor: colors.card }]}>
+      <View style={[styles.skeletonIcon, { backgroundColor: colors.border }]} />
+      <View style={styles.menuText}>
+        <View style={[styles.skeletonText, { backgroundColor: colors.border }]} />
+        <View style={[styles.skeletonSubtext, { backgroundColor: colors.border }]} />
+      </View>
+    </View>
+  </Shimmer>
+);
+
+const AchievementBannerSkeleton = ({ colors }) => (
+  <Shimmer colors={colors}>
+    <View style={[styles.achievementBanner, { backgroundColor: colors.border }]}>
+      <View style={[styles.skeletonIcon, { backgroundColor: colors.text }]} />
+      <View style={styles.achievementText}>
+        <View style={[styles.skeletonText, { backgroundColor: colors.text }]} />
+        <View style={[styles.skeletonSubtext, { backgroundColor: colors.text }]} />
+      </View>
+    </View>
+  </Shimmer>
+);
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
@@ -19,11 +105,8 @@ export default function ProfileScreen() {
 
   const [selectedTab, setSelectedTab] = useState('basic-info');
   const [selectedTitle, setSelectedTitle] = useState(profile?.selected_title || '');
-
-  // Ref for file input (web only)
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle file input change for web
   const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       const file = event.target.files?.[0];
@@ -31,26 +114,21 @@ export default function ProfileScreen() {
         alert('Please select a valid image file.');
         return;
       }
-
-      const publicUrl = await uploadAvatar(file); // Use the uploadAvatar function from the hook
+      const publicUrl = await uploadAvatar(file);
       console.log('Avatar uploaded successfully:', publicUrl);
     } catch (error) {
       console.error('Error uploading image:', error);
     }
   };
 
-  // Handle image picker (mobile) or file input (web)
   const handleImagePicker = () => {
     if (Platform.OS === 'web') {
-      // Trigger file input click
       fileInputRef.current?.click();
     } else {
-      // Mobile: Use expo-image-picker
       handleImagePickerMobile();
     }
   };
 
-  // Handle image picker for mobile
   const handleImagePickerMobile = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -68,7 +146,7 @@ export default function ProfileScreen() {
 
       if (!result.canceled) {
         const selectedImage = result.assets[0].uri;
-        const publicUrl = await uploadAvatar(selectedImage); // Use the uploadAvatar function from the hook
+        const publicUrl = await uploadAvatar(selectedImage);
         console.log('Avatar uploaded successfully:', publicUrl);
       }
     } catch (error) {
@@ -76,17 +154,6 @@ export default function ProfileScreen() {
       alert('Failed to pick or upload image. Please try again.');
     }
   };
-
-  if (loading) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
-  const unlockedTitles = titles.filter((title) => profile?.titles?.includes(title.title));
-  const lockedTitles = titles.filter((title) => !profile?.titles?.includes(title.title));
 
   const basicMenuItems = [
     {
@@ -122,7 +189,45 @@ export default function ProfileScreen() {
     },
   ];
 
-  
+  if (loading) {
+    return (
+      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Header Skeleton */}
+        <ProfileHeaderSkeleton colors={colors} />
+
+        {/* Tabs Skeleton */}
+        <View style={styles.tabs}>
+          {['Basic Info', 'Rank', 'Awards'].map((tab, index) => (
+            <Shimmer key={index} colors={colors}>
+              <View style={[styles.skeletonTab, { backgroundColor: colors.border }]} />
+            </Shimmer>
+          ))}
+        </View>
+
+        {/* Menu Items Skeleton */}
+        <View style={styles.menuContainer}>
+          {[1, 2].map((item) => (
+            <MenuItemSkeleton key={item} colors={colors} />
+          ))}
+        </View>
+
+        {/* Sign Out Button Skeleton */}
+        <Shimmer colors={colors}>
+          <View style={[styles.skeletonSignOut, { backgroundColor: colors.border }]} />
+        </Shimmer>
+
+        {/* App Info Skeleton */}
+        <View style={styles.appInfo}>
+          <Shimmer colors={colors}>
+            <View style={[styles.skeletonAppInfo, { backgroundColor: colors.border }]} />
+          </Shimmer>
+          <Shimmer colors={colors}>
+            <View style={[styles.skeletonMotto, { backgroundColor: colors.border }]} />
+          </Shimmer>
+        </View>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -144,26 +249,46 @@ export default function ProfileScreen() {
           onPress={handleImagePicker}
           disabled={uploading}
         >
-          <Image
-            source={{
-              uri: profile?.avatar_url ||
-                'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop',
-            }}
-            style={styles.avatar}
-          />
-          <View style={[styles.cameraButton, { backgroundColor: colors.primary }]}>
-            <Camera size={16} color="white" />
-          </View>
-          {uploading && (
-            <View style={styles.uploadingOverlay}>
-              <ActivityIndicator color="white" />
-            </View>
+          {loading ? (
+            <Shimmer colors={colors}>
+              <View style={[styles.avatar, { backgroundColor: colors.border }]} />
+            </Shimmer>
+          ) : (
+            <>
+              <Image
+                source={{
+                  uri: profile?.avatar_url ||
+                    'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop',
+                }}
+                style={styles.avatar}
+              />
+              <View style={[styles.cameraButton, { backgroundColor: colors.primary }]}>
+                <Camera size={16} color="white" />
+              </View>
+              {uploading && (
+                <View style={styles.uploadingOverlay}>
+                  <ActivityIndicator color="white" />
+                </View>
+              )}
+            </>
           )}
         </TouchableOpacity>
-        <Text style={[styles.name, { color: colors.text }]}>
-          {profile?.first_name} {profile?.last_name}
-        </Text>
-        <Text style={[styles.userTitle, { color: colors.primary }]}>{profile?.selected_title}</Text>
+        {loading ? (
+          <Shimmer colors={colors}>
+            <View style={[styles.skeletonName, { backgroundColor: colors.border }]} />
+          </Shimmer>
+        ) : (
+          <Text style={[styles.name, { color: colors.text }]}>
+            {profile?.first_name} {profile?.last_name}
+          </Text>
+        )}
+        {loading ? (
+          <Shimmer colors={colors}>
+            <View style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
+          </Shimmer>
+        ) : (
+          <Text style={[styles.userTitle, { color: colors.primary }]}>{profile?.selected_title}</Text>
+        )}
       </View>
 
       {/* Tabs */}
@@ -231,9 +356,6 @@ export default function ProfileScreen() {
                 if (item.title === 'Title To Earn') {
                   router.push('/titleearn');
                 }
-                if (item.title === 'Edit Profile') {
-                  router.push('/EditProfileScreen');
-                }
               }}
             >
               {item.icon}
@@ -250,11 +372,8 @@ export default function ProfileScreen() {
         </View>
       )}
 
-        {selectedTab === 'awards' && (
-                <View style={styles.menuContainer}>
-
-
-
+      {selectedTab === 'achievements' && (
+        <View style={styles.menuContainer}>
           {awardMenuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
@@ -276,36 +395,36 @@ export default function ProfileScreen() {
               </View>
             </TouchableOpacity>
           ))}
-                            {/* Achievement Banner - Eco Warrior */}
-        <View style={styles.achievementBanner}>
-          <Star size={24} color="#fbbf24" />
-          <View style={styles.achievementText}>
-            <Text style={styles.achievementTitle}>Eco Warrior</Text>
-            <Text style={styles.achievementDescription}>
-              You've helped reduce carbon emissions by using public transport!
-            </Text>
-          </View>
-        </View>
 
-        {/* Achievement Banner - Early Adopter */}
-        <View style={styles.achievementBanner}>
-          <Star size={24} color="#34d399" /> {/* green-ish for variety */}
-          <View style={styles.achievementText}>
-            <Text style={styles.achievementTitle}>Early Adopter</Text>
-            <Text style={styles.achievementDescription}>
-              Thanks for being one of the first to try Uthutho!
-            </Text>
-          </View>
-        </View>
-        </View>
-      )}
+          {/* Achievement Banners */}
+          {loading ? (
+            <>
+              <AchievementBannerSkeleton colors={colors} />
+              <AchievementBannerSkeleton colors={colors} />
+            </>
+          ) : (
+            <>
+              <View style={styles.achievementBanner}>
+                <Star size={24} color="#fbbf24" />
+                <View style={styles.achievementText}>
+                  <Text style={styles.achievementTitle}>Eco Warrior</Text>
+                  <Text style={styles.achievementDescription}>
+                    You've helped reduce carbon emissions by using public transport!
+                  </Text>
+                </View>
+              </View>
 
-      {selectedTab === 'achievements' && (
-        <View style={styles.achievementsContainer}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Achievements</Text>
-          <Text style={[styles.achievementText, { color: colors.text }]}>
-            Coming soon!
-          </Text>
+              <View style={styles.achievementBanner}>
+                <Star size={24} color="#34d399" />
+                <View style={styles.achievementText}>
+                  <Text style={styles.achievementTitle}>Early Adopter</Text>
+                  <Text style={styles.achievementDescription}>
+                    Thanks for being one of the first to try Uthutho!
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
         </View>
       )}
 
@@ -318,14 +437,13 @@ export default function ProfileScreen() {
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
 
-            <View style={styles.bottomSpace} />
+      <View style={styles.bottomSpace} />
 
-            {/* App Info */}
+      {/* App Info */}
       <View style={styles.appInfo}>
         <Text style={styles.appInfoText}>Uthutho v0.0.1</Text>
         <Text style={styles.motto}>"Izindlela zakho ziqinisekisa impumelelo!"</Text>
       </View>
-
     </ScrollView>
   );
 }
@@ -338,6 +456,9 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
   },
+  avatarContainer: {
+    position: 'relative',
+  },
   avatar: {
     width: 100,
     height: 100,
@@ -349,14 +470,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 5,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1ea2b1',
-  },
-  email: {
+  userTitle: {
     fontSize: 16,
-    opacity: 0.8,
   },
   tabs: {
     flexDirection: 'row',
@@ -426,7 +541,7 @@ const styles = StyleSheet.create({
     borderColor: '#ef4444',
     marginBottom: 30,
   },
-   appInfo: {
+  appInfo: {
     alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 20,
@@ -448,10 +563,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
-    bottomSpace: {
+  bottomSpace: {
     height: 20,
   },
-    achievementBanner: {
+  achievementBanner: {
     backgroundColor: '#1a1a1a',
     marginHorizontal: 20,
     marginBottom: 20,
@@ -461,9 +576,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#fbbf2450',
-  },
-  userTitle: {
-    fontSize: 16,
   },
   achievementTitle: {
     fontSize: 16,
@@ -475,10 +587,58 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#cccccc',
   },
-  achievementsContainer: {
-    padding: 20,
-  },
   achievementText: {
-    fontSize: 16,
+    flex: 1,
+    marginLeft: 12,
+  },
+  // Skeleton styles
+  skeletonName: {
+    width: 200,
+    height: 30,
+    borderRadius: 4,
+    marginBottom: 10,
+  },
+  skeletonTitle: {
+    width: 150,
+    height: 20,
+    borderRadius: 4,
+  },
+  skeletonTab: {
+    width: 80,
+    height: 30,
+    borderRadius: 4,
+  },
+  skeletonIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  skeletonText: {
+    height: 16,
+    borderRadius: 4,
+    marginBottom: 6,
+    width: '70%',
+  },
+  skeletonSubtext: {
+    height: 14,
+    borderRadius: 4,
+    width: '90%',
+  },
+  skeletonSignOut: {
+    height: 50,
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginBottom: 30,
+  },
+  skeletonAppInfo: {
+    height: 16,
+    width: 100,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonMotto: {
+    height: 16,
+    width: 200,
+    borderRadius: 4,
   },
 });
