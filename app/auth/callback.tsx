@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { View, Text, ActivityIndicator, StyleSheet, Linking } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import * as QueryParams from 'expo-auth-session/build/QueryParams';
+import { parse } from 'expo-linking';
 
 export default function AuthCallback() {
   const router = useRouter();
@@ -15,15 +15,16 @@ export default function AuthCallback() {
 
     const handleOAuthCallback = async () => {
       try {
-        // Get the redirect URL (works for both deep linking and web)
+        // Get the current URL
         const url = await Linking.getInitialURL();
         
         if (!url) {
           throw new Error('No callback URL found');
         }
 
-        // Parse the URL to get query parameters
-        const { params } = QueryParams.getQueryParams(url);
+        // Parse the URL using expo-linking
+        const parsedUrl = parse(url);
+        const params = parsedUrl.queryParams;
         
         if (!params?.code) {
           throw new Error('No authentication code found');
@@ -31,18 +32,12 @@ export default function AuthCallback() {
 
         setStatus('Verifying authentication...');
 
-        // Retrieve the code verifier from storage
-        const codeVerifier = await SecureStore.getItemAsync('supabase-auth-code-verifier');
-        
-        if (!codeVerifier) {
-          throw new Error('No code verifier found');
-        }
-
         // Exchange the code for a session
         const { data: { session }, error: authError } = 
           await supabase.auth.exchangeCodeForSession({
             code: params.code,
-            codeVerifier,
+            // If using PKCE, you'll need to retrieve the code verifier
+            codeVerifier: await SecureStore.getItemAsync('supabase-auth-code-verifier'),
           });
 
         if (authError) {
