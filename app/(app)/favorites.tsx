@@ -401,10 +401,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   filtersContainer: {
+    flex: 1,
     paddingHorizontal: 16,
     marginBottom: 12,  // Reduced from 16
-    paddingVertical: 4,
-    alignSelf: 'flex-start', 
+    paddingVertical: 4
   },
   filterTab: {
     flexDirection: 'row',
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     margin: 6,
     borderWidth: 1,
     borderColor: '#333333',
-    width: undefined,
+    width: 'auto', // Let content determine width
   },
   activeFilterTab: {
     backgroundColor: '#1ea2b1',
@@ -424,6 +424,7 @@ const styles = StyleSheet.create({
   },
   filterText: {
     color: '#888888',
+    flexGrow: 0, // Prevent text from stretching
     fontSize: 14,
     marginLeft: 6,
     fontWeight: '500',
@@ -432,7 +433,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   resultsContainer: {
-    flex: 1,
   },
   resultsContent: {
     padding: 16,
