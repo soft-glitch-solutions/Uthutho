@@ -357,49 +357,7 @@ export default function StopDetailsScreen() {
           )}
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Posts</Text>
-            <TouchableOpacity
-              onPress={() => setShowAddPost(!showAddPost)}
-              style={styles.addPostButton}
-            >
-              <Plus size={24} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
-          
-          <FlatList
-            data={stopDetails.stop_posts}
-            renderItem={renderPost}
-            keyExtractor={(item) => item.id.toString()}
-            ListEmptyComponent={
-              <View style={styles.noPostsContainer}>
-                <Text style={[styles.noPostsText, { color: colors.text, textAlign: 'center' }]}>
-                  Be the first to post and get 1 point for early bird!
-                </Text>
-              </View>
-            }
-          />
-        </View>
 
-        {showAddPost && (
-          <View style={styles.section}>
-            <TextInput
-              style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-              placeholder="What's on your mind?"
-              placeholderTextColor={colors.textSecondary}
-              value={newPostContent}
-              onChangeText={setNewPostContent}
-              multiline
-            />
-            <TouchableOpacity
-              style={[styles.postButton, { backgroundColor: colors.primary }]}
-              onPress={handleAddPost}
-            >
-              <Text style={styles.postButtonText}>Post</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
     </ScrollView>
   );
