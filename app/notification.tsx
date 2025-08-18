@@ -1,16 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useTheme } from '../context/ThemeContext'; // Assuming ThemeContext is in this path
- 
-// Define the structure for a notification
+import { useTheme } from '../context/ThemeContext';
+
 interface Notification {
   id: string;
   type: 'new_feed' | 'liked_post' | 'commented_on_post';
   message: string;
-  timestamp: string; // Or use a Date object
-  postId?: string; // Optional, for liked/commented posts
-  userId?: string; // Optional, for liked/commented posts
+  timestamp: string;
+  postId?: string;
+  userId?: string;
 }
 
 const notificationsData: Notification[] = [
@@ -47,36 +46,72 @@ const notificationsData: Notification[] = [
 const NotificationsScreen: React.FC = () => {
   const navigation = useNavigation();
   const { theme } = useTheme();
+  
+  // Get colors with fallback values
+  const colors = {
+    background: theme?.colors?.background || '#000000',
+    card: theme?.colors?.card || '#000000',
+    text: theme?.colors?.text || '#FFFFFF',
+    textSecondary: theme?.colors?.textSecondary || '#6C757D',
+    primary: theme?.colors?.primary || '#1EA2B1',
+    border: theme?.colors?.border || '#DEE2E6'
+  };
 
   const renderNotificationItem = ({ item }: { item: Notification }) => {
     const handlePress = () => {
-      // Navigate to the relevant screen based on notification type
       if (item.type === 'liked_post' || item.type === 'commented_on_post') {
-        // Assuming you have a screen to display a single post
         // navigation.navigate('PostDetails', { postId: item.postId });
       }
-      // For new_feed, you might navigate to the feeds list or a specific section
       // navigation.navigate('Feeds');
     };
 
     return (
-      <TouchableOpacity style={[styles.notificationItem, { backgroundColor: theme.colors.card }]} onPress={handlePress}>
-        <Text style={[styles.notificationMessage, { color: theme.colors.text }]}>{item.message}</Text>
-        <Text style={[styles.notificationTimestamp, { color: theme.colors.textSecondary }]}>
-          {new Date(item.timestamp).toLocaleString()}
+      <TouchableOpacity 
+        style={[
+          styles.notificationItem, 
+          { 
+            backgroundColor: colors.card,
+            borderLeftWidth: 4,
+            borderLeftColor: item.type === 'new_feed' ? colors.primary : '#1EA2B1',
+            shadowColor: theme?.colors?.shadow || '#000',
+          }
+        ]} 
+        onPress={handlePress}
+      >
+        <Text style={[styles.notificationMessage, { color: colors.text }]}>
+          {item.message}
+        </Text>
+        <Text style={[styles.notificationTimestamp, { color: colors.textSecondary }]}>
+          {new Date(item.timestamp).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}
         </Text>
       </TouchableOpacity>
     );
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Text style={[styles.title, { color: theme.colors.text }]}>Notifications</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: colors.text }]}>Notifications</Text>
+      </View>
+      
       <FlatList
         data={notificationsData}
         keyExtractor={(item) => item.id}
         renderItem={renderNotificationItem}
         contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              No notifications yet
+            </Text>
+          </View>
+        }
+        showsVerticalScrollIndicator={false}
       />
     </View>
   );
@@ -85,35 +120,51 @@ const NotificationsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingTop: 40,
+  },
+  header: {
+    marginBottom: 24,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,    
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   notificationItem: {
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,    
-    elevation: 2,    
+    padding: 18,
+    borderRadius: 12,
+    marginBottom: 16,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   notificationMessage: {
     fontSize: 16,
-    marginBottom: 5,
-    color: '#333',
+    marginBottom: 8,
+    lineHeight: 22,
+    fontWeight: '500',
   },
   notificationTimestamp: {
-    fontSize: 12,    
+    fontSize: 13,
     textAlign: 'right',
+    opacity: 0.7,
+    fontWeight: '400',
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 30,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    opacity: 0.6,
   },
 });
 
