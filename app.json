@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "web": {
+      "favicon": "./assets/images/logo.png",
       "bundler": "metro",
       "output": "single"
     },
