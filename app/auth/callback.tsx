@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { supabase } from '../../lib/supabase';
+import * as Linking from 'expo-linking';
 
 export default function AuthCallback() {
   const router = useRouter();
@@ -8,13 +10,53 @@ export default function AuthCallback() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // With implicit flow, Supabase handles the session automatically
-    // We just need to wait for the session to be available
-    const checkSession = setTimeout(() => {
-      router.replace('/(app)/(tabs)/home');
-    }, 2000);
+    let isMounted = true;
 
-    return () => clearTimeout(checkSession);
+    const checkAuthStatus = async () => {
+      try {
+        setStatus('Verifying session...');
+        
+        // Check for any incoming deep link (for mobile)
+        const initialUrl = await Linking.getInitialURL();
+        if (initialUrl) {
+          const { queryParams } = Linking.parse(initialUrl);
+          if (queryParams?.refresh_token || queryParams?.access_token) {
+            // The tokens are in the URL, Supabase should handle them automatically
+            setStatus('Session detected...');
+          }
+        }
+
+        // Wait for Supabase to initialize the session
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Check if we have an active session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) throw sessionError;
+        
+        if (session) {
+          if (isMounted) {
+            setStatus('Authentication successful!');
+            router.replace('/(app)/(tabs)/home');
+          }
+        } else {
+          throw new Error('No active session found');
+        }
+
+      } catch (err) {
+        console.error('Auth callback error:', err);
+        if (isMounted) {
+          setError(err.message || 'Authentication failed');
+          router.replace('/auth');
+        }
+      }
+    };
+
+    checkAuthStatus();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (
