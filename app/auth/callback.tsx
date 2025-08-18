@@ -5,94 +5,78 @@ import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 
 export default function AuthCallback() {
   const router = useRouter();
-  const [status, setStatus] = useState('Checking authentication...');
-  const [error, setError] = useState(null);
+  const [status, setStatus] = useState('Completing authentication...');
+  const [hasCheckedInitialSession, setHasCheckedInitialSession] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
+    let isMounted = true;
     let authListener;
 
-    const handleAuthStateChange = async (event, session) => {
-      console.log('Auth state change:', event, session);
-      
-      if (!mounted) return;
+    const handleAuthChange = async (event, session) => {
+      if (!isMounted) return;
+
+      console.log('Auth event:', event, session);
+
+      // Skip INITIAL_SESSION if we've already checked it
+      if (event === 'INITIAL_SESSION' && hasCheckedInitialSession) {
+        return;
+      }
 
       try {
-        switch (event) {
-          case 'SIGNED_IN':
-            if (session) {
-              setStatus('Authentication successful!');
-              router.replace('/(app)/(tabs)/home');
-            } else {
-              throw new Error('No session available after sign in');
-            }
-            break;
-
-          case 'SIGNED_OUT':
-            setError('Authentication failed. Please try again.');
-            router.replace('/auth?error=Authentication failed');
-            break;
-
-          case 'INITIAL_SESSION':
-            if (session) {
-              setStatus('Already authenticated');
-              router.replace('/(app)/(tabs)/home');
-            } else {
-              setStatus('No active session found');
-              router.replace('/auth');
-            }
-            break;
-
-          case 'TOKEN_REFRESHED':
-          case 'USER_UPDATED':
-            // These events don't require navigation changes
-            break;
-
-          default:
-            console.warn('Unhandled auth event:', event);
+        if (event === 'SIGNED_IN' || (event === 'INITIAL_SESSION' && session)) {
+          setStatus('Authentication successful!');
+          router.replace('/(app)/(tabs)/home');
+        } 
+        else if (event === 'SIGNED_OUT') {
+          setStatus('Redirecting to login...');
+          router.replace('/auth');
         }
-      } catch (err) {
-        console.error('Auth state change error:', err);
-        if (mounted) {
-          setError(err.message || 'Authentication error');
-          router.replace(`/auth?error=${encodeURIComponent(err.message)}`);
+        else if (event === 'INITIAL_SESSION' && !session) {
+          // Only redirect if this is the initial check
+          if (!hasCheckedInitialSession) {
+            setStatus('No active session found');
+            router.replace('/auth');
+            setHasCheckedInitialSession(true);
+          }
+        }
+      } catch (error) {
+        console.error('Auth handling error:', error);
+        if (isMounted) {
+          setStatus('Authentication error');
+          router.replace('/auth?error=' + encodeURIComponent(error.message));
         }
       }
     };
 
-    // Set up the auth state listener
-    authListener = supabase.auth.onAuthStateChange(handleAuthStateChange);
-
-    // Check initial session immediately
+    // First check the current session synchronously
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
-        if (mounted) {
-          handleAuthStateChange('INITIAL_SESSION', session);
+        if (isMounted) {
+          setHasCheckedInitialSession(true);
+          handleAuthChange('INITIAL_SESSION', session);
         }
       })
-      .catch(err => {
-        console.error('Initial session check error:', err);
-        if (mounted) {
-          setError('Failed to check authentication status');
+      .catch(error => {
+        console.error('Session check error:', error);
+        if (isMounted) {
+          setStatus('Session check failed');
           router.replace('/auth');
         }
       });
 
+    // Then set up the listener for future changes
+    authListener = supabase.auth.onAuthStateChange(handleAuthChange);
+
     return () => {
-      mounted = false;
-      if (authListener?.subscription) {
-        authListener.subscription.unsubscribe();
-      }
+      isMounted = false;
+      authListener?.subscription?.unsubscribe();
     };
-  }, []);
+  }, [hasCheckedInitialSession]);
 
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" />
       <Text style={styles.statusText}>{status}</Text>
-      {error && (
-        <Text style={styles.errorText}>{error}</Text>
-      )}
     </View>
   );
 }
@@ -102,18 +86,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
     gap: 16,
   },
   statusText: {
     fontSize: 16,
     textAlign: 'center',
-    marginTop: 16,
-  },
-  errorText: {
-    fontSize: 16,
-    textAlign: 'center',
-    color: 'red',
-    marginTop: 8,
   },
 });
