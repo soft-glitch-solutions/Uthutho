@@ -152,27 +152,42 @@ export default function HomeScreen() {
     }
   }, []);
 
-    const toggleFavorite = async (item: FavoriteItem) => {
+  const toggleFavorite = async (item: FavoriteItem) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
+  
       const isFavorite = favorites.some(fav => fav.id === item.id);
       let newFavorites;
-
+  
       if (isFavorite) {
         newFavorites = favorites.filter(fav => fav.id !== item.id);
       } else {
-        newFavorites = [...favorites, item];
+        // Ensure new favorite has proper structure
+        newFavorites = [...favorites, {
+          id: item.id,
+          name: item.name,
+          type: item.type,
+          distance: item.distance
+        }];
       }
-
+  
       const { error } = await supabase
         .from('profiles')
         .update({ favorites: newFavorites })
         .eq('id', user.id);
-
+  
       if (!error) {
         setFavorites(newFavorites);
+        // Update favorite details as well
+        if (!isFavorite) {
+          const details = await handleFavoritePress(item.name || item.id);
+          if (details) {
+            setFavoriteDetails(prev => [...prev, { ...item, ...details }]);
+          }
+        } else {
+          setFavoriteDetails(prev => prev.filter(fav => fav.id !== item.id));
+        }
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
@@ -184,30 +199,74 @@ export default function HomeScreen() {
       try {
         const session = await supabase.auth.getSession();
         const userId = session.data.session?.user.id;
-
+    
         if (!userId) {
           router.replace('/auth');
           return;
         }
-
+    
         setUserId(userId);
         const { data, error } = await supabase
           .from('profiles')
           .select('first_name, selected_title, favorites, points')
           .eq('id', userId)
           .single();
-
+    
         if (error) throw error;
         setUserProfile(data);
-
+    
+        // Process favorites to ensure consistent structure
         if (data?.favorites?.length) {
+          const processedFavorites = data.favorites.map(fav => {
+            // If favorite is already in correct object format, return it
+            if (typeof fav === 'object' && fav.id && fav.name && fav.type) {
+              return fav;
+            }
+            
+            // If favorite is just a string (legacy format), create a basic object
+            if (typeof fav === 'string') {
+              return {
+                id: fav, // Use the string as ID
+                name: fav, // Use the string as name
+                type: 'stop' // Default type
+              };
+            }
+            
+            // If favorite is an object but missing required fields
+            if (typeof fav === 'object') {
+              return {
+                id: fav.id || String(Math.random()), // Generate ID if missing
+                name: fav.name || 'Unknown',
+                type: fav.type || 'stop'
+              };
+            }
+            
+            // Fallback for any other case
+            return {
+              id: String(Math.random()),
+              name: 'Unknown',
+              type: 'stop'
+            };
+          });
+    
+          setFavorites(processedFavorites);
+    
+          // Fetch additional details for each favorite
           const details = await Promise.all(
-            data.favorites.map(async (favorite) => {
-              const details = await handleFavoritePress(favorite);
-              return details ? { name: favorite, ...details } : null;
+            processedFavorites.map(async (favorite) => {
+              try {
+                const details = await handleFavoritePress(favorite.name || favorite.id);
+                return details ? { 
+                  ...favorite,
+                  ...details 
+                } : null;
+              } catch (error) {
+                console.error('Error fetching favorite details:', error);
+                return null;
+              }
             })
           );
-          setFavoriteDetails(details.filter(Boolean)); // Remove nulls
+          setFavoriteDetails(details.filter(Boolean));
         }
       } catch (error) {
         router.replace('/auth');
@@ -505,70 +564,76 @@ export default function HomeScreen() {
         )}
       </View>
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Favorites</Text>
-
-              {/* Favorites */}
-      {favorites.length > 0 && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Your Favorites</Text>
-          {favorites.map((favorite) => (
-            <View key={favorite.id} style={styles.favoriteItem}>
-              <View style={styles.favoriteInfo}>
-                <Text style={styles.favoriteName}>{favorite.name}</Text>
-                <Text style={styles.favoriteType}>{favorite.type} {favorite.distance && `• ${favorite.distance}`}</Text>
+{/* Favorites Section */}
+<View style={styles.section}>
+  <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Favorites</Text>
+  
+  {isProfileLoading ? (
+    <FavoritesSkeleton colors={colors} />
+  ) : favorites.length > 0 ? (
+    <View style={styles.grid}>
+      {favorites.map((favorite, index) => {
+        // Find corresponding details if available
+        const details = favoriteDetails.find(d => d.id === favorite.id) || {};
+        
+        return (
+          <Pressable
+            key={`${favorite.id}-${index}`}
+            style={[styles.card, { backgroundColor: colors.card }]}
+            onPress={() => {
+              if (details.type === 'hub') {
+                router.push(`/hub-details?hubId=${details.id}`);
+              } else if (details.type === 'stop') {
+                router.push(`/stop-details?stopId=${details.id}`);
+              } else if (details.type === 'route') {
+                router.push(`/route-details?routeId=${details.id}`);
+              } else {
+                // Fallback for favorites without details
+                Alert.alert('Info', `Favorite: ${favorite.name}`);
+              }
+            }}
+          >
+            <View style={styles.favoriteItem}>
+              {details.type === 'hub' && <MapPin size={24} color={colors.primary} />}
+              {details.type === 'stop' && <Flag size={24} color={colors.primary} />}
+              {details.type === 'route' && <Route size={24} color={colors.primary} />}
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.cardText, { color: colors.text }]}>
+                  {favorite.name}
+                </Text>
+                {favorite.distance && (
+                  <Text style={[styles.distanceText, { color: colors.text }]}>
+                    {favorite.distance} away
+                  </Text>
+                )}
               </View>
-              <TouchableOpacity 
-                style={styles.favoriteButton}
+              <TouchableOpacity
                 onPress={() => toggleFavorite(favorite)}
+                style={{ padding: 4 }}
               >
-                <Heart size={20} color="#1ea2b1" fill="#1ea2b1" />
+                <Heart
+                  size={20}
+                  color={colors.primary}
+                  fill={colors.primary}
+                />
               </TouchableOpacity>
             </View>
-          ))}
-        </View>
-      )}
-        {isProfileLoading ? (
-          <FavoritesSkeleton colors={colors} />
-        ) : favoriteDetails.length ? (
-          <View style={styles.grid}>
-            {favoriteDetails.map((favorite, index) => (
-              <Pressable
-                key={index}
-                style={[styles.card, { backgroundColor: colors.card }]}
-                onPress={() => {
-                  if (favorite.type === 'hub') {
-                    router.push(`/hub-details?hubId=${favorite.id}`);
-                  } else if (favorite.type === 'stop') {
-                    router.push(`/stop-details?stopId=${favorite.id}`);
-                  } else if (favorite.type === 'route') {
-                    router.push(`/route-details?routeId=${favorite.id}`);
-                  }
-                }}
-              >
-                <View style={styles.favoriteItem}>
-                  {favorite.type === 'hub' && <MapPin size={24} color={colors.primary} />}
-                  {favorite.type === 'stop' && <Flag size={24} color={colors.primary} />}
-                  {favorite.type === 'route' && <Route size={24} color={colors.primary} />}
-                  <Text style={[styles.cardText, { color: colors.text, marginLeft: 8 }]}>
-                    {favorite.name}
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyFavoritesContainer}>
-            <Text style={[styles.emptyText, { color: colors.text }]}>No favorites added yet.</Text>
-            <Pressable
-              onPress={() => router.push('/favorites')}
-              style={[styles.addButton, { backgroundColor: colors.primary }]}
-            >
-              <Plus size={24} color="white" />
-            </Pressable>
-          </View>
-        )}
-      </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  ) : (
+    <View style={styles.emptyFavoritesContainer}>
+      <Text style={[styles.emptyText, { color: colors.text }]}>No favorites added yet.</Text>
+      <Pressable
+        onPress={() => router.push('/favorites')}
+        style={[styles.addButton, { backgroundColor: colors.primary }]}
+      >
+        <Plus size={24} color="white" />
+      </Pressable>
+    </View>
+  )}
+</View>
 
 
        {/* Gamification Section */}
