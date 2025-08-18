@@ -8,10 +8,11 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
+      console.log('Auth state change:', event, session); // Added logging
+      if (event === 'SIGNED_OUT') { // Corrected logic to handle SIGNED_OUT for errors
         router.replace('/auth?error=Authentication failed');
       }
- else if (event === 'SIGNED_IN' && session) {
+      else if (event === 'SIGNED_IN' && session) {
           router.replace('/(app)/(tabs)/home');
       }
     });
