@@ -12,24 +12,38 @@ import {
   Alert,
 } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
-import { PlusCircle, Heart, Search, X , CircleAlert as AlertCircle } from 'lucide-react-native'; // Icons
-import { supabase } from '../../../lib/supabase'; // Adjust the path
+import { PlusCircle, Heart, Search, X, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
-// stops.tsx
-import StopBlock from '../../../components/stop/StopBlock'; // Ensure the path is correct
+import StopBlock from '../../../components/stop/StopBlock';
 
 const TRANSPORT_TYPES = ['Bus 🚌', 'Train 🚂', 'Taxi 🚕'];
 const WAITING_COLORS = {
-  low: '#3b82f6', // Blue
-  moderate: '#f97316', // Orange
-  high: '#ef4444', // Red
+  low: '#3b82f6',
+  moderate: '#f97316',
+  high: '#ef4444',
+};
+
+// Helper function to calculate distance between two coordinates
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * 
+    Math.cos(lat2 * (Math.PI / 180)) * 
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
 };
 
 export default function StopsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const [stops, setStops] = useState([]);
+  const [sortedStops, setSortedStops] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,13 +61,35 @@ export default function StopsScreen() {
 
       if (error) throw error;
       setStops(data);
+      return data;
     } catch (error) {
       console.error('Error fetching stops:', error);
+      return [];
     } finally {
       setIsLoading(false);
       setRefreshing(false);
-      fetchFavorites();
     }
+  };
+
+  // Sort stops by distance from user
+  const sortStopsByDistance = (stopsList) => {
+    if (!userLocation || !stopsList) return stopsList;
+    
+    return [...stopsList].sort((a, b) => {
+      const distanceA = calculateDistance(
+        userLocation.latitude,
+        userLocation.longitude,
+        a.latitude,
+        a.longitude
+      );
+      const distanceB = calculateDistance(
+        userLocation.latitude,
+        userLocation.longitude,
+        b.latitude,
+        b.longitude
+      );
+      return distanceA - distanceB;
+    });
   };
 
   // Fetch the current user session
@@ -62,51 +98,49 @@ export default function StopsScreen() {
       const { data } = await supabase.auth.getSession();
       setUserSession(data.session);
     };
-
     fetchSession();
   }, []);
 
+  // Get user location and fetch data
+  const getUserLocation = async () => {
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required for nearby stops');
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      setUserLocation(location.coords);
+      
+      // Fetch stops after getting location
+      const stopsData = await fetchStops();
+      const sorted = sortStopsByDistance(stopsData);
+      setSortedStops(sorted);
+      fetchFavorites();
+    } catch (error) {
+      console.error('Error getting location:', error);
+    }
+  };
+
   // Initial data fetch
   useEffect(() => {
-    fetchStops();
     getUserLocation();
-    fetchFavorites();
   }, []);
 
   // Pull-to-refresh handler
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchStops();
+    const stopsData = await fetchStops();
+    const sorted = sortStopsByDistance(stopsData);
+    setSortedStops(sorted);
     fetchFavorites();
   };
 
   // Filter stops based on search query
-  const filteredStops = stops.filter((stop) =>
+  const filteredStops = sortedStops.filter((stop) =>
     stop.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  // Navigate to stop details
-  const navigateToStopDetails = (stopId) => {
-    router.push(`/stop-details?stopId=${stopId}`);
-  };
-
-  // Get waiting color based on waiting count
-  const getWaitingColor = (waitingCount) => {
-    if (waitingCount <= 3) return WAITING_COLORS.low;
-    if (waitingCount <= 7) return WAITING_COLORS.moderate;
-    return WAITING_COLORS.high;
-  };
-
-  const getUserLocation = async () => {
-    let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      alert('Permission to access location was denied');
-      return;
-    }
-
-    let location = await Location.getCurrentPositionAsync({});
-    setUserLocation(location.coords);
-  };
 
   // Fetch the user's favorites
   const fetchFavorites = async () => {
@@ -158,8 +192,35 @@ export default function StopsScreen() {
       setUserFavorites(updatedFavorites);
     } catch (error) {
       console.error('Error updating favorites:', error);
-      alert('An error occurred. Please try again.');
+      Alert.alert('Error', 'An error occurred. Please try again.');
     }
+  };
+
+  // Get waiting color based on waiting count
+  const getWaitingColor = (waitingCount) => {
+    if (waitingCount <= 3) return WAITING_COLORS.low;
+    if (waitingCount <= 7) return WAITING_COLORS.moderate;
+    return WAITING_COLORS.high;
+  };
+
+  // Navigate to stop details
+  const navigateToStopDetails = (stopId) => {
+    router.push(`/stop-details?stopId=${stopId}`);
+  };
+
+  // Display distance in a user-friendly format
+  const displayDistance = (stop) => {
+    if (!userLocation || !stop.latitude || !stop.longitude) return '';
+    
+    const distance = calculateDistance(
+      userLocation.latitude,
+      userLocation.longitude,
+      stop.latitude,
+      stop.longitude
+    );
+    
+    if (distance < 1) return `${(distance * 1000).toFixed(0)}m away`;
+    return `${distance.toFixed(1)}km away`;
   };
 
   return (
@@ -178,7 +239,6 @@ export default function StopsScreen() {
       {/* Header Section */}
       <View style={styles.header}>
         <Text style={[styles.headerText, { color: colors.text }]}>Nearby Stops</Text>
-
         <TouchableOpacity
           onPress={() => router.push('/AddStop')}
           style={[styles.addButton, { backgroundColor: colors.primary }]}
@@ -189,10 +249,8 @@ export default function StopsScreen() {
       </View>
 
       <View>
-      <Text style={styles.subtitle}>Mark yourself as waiting to help others</Text>
-        </View>
-
-
+        <Text style={styles.subtitle}>Mark yourself as waiting to help others</Text>
+      </View>
 
       <View style={[styles.searchBarContainer, { borderColor: colors.border }]}>
         <Search size={20} color={colors.text} />
@@ -210,7 +268,7 @@ export default function StopsScreen() {
         )}
       </View>
 
-                    {/* Info Card */}
+      {/* Info Card */}
       <View style={styles.infoCard}>
         <AlertCircle size={20} color="#1ea2b1" />
         <Text style={styles.infoText}>
@@ -234,6 +292,7 @@ export default function StopsScreen() {
           {filteredStops.map((stop) => {
             const waitingCount = stop.stop_waiting?.length || 0;
             const waitingColor = getWaitingColor(waitingCount);
+            const distanceText = displayDistance(stop);
 
             return (
               <TouchableOpacity
@@ -247,7 +306,12 @@ export default function StopsScreen() {
                 />
                 <View style={styles.stopHeader}>
                   <Text style={[styles.stopName, { color: colors.text }]}>{stop.name}</Text>
-                  <TouchableOpacity onPress={() => handleFavorite(stop.name)}>
+                  <TouchableOpacity 
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleFavorite(stop.name);
+                    }}
+                  >
                     <Heart
                       size={20}
                       color={userFavorites.includes(stop.name) ? colors.primary : colors.text}
@@ -255,14 +319,21 @@ export default function StopsScreen() {
                     />
                   </TouchableOpacity>
                 </View>
+                
                 <Text style={[styles.routeName, { color: colors.text }]}>
                   Route: {stop.routes ? stop.routes.name : 'Unknown'}
                 </Text>
+                
+                {distanceText && (
+                  <Text style={[styles.distanceText, { color: colors.primary }]}>
+                    {distanceText}
+                  </Text>
+                )}
+                
                 <View style={[styles.waitingBadge, { backgroundColor: waitingColor }]}>
                   <Text style={styles.waitingText}>{waitingCount} waiting</Text>
                 </View>
 
-                {/* Add the StopBlock component here */}
                 <StopBlock
                   stopId={stop.id}
                   stopName={stop.name}
@@ -308,12 +379,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-    subtitle: {
+  subtitle: {
     fontSize: 16,
     color: '#cccccc',
     marginTop: 4,
   },
-   infoCard: {
+  infoCard: {
     marginHorizontal: 20,
     marginBottom: 20,
     borderRadius: 12,
@@ -329,9 +400,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     marginLeft: 12,
-  },
-  section: {
-    paddingHorizontal: 20,
   },
   searchBarContainer: {
     flexDirection: 'row',
@@ -378,13 +446,19 @@ const styles = StyleSheet.create({
   routeName: {
     fontSize: 14,
     fontStyle: 'italic',
-    marginBottom: 10,
+    marginBottom: 5,
+  },
+  distanceText: {
+    fontSize: 13,
+    marginBottom: 5,
+    fontWeight: '500',
   },
   waitingBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
     alignSelf: 'flex-start',
+    marginBottom: 10,
   },
   waitingText: {
     color: 'white',
