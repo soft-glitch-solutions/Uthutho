@@ -1,30 +1,94 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { View, Text } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Linking } from 'react-native';
 
 export default function AuthCallback() {
   const router = useRouter();
+  const [status, setStatus] = useState('Processing authentication...');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        router.replace('/(app)/(tabs)/home');
-      }
-    });
+    let isMounted = true;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN') {
-        router.replace('/(app)/(tabs)/home');
-      }
-    });
+    const handleOAuthCallback = async () => {
+      try {
+        // Get the current URL
+        const url = await Linking.getInitialURL();
+        
+        if (!url) {
+          throw new Error('No callback URL found');
+        }
 
-    return () => subscription.unsubscribe();
+        // Extract the code from URL
+        const urlObj = new URL(url);
+        const code = urlObj.searchParams.get('code');
+        
+        if (!code) {
+          throw new Error('No authentication code found');
+        }
+
+        setStatus('Verifying authentication...');
+
+        // Exchange the code for a session
+        const { data: { session }, error: authError } = 
+          await supabase.auth.exchangeCodeForSession(code);
+
+        if (authError) {
+          throw authError;
+        }
+
+        if (!session) {
+          throw new Error('Authentication failed: No session created');
+        }
+
+        // Success - redirect to app
+        if (isMounted) {
+          setStatus('Authentication successful!');
+          router.replace('/(app)/(tabs)/home');
+        }
+
+      } catch (err) {
+        console.error('OAuth callback error:', err);
+        if (isMounted) {
+          setError(err.message);
+          setStatus('Authentication failed');
+          router.replace(`/auth?error=${encodeURIComponent(err.message)}`);
+        }
+      }
+    };
+
+    handleOAuthCallback();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text>Authenticating...</Text>
+    <View style={styles.container}>
+      <ActivityIndicator size="large" />
+      <Text style={styles.statusText}>{status}</Text>
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    gap: 16,
+  },
+  statusText: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: 'red',
+  },
+});
