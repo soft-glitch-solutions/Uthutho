@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { View, Text, ActivityIndicator, StyleSheet, Linking } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
+import * as SecureStore from 'expo-secure-store';
 import { parse } from 'expo-linking';
 
 export default function AuthCallback() {
@@ -32,12 +32,18 @@ export default function AuthCallback() {
 
         setStatus('Verifying authentication...');
 
+        // Retrieve the stored code verifier
+        const codeVerifier = await SecureStore.getItemAsync('supabase-auth-code-verifier');
+        
+        if (!codeVerifier) {
+          throw new Error('Missing code verifier');
+        }
+
         // Exchange the code for a session
         const { data: { session }, error: authError } = 
           await supabase.auth.exchangeCodeForSession({
             code: params.code,
-            // If using PKCE, you'll need to retrieve the code verifier
-            codeVerifier: await SecureStore.getItemAsync('supabase-auth-code-verifier'),
+            codeVerifier: codeVerifier
           });
 
         if (authError) {
@@ -47,6 +53,9 @@ export default function AuthCallback() {
         if (!session) {
           throw new Error('Authentication failed: No session created');
         }
+
+        // Clean up the code verifier after successful exchange
+        await SecureStore.deleteItemAsync('supabase-auth-code-verifier');
 
         // Success - redirect to app
         if (isMounted) {
