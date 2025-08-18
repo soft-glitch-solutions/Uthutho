@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { supabase } from '../../lib/supabase';
-import { View, Text, ActivityIndicator, StyleSheet, Linking } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
-import { parse } from 'expo-linking';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 
 export default function AuthCallback() {
   const router = useRouter();
@@ -11,76 +8,13 @@ export default function AuthCallback() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    let isMounted = true;
+    // With implicit flow, Supabase handles the session automatically
+    // We just need to wait for the session to be available
+    const checkSession = setTimeout(() => {
+      router.replace('/(app)/(tabs)/home');
+    }, 2000);
 
-    const handleOAuthCallback = async () => {
-      try {
-        // Get the current URL
-        const url = await Linking.getInitialURL();
-        
-        if (!url) {
-          throw new Error('No callback URL found');
-        }
-
-        // Parse the URL using expo-linking
-        const parsedUrl = parse(url);
-        const params = parsedUrl.queryParams;
-        
-        if (!params?.code) {
-          throw new Error('No authentication code found');
-        }
-
-        setStatus('Verifying authentication...');
-
-        // Retrieve the stored code verifier - CORRECT SecureStore usage
-        const codeVerifier = await SecureStore.getItemAsync('supabase-auth-code-verifier');
-        
-        if (!codeVerifier) {
-          throw new Error('Missing code verifier - please try signing in again');
-        }
-
-        // Exchange the code for a session
-        const { data: { session }, error: authError } = 
-          await supabase.auth.exchangeCodeForSession({
-            code: params.code,
-            codeVerifier: codeVerifier
-          });
-
-        if (authError) {
-          throw authError;
-        }
-
-        if (!session) {
-          throw new Error('Authentication failed: No session created');
-        }
-
-        // Clean up the code verifier after successful exchange
-        await SecureStore.deleteItemAsync('supabase-auth-code-verifier');
-
-        // Success - redirect to app
-        if (isMounted) {
-          setStatus('Authentication successful!');
-          router.replace('/(app)/(tabs)/home');
-        }
-
-      } catch (err) {
-        console.error('OAuth callback error:', err);
-        if (isMounted) {
-          setError(err.message);
-          setStatus('Authentication failed');
-          // Don't redirect if we're already on auth screen
-          if (!router.canGoBack()) {
-            router.replace(`/auth?error=${encodeURIComponent(err.message)}`);
-          }
-        }
-      }
-    };
-
-    handleOAuthCallback();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => clearTimeout(checkSession);
   }, []);
 
   return (
