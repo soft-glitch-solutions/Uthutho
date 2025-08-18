@@ -300,6 +300,15 @@ export default function ProfileScreen() {
         </View>
       )}
 
+      {selectedTab === 'achievements' && (
+        <View style={styles.achievementsContainer}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Achievements</Text>
+          <Text style={[styles.achievementText, { color: colors.text }]}>
+            Coming soon!
+          </Text>
+        </View>
+      )}
+
       {/* Sign Out Button */}
       <TouchableOpacity
         style={styles.signOutButton}
@@ -453,10 +462,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#fbbf2450',
   },
-  achievementText: {
-    marginLeft: 12,
-    flex: 1,
-  },
   userTitle: {
     fontSize: 16,
   },
@@ -469,5 +474,11 @@ const styles = StyleSheet.create({
   achievementDescription: {
     fontSize: 14,
     color: '#cccccc',
+  },
+  achievementsContainer: {
+    padding: 20,
+  },
+  achievementText: {
+    fontSize: 16,
   },
 });
