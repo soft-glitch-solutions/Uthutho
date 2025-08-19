@@ -20,7 +20,7 @@ export default function AuthCallback() {
         const initialUrl = await Linking.getInitialURL();
         if (initialUrl) {
           const { queryParams } = Linking.parse(initialUrl);
-          if (queryParams?.refresh_token || queryParams?.access_token) {
+          if (queryParams?.refresh_token || queryParams?.access_tokgen) {
             // The tokens are in the URL, Supabase should handle them automatically
             setStatus('Session detected...');
           }

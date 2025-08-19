@@ -544,6 +544,7 @@ const styles = StyleSheet.create({
   },
   optionButton: {
     borderRadius: 20,
+    color: 'white',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
@@ -556,6 +557,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 14,
+    color: '#ffffff',
     fontWeight: '500',
   },
   optionTextActive: {
