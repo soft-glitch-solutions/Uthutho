@@ -1,8 +1,10 @@
 import { Tabs } from 'expo-router';
 import { House, User, Rss, Flag ,MessageCircle } from 'lucide-react-native';
-import { useTheme } from '../../../context/ThemeContext';
-
+import { View, Text } from 'react-native';
+import { useTheme } from '@/context/ThemeContext';
+import { useNotifications } from '../../../hook/useNotifications';
 export default function TabLayout() {
+  const { unreadCount } = useNotifications();
   const { colors } = useTheme();
 
   return (
@@ -30,7 +32,28 @@ export default function TabLayout() {
         name="feeds"
         options={{
           title: 'Feeds',
-          tabBarIcon: ({ color, size }) => <Rss color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+ <View style={{ position: 'relative' }}>
+ <Rss color={color} size={size} />
+              {unreadCount > 0 && (
+ <View
+ style={{
+ position: 'absolute',
+ top: -5,
+ right: -5,
+ backgroundColor: 'red',
+ borderRadius: 10,
+ width: 20,
+ height: 20,
+ justifyContent: 'center',
+ alignItems: 'center',
+                  }}
+ >
+ <Text style={{ color: 'white', fontSize: 12 }}>{unreadCount}</Text>
+ </View>
+              )}
+ </View>
+          ),
         }}
       />
       <Tabs.Screen
