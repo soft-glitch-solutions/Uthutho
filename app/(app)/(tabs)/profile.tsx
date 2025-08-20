@@ -1,10 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
 import { router } from 'expo-router';
-import { Settings, LogOut, Camera, Captions, Edit, Badge, Star } from 'lucide-react-native';
+import { Settings, LogOut, Camera, Captions, Edit, Badge, Star, MessageSquare, MapPin, Flame } from 'lucide-react-native';
 import { useProfile } from '@/hook/useProfile';
 import { Animated } from 'react-native';
+import { supabase } from '@/lib/supabase';
 
 // Skeleton Loading Components
 const Shimmer = ({ children, colors }) => {
@@ -35,20 +36,22 @@ const Shimmer = ({ children, colors }) => {
   });
 
   return (
-    <View style={{ overflow: 'hidden' }}>
+    <View style={{ overflow: 'hidden' }}>{/* Keep the surrounding View for overflow hiding */}
+      <>
       {children}
       <Animated.View
         style={{
           position: 'absolute',
           top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          left: '-100%', // Start off-screen to the left
+          right: '-100%', // Extend off-screen to the right
+          bottom: 0, // Cover the height of the child content
           backgroundColor: colors.text,
           opacity: 0.1,
           transform: [{ translateX }],
         }}
       />
+      </>
     </View>
   );
 };
@@ -67,6 +70,18 @@ const ProfileHeaderSkeleton = ({ colors }) => (
   </View>
 );
 
+const PostSkeleton = ({ colors }) => (
+  <Shimmer colors={colors}>
+    <View style={[styles.postItem, { backgroundColor: colors.card }]}>
+      <View style={[styles.skeletonPostContent, { backgroundColor: colors.border }]} />
+      <View style={styles.postFooter}>
+        <View style={[styles.skeletonPostLocation, { backgroundColor: colors.border }]} />
+        <View style={[styles.skeletonPostReactions, { backgroundColor: colors.border }]} />
+      </View>
+    </View>
+  </Shimmer>
+);
+
 const MenuItemSkeleton = ({ colors }) => (
   <Shimmer colors={colors}>
     <View style={[styles.menuItem, { backgroundColor: colors.card }]}>
@@ -80,7 +95,7 @@ const MenuItemSkeleton = ({ colors }) => (
 );
 
 const AchievementBannerSkeleton = ({ colors }) => (
-  <Shimmer colors={colors}>
+ <Shimmer colors={colors}>
     <View style={[styles.achievementBanner, { backgroundColor: colors.border }]}>
       <View style={[styles.skeletonIcon, { backgroundColor: colors.text }]} />
       <View style={styles.achievementText}>
@@ -90,6 +105,16 @@ const AchievementBannerSkeleton = ({ colors }) => (
     </View>
   </Shimmer>
 );
+
+interface UserPost {
+  id: string;
+  content: string;
+  created_at: string;
+  type: 'hub' | 'stop';
+  location_name: string;
+  likes_count: number;
+  comments_count: number;
+}
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
@@ -103,9 +128,82 @@ export default function ProfileScreen() {
     uploading,
   } = useProfile();
 
-  const [selectedTab, setSelectedTab] = useState('basic-info');
-  const [selectedTitle, setSelectedTitle] = useState(profile?.selected_title || '');
+  const [selectedTab, setSelectedTab] = useState('posts');
+  const [userPosts, setUserPosts] = useState<UserPost[]>([]);
+  const [postsLoading, setPostsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (selectedTab === 'posts' && profile?.id) {
+      loadUserPosts();
+    }
+  }, [selectedTab, profile?.id]);
+
+  const loadUserPosts = async () => {
+    try {
+      setPostsLoading(true);
+      
+      // Load hub posts
+      const { data: hubPosts, error: hubError } = await supabase
+        .from('hub_posts')
+        .select(`
+          id, 
+          content, 
+          created_at,
+          hubs (name),
+          post_reactions (reaction_type),
+          post_comments (id)
+        `)
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false });
+
+      if (hubError) throw hubError;
+
+      // Load stop posts
+      const { data: stopPosts, error: stopError } = await supabase
+        .from('stop_posts')
+        .select(`
+          id, 
+          content, 
+          created_at,
+          stops (name),
+          post_reactions (reaction_type),
+          post_comments (id)
+        `)
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false });
+
+      if (stopError) throw stopError;
+
+      // Combine and format posts
+      const combinedPosts = [
+        ...(hubPosts || []).map(post => ({
+          id: post.id,
+          content: post.content,
+          created_at: post.created_at,
+          type: 'hub' as const,
+          location_name: post.hubs?.name || 'Unknown Hub',
+          likes_count: post.post_reactions?.filter(r => r.reaction_type === 'fire').length || 0,
+          comments_count: post.post_comments?.length || 0
+        })),
+        ...(stopPosts || []).map(post => ({
+          id: post.id,
+          content: post.content,
+          created_at: post.created_at,
+          type: 'stop' as const,
+          location_name: post.stops?.name || 'Unknown Stop',
+          likes_count: post.post_reactions?.filter(r => r.reaction_type === 'fire').length || 0,
+ comments_count: post.post_comments?.length || 0
+        }))
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setUserPosts(combinedPosts);
+    } catch (error) {
+      console.error('Error loading user posts:', error);
+    } finally {
+      setPostsLoading(false);
+    }
+  };
 
   const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -124,34 +222,14 @@ export default function ProfileScreen() {
   const handleImagePicker = () => {
     if (Platform.OS === 'web') {
       fileInputRef.current?.click();
-    } else {
-      handleImagePickerMobile();
     }
   };
 
-  const handleImagePickerMobile = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        alert('Sorry, we need camera roll permissions to make this work!');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 1,
-      });
-
-      if (!result.canceled) {
-        const selectedImage = result.assets[0].uri;
-        const publicUrl = await uploadAvatar(selectedImage);
-        console.log('Avatar uploaded successfully:', publicUrl);
-      }
-    } catch (error) {
-      console.error('Error picking or uploading image:', error);
-      alert('Failed to pick or upload image. Please try again.');
+  const navigateToPost = (postId: string, postType: 'hub' | 'stop') => {
+    if (postType === 'hub') {
+      router.push(`/hub-post-details?postId=${postId}`);
+    } else {
+      router.push(`/stop-post-details?postId=${postId}`);
     }
   };
 
@@ -160,11 +238,13 @@ export default function ProfileScreen() {
       icon: <Edit size={24} color={colors.primary} />,
       title: 'Edit Profile',
       subtitle: 'Update your profile details',
+      route: '/EditProfileScreen'
     },
     {
       icon: <Settings size={24} color={colors.primary} />,
       title: 'Settings',
       subtitle: 'App settings and preferences',
+      route: '/settings'
     },
   ];
 
@@ -173,14 +253,15 @@ export default function ProfileScreen() {
       icon: <Badge size={24} color={colors.primary} />,
       title: 'Change Title',
       subtitle: 'Change your profile title',
+      route: '/changetitle'
     },
     {
       icon: <Edit size={24} color={colors.primary} />,
       title: 'Title To Earn',
       subtitle: 'Look at what title to earn',
+      route: '/titleearn'
     },
   ];
-
 
   if (loading) {
     return (
@@ -190,7 +271,7 @@ export default function ProfileScreen() {
 
         {/* Tabs Skeleton */}
         <View style={styles.tabs}>
-          {['Basic Info', 'Rank', 'Awards'].map((tab, index) => (
+          {['Posts', 'Basic Info', 'Awards'].map((tab, index) => (
             <Shimmer key={index} colors={colors}>
               <View style={[styles.skeletonTab, { backgroundColor: colors.border }]} />
             </Shimmer>
@@ -287,16 +368,16 @@ export default function ProfileScreen() {
       {/* Tabs */}
       <View style={styles.tabs}>
         <TouchableOpacity
+          style={[styles.tab, selectedTab === 'posts' && styles.activeTab]}
+          onPress={() => setSelectedTab('posts')}
+        >
+          <Text style={[styles.tabText, { color: colors.text }]}>Posts</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={[styles.tab, selectedTab === 'basic-info' && styles.activeTab]}
           onPress={() => setSelectedTab('basic-info')}
         >
           <Text style={[styles.tabText, { color: colors.text }]}>Basic Info</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'gamification' && styles.activeTab]}
-          onPress={() => setSelectedTab('gamification')}
-        >
-          <Text style={[styles.tabText, { color: colors.text }]}>Rank</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, selectedTab === 'achievements' && styles.activeTab]}
@@ -307,49 +388,65 @@ export default function ProfileScreen() {
       </View>
 
       {/* Tab Content */}
+      {selectedTab === 'posts' && (
+        <View style={styles.postsContainer}>
+          {postsLoading ? (
+            <>
+              <PostSkeleton colors={colors} />
+              <PostSkeleton colors={colors} />
+              <PostSkeleton colors={colors} />
+            </>
+          ) : userPosts.length === 0 ? (
+            <View style={styles.noPosts}>
+              <MessageSquare size={48} color={colors.text} opacity={0.5} />
+              <Text style={[styles.noPostsText, { color: colors.text }]}>
+                No posts yet
+              </Text>
+              <Text style={[styles.noPostsSubtext, { color: colors.text }]}>
+                Start sharing your transportation experiences!
+              </Text>
+            </View>
+          ) : (
+            userPosts.map((post) => (
+              <TouchableOpacity
+                key={post.id}
+                style={[styles.postItem, { backgroundColor: colors.card }]}
+                onPress={() => navigateToPost(post.id, post.type)}
+              >
+                <Text style={[styles.postContent, { color: colors.text }]} numberOfLines={3}>
+                  {post.content}
+                </Text>
+                <View style={styles.postFooter}>
+                  <View style={styles.postLocation}>
+                    <MapPin size={12} color="#666666" />
+                    <Text style={[styles.postLocationText, { color: colors.text }]}>
+                      {post.location_name}
+                    </Text>
+                  </View>
+                  <View style={styles.postReactions}>
+                    <Flame size={14} color="#ff6b35" />
+                    <Text style={[styles.postReactionCount, { color: colors.text }]}>
+                      {post.likes_count}
+                    </Text>
+                    <MessageSquare size={14} color="#666666" style={{ marginLeft: 12 }} />
+                    <Text style={[styles.postReactionCount, { color: colors.text }]}>
+                      {post.comments_count}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+      )}
+
       {selectedTab === 'basic-info' && (
         <View style={styles.menuContainer}>
           {basicMenuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
               style={[styles.menuItem, { backgroundColor: colors.card }]}
-              onPress={() => {
-                if (item.title === 'Settings') {
-                  router.push('/settings');
-                }
-                if (item.title === 'Edit Profile') {
-                  router.push('/EditProfileScreen');
-                }
-              }}
-            >
-              {item.icon}
-              <View style={styles.menuText}>
-                <Text style={[styles.menuTitle, { color: colors.text }]}>
-                  {item.title}
-                </Text>
-                <Text style={[styles.menuSubtitle, { color: colors.text }]}>
-                  {item.subtitle}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {selectedTab === 'gamification' && (
-        <View style={styles.menuContainer}>
-          {rankMenuItems.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[styles.menuItem, { backgroundColor: colors.card }]}
-              onPress={() => {
-                if (item.title === 'Change Title') {
-                  router.push('/changetitle');
-                }
-                if (item.title === 'Title To Earn') {
-                  router.push('/titleearn');
-                }
-              }}
+              onPress={() => router.push(item.route)}
             >
               {item.icon}
               <View style={styles.menuText}>
@@ -375,21 +472,21 @@ export default function ProfileScreen() {
             </>
           ) : (
             <>
-              <View style={styles.achievementBanner}>
+              <View style={[styles.achievementBanner, { backgroundColor: colors.card }]}>
                 <Star size={24} color="#fbbf24" />
                 <View style={styles.achievementText}>
-                  <Text style={styles.achievementTitle}>Eco Warrior</Text>
-                  <Text style={styles.achievementDescription}>
+                  <Text style={[styles.achievementTitle, { color: colors.text }]}>Eco Warrior</Text>
+                  <Text style={[styles.achievementDescription, { color: colors.text }]}>
                     You've helped reduce carbon emissions by using public transport!
                   </Text>
                 </View>
               </View>
 
-              <View style={styles.achievementBanner}>
+              <View style={[styles.achievementBanner, { backgroundColor: colors.card }]}>
                 <Star size={24} color="#34d399" />
                 <View style={styles.achievementText}>
-                  <Text style={styles.achievementTitle}>Early Adopter</Text>
-                  <Text style={styles.achievementDescription}>
+                  <Text style={[styles.achievementTitle, { color: colors.text }]}>Early Adopter</Text>
+                  <Text style={[styles.achievementDescription, { color: colors.text }]}>
                     Thanks for being one of the first to try Uthutho!
                   </Text>
                 </View>
@@ -401,7 +498,7 @@ export default function ProfileScreen() {
 
       {/* Sign Out Button */}
       <TouchableOpacity
-        style={styles.signOutButton}
+        style={[styles.signOutButton, { borderColor: '#ef4444' }]}
         onPress={handleSignOut}
       >
         <LogOut size={24} color="#ef4444" />
@@ -412,8 +509,8 @@ export default function ProfileScreen() {
 
       {/* App Info */}
       <View style={styles.appInfo}>
-        <Text style={styles.appInfoText}>Uthutho v0.0.1</Text>
-        <Text style={styles.motto}>"Izindlela zakho ziqinisekisa impumelelo!"</Text>
+        <Text style={[styles.appInfoText, { color: colors.text }]}>Uthutho v0.0.1</Text>
+        <Text style={[styles.motto, { color: colors.primary }]}>"Izindlela zakho ziqinisekisa impumelelo!"</Text>
       </View>
     </ScrollView>
   );
@@ -460,6 +557,58 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  postsContainer: {
+    padding: 20,
+    gap: 15,
+  },
+  postItem: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  postContent: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  postFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  postLocation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  postLocationText: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  postReactions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  postReactionCount: {
+    fontSize: 12,
+    marginLeft: 4,
+    fontWeight: '500',
+  },
+  noPosts: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  noPostsText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  noPostsSubtext: {
+    fontSize: 14,
+    opacity: 0.8,
+    textAlign: 'center',
   },
   menuContainer: {
     padding: 20,
@@ -509,7 +658,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#ef4444',
     marginBottom: 30,
   },
   appInfo: {
@@ -518,12 +666,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   appInfoText: {
-    color: '#666666',
     fontSize: 14,
     marginBottom: 8,
   },
   motto: {
-    color: '#1ea2b1',
     fontSize: 14,
     fontStyle: 'italic',
     textAlign: 'center',
@@ -538,8 +684,6 @@ const styles = StyleSheet.create({
     height: 20,
   },
   achievementBanner: {
-    backgroundColor: '#1a1a1a',
-    marginHorizontal: 20,
     marginBottom: 20,
     borderRadius: 12,
     padding: 16,
@@ -551,12 +695,11 @@ const styles = StyleSheet.create({
   achievementTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fbbf24',
     marginBottom: 4,
   },
   achievementDescription: {
     fontSize: 14,
-    color: '#cccccc',
+    opacity: 0.8,
   },
   achievementText: {
     flex: 1,
@@ -610,6 +753,21 @@ const styles = StyleSheet.create({
   skeletonMotto: {
     height: 16,
     width: 200,
+    borderRadius: 4,
+  },
+  skeletonPostContent: {
+    height: 60,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  skeletonPostLocation: {
+    width: 80,
+    height: 14,
+    borderRadius: 4,
+  },
+  skeletonPostReactions: {
+    width: 40,
+    height: 14,
     borderRadius: 4,
   },
 });
