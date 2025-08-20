@@ -11,6 +11,7 @@ import {
   Image,
   Platform, ViewStyle,
 } from 'react-native';
+import { useNotifications } from '@/hook/useNotifications';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { MessageSquare, Heart, Flame, Send, MapPin, Bell, User, Plus, X, MoreVertical } from 'lucide-react-native';
@@ -84,6 +85,7 @@ export default function FeedsScreen() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
 
+ const { unreadCount } = useNotifications();
   // 3-dot menu state
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
@@ -548,7 +550,14 @@ export default function FeedsScreen() {
           style={styles.notificationButton}
           onPress={() => router.push('/notification')}
         >
-          <Bell size={24} color="#cccccc" />
+ <Bell size={24} color="#cccccc" />
+ {unreadCount > 0 && (
+ <View style={styles.badge}>
+ <Text style={styles.badgeText}>
+ {unreadCount > 99 ? '99+' : unreadCount}
+ </Text>
+ </View>
+ )}
         </TouchableOpacity>
       </View>
 
@@ -830,6 +839,18 @@ const styles = StyleSheet.create({
   notificationButton: {
     padding: 8,
     marginLeft: 16,
+ position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: 4,
+ right: 4,
+ backgroundColor: 'red',
+    borderRadius: 10,
+ paddingHorizontal: 5,
+ minWidth: 18,
+ justifyContent: 'center',
+ alignItems: 'center',
   },
 
 
@@ -933,5 +954,6 @@ const styles = StyleSheet.create({
   reportBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10 },
   reportBtnText: { color: '#fff', fontWeight: '600' },
 
-  bottomSpace: { height: 20 },
+  badgeText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+ bottomSpace: { height: 20 },
 });
