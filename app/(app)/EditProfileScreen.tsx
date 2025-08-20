@@ -17,6 +17,76 @@ interface UserProfile {
   selected_title?: string;
 }
 
+// Skeleton Loading Component
+const SkeletonLoader = () => {
+  return (
+    <View style={styles.skeletonContainer}>
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Header Skeleton */}
+      <View style={styles.skeletonHeader}>
+        <View style={styles.skeletonBackButton} />
+        <View style={styles.skeletonHeaderTitle} />
+        <View style={styles.skeletonSaveButton} />
+      </View>
+
+      {/* Form Skeleton */}
+      <View style={styles.skeletonForm}>
+        {/* Personal Information Skeleton */}
+        <View style={styles.skeletonSection}>
+          <View style={styles.skeletonSectionTitle} />
+          
+          {[1, 2, 3].map((item) => (
+            <View key={item} style={styles.skeletonInputGroup}>
+              <View style={styles.skeletonInputLabel} />
+              <View style={styles.skeletonInputContainer} />
+            </View>
+          ))}
+        </View>
+
+        {/* Preferences Skeleton */}
+        <View style={styles.skeletonSection}>
+          <View style={styles.skeletonSectionTitle} />
+          
+          {[1, 2].map((item) => (
+            <View key={item} style={styles.skeletonInputGroup}>
+              <View style={styles.skeletonInputLabel} />
+              <View style={styles.skeletonOptionsContainer}>
+                {[1, 2, 3, 4].map((option) => (
+                  <View key={option} style={styles.skeletonOptionButton} />
+                ))}
+              </View>
+            </View>
+          ))}
+          
+          <View style={styles.skeletonInputGroup}>
+            <View style={styles.skeletonInputLabel} />
+            <View style={styles.skeletonInputContainer} />
+          </View>
+        </View>
+
+        {/* Account Stats Skeleton */}
+        <View style={styles.skeletonSection}>
+          <View style={styles.skeletonSectionTitle} />
+          <View style={styles.skeletonStatsContainer}>
+            <View style={styles.skeletonStatItem}>
+              <View style={styles.skeletonStatValue} />
+              <View style={styles.skeletonStatLabel} />
+            </View>
+            <View style={styles.skeletonStatItem}>
+              <View style={styles.skeletonStatValue} />
+              <View style={styles.skeletonStatLabel} />
+            </View>
+          </View>
+        </View>
+
+        {/* Save Button Skeleton */}
+        <View style={styles.skeletonSaveButtonLarge} />
+      </View>
+    </View>
+  );
+};
+
 export default function EditProfileScreen() {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -104,11 +174,7 @@ export default function EditProfileScreen() {
   };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading profile...</Text>
-      </View>
-    );
+    return <SkeletonLoader />;
   }
 
   return (
@@ -282,6 +348,107 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+  // Skeleton Styles
+  skeletonContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  skeletonHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+  },
+  skeletonBackButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1a1a1a',
+  },
+  skeletonHeaderTitle: {
+    width: 120,
+    height: 24,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 6,
+  },
+  skeletonSaveButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1a1a1a',
+  },
+  skeletonForm: {
+    paddingHorizontal: 20,
+  },
+  skeletonSection: {
+    marginBottom: 30,
+  },
+  skeletonSectionTitle: {
+    width: 180,
+    height: 24,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 6,
+    marginBottom: 20,
+  },
+  skeletonInputGroup: {
+    marginBottom: 20,
+  },
+  skeletonInputLabel: {
+    width: 120,
+    height: 18,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonInputContainer: {
+    height: 54,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+  },
+  skeletonOptionsContainer: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  skeletonOptionButton: {
+    width: 80,
+    height: 40,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  skeletonStatsContainer: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  skeletonStatItem: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  skeletonStatValue: {
+    width: 60,
+    height: 24,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonStatLabel: {
+    width: 80,
+    height: 14,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 4,
+  },
+  skeletonSaveButtonLarge: {
+    height: 56,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    marginTop: 20,
+  },
+  // Original Styles
   loadingContainer: {
     flex: 1,
     backgroundColor: '#000000',

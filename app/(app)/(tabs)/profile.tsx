@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Platform } from 'react-native';
-import { useTheme } from '../../../context/ThemeContext';
-import { formatTimeAgo } from '../../../components/utils'; // Assuming the path to utils.tsx
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Platform, Alert } from 'react-native';
+import { useTheme } from '@/context/ThemeContext';
+import { formatTimeAgo } from '../../../components/utils';
 import { router } from 'expo-router';
-import { Settings, LogOut, Camera, Captions, Edit, Badge, Star, MessageSquare, MapPin, Flame } from 'lucide-react-native';
+import { Settings, LogOut, Camera, Captions, Edit, Badge, Star, MessageSquare, MapPin, Flame, Trash } from 'lucide-react-native';
 import { useProfile } from '@/hook/useProfile';
 import { Animated } from 'react-native';
 import { supabase } from '@/lib/supabase';
@@ -227,6 +227,47 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleDeletePost = async (postId: string, postType: 'hub' | 'stop') => {
+    Alert.alert(
+      'Delete Post',
+      'Are you sure you want to delete this post?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              let error = null;
+              if (postType === 'hub') {
+                const { error: hubError } = await supabase.from('hub_posts').delete().eq('id', postId);
+                error = hubError;
+              } else {
+                const { error: stopError } = await supabase.from('stop_posts').delete().eq('id', postId);
+                error = stopError;
+              }
+
+              if (error) {
+                throw error;
+              }
+
+              setUserPosts(userPosts.filter(post => post.id !== postId));
+              console.log('Post deleted successfully');
+            } catch (error) {
+              console.error('Error deleting post:', error);
+              Alert.alert('Error', 'Failed to delete post. Please try again.');
+            }
+          },
+        },
+      ],
+      { cancelable: false }
+    );
+  };
+
+
   const navigateToPost = (postId: string, postType: 'hub' | 'stop') => {
     if (postType === 'hub') {
       router.push(`/hub-post-details?postId=${postId}`);
@@ -414,14 +455,22 @@ export default function ProfileScreen() {
                 key={post.id}
                 style={[styles.postItem, { backgroundColor: colors.card }]}
                 onPress={() => navigateToPost(post.id, post.type)}
+                onLongPress={() => handleDeletePost(post.id, post.type)} // Added long press for delete
+
               >
-                <Text style={[styles.postContent, { color: colors.text }]} numberOfLines={3}>
-                  {post.content}
-                </Text>
+                <View style={styles.postHeader}>
+                  <Text style={[styles.postContent, { color: colors.text }]} numberOfLines={3}>
+                    {post.content}
+                  </Text>
+                  {/* {profile?.id === post.user_id && ( // Assuming post object has user_id */}
+                    <TouchableOpacity onPress={() => handleDeletePost(post.id, post.type)}>
+ <Trash size={20} color="#ef4444" />
+                    </TouchableOpacity>
+                  )}
                 <Text style={[styles.postTimeAgo, { color: colors.text }]}>
                   {formatTimeAgo(post.created_at)}
                 </Text>
-                <View style={styles.postFooter}>
+                 <Text style={[styles.postTimeAgo, { color: colors.text }]}>
                   <View style={styles.postLocation}>
                     <MapPin size={12} color="#666666" />
                     <Text style={[styles.postLocationText, { color: colors.text }]}>
@@ -438,6 +487,7 @@ export default function ProfileScreen() {
                       {post.comments_count}
                     </Text>
                   </View>
+                  </Text>
                 </View>
               </TouchableOpacity>
             ))
