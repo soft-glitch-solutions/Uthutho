@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
+import { formatTimeAgo } from '../../../components/utils'; // Assuming the path to utils.tsx
 import { router } from 'expo-router';
 import { Settings, LogOut, Camera, Captions, Edit, Badge, Star, MessageSquare, MapPin, Flame } from 'lucide-react-native';
 import { useProfile } from '@/hook/useProfile';
@@ -117,6 +118,7 @@ interface UserPost {
 }
 
 export default function ProfileScreen() {
+  const { formatTimeAgo } = require('../../../components/utils.tsx'); // Assuming the path to utils.tsx
   const { colors } = useTheme();
   const {
     loading,
@@ -416,6 +418,9 @@ export default function ProfileScreen() {
                 <Text style={[styles.postContent, { color: colors.text }]} numberOfLines={3}>
                   {post.content}
                 </Text>
+                <Text style={[styles.postTimeAgo, { color: colors.text }]}>
+                  {formatTimeAgo(post.created_at)}
+                </Text>
                 <View style={styles.postFooter}>
                   <View style={styles.postLocation}>
                     <MapPin size={12} color="#666666" />
@@ -496,14 +501,16 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {/* Sign Out Button */}
-      <TouchableOpacity
-        style={[styles.signOutButton, { borderColor: '#ef4444' }]}
-        onPress={handleSignOut}
-      >
-        <LogOut size={24} color="#ef4444" />
-        <Text style={styles.signOutText}>Sign Out</Text>
-      </TouchableOpacity>
+      {/* Sign Out Button (only show on basic-info tab) */}
+      {selectedTab === 'basic-info' && (
+        <TouchableOpacity
+          style={[styles.signOutButton, { borderColor: '#ef4444' }]}
+          onPress={handleSignOut}
+        >
+          <LogOut size={24} color="#ef4444" />
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.bottomSpace} />
 
@@ -516,7 +523,7 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create({  postTimeAgo: {   fontSize: 12,    color: '#999999',    marginBottom: 8, },
   container: {
     flex: 1,
   },
