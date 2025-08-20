@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity , Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Animated } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, User, Flame, MapPin, Calendar, Award, Trophy } from 'lucide-react-native';
@@ -27,6 +27,96 @@ interface UserPost {
     reaction_type: string;
   }>;
 }
+
+// Skeleton Loader Component
+const SkeletonLoader = () => {
+  const shimmerValue = new Animated.Value(0);
+
+  useEffect(() => {
+    const animateShimmer = () => {
+      Animated.sequence([
+        Animated.timing(shimmerValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => animateShimmer());
+    };
+
+    animateShimmer();
+  }, []);
+
+  const shimmerAnimation = shimmerValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['-100%', '100%'],
+  });
+
+  const SkeletonItem = ({ width, height, style = {} }) => (
+    <View style={[styles.skeletonItem, { width, height }, style]}>
+      <Animated.View
+        style={[
+          styles.shimmer,
+          {
+            transform: [{ translateX: shimmerAnimation }],
+          },
+        ]}
+      />
+    </View>
+  );
+
+  return (
+    <ScrollView style={styles.container}>
+      {/* Header Skeleton */}
+      <View style={styles.header}>
+        <SkeletonItem width={44} height={44} style={styles.skeletonCircle} />
+        <SkeletonItem width={120} height={24} />
+        <SkeletonItem width={44} height={44} style={styles.skeletonCircle} />
+      </View>
+
+      {/* Profile Card Skeleton */}
+      <View style={styles.profileCard}>
+        <View style={styles.profileHeader}>
+          <SkeletonItem width={80} height={80} style={styles.skeletonCircle} />
+          <SkeletonItem width={150} height={28} style={{ marginTop: 12 }} />
+          <SkeletonItem width={100} height={18} style={{ marginTop: 4 }} />
+        </View>
+
+        <View style={styles.statsContainer}>
+          {[1, 2, 3].map((item) => (
+            <View key={item} style={styles.statItem}>
+              <SkeletonItem width={24} height={24} style={styles.skeletonCircle} />
+              <SkeletonItem width={40} height={20} style={{ marginTop: 4 }} />
+              <SkeletonItem width={60} height={14} style={{ marginTop: 2 }} />
+            </View>
+          ))}
+        </View>
+
+        <SkeletonItem width={120} height={16} style={{ marginTop: 8 }} />
+        <SkeletonItem width={180} height={16} style={{ marginTop: 8 }} />
+      </View>
+
+      {/* Posts Section Skeleton */}
+      <View style={styles.postsSection}>
+        <SkeletonItem width={120} height={20} style={{ marginBottom: 16 }} />
+        
+        {[1, 2, 3].map((item) => (
+          <View key={item} style={styles.postItem}>
+            <SkeletonItem width="100%" height={60} style={{ marginBottom: 12 }} />
+            <View style={styles.postFooter}>
+              <SkeletonItem width={80} height={14} />
+              <SkeletonItem width={40} height={14} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+};
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams();
@@ -173,11 +263,7 @@ export default function UserProfileScreen() {
   };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading profile...</Text>
-      </View>
-    );
+    return <SkeletonLoader />;
   }
 
   if (!profile) {
@@ -297,16 +383,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
+  // Skeleton Styles
+  skeletonItem: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 4,
+    overflow: 'hidden',
+    position: 'relative',
   },
-  loadingText: {
-    color: '#ffffff',
-    fontSize: 16,
+  skeletonCircle: {
+    borderRadius: 9999,
   },
+  shimmer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  // Error Styles
   errorContainer: {
     flex: 1,
     backgroundColor: '#000000',
@@ -319,6 +414,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginBottom: 20,
   },
+  // Header Styles
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -348,6 +444,7 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 44,
   },
+  // Profile Card Styles
   profileCard: {
     backgroundColor: '#1a1a1a',
     marginHorizontal: 20,
@@ -427,15 +524,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  joinedContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  joinedText: {
-    color: '#666666',
-    fontSize: 12,
-    marginLeft: 8,
-  },
+  // Posts Section Styles
   postsSection: {
     paddingHorizontal: 20,
   },
