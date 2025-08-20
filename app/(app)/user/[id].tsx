@@ -21,8 +21,8 @@ interface UserPost {
   id: string;
   content: string;
   created_at: string;
-  hubs?: { name: string };
-  stops?: { name: string };
+  type: 'hub' | 'stop';
+  location_name: string;
   post_reactions: Array<{
     reaction_type: string;
   }>;
@@ -38,62 +38,95 @@ export default function UserProfileScreen() {
 
   useEffect(() => {
     if (id) {
-      loadUserProfile();
-      loadUserPosts();
-      loadFireCount();
+      loadUserData();
     }
   }, [id]);
 
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load profile first
+      await loadUserProfile();
+      
+      // Then load posts and fire count
+      await Promise.all([
+        loadUserPosts(),
+        loadFireCount()
+      ]);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadUserProfile = async () => {
     try {
-      // Get user profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', id)
         .single();
 
-      if (profileError) {
-        console.error('Error loading profile:', profileError);
-        return;
-      }
-
-      // Count fire reactions on user's posts
-      const { data: fireData } = await supabase
-        .from('post_reactions')
-        .select('id')
-        .eq('reaction_type', 'fire')
-        .in('post_hub_id', posts.map(p => p.id));
-
-      const fireCount = fireData?.length || 0;
-
-      setProfile({
-        ...profileData,
-        fire_count: fireCount,
-      });
+      if (profileError) throw profileError;
+      
+      setProfile(profileData);
     } catch (error) {
-      console.error('Error loading user profile:', error);
+      console.error('Error loading profile:', error);
     }
-    setLoading(false);
   };
 
   const loadUserPosts = async () => {
     try {
-      const { data, error } = await supabase
+      // Load hub posts
+      const { data: hubPosts, error: hubError } = await supabase
         .from('hub_posts')
         .select(`
           id, content, created_at,
           hubs (name),
+          post_reactions (reaction_type)
+        `)
+        .eq('user_id', id)
+        .order('created_at', { ascending: false });
+
+      if (hubError) throw hubError;
+
+      // Load stop posts
+      const { data: stopPosts, error: stopError } = await supabase
+        .from('stop_posts')
+        .select(`
+          id, content, created_at,
           stops (name),
           post_reactions (reaction_type)
         `)
         .eq('user_id', id)
-        .order('created_at', { ascending: false })
-        .limit(10);
+        .order('created_at', { ascending: false });
 
-      if (!error) {
-        setPosts(data || []);
-      }
+      if (stopError) throw stopError;
+
+      // Combine and format posts
+      const combinedPosts = [
+        ...(hubPosts || []).map(post => ({
+          id: post.id,
+          content: post.content,
+          created_at: post.created_at,
+          type: 'hub' as const,
+          location_name: post.hubs?.name || 'Unknown Hub',
+          post_reactions: post.post_reactions || []
+        })),
+        ...(stopPosts || []).map(post => ({
+          id: post.id,
+          content: post.content,
+          created_at: post.created_at,
+          type: 'stop' as const,
+          location_name: post.stops?.name || 'Unknown Stop',
+          post_reactions: post.post_reactions || []
+        }))
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+       .slice(0, 10); // Limit to 10 most recent posts
+
+      setPosts(combinedPosts);
     } catch (error) {
       console.error('Error loading user posts:', error);
     }
@@ -101,23 +134,42 @@ export default function UserProfileScreen() {
 
   const loadFireCount = async () => {
     try {
-      // Count all fire reactions on this user's posts
-      const { data, error } = await supabase
+      // Count fire reactions from both hub and stop posts
+      const { data: hubFireReactions, error: hubError } = await supabase
         .from('post_reactions')
         .select('id')
         .eq('reaction_type', 'fire')
-        .in('post_hub_id', posts.map(p => p.id));
+        .eq('user_id', id);
 
-      if (!error) {
-        setFireCount(data?.length || 0);
+      const { data: stopFireReactions, error: stopError } = await supabase
+        .from('stop_post_reactions')
+        .select('id')
+        .eq('reaction_type', 'fire')
+        .eq('user_id', id);
+
+      if (hubError || stopError) {
+        console.error('Error loading fire reactions:', hubError || stopError);
+        return;
+      }
+
+      const totalFireCount = (hubFireReactions?.length || 0) + (stopFireReactions?.length || 0);
+      setFireCount(totalFireCount);
+      
+      // Update profile with fire count
+      if (profile) {
+        setProfile(prev => prev ? { ...prev, fire_count: totalFireCount } : null);
       }
     } catch (error) {
       console.error('Error loading fire count:', error);
     }
   };
 
-  const navigateToPost = (postId: string) => {
-    router.push(`/post/${postId}`);
+  const navigateToPost = (postId: string, postType: 'hub' | 'stop') => {
+    if (postType === 'hub') {
+      router.push(`/hub-post-details?postId=${postId}`);
+    } else {
+      router.push(`/stop-post-details?postId=${postId}`);
+    }
   };
 
   if (loading) {
@@ -157,10 +209,10 @@ export default function UserProfileScreen() {
       <View style={styles.profileCard}>
         <View style={styles.profileHeader}>
           <View style={styles.profileIcon}>
-                    <Image
-                      source={{ uri: profile.avatar_url || 'https://via.placeholder.com/50' }}
-                      style={styles.profileIcon}
-                    />
+            <Image
+              source={{ uri: profile.avatar_url || 'https://via.placeholder.com/50' }}
+              style={styles.profileIcon}
+            />
           </View>
           <Text style={styles.profileName}>
             {profile.first_name} {profile.last_name}
@@ -176,7 +228,7 @@ export default function UserProfileScreen() {
           </View>
           <View style={styles.statItem}>
             <Flame size={20} color="#ff6b35" />
-            <Text style={styles.statValue}>{profile.fire_count || 0}</Text>
+            <Text style={styles.statValue}>{fireCount}</Text>
             <Text style={styles.statLabel}>Fire Received</Text>
           </View>
           <View style={styles.statItem}>
@@ -211,7 +263,7 @@ export default function UserProfileScreen() {
             <TouchableOpacity
               key={post.id}
               style={styles.postItem}
-              onPress={() => navigateToPost(post.id)}
+              onPress={() => navigateToPost(post.id, post.type)}
             >
               <Text style={styles.postContent} numberOfLines={3}>
                 {post.content}
@@ -220,7 +272,7 @@ export default function UserProfileScreen() {
                 <View style={styles.postLocation}>
                   <MapPin size={12} color="#666666" />
                   <Text style={styles.postLocationText}>
-                    {post.hubs?.name || post.stops?.name || 'Unknown'}
+                    {post.location_name}
                   </Text>
                 </View>
                 <View style={styles.postReactions}>
