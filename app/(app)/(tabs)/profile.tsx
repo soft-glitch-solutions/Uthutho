@@ -181,13 +181,6 @@ export default function ProfileScreen() {
     },
   ];
 
-  const awardMenuItems = [
-    {
-      icon: <Badge size={24} color={colors.text} />,
-      title: 'Mission',
-      subtitle: 'Change your profile title',
-    },
-  ];
 
   if (loading) {
     return (
@@ -374,28 +367,6 @@ export default function ProfileScreen() {
 
       {selectedTab === 'achievements' && (
         <View style={styles.menuContainer}>
-          {awardMenuItems.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[styles.menuItem, { backgroundColor: colors.card }]}
-              onPress={() => {
-                if (item.title === 'Missions') {
-                  router.push('/mission');
-                }
-              }}
-            >
-              {item.icon}
-              <View style={styles.menuText}>
-                <Text style={[styles.menuTitle, { color: colors.text }]}>
-                  {item.title}
-                </Text>
-                <Text style={[styles.menuSubtitle, { color: colors.text }]}>
-                  {item.subtitle}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-
           {/* Achievement Banners */}
           {loading ? (
             <>
