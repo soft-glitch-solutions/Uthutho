@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Animated, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, User, Flame, MapPin, Calendar, Award, Trophy } from 'lucide-react-native';
@@ -224,30 +224,54 @@ export default function UserProfileScreen() {
 
   const loadFireCount = async () => {
     try {
-      // Count fire reactions from both hub and stop posts
-      const { data: hubFireReactions, error: hubError } = await supabase
+      // Fetch all hub post IDs for the user
+      const { data: hubPosts, error: hubPostError } = await supabase
+        .from('hub_posts')
+        .select('id')
+        .eq('user_id', id);
+
+      if (hubPostError) {
+        console.error('Error fetching user hub post IDs:', hubPostError);
+ return;
+      }
+      const hubPostIds = (hubPosts || []).map(p => p.id);
+
+      const { data: stopPosts, error: stopPostError } = await supabase
+        .from('stop_posts')
+        .select('id')
+        .eq('user_id', id);
+
+      if (hubPostError || stopPostError) {
+        console.error('Error fetching user stop post IDs:', stopPostError);
+        return;
+      }
+      const stopPostIds = (stopPosts || []).map(p => p.id);
+
+      const { data: fireReactions, error: fireError } = await supabase
         .from('post_reactions')
-        .select('id')
+        .select('id') // Just need the count, so selecting 'id' is sufficient
         .eq('reaction_type', 'fire')
-        .eq('user_id', id);
+ .or(`post_hub_id.in.(${hubPostIds.join(',')}),post_stop_id.in.(${stopPostIds.join(',')})`);
 
-      const { data: stopFireReactions, error: stopError } = await supabase
-        .from('stop_post_reactions')
-        .select('id')
-        .eq('reaction_type', 'fire')
-        .eq('user_id', id);
-
-      if (hubError || stopError) {
-        console.error('Error loading fire reactions:', hubError || stopError);
+      if (fireError) {
+        console.error('Error loading fire reactions:', fireError);
         return;
       }
 
-      const totalFireCount = (hubFireReactions?.length || 0) + (stopFireReactions?.length || 0);
+      const totalFireCount = fireReactions?.length || 0;
       setFireCount(totalFireCount);
       
       // Update profile with fire count
-      if (profile) {
+      if (profile && profile.fire_count !== totalFireCount) {
         setProfile(prev => prev ? { ...prev, fire_count: totalFireCount } : null);
+        // Optionally, you might want to update the database as well
+        // const { error: updateError } = await supabase
+        //   .from('profiles')
+        //   .update({ fire_count: totalFireCount })
+        //   .eq('id', id);
+        // if (updateError) {
+        //   console.error('Error updating profile fire count:', updateError);
+        // }
       }
     } catch (error) {
       console.error('Error loading fire count:', error);
@@ -278,68 +302,62 @@ export default function UserProfileScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
+ <SafeAreaView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" backgroundColor="#000000" />
       
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#ffffff" />
+ <ArrowLeft size={24} color="#ffffff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>User Profile</Text>
         <View style={styles.placeholder} />
       </View>
 
       {/* Profile Info */}
-      <View style={styles.profileCard}>
-        <View style={styles.profileHeader}>
-          <View style={styles.profileIcon}>
-            <Image
-              source={{ uri: profile.avatar_url || 'https://via.placeholder.com/50' }}
-              style={styles.profileIcon}
-            />
+
+        <View style={styles.profileCard}>
+ <View style={styles.profileHeader}>
+ <View style={styles.profileIcon}>
+ <Image
+ source={{ uri: profile.avatar_url || 'https://via.placeholder.com/50' }}
+ style={styles.profileIcon}
+ />
+ </View>
+ <Text style={styles.profileName}>
+ {profile.first_name} {profile.last_name}
+ </Text>
+ <Text style={styles.profileTitle}>{profile.selected_title}</Text>
+ </View>
+
+ <View style={styles.statsContainer}>
+ <View style={styles.statItem}>
+ <Trophy size={20} color="#fbbf24" />
+ <Text style={styles.statValue}>{profile.points}</Text>
+ <Text style={styles.statLabel}>Points</Text>
+ </View>
+ <View style={styles.statItem}>
+ <Flame size={20} color="#ff6b35" />
+ <Text style={styles.statValue}>{fireCount}</Text>
+ <Text style={styles.statLabel}>Fire Received</Text>
+ </View>
+ <View style={styles.statItem}>
+ <Award size={20} color="#1ea2b1" />
+ <Text style={styles.statValue}>Level {Math.floor(profile.points / 100) + 1}</Text>
+ <Text style={styles.statLabel}>Explorer</Text>
+ </View>
+ </View>
+
+ {profile.home && (
+ <View style={styles.locationContainer}>
+ <MapPin size={16} color="#1ea2b1" />
+ <Text style={styles.locationText}>Lives in {profile.home}</Text>
           </View>
-          <Text style={styles.profileName}>
-            {profile.first_name} {profile.last_name}
-          </Text>
-          <Text style={styles.profileTitle}>{profile.selected_title}</Text>
+ )}
+
         </View>
-
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Trophy size={20} color="#fbbf24" />
-            <Text style={styles.statValue}>{profile.points}</Text>
-            <Text style={styles.statLabel}>Points</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Flame size={20} color="#ff6b35" />
-            <Text style={styles.statValue}>{fireCount}</Text>
-            <Text style={styles.statLabel}>Fire Received</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Award size={20} color="#1ea2b1" />
-            <Text style={styles.statValue}>Level {Math.floor(profile.points / 100) + 1}</Text>
-            <Text style={styles.statLabel}>Explorer</Text>
-          </View>
-        </View>
-
-        {profile.home && (
-          <View style={styles.locationContainer}>
-            <MapPin size={16} color="#1ea2b1" />
-            <Text style={styles.locationText}>Lives in {profile.home}</Text>
-          </View>
-        )}
-
-        {profile.preferred_transport && (
-          <View style={styles.transportContainer}>
-            <Text style={styles.transportLabel}>Preferred Transport:</Text>
-            <Text style={styles.transportValue}>{profile.preferred_transport}</Text>
-          </View>
-        )}
-      </View>
-
-      {/* User Posts */}
+        <ScrollView>
       <View style={styles.postsSection}>
         <Text style={styles.postsTitle}>Recent Posts ({posts.length})</Text>
         {posts.length === 0 ? (
@@ -372,9 +390,9 @@ export default function UserProfileScreen() {
           ))
         )}
       </View>
-
+      </ScrollView>
       <View style={styles.bottomSpace} />
-    </ScrollView>
+ </SafeAreaView>
   );
 }
 
@@ -422,6 +440,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 20,
+    zIndex: 1, // Ensure header is above scrolling content
   },
   backButton: {
     backgroundColor: '#1a1a1a',
@@ -452,6 +471,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
+    marginTop: 20, // Overlap with the bottom of the header for a smoother look
     borderColor: '#333333',
   },
   profileHeader: {
