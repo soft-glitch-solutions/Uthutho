@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../context/ThemeContext'; // Assuming you have a theme context
 
+
 interface LoginStreakPopupProps {
   open: boolean;
   onClose: () => void;
@@ -63,7 +64,7 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
   return (
     <Provider>
       <Portal>
-        <Dialog visible={open} onDismiss={onClose} style={{ backgroundColor: colors.background }}>
+        <Dialog visible={open} onDismiss={onClose} style={[styles.dialogContainer, { backgroundColor: colors.background }]}>
           <Dialog.Title style={{ color: colors.text }}>Login Streak</Dialog.Title>
           <Dialog.Content>
             {loading ? (
@@ -74,7 +75,7 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
             ) : streak ? (
               <View style={styles.streakContainer}>
                 <View style={styles.streakCircle}>
-                  <Text style={styles.streakNumber}>{streak.current_streak}</Text>
+                  <Text style={[styles.streakNumber, { color: colors.primary }]}>{streak.current_streak}</Text>
                 </View>
                 <Text style={[styles.streakText, { color: colors.text }]}>
                   {streak.current_streak === 1 
@@ -86,7 +87,7 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
                 </Text>
                 {streak.points_earned ? (
                   <View style={styles.pointsContainer}>
-                    <Text style={styles.pointsText}>
+                    <Text style={[styles.pointsText, { color: colors.text }]}>
                       +{streak.points_earned} point earned for completing 7 days!
                     </Text>
                   </View>
@@ -112,6 +113,10 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
 }
 
 const styles = {
+  dialogContainer: {
+    borderRadius: 10,
+    padding: 10,
+  },
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -122,14 +127,14 @@ const styles = {
     justifyContent: 'center',
   },
   streakCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#E3F2FD', // Light blue background for the circle
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#E0F7FA', // Lighter blue background
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
-  },
+    marginBottom: 30,
+  } as any, // Add 'as any' to resolve potential type conflicts with ViewStyle
   streakNumber: {
     fontSize: 36,
     fontWeight: 'bold',
@@ -145,13 +150,13 @@ const styles = {
     marginBottom: 10,
   },
   pointsContainer: {
-    backgroundColor: '#C8E6C9', // Light green background for points
+    backgroundColor: '#DCEDC8', // Lighter green background
     padding: 10,
-    borderRadius: 5,
-    marginTop: 10,
+    borderRadius: 8,
+    marginTop: 15,
+    alignItems: 'center',
   },
   pointsText: {
-    color: '#388E3C', // Dark green color for points text
     fontWeight: '500',
   },
 };

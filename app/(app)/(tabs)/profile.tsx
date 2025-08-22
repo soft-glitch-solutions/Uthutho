@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIn
 import { useTheme } from '@/context/ThemeContext';
 import { formatTimeAgo } from '../../../components/utils';
 import { router } from 'expo-router';
-import { Settings, LogOut, Camera, Captions, Edit, Badge, Star, MessageSquare, MapPin, Flame, Trash } from 'lucide-react-native';
+import { Settings, LogOut, Camera, Captions, Edit, Badge, Star, MessageSquare, MapPin, Flame, Trash, MoreVertical } from 'lucide-react-native';
 import { useProfile } from '@/hook/useProfile';
 import { Animated } from 'react-native';
 import { supabase } from '@/lib/supabase';
@@ -133,6 +133,7 @@ export default function ProfileScreen() {
   const [selectedTab, setSelectedTab] = useState('posts');
   const [userPosts, setUserPosts] = useState<UserPost[]>([]);
   const [postsLoading, setPostsLoading] = useState(true);
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -195,7 +196,7 @@ export default function ProfileScreen() {
           type: 'stop' as const,
           location_name: post.stops?.name || 'Unknown Stop',
           likes_count: post.post_reactions?.filter(r => r.reaction_type === 'fire').length || 0,
- comments_count: post.post_comments?.length || 0
+          comments_count: post.post_comments?.length || 0
         }))
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
@@ -255,6 +256,7 @@ export default function ProfileScreen() {
               }
 
               setUserPosts(userPosts.filter(post => post.id !== postId));
+              setActiveMenu(null); // Close the menu after deletion
               console.log('Post deleted successfully');
             } catch (error) {
               console.error('Error deleting post:', error);
@@ -267,12 +269,15 @@ export default function ProfileScreen() {
     );
   };
 
+  const toggleMenu = (postId: string) => {
+    setActiveMenu(activeMenu === postId ? null : postId);
+  };
 
   const navigateToPost = (postId: string, postType: 'hub' | 'stop') => {
     if (postType === 'hub') {
-      router.push(`/hub-post-details?postId=${postId}`);
+      router.push(`/post/${postId}`);
     } else {
-      router.push(`/stop-post-details?postId=${postId}`);
+      router.push(`/post/${postId}`);
     }
   };
 
@@ -451,26 +456,40 @@ export default function ProfileScreen() {
             </View>
           ) : (
             userPosts.map((post) => (
-              <TouchableOpacity
-                key={post.id}
-                style={[styles.postItem, { backgroundColor: colors.card }]}
-                onPress={() => navigateToPost(post.id, post.type)}
-                onLongPress={() => handleDeletePost(post.id, post.type)} // Added long press for delete
-
-              >
+              <View key={post.id} style={[styles.postItem, { backgroundColor: colors.card }]}>
                 <View style={styles.postHeader}>
-                  <Text style={[styles.postContent, { color: colors.text }]} numberOfLines={3}>
-                    {post.content}
-                  </Text>
-                  {/* {profile?.id === post.user_id && ( // Assuming post object has user_id */}
-                    <TouchableOpacity onPress={() => handleDeletePost(post.id, post.type)}>
- <Trash size={20} color="#ef4444" />
+                  <TouchableOpacity 
+                    style={{flex: 1}} 
+                    onPress={() => navigateToPost(post.id, post.type)}
+                  >
+                    <Text style={[styles.postContent, { color: colors.text }]} numberOfLines={3}>
+                      {post.content}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => toggleMenu(post.id)}>
+                    <MoreVertical size={20} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+                
+                {activeMenu === post.id && (
+                  <View style={[styles.postMenu, { backgroundColor: colors.card }]}>
+                    <TouchableOpacity 
+                      style={styles.menuOption}
+                      onPress={() => handleDeletePost(post.id, post.type)}
+                    >
+                      <Trash size={16} color="#ef4444" />
+                      <Text style={[styles.menuOptionText, { color: '#ef4444' }]}>
+                        Delete Post
+                      </Text>
                     </TouchableOpacity>
-                  )}
+                  </View>
+                )}
+                
                 <Text style={[styles.postTimeAgo, { color: colors.text }]}>
                   {formatTimeAgo(post.created_at)}
                 </Text>
-                 <Text style={[styles.postTimeAgo, { color: colors.text }]}>
+                
+                <View style={styles.postFooter}>
                   <View style={styles.postLocation}>
                     <MapPin size={12} color="#666666" />
                     <Text style={[styles.postLocationText, { color: colors.text }]}>
@@ -487,9 +506,8 @@ export default function ProfileScreen() {
                       {post.comments_count}
                     </Text>
                   </View>
-                  </Text>
                 </View>
-              </TouchableOpacity>
+              </View>
             ))
           )}
         </View>
@@ -573,7 +591,12 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({  postTimeAgo: {   fontSize: 12,    color: '#999999',    marginBottom: 8, },
+const styles = StyleSheet.create({
+  postTimeAgo: {
+    fontSize: 12,
+    color: '#999999',
+    marginBottom: 8,
+  },
   container: {
     flex: 1,
   },
@@ -625,10 +648,17 @@ const styles = StyleSheet.create({  postTimeAgo: {   fontSize: 12,    color: '#9
     borderWidth: 1,
     borderColor: '#333333',
   },
+  postHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
   postContent: {
     fontSize: 14,
     lineHeight: 20,
-    marginBottom: 12,
+    flex: 1,
+    marginRight: 12,
   },
   postFooter: {
     flexDirection: 'row',
@@ -651,6 +681,28 @@ const styles = StyleSheet.create({  postTimeAgo: {   fontSize: 12,    color: '#9
     fontSize: 12,
     marginLeft: 4,
     fontWeight: '500',
+  },
+  postMenu: {
+    position: 'absolute',
+    top: 40,
+    right: 16,
+    borderRadius: 8,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 10,
+  },
+  menuOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  menuOptionText: {
+    fontSize: 14,
+    marginLeft: 8,
   },
   noPosts: {
     alignItems: 'center',
