@@ -1,449 +1,322 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Image,
-  Pressable,
-  TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
-  Animated,
-  Linking,
-} from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useTheme } from '../../context/ThemeContext';
-import { MapPin, Bus, Clock, Plus, Heart , CheckCircle } from 'lucide-react-native';
-import { supabase } from '../../lib/supabase';
-// Shimmer component for loading state
-const Shimmer = ({ children, colors }) => {
-  const animatedValue = new Animated.Value(0);
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { MapPin, Clock, Users, Heart, HeartOff, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon } from 'lucide-react-native';
+import { supabase } from '@/lib/supabase';
 
-  React.useEffect(() => {
-    const shimmerAnimation = () => {
-      Animated.sequence([
-        Animated.timing(animatedValue, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(animatedValue, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ]).start(() => shimmerAnimation());
-    };
+interface Hub {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  address?: string;
+  transport_type?: string;
+  image?: string;
+}
 
-    shimmerAnimation();
-  }, []);
+interface Route {
+  id: string;
+  name: string;
+  transport_type: string;
+  cost: number;
+  start_point: string;
+  end_point: string;
+}
 
-  
-
-  const translateX = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-100, 100],
-  });
-
-  return (
-    <View style={{ overflow: 'hidden' }}>
-      {children}
-      <Animated.View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: colors.text,
-          opacity: 0.1,
-          transform: [{ translateX }],
-        }}
-      />
-    </View>
-  );
-};
-
-const formatTimeAgo = (timestamp) => {
-  const now = new Date();
-  const postDate = new Date(timestamp);
-  const timeDiff = now - postDate;
-
-  const seconds = Math.floor(timeDiff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  if (minutes > 0) return `${minutes}m ago`;
-  return `${seconds}s ago`;
-};
-
-// Skeleton component for loading state
-const HubDetailsSkeleton = ({ colors }) => {
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Shimmer colors={colors}>
-        <View style={[styles.imageSkeleton, { backgroundColor: colors.card }]} />
-      </Shimmer>
-      <View style={styles.content}>
-        <Shimmer colors={colors}>
-          <View style={[styles.skeletonText, { width: '60%', backgroundColor: colors.card }]} />
-        </Shimmer>
-        <Shimmer colors={colors}>
-          <View style={[styles.skeletonText, { width: '80%', backgroundColor: colors.card }]} />
-        </Shimmer>
-        <Shimmer colors={colors}>
-          <View style={[styles.skeletonText, { width: '40%', backgroundColor: colors.card }]} />
-        </Shimmer>
-      </View>
-    </View>
-  );
-};
-
-// ChatBox Component
-const ChatBox = ({ onPost, colors }) => {
-  const [postContent, setPostContent] = useState('');
-
-  const handlePost = () => {
-    if (postContent.trim()) {
-      onPost(postContent);
-      setPostContent('');
-    }
+interface Post {
+  id: string;
+  content: string;
+  created_at: string;
+  user_id: string;
+  profiles: {
+    first_name: string;
+    last_name: string;
   };
+}
 
-  return (
-    <View style={[styles.chatBoxContainer, { backgroundColor: colors.card }]}>
-      <TextInput
-        style={[styles.input, { backgroundColor: colors.background, color: colors.text }]}
-        placeholder="Write your post..."
-        placeholderTextColor={colors.text}
-        value={postContent}
-        onChangeText={setPostContent}
-        multiline
-      />
-      <TouchableOpacity
-        style={[styles.postButton, { backgroundColor: colors.primary }]}
-        onPress={handlePost}
-      >
-        <Text style={[styles.postButtonText, { color: colors.text }]}>Post</Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
-
-// Main HubDetailsScreen component
-export default function HubDetailsScreen() {
-  const { hubId } = useLocalSearchParams();
-  const [activeTab, setActiveTab] = useState('EkSe Wall');
-  const [hub, setHub] = useState(null);
+export default function HubDetailScreen() {
+  const { id } = useLocalSearchParams();
+  const router = useRouter();
+  const [hub, setHub] = useState<Hub | null>(null);
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(true);
-  const { colors } = useTheme();
 
-  // Fetch hub details
   useEffect(() => {
-    const fetchHubDetails = async () => {
-      try {
-        const { data: hubData, error: hubError } = await supabase
-          .from('hubs')
-          .select('*')
-          .eq('id', hubId)
-          .single();
+    if (id) {
+      loadHubDetails();
+      loadHubRoutes();
+      loadHubPosts();
+      checkIfFavorite();
+    }
+  }, [id]);
 
-        if (hubError) throw hubError;
-        setHub(hubData);
-      } catch (error) {
-        console.error('Error fetching hub details:', error);
-      } finally {
-        setLoading(false);
+  const loadHubDetails = async () => {
+    try {
+      const { data: hubData, error: hubError } = await supabase
+        .from('hubs')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (hubError) {
+        console.error('Error loading hub:', hubError);
+        return;
       }
-    };
 
-    fetchHubDetails();
-  }, [hubId]);
-
-  const openMap = () => {
-    if (!hub) return;
-    const lat = hub.latitude;
-    const long = hub.longitude;
-    const url = `https://www.google.com/maps/search/?api=1&query=${lat},${long}`;
-    Linking.openURL(url).catch((err) => console.error('Error opening map:', err));
-  };
-
-  if (loading) {
-    return <HubDetailsSkeleton colors={colors} />;
-  }
-
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Hub Image, Name, and Address */}
-      <Image
-        source={{ uri: hub?.image }}
-        style={styles.image}
-        resizeMode="cover"
-      />
-      <View style={styles.content}>
-        <View style={styles.titleContainer}>
-          <Text style={[styles.title, { color: colors.text }]}>{hub?.name}</Text>
-          <TouchableOpacity
-            onPress={openMap}
-            style={[styles.mapButton, { backgroundColor: colors.primary }]}
-          >
-            <CheckCircle size={60} color="#4BB543" style={styles.successIcon} />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.infoRow}>
-          <MapPin size={20} color={colors.text} />
-          <Text style={[styles.address, { color: colors.text }]}>{hub?.address}</Text>
-        </View>
-
-        {/* Tab Navigation */}
-        <View style={[styles.tabContainer, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === 'EkSe Wall' && styles.activeTabButton,
-            ]}
-            onPress={() => setActiveTab('EkSe Wall')}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'EkSe Wall' && styles.activeTabText,
-                { color: colors.text },
-              ]}
-            >
-              EkSe Wall
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === 'Route Info' && styles.activeTabButton,
-            ]}
-            onPress={() => setActiveTab('Route Info')}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'Route Info' && styles.activeTabText,
-                { color: colors.text },
-              ]}
-            >
-              Route Info
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Render Active Tab */}
-        {activeTab === 'EkSe Wall' ? (
-          <EkSeWall hubId={hubId} hub={hub} colors={colors} />
-        ) : (
-          <RouteInfo hubId={hubId} hub={hub} colors={colors} />
-        )}
-      </View>
-    </View>
-  );
-}
-
-// EkSe Wall Tab
-function EkSeWall({ hubId, hub, colors }) {
-  const router = useRouter();
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    fetchPosts();
-  }, [hubId]);
-
-  const fetchPosts = async () => {
-    try {
-      const { data: postsData, error: postsError } = await supabase
-        .from('hub_posts')
-        .select('*, profiles!inner(first_name, last_name, avatar_url, selected_title)')
-        .eq('hub_id', hubId);
-
-      if (postsError) throw postsError;
-
-      // Ensure profiles is not null
-      const filteredPosts = postsData.filter((post) => post.profiles !== null);
-      setPosts(filteredPosts);
+      setHub(hubData);
     } catch (error) {
-      console.error('Error fetching posts:', error);
-      setError('Failed to fetch posts. Please try again.');
-    } finally {
-      setLoading(false);
+      console.error('Error loading hub details:', error);
     }
+    setLoading(false);
   };
 
-  const handlePost = async (content) => {
-    const userId = (await supabase.auth.getSession()).data.session?.user.id;
-    if (!userId) return;
-
+  const loadHubRoutes = async () => {
     try {
-      const { data: postData, error: postError } = await supabase
-        .from('hub_posts')
-        .insert([{ hub_id: hubId, user_id: userId, content }])
-        .select('*, profiles!inner(first_name, last_name, avatar_url, selected_title)');
-
-      if (postError) throw postError;
-
-      // Add the new post to the local state
-      setPosts((prevPosts) => [postData[0], ...prevPosts]);
-      setError(null); // Clear any previous errors
-    } catch (error) {
-      console.error('Error creating post:', error);
-      setError('Failed to create post. Please try again.');
-    }
-  };
-
-  if (loading) {
-    return <HubDetailsSkeleton colors={colors} />;
-  }
-
-  return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      {error && (
-        <Text style={[styles.errorText, { color: colors.error }]}>
-          {error}
-        </Text>
-      )}
-
-      {posts.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={[styles.emptyStateText, { color: colors.text }]}>
-            No posts yet. Be the first to post and earn 1 point!
-          </Text>
-          <TouchableOpacity
-            style={[styles.firstPostButton, { backgroundColor: colors.primary }]}
-            onPress={() => handlePost('First post!')}
-          >
-            <Text style={[styles.firstPostButtonText, { color: colors.text }]}>
-              Be the first to post
-            </Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        posts.map((post) => (
-          <View key={post.id} style={[styles.postContainer, { backgroundColor: colors.card }]}>
-            {/* Post Header */}
-            <View style={styles.postHeader}>
-              <Image
-                source={{ uri: post.profiles?.avatar_url || 'https://via.placeholder.com/50' }}
-                style={styles.avatar}
-              />
-              <View style={styles.postHeaderText}>
-                <Pressable onPress={() => router.push(`/social-profile?id=${post.profiles.id}`)}>
-                  <Text style={[styles.userName, { color: colors.text }]}>
-                    {post.profiles.first_name} {post.profiles.last_name}
-                  </Text>
-                </Pressable>
-                {post.profiles.selected_title && (
-                  <Text style={[styles.selectedTitle, { color: colors.primary }]}>
-                    {post.profiles.selected_title}
-                  </Text>
-                )}
-                <Text style={[styles.postTime, { color: colors.textSecondary }]}>
-                  {formatTimeAgo(post.created_at)}
-                </Text>
-              </View>
-            </View>
-
-            {/* Post Content */}
-            <Text style={[styles.postContent, { color: colors.text }]}>
-              {post.content}
-            </Text>
-
-            {/* Post Footer */}
-            <View style={styles.postFooter}>
-              <Text style={[styles.postDate, { color: colors.text }]}>
-                {new Date(post.created_at).toLocaleDateString()}
-              </Text>
-              <Heart size={20} color={colors.text} />
-            </View>
-          </View>
-        ))
-      )}
-
-      {/* Chat Box for creating posts */}
-      <ChatBox onPost={handlePost} colors={colors} />
-    </ScrollView>
-  );
-}
-
-// Route Info Tab
-function RouteInfo({ hubId, hub, colors }) {
-  const router = useRouter();
-  const [relatedRoutes, setRelatedRoutes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    fetchRelatedRoutes();
-  }, [hubId]);
-
-  const fetchRelatedRoutes = async () => {
-    try {
-      const { data: routesData, error: routesError } = await supabase
+      const { data, error } = await supabase
         .from('routes')
         .select('*')
-        .eq('hub_id', hubId);
+        .eq('hub_id', id);
 
-      if (routesError) throw routesError;
-      setRelatedRoutes(routesData);
+      if (!error) {
+        setRoutes(data || []);
+      }
     } catch (error) {
-      console.error('Error fetching related routes:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error loading hub routes:', error);
     }
   };
 
+  const loadHubPosts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('hub_posts')
+        .select(`
+          *,
+          profiles (first_name, last_name)
+        `)
+        .eq('hub_id', id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (!error) {
+        setPosts(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading hub posts:', error);
+    }
+  };
+
+  const checkIfFavorite = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('favorites')
+        .eq('id', user.id)
+        .single();
+
+      if (profile && profile.favorites) {
+        const favorites = profile.favorites;
+        setIsFavorite(favorites.some((fav: any) => fav.id === id && fav.type === 'hub'));
+      }
+    } catch (error) {
+      console.error('Error checking favorite status:', error);
+    }
+  };
+
+  const toggleFavorite = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !hub) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('favorites')
+        .eq('id', user.id)
+        .single();
+
+      let favorites = profile?.favorites || [];
+      const favoriteItem = {
+        id: hub.id,
+        name: hub.name,
+        type: 'hub' as const,
+      };
+
+      if (isFavorite) {
+        favorites = favorites.filter((fav: any) => !(fav.id === hub.id && fav.type === 'hub'));
+      } else {
+        favorites = [...favorites, favoriteItem];
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ favorites })
+        .eq('id', user.id);
+
+      if (!error) {
+        setIsFavorite(!isFavorite);
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
+  const openInMaps = () => {
+    if (hub) {
+      const url = `https://maps.google.com/?q=${hub.latitude},${hub.longitude}`;
+      Alert.alert('Open in Maps', `Would you like to open ${hub.name} in Google Maps?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open', onPress: () => console.log('Open maps:', url) },
+      ]);
+    }
+  };
+
+  const navigateToRoute = (routeId: string) => {
+    router.push(`/route/${routeId}`);
+  };
+
   if (loading) {
-    return <HubDetailsSkeleton colors={colors} />;
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading hub details...</Text>
+      </View>
+    );
+  }
+
+  if (!hub) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Hub not found</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.content}>
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Related Routes</Text>
-          <Pressable onPress={() => router.push('/AddRoute')} style={styles.addButton}>
-            <Plus size={24} color={colors.text} />
-          </Pressable>
+    <ScrollView style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <StatusBar style="light" backgroundColor="#000000" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <ArrowLeft size={24} color="#ffffff" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
+          {isFavorite ? (
+            <Heart size={24} color="#1ea2b1" fill="#1ea2b1" />
+          ) : (
+            <HeartOff size={24} color="#ffffff" />
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Hub Image */}
+      <View style={styles.imageContainer}>
+        <View style={styles.imagePlaceholder}>
+          <MapPin size={48} color="#1ea2b1" />
+        </View>
+      </View>
+
+      {/* Hub Info */}
+      <View style={styles.infoSection}>
+        <Text style={styles.hubName}>{hub.name}</Text>
+        {hub.address && (
+          <Text style={styles.hubAddress}>{hub.address}</Text>
+        )}
+        
+        <View style={styles.coordinates}>
+          <Text style={styles.coordinatesText}>
+            {hub.latitude.toFixed(6)}, {hub.longitude.toFixed(6)}
+          </Text>
         </View>
 
-        {/* Search Input */}
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search related routes..."
-          placeholderTextColor="#888"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {relatedRoutes.map((route) => (
-          <Pressable
-            key={route.id}
-            style={[styles.routeItem, { borderBottomColor: colors.border }]}
-            onPress={() => router.push(`/route-details?routeId=${route.id}`)}
-          >
-            <Bus size={20} color={colors.text} />
-            <View style={styles.routeInfo}>
-              <Text style={[styles.routeName, { color: colors.text }]}>
-                {route.name}
-              </Text>
-              <Text style={[styles.routeDetails, { color: colors.text }]}>
-                {route.start_point} → {route.end_point}
-              </Text>
-            </View>
-            <Text style={[styles.routePrice, { color: colors.primary }]}>
-              R{route.cost}
-            </Text>
-          </Pressable>
-        ))}
+        {hub.transport_type && (
+          <View style={styles.transportBadge}>
+            <Text style={styles.transportType}>{hub.transport_type}</Text>
+          </View>
+        )}
       </View>
+
+      {/* Action Buttons */}
+      <View style={styles.actionButtons}>
+        <TouchableOpacity style={styles.actionButton} onPress={openInMaps}>
+          <Navigation size={20} color="#ffffff" />
+          <Text style={styles.actionButtonText}>Directions</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(tabs)/feeds')}>
+          <MessageSquare size={20} color="#ffffff" />
+          <Text style={styles.actionButtonText}>View Posts</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Routes from this Hub */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Routes from this Hub ({routes.length})</Text>
+        {routes.length === 0 ? (
+          <View style={styles.emptyState}>
+            <RouteIcon size={24} color="#666666" />
+            <Text style={styles.emptyStateText}>No routes available from this hub</Text>
+          </View>
+        ) : (
+          routes.map((route) => (
+            <TouchableOpacity
+              key={route.id}
+              style={styles.routeItem}
+              onPress={() => navigateToRoute(route.id)}
+            >
+              <View style={styles.routeInfo}>
+                <Text style={styles.routeName}>{route.name}</Text>
+                <Text style={styles.routeDestination}>
+                  {route.start_point} → {route.end_point}
+                </Text>
+                <View style={styles.routeDetails}>
+                  <Text style={styles.routeType}>{route.transport_type}</Text>
+                  <Text style={styles.routeCost}>R {route.cost}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.routeArrow}>
+                <Text style={styles.routeArrowText}>›</Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
+      </View>
+
+      {/* Recent Posts */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Recent Posts ({posts.length})</Text>
+        {posts.length === 0 ? (
+          <View style={styles.emptyState}>
+            <MessageSquare size={24} color="#666666" />
+            <Text style={styles.emptyStateText}>No posts yet from this hub</Text>
+          </View>
+        ) : (
+          posts.map((post) => (
+            <View key={post.id} style={styles.postItem}>
+              <View style={styles.postHeader}>
+                <Text style={styles.postAuthor}>
+                  {post.profiles.first_name} {post.profiles.last_name}
+                </Text>
+                <Text style={styles.postTime}>
+                  {new Date(post.created_at).toLocaleDateString()}
+                </Text>
+              </View>
+              <Text style={styles.postContent}>{post.content}</Text>
+            </View>
+          ))
+        )}
+      </View>
+
+      <View style={styles.bottomSpace} />
     </ScrollView>
   );
 }
@@ -451,139 +324,157 @@ function RouteInfo({ hubId, hub, colors }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000000',
   },
-  image: {
-    width: '100%',
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#ffffff',
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    color: '#ffffff',
+    fontSize: 18,
+    marginBottom: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+  },
+  backButton: {
+    backgroundColor: '#1a1a1a',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backButtonText: {
+    color: '#1ea2b1',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  favoriteButton: {
+    backgroundColor: '#1a1a1a',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageContainer: {
     height: 200,
-  },
-  content: {
-    padding: 20,
-  },
-  titleContainer: {
-    flexDirection: 'row',
+    backgroundColor: '#1a1a1a',
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    marginHorizontal: 20,
+    borderRadius: 16,
     marginBottom: 20,
   },
-  address: {
-    fontSize: 16,
-    flex: 1,
+  imagePlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  tabContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
+  infoSection: {
+    paddingHorizontal: 20,
     marginBottom: 20,
   },
-  tabButton: {
-    padding: 10,
-  },
-  activeTabButton: {
-    borderBottomWidth: 2,
-  },
-  tabText: {
-    fontSize: 16,
-  },
-  activeTabText: {
+  hubName: {
+    fontSize: 28,
     fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 8,
   },
-  postContainer: {
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
+  hubAddress: {
+    fontSize: 16,
+    color: '#cccccc',
+    marginBottom: 12,
   },
-  postHeader: {
+  coordinates: {
+    marginBottom: 12,
+  },
+  coordinatesText: {
+    fontSize: 14,
+    color: '#666666',
+    fontFamily: 'monospace',
+  },
+  transportBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#1ea2b120',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  transportType: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  actionButtons: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
+    paddingHorizontal: 20,
+    marginBottom: 30,
+    gap: 12,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  postHeaderText: {
+  actionButton: {
     flex: 1,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  selectedTitle: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  postTime: {
-    fontSize: 12,
-    opacity: 0.8,
-  },
-  postContent: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  postFooter: {
+    backgroundColor: '#1ea2b1',
+    borderRadius: 12,
+    paddingVertical: 16,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  postDate: {
-    fontSize: 14,
-    opacity: 0.8,
+  actionButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 30,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 16,
   },
   emptyState: {
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
+    paddingVertical: 40,
   },
   emptyStateText: {
+    color: '#666666',
     fontSize: 16,
+    marginTop: 12,
     textAlign: 'center',
-    marginBottom: 20,
-  },
-  firstPostButton: {
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  firstPostButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  addButton: {
-    padding: 5,
-  },
-  searchInput: {
-    height: 40,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 15,
   },
   routeItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    gap: 15,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
   },
   routeInfo: {
     flex: 1,
@@ -591,43 +482,68 @@ const styles = StyleSheet.create({
   routeName: {
     fontSize: 16,
     fontWeight: '500',
+    color: '#ffffff',
     marginBottom: 4,
   },
+  routeDestination: {
+    fontSize: 14,
+    color: '#cccccc',
+    marginBottom: 8,
+  },
   routeDetails: {
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  routePrice: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  chatBoxContainer: {
-    padding: 10,
-    borderTopWidth: 1,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 10,
-    minHeight: 50,
-  },
-  mapButton: {
-    padding: 10,
-    borderRadius: 5,
-  },
-  postButton: {
-    padding: 10,
-    borderRadius: 5,
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
-  postButtonText: {
-    fontWeight: 'bold',
+  routeType: {
+    fontSize: 12,
+    color: '#1ea2b1',
+    backgroundColor: '#1ea2b120',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
-  errorText: {
+  routeCost: {
     fontSize: 14,
-    color: 'red',
-    textAlign: 'center',
-    marginBottom: 10,
+    color: '#1ea2b1',
+    fontWeight: '500',
+  },
+  routeArrow: {
+    marginLeft: 12,
+  },
+  routeArrowText: {
+    fontSize: 24,
+    color: '#666666',
+  },
+  postItem: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  postHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  postAuthor: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1ea2b1',
+  },
+  postTime: {
+    fontSize: 12,
+    color: '#666666',
+  },
+  postContent: {
+    fontSize: 14,
+    color: '#ffffff',
+    lineHeight: 20,
+  },
+  bottomSpace: {
+    height: 20,
   },
 });
