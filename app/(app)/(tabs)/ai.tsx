@@ -4,8 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { MessageSquare, Zap, MapPin, Clock, CloudRain, Sun, Navigation, Users, Bot } from 'lucide-react-native';
-import { getNearbyHubs, getNearbyRoutes, getNearbyStops, Hub, Route, Stop } from '../../services/locationService';
-import { getWeatherData, getWeatherAdvice, WeatherData } from '../../services/weatherService';
+import { getNearbyHubs, getNearbyRoutes, getNearbyStops, Hub, Route, Stop } from '@/services/locationService';
+import { getWeatherData, getWeatherAdvice, WeatherData } from '@/services/weatherService';
 
 interface Message {
   id: string;
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 60,
     paddingBottom: 20,
     position: 'relative',
   },

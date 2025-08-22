@@ -36,6 +36,7 @@
     "expo-localization": "~16.0.1",
     "expo-location": "^18.0.7",
     "expo-router": "4.0.17",
+    "expo-secure-store": "~14.0.1",
     "expo-sharing": "~13.0.1",
     "expo-snackbar": "^1.0.0",
     "expo-splash-screen": "~0.29.22",
@@ -60,8 +61,7 @@
     "react-native-toast-message": "^2.2.1",
     "react-native-url-polyfill": "^2.0.0",
     "react-native-web": "^0.19.13",
-    "react-native-webview": "13.12.5",
-    "expo-secure-store": "~14.0.1"
+    "react-native-webview": "13.12.5"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

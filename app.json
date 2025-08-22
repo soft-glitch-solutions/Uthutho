@@ -9,7 +9,15 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSUserTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you.",
+        "SKAdNetworkItems": [
+          {
+            "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork"
+          }
+        ]
+      }
     },
     "web": {
       "favicon": "./assets/images/logo.png",
@@ -36,7 +44,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "d57defc0-07eb-42d8-9c0c-e0c8df94ce4a"
+        "projectId": "45908a0a-a038-4ab8-8a4e-8ff5b7db2db4"
       }
     },
     "android": {
@@ -45,6 +53,7 @@
     "splash": {
       "image": "./assets/images/SplashScreen.png",
       "backgroundColor": "#000000"
-    }
+    },
+    "owner": "soft-glitch-solution"
   }
 }
