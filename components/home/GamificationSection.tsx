@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { Trophy, Award } from 'lucide-react-native';
-import { useTheme } from '../../../context/ThemeContext';
+import { useTheme } from '@/context/ThemeContext';
 import GamificationSkeleton from './skeletons/GamificationSkeleton';
 
 interface GamificationSectionProps {

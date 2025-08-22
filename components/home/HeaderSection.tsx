@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Search } from 'lucide-react-native';
-import { useTheme } from '../../../context/ThemeContext';
+import { useTheme } from '@/context/ThemeContext';
 import HeaderSkeleton from './skeletons/HeaderSkeleton';
 
 interface HeaderSectionProps {

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MapPin, Flag, Route, Heart, Plus } from 'lucide-react-native';
-import { useTheme } from '../../../context/ThemeContext';
+import { useTheme } from '@/context/ThemeContext';
 import FavoritesSkeleton from './skeletons/FavoritesSkeleton';
 
 interface FavoriteItem {

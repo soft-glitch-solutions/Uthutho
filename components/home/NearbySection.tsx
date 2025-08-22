@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Flag, MapPin } from 'lucide-react-native';
-import { useTheme } from '../../../context/ThemeContext';
-import StopBlock from '../../../components/stop/StopBlock';
+import { useTheme } from '@/context/ThemeContext';
+import StopBlock from '@/components/stop/StopBlock';
 import NearestLocationsSkeleton from './skeletons/NearestLocationsSkeleton';
 
 interface NearbySectionProps {
