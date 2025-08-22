@@ -14,12 +14,14 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Flag, MapPin, Route, Search, Plus , Award , Trophy , Heart} from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext';
 import StopBlock from '../../../components/stop/StopBlock';
 import { AdMobBanner, setTestDeviceIDAsync } from 'expo-ads-admob';
 import { useNavigation } from 'expo-router';
+import StreakOverlay from '@/components/StreakOverlay'; // Import the StreakOverlay component
 
 interface FavoriteItem {
   id: string;
@@ -233,6 +235,7 @@ export default function HomeScreen() {
   const [userId, setUserId] = useState(null);
   const [favoriteDetails, setFavoriteDetails] = useState([]);
   const [isStatsLoading, setIsStatsLoading] = useState(true);
+  const [showStreakOverlay, setShowStreakOverlay] = useState(false);
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -240,6 +243,22 @@ export default function HomeScreen() {
       setTestDeviceIDAsync('EMULATOR');
     }
   }, []);
+
+  const checkAndShowStreakOverlay = async (userId: string) => {
+    try {
+      // Check if we've already shown the streak overlay for this user in this session
+      const shownKey = `streakOverlayShown_${userId}`;
+      const hasShown = await AsyncStorage.getItem(shownKey);
+      
+      if (!hasShown) {
+        setShowStreakOverlay(true);
+        // Mark as shown for this session
+        await AsyncStorage.setItem(shownKey, 'true');
+      }
+    } catch (error) {
+      console.error('Error checking streak overlay status:', error);
+    }
+  };
 
   const toggleFavorite = async (item: FavoriteItem) => {
     try {
@@ -349,6 +368,9 @@ export default function HomeScreen() {
           );
           setFavoriteDetails(details.filter(Boolean));
         }
+
+        // Check if we should show the streak overlay
+        checkAndShowStreakOverlay(userId);
       } catch (error) {
         router.replace('/auth');
       } finally {
@@ -426,17 +448,25 @@ export default function HomeScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        // Get profile data
         const { data: profile } = await supabase
           .from('profiles')
           .select('points, selected_title')
           .eq('id', user.id)
           .single();
         
+        // Get streak data from login_streaks table
+        const { data: streakData } = await supabase
+          .from('login_streaks')
+          .select('current_streak')
+          .eq('user_id', user.id)
+          .single();
+        
         if (profile) {
           setUserStats({
             points: profile.points || 0,
             level: Math.floor((profile.points || 0) / 100) + 1,
-            streak: 5, // This would come from login_streaks table
+            streak: streakData?.current_streak || 0, // Use actual streak from login_streaks table
             title: profile.selected_title || 'Newbie Explorer'
           });
         }
@@ -447,7 +477,6 @@ export default function HomeScreen() {
       setIsStatsLoading(false);
     }
   };
-
   useEffect(() => {
     loadUserStats();
   }, []);
@@ -550,6 +579,13 @@ export default function HomeScreen() {
           </View>
         </View>
       )}
+
+      {/* Streak Overlay */}
+      <StreakOverlay
+        visible={showStreakOverlay}
+        userId={userId}
+        onClose={() => setShowStreakOverlay(false)}
+      />
 
       {/* Ad Banner */}
       {Platform.OS !== 'web' ? (
