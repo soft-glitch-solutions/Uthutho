@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { House, User, Rss, Flag ,MessageCircle } from 'lucide-react-native';
+import { House, User, Rss, Route ,MessageCircle } from 'lucide-react-native';
 import { View, Text } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { useNotifications } from '../../../hook/useNotifications';
@@ -66,10 +66,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="stops"
+        name="route"
         options={{
-          title: 'Stops',
-          tabBarIcon: ({ color, size }) => <Flag color={color} size={size} />,
+          title: 'Route',
+          tabBarIcon: ({ color, size }) => <Route color={color} size={size} />,
         }}
       />
             <Tabs.Screen

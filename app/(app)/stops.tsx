@@ -11,12 +11,12 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { useTheme } from '../../../context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 import { PlusCircle, Heart, Search, X, CircleAlert as AlertCircle } from 'lucide-react-native';
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
-import StopBlock from '../../../components/stop/StopBlock';
+import StopBlock from '../../components/stop/StopBlock';
 
 const TRANSPORT_TYPES = ['Bus 🚌', 'Train 🚂', 'Taxi 🚕'];
 const WAITING_COLORS = {

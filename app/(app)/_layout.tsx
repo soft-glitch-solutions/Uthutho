@@ -1,7 +1,7 @@
 import React from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { useTheme } from '../../context/ThemeContext';
-import { Route, House, Settings, CircleHelp as HelpCircle, User , MapPin } from 'lucide-react-native';
+import { Route, House, Flag , Settings, CircleHelp as HelpCircle, User , MapPin } from 'lucide-react-native';
 
 export default function AppLayout() {
   const { colors } = useTheme();
@@ -35,10 +35,10 @@ export default function AppLayout() {
             <MapPin color={color} size={size} />
           ),
         }} />
-   <Drawer.Screen name="routes"         options={{
-          title: 'Routes',
+   <Drawer.Screen name="stops"         options={{
+          title: 'Stop',
           drawerIcon: ({ color, size }) => (
-            <Route color={color} size={size} />
+            <Flag color={color} size={size} />
           ),
         }}/>
       <Drawer.Screen

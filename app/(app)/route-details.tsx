@@ -16,7 +16,6 @@ import { useTheme } from '@/context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { Route as RouteIcon, MapPin, Clock, DollarSign, Heart, HeartOff, ArrowLeft, Users, TrendingUp, Shield } from 'lucide-react-native';
 
-
 interface RouteStats {
   avg_journey_time: string;
   peak_hours: string;
@@ -25,67 +24,85 @@ interface RouteStats {
   safety_rating: number;
 }
 
-// Shimmer Component for Loading Animation
-const Shimmer = ({ children, colors }) => {
-  const animatedValue = new Animated.Value(0);
-
-  React.useEffect(() => {
-    const shimmerAnimation = () => {
-      Animated.sequence([
-        Animated.timing(animatedValue, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(animatedValue, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ]).start(() => shimmerAnimation());
-    };
-
-    shimmerAnimation();
-  }, []);
-
-  const translateX = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-100, 100],
-  });
-
-  return (
-    <View style={{ overflow: 'hidden' }}>
-      {children}
-      <Animated.View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: colors.text,
-          opacity: 0.1,
-          transform: [{ translateX }],
-        }}
-      />
-    </View>
-  );
-};
-
 // Skeleton Loading Component
 const RouteDetailsSkeleton = ({ colors }) => {
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Shimmer colors={colors}>
-        <View style={[styles.skeletonText, { width: '60%' }]} />
-      </Shimmer>
-      <Shimmer colors={colors}>
-        <View style={[styles.skeletonText, { width: '80%' }]} />
-      </Shimmer>
-      <Shimmer colors={colors}>
-        <View style={[styles.skeletonText, { width: '40%' }]} />
-      </Shimmer>
-    </View>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.content}>
+        {/* Header Skeleton */}
+        <View style={styles.skeletonHeader}>
+          <View style={[styles.skeletonCircle, { backgroundColor: colors.card }]} />
+          <View style={[styles.skeletonCircle, { backgroundColor: colors.card }]} />
+        </View>
+
+        {/* Route Header Skeleton */}
+        <View style={styles.skeletonRouteHeader}>
+          <View style={[styles.skeletonCircleLarge, { backgroundColor: colors.card }]} />
+          <View style={[styles.skeletonTextLarge, { backgroundColor: colors.card }]} />
+        </View>
+
+        {/* Info Cards Skeleton */}
+        <View style={styles.skeletonInfoCards}>
+          {[1, 2, 3].map((item) => (
+            <View key={item} style={[styles.skeletonInfoCard, { backgroundColor: colors.card }]}>
+              <View style={[styles.skeletonCircleSmall, { backgroundColor: colors.border }]} />
+              <View style={[styles.skeletonTextSmall, { backgroundColor: colors.border }]} />
+              <View style={[styles.skeletonTextMedium, { backgroundColor: colors.border }]} />
+            </View>
+          ))}
+        </View>
+
+        {/* Route Statistics Skeleton */}
+        <View style={styles.skeletonSection}>
+          <View style={[styles.skeletonSectionTitle, { backgroundColor: colors.card }]} />
+          <View style={[styles.skeletonStatsCard, { backgroundColor: colors.card }]}>
+            {[1, 2, 3, 4, 5].map((item) => (
+              <View key={item} style={styles.skeletonStatRow}>
+                <View style={[styles.skeletonCircleTiny, { backgroundColor: colors.border }]} />
+                <View style={[styles.skeletonTextStatLabel, { backgroundColor: colors.border }]} />
+                <View style={[styles.skeletonTextStatValue, { backgroundColor: colors.border }]} />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Points Container Skeleton */}
+        <View style={styles.skeletonPointsContainer}>
+          {[1, 2].map((item) => (
+            <View key={item} style={[styles.skeletonPointColumn, { backgroundColor: colors.card }]}>
+              <View style={[styles.skeletonTextLabel, { backgroundColor: colors.border }]} />
+              <View style={[styles.skeletonTextValue, { backgroundColor: colors.border }]} />
+            </View>
+          ))}
+        </View>
+
+        {/* Stops Section Skeleton */}
+        <View style={styles.skeletonSection}>
+          <View style={[styles.skeletonSectionTitle, { backgroundColor: colors.card }]} />
+          {[1, 2, 3].map((item) => (
+            <View key={item} style={[styles.skeletonStopItem, { backgroundColor: colors.card }]}>
+              <View style={[styles.skeletonTextStopName, { backgroundColor: colors.border }]} />
+              <View style={[styles.skeletonTextStopDetails, { backgroundColor: colors.border }]} />
+            </View>
+          ))}
+        </View>
+
+        {/* Button Skeleton */}
+        <View style={[styles.skeletonButton, { backgroundColor: colors.card }]} />
+
+        {/* Price Requests Skeleton */}
+        <View style={styles.skeletonSection}>
+          <View style={[styles.skeletonSectionTitle, { backgroundColor: colors.card }]} />
+          {[1, 2].map((item) => (
+            <View key={item} style={[styles.skeletonRequestItem, { backgroundColor: colors.card }]}>
+              <View style={[styles.skeletonTextRequest, { backgroundColor: colors.border }]} />
+              <View style={[styles.skeletonTextRequest, { backgroundColor: colors.border }]} />
+              <View style={[styles.skeletonTextRequest, { backgroundColor: colors.border }]} />
+            </View>
+          ))}
+        </View>
+      </View>
+    </ScrollView>
   );
 };
 
@@ -109,23 +126,21 @@ export default function RouteDetailsScreen() {
     fetchPriceChangeRequests();
   }, [routeId]);
 
-    const loadRouteStats = async () => {
+  const loadRouteStats = async () => {
     try {
-      // In a real app, this would come from analytics/stats tables
-      // For now, we'll generate realistic data
       setRouteStats({
         avg_journey_time: `${30 + Math.floor(Math.random() * 30)}-${45 + Math.floor(Math.random() * 30)} min`,
         peak_hours: '7-9 AM, 5-7 PM',
         service_frequency: `Every ${10 + Math.floor(Math.random() * 15)}-${15 + Math.floor(Math.random() * 15)} min`,
-        reliability_score: 3 + Math.floor(Math.random() * 2), // 3-4 out of 5
-        safety_rating: 3 + Math.floor(Math.random() * 2), // 3-4 out of 5
+        reliability_score: 3 + Math.floor(Math.random() * 2),
+        safety_rating: 3 + Math.floor(Math.random() * 2),
       });
     } catch (error) {
       console.error('Error loading route stats:', error);
     }
   };
 
-    const toggleFavorite = async () => {
+  const toggleFavorite = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !route) return;
@@ -180,7 +195,6 @@ export default function RouteDetailsScreen() {
 
       if (stopsError) throw stopsError;
 
-      // Fetch waiting count for each stop
       const stopsWithWaitingCount = await Promise.all(
         stopsData.map(async (stop) => {
           const { data: waitingData, error: waitingError } = await supabase
@@ -213,7 +227,6 @@ export default function RouteDetailsScreen() {
       if (error) throw error;
       setPriceChangeRequests(data);
 
-      // Check if there's a pending request
       const hasPending = data.some((request) => request.status === 'pending');
       setHasPendingRequest(hasPending);
     } catch (error) {
@@ -228,7 +241,6 @@ export default function RouteDetailsScreen() {
     }
 
     try {
-      // Ensure the user is authenticated
       const { data: { user }, error: authError } = await supabase.auth.getUser();
 
       if (authError || !user) {
@@ -236,13 +248,11 @@ export default function RouteDetailsScreen() {
         return;
       }
 
-      // Check if there's already a pending request
       if (hasPendingRequest) {
         Alert.alert('Error', 'There is already a pending price change request for this route.');
         return;
       }
 
-      // Insert the price change request
       const { error } = await supabase
         .from('price_change_requests')
         .insert([
@@ -260,7 +270,7 @@ export default function RouteDetailsScreen() {
       Alert.alert('Success', 'Your price change request has been submitted.');
       setModalVisible(false);
       setNewPrice('');
-      fetchPriceChangeRequests(); // Refresh the price change requests list
+      fetchPriceChangeRequests();
     } catch (error) {
       console.error('Error submitting price change request:', error);
       Alert.alert('Error', 'There was an error submitting your request.');
@@ -292,82 +302,80 @@ export default function RouteDetailsScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color="#ffffff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
+            {isFavorite ? (
+              <Heart size={24} color="#1ea2b1" fill="#1ea2b1" />
+            ) : (
+              <HeartOff size={24} color="#ffffff" />
+            )}
+          </TouchableOpacity>
+        </View>
+
         {/* Route Header */}
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
-          {isFavorite ? (
-            <Heart size={24} color="#1ea2b1" fill="#1ea2b1" />
-          ) : (
-            <HeartOff size={24} color="#ffffff" />
-          )}
-        </TouchableOpacity>
-      </View>
+        <View style={styles.routeHeader}>
+          <View style={styles.routeIcon}>
+            <RouteIcon size={32} color="#1ea2b1" />
+          </View>
+          <Text style={styles.routeName}>{route.name}</Text>
+        </View>
 
-      {/* Route Header */}
-      <View style={styles.routeHeader}>
-        <View style={styles.routeIcon}>
-          <RouteIcon size={32} color="#1ea2b1" />
-        </View>
-        <Text style={styles.routeName}>{route.name}</Text>
-      </View>
-
-      {/* Route Info Cards */}
-      <View style={styles.infoCards}>
-        <View style={styles.infoCard}>
-          <DollarSign size={20} color="#1ea2b1" />
-          <Text style={styles.infoLabel}>Fare</Text>
-          <Text style={styles.infoValue}>R {route.cost}</Text>
+        {/* Route Info Cards */}
+        <View style={styles.infoCards}>
+          <View style={styles.infoCard}>
+            <DollarSign size={20} color="#1ea2b1" />
+            <Text style={styles.infoLabel}>Fare</Text>
+            <Text style={styles.infoValue}>R {route.cost}</Text>
+          </View>
+          
+          <View style={styles.infoCard}>
+            <RouteIcon size={20} color="#1ea2b1" />
+            <Text style={styles.infoLabel}>Type</Text>
+            <Text style={styles.infoValue}>{route.transport_type}</Text>
+          </View>
+          
+          <View style={styles.infoCard}>
+            <MapPin size={20} color="#1ea2b1" />
+            <Text style={styles.infoLabel}>Stops</Text>
+            <Text style={styles.infoValue}>{stops.length}</Text>
+          </View>
         </View>
         
-        <View style={styles.infoCard}>
-          <RouteIcon size={20} color="#1ea2b1" />
-          <Text style={styles.infoLabel}>Type</Text>
-          <Text style={styles.infoValue}>{route.transport_type}</Text>
-        </View>
-        
-        <View style={styles.infoCard}>
-          <MapPin size={20} color="#1ea2b1" />
-          <Text style={styles.infoLabel}>Stops</Text>
-          <Text style={styles.infoValue}>{stops.length}</Text>
-        </View>
-        </View>
-        
-         {/* Route Statistics */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Route Information</Text>
-        <View style={styles.statsCard}>
-          <View style={styles.statRow}>
-            <Clock size={16} color="#1ea2b1" />
-            <Text style={styles.statLabel}>Estimated Journey Time:</Text>
-            <Text style={styles.statValue}>{routeStats?.avg_journey_time || '45-60 min'}</Text>
-          </View>
-          <View style={styles.statRow}>
-            <Users size={16} color="#1ea2b1" />
-            <Text style={styles.statLabel}>Peak Hours:</Text>
-            <Text style={styles.statValue}>{routeStats?.peak_hours || '7-9 AM, 5-7 PM'}</Text>
-          </View>
-          <View style={styles.statRow}>
-            <RouteIcon size={16} color="#1ea2b1" />
-            <Text style={styles.statLabel}>Service Frequency:</Text>
-            <Text style={styles.statValue}>{routeStats?.service_frequency || 'Every 15-20 min'}</Text>
-          </View>
-          <View style={styles.statRow}>
-            <TrendingUp size={16} color="#1ea2b1" />
-            <Text style={styles.statLabel}>Reliability Score:</Text>
-            <Text style={styles.statValue}>{routeStats?.reliability_score || 4}/5</Text>
-          </View>
-          <View style={styles.statRow}>
-            <Shield size={16} color="#1ea2b1" />
-            <Text style={styles.statLabel}>Safety Rating:</Text>
-            <Text style={styles.statValue}>{routeStats?.safety_rating || 4}/5</Text>
+        {/* Route Statistics */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Route Information</Text>
+          <View style={styles.statsCard}>
+            <View style={styles.statRow}>
+              <Clock size={16} color="#1ea2b1" />
+              <Text style={styles.statLabel}>Estimated Journey Time:</Text>
+              <Text style={styles.statValue}>{routeStats?.avg_journey_time || '45-60 min'}</Text>
+            </View>
+            <View style={styles.statRow}>
+              <Users size={16} color="#1ea2b1" />
+              <Text style={styles.statLabel}>Peak Hours:</Text>
+              <Text style={styles.statValue}>{routeStats?.peak_hours || '7-9 AM, 5-7 PM'}</Text>
+            </View>
+            <View style={styles.statRow}>
+              <RouteIcon size={16} color="#1ea2b1" />
+              <Text style={styles.statLabel}>Service Frequency:</Text>
+              <Text style={styles.statValue}>{routeStats?.service_frequency || 'Every 15-20 min'}</Text>
+            </View>
+            <View style={styles.statRow}>
+              <TrendingUp size={16} color="#1ea2b1" />
+              <Text style={styles.statLabel}>Reliability Score:</Text>
+              <Text style={styles.statValue}>{routeStats?.reliability_score || 4}/5</Text>
+            </View>
+            <View style={styles.statRow}>
+              <Shield size={16} color="#1ea2b1" />
+              <Text style={styles.statLabel}>Safety Rating:</Text>
+              <Text style={styles.statValue}>{routeStats?.safety_rating || 4}/5</Text>
+            </View>
           </View>
         </View>
-      </View>
-        
         
         <View style={styles.detailsContainer}>
           {/* Start and End Points in Two Columns */}
@@ -392,8 +400,6 @@ export default function RouteDetailsScreen() {
           </View>
         </View>
 
-
-
         {/* Stops Section */}
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Stops</Text>
         {stops.length > 0 ? (
@@ -414,7 +420,7 @@ export default function RouteDetailsScreen() {
           </Text>
         )}
 
-                {/* Price Change Button */}
+        {/* Price Change Button */}
         <Pressable
           style={[styles.priceChangeButton, { backgroundColor: colors.primary }]}
           onPress={openPriceChangeModal}>
@@ -485,10 +491,10 @@ export default function RouteDetailsScreen() {
               <Text style={[styles.requestText, { color: colors.text }]}>
                 Status: {request.status}
               </Text>
-            <Pressable onPress={() => router.push(`/social-profile?id=${request.profiles.id}`)}>
-              <Text style={[styles.requestText, { color: colors.text }]}>
-                Requested by: {request.profiles.first_name} {request.profiles.last_name}
-              </Text>
+              <Pressable onPress={() => router.push(`/social-profile?id=${request.profiles.id}`)}>
+                <Text style={[styles.requestText, { color: colors.text }]}>
+                  Requested by: {request.profiles.first_name} {request.profiles.last_name}
+                </Text>
               </Pressable>
             </View>
           ))
@@ -515,16 +521,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  detailsContainer: {
-    marginBottom: 16,
-  },
-    routeHeader: {
+  routeHeader: {
     alignItems: 'center',
-    paddingHorizontal: 20,
     marginBottom: 30,
   },
   routeIcon: {
@@ -545,6 +543,66 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
   },
+  infoCards: {
+    flexDirection: 'row',
+    marginBottom: 30,
+    gap: 12,
+  },
+  infoCard: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  section: {
+    marginBottom: 30,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 16,
+  },
+  statsCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: '#cccccc',
+    marginLeft: 8,
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 14,
+    color: '#ffffff',
+    fontWeight: '500',
+  },
+  detailsContainer: {
+    marginBottom: 16,
+  },
   detailLabel: {
     fontSize: 16,
     fontWeight: 'bold',
@@ -562,6 +620,22 @@ const styles = StyleSheet.create({
   pointColumn: {
     flex: 1,
     marginRight: 8,
+  },
+  stopItem: {
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  stopName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  stopDetails: {
+    fontSize: 14,
+  },
+  noStopsText: {
+    textAlign: 'center',
+    fontSize: 16,
   },
   priceChangeButton: {
     padding: 12,
@@ -611,32 +685,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 4,
   },
-section: {
-    paddingHorizontal: 20,
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 16,
-  },
-  stopItem: {
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  stopName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  stopDetails: {
-    fontSize: 14,
-  },
-  noStopsText: {
-    textAlign: 'center',
-    fontSize: 16,
-  },
   requestItem: {
     padding: 16,
     borderRadius: 8,
@@ -649,28 +697,17 @@ section: {
     textAlign: 'center',
     fontSize: 16,
   },
-  skeletonText: {
-    height: 14,
-    borderRadius: 4,
-    marginVertical: 4,
-    backgroundColor: '#ccc',
-  },
   errorText: {
     textAlign: 'center',
     fontSize: 16,
   },
-    backButton: {
+  backButton: {
     backgroundColor: '#1a1a1a',
     width: 44,
     height: 44,
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  backButtonText: {
-    color: '#1ea2b1',
-    fontSize: 16,
-    fontWeight: '600',
   },
   favoriteButton: {
     backgroundColor: '#1a1a1a',
@@ -680,53 +717,150 @@ section: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-    infoCards: {
+  buttonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+
+  // Skeleton Styles
+  skeletonHeader: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  skeletonCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  skeletonRouteHeader: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  skeletonCircleLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 16,
+  },
+  skeletonTextLarge: {
+    height: 28,
+    width: '60%',
+    borderRadius: 8,
+  },
+  skeletonInfoCards: {
+    flexDirection: 'row',
     marginBottom: 30,
     gap: 12,
   },
-  infoCard: {
+  skeletonInfoCard: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#333333',
   },
-  infoLabel: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 8,
+  skeletonCircleSmall: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  skeletonTextSmall: {
+    height: 12,
+    width: '60%',
+    borderRadius: 4,
     marginBottom: 4,
   },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
+  skeletonTextMedium: {
+    height: 16,
+    width: '40%',
+    borderRadius: 4,
   },
-    statsCard: {
-    backgroundColor: '#1a1a1a',
+  skeletonStatsCard: {
     borderRadius: 12,
     padding: 16,
-    borderWidth: 1,
-    borderColor: '#333333',
   },
-  statRow: {
+  skeletonStatRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
-  statLabel: {
-    fontSize: 14,
-    color: '#cccccc',
+  skeletonCircleTiny: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+  },
+  skeletonTextStatLabel: {
+    height: 14,
+    width: '60%',
+    borderRadius: 4,
     marginLeft: 8,
     flex: 1,
   },
-  statValue: {
-    fontSize: 14,
-    color: '#ffffff',
-    fontWeight: '500',
+  skeletonTextStatValue: {
+    height: 14,
+    width: '20%',
+    borderRadius: 4,
+  },
+  skeletonPointsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  skeletonPointColumn: {
+    flex: 1,
+    marginRight: 8,
+    padding: 12,
+    borderRadius: 8,
+  },
+  skeletonTextLabel: {
+    height: 16,
+    width: '40%',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonTextValue: {
+    height: 14,
+    width: '80%',
+    borderRadius: 4,
+  },
+  skeletonStopItem: {
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  skeletonTextStopName: {
+    height: 16,
+    width: '70%',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonTextStopDetails: {
+    height: 14,
+    width: '50%',
+    borderRadius: 4,
+  },
+  skeletonButton: {
+    height: 48,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  skeletonRequestItem: {
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  skeletonTextRequest: {
+    height: 14,
+    width: '80%',
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  skeletonSectionTitle: {
+    height: 20,
+    width: '50%',
+    borderRadius: 6,
+    marginBottom: 16,
   },
 });

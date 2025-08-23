@@ -9,9 +9,9 @@ import {
   RefreshControl,
   TextInput,
 } from 'react-native';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from '../../../context/ThemeContext';
 import { PlusCircle, Heart } from 'lucide-react-native'; // Icons
-import { supabase } from '../../lib/supabase'; // Adjust the path
+import { supabase } from '../../../lib/supabase'; // Adjust the path
 import { useRouter } from 'expo-router'; // Use useRouter for navigation
 
 export default function RoutesScreen() {
@@ -226,7 +226,6 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   header: {
-    paddingTop: 30,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
