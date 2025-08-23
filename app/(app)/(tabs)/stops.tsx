@@ -358,6 +358,7 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   header: {
+    paddingTop: 30,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

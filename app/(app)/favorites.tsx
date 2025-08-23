@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 24,
-    paddingTop: 60,
+    paddingTop: 50,
   },
   headerTitle: {
     fontSize: 28,

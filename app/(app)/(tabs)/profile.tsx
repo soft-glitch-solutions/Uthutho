@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView,  ActivityIndicator, Platform, Alert } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { formatTimeAgo } from '../../../components/utils';
 import { router } from 'expo-router';
 import { Settings, LogOut, Camera, Captions, Edit, Badge, Star, MessageSquare, MapPin, Flame, Trash, MoreVertical } from 'lucide-react-native';
 import { useProfile } from '@/hook/useProfile';
 import { Animated } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
 
 // Skeleton Loading Components
@@ -222,9 +223,23 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleImagePicker = () => {
+  const handleImagePicker = async () => {
     if (Platform.OS === 'web') {
       fileInputRef.current?.click();
+    } else {
+      // Native: use expo-image-picker
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+  
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        // You may need to convert the asset to a blob or base64 depending on your uploadAvatar implementation
+        await uploadAvatar(asset.uri);
+      }
     }
   };
 
@@ -602,6 +617,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
+    paddingTop: 30,
     alignItems: 'center',
   },
   avatarContainer: {

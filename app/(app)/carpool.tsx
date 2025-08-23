@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 24,
-    paddingTop: 60,
+    paddingTop: 50,
   },
   backButton: {
     color: '#1ea2b1',

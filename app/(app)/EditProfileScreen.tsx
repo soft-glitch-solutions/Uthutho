@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 50,
     paddingBottom: 20,
   },
   skeletonBackButton: {
