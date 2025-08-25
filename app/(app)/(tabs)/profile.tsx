@@ -552,6 +552,30 @@ export default function ProfileScreen() {
 
       {selectedTab === 'achievements' && (
         <View style={styles.menuContainer}>
+                    {rankMenuItems.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[styles.menuItem, { backgroundColor: colors.card }]}
+              onPress={() => {
+                if (item.title === 'Change Title') {
+                  router.push('/changetitle');
+                }
+                if (item.title === 'Title To Earn') {
+                  router.push('/titleearn');
+                }
+              }}
+            >
+              {item.icon}
+              <View style={styles.menuText}>
+                <Text style={[styles.menuTitle, { color: colors.text }]}>
+                  {item.title}
+                </Text>
+                <Text style={[styles.menuSubtitle, { color: colors.text }]}>
+                  {item.subtitle}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
           {/* Achievement Banners */}
           {loading ? (
             <>
