@@ -1,8 +1,9 @@
 import { Tabs } from 'expo-router';
-import { House, User, Rss, Route ,MessageCircle } from 'lucide-react-native';
+import { House, User, Rss, Route, MessageCircle } from 'lucide-react-native';
 import { View, Text } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { useNotifications } from '../../../hook/useNotifications';
+
 export default function TabLayout() {
   const { unreadCount } = useNotifications();
   const { colors } = useTheme();
@@ -19,8 +20,9 @@ export default function TabLayout() {
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.text,
-        headerShown: false, 
-      }}>
+        headerShown: false,
+      }}
+    >
       <Tabs.Screen
         name="home"
         options={{
@@ -28,51 +30,55 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <House color={color} size={size} />,
         }}
       />
+
       <Tabs.Screen
         name="feeds"
         options={{
           title: 'Feeds',
           tabBarIcon: ({ color, size }) => (
- <View style={{ position: 'relative' }}>
- <Rss color={color} size={size} />
+            <View style={{ position: 'relative' }}>
+              <Rss color={color} size={size} />
               {unreadCount > 0 && (
- <View
- style={{
- position: 'absolute',
- top: -5,
- right: -5,
- backgroundColor: 'red',
- borderRadius: 10,
- width: 20,
- height: 20,
- justifyContent: 'center',
- alignItems: 'center',
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -5,
+                    right: -10,
+                    backgroundColor: 'red',
+                    borderRadius: 10,
+                    width: 20,
+                    height: 20,
+                    justifyContent: 'center',
+                    alignItems: 'center',
                   }}
- >
- <Text style={{ color: 'white', fontSize: 12 }}>{unreadCount}</Text>
- </View>
+                >
+                  <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>
+                    {unreadCount}
+                  </Text>
+                </View>
               )}
- </View>
+            </View>
           ),
         }}
       />
+
       <Tabs.Screen
         name="ai"
         options={{
           title: 'AI Assistant',
-          tabBarIcon: ({ size, color }) => (
-            <MessageCircle size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} />,
         }}
       />
+
       <Tabs.Screen
-        name="route"
+        name="routes"
         options={{
-          title: 'Route',
+          title: 'Routes',
           tabBarIcon: ({ color, size }) => <Route color={color} size={size} />,
         }}
       />
-            <Tabs.Screen
+
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
@@ -80,6 +86,5 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
-    
   );
 }
