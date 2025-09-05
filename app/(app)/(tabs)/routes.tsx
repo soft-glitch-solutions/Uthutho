@@ -205,7 +205,7 @@ export default function RoutesScreen() {
   });
 
   const navigateToRoute = (routeId: string) => {
-    router.push(`/route/${routeId}`);
+    router.push(`/route-details?routeId=${routeId}`);
   };
 
   const navigateToHub = (hubId: string) => {
