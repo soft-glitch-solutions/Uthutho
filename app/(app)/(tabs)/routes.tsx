@@ -53,7 +53,10 @@ export default function RoutesScreen() {
 
   // Hubs State
   const [hubs, setHubs] = useState<Hub[]>([]);
+  const [filteredHubs, setFilteredHubs] = useState<Hub[]>([]);
+  const [hubSearchQuery, setHubSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingHubs, setLoadingHubs] = useState(false);
 
   const transportTypes = ['All', 'Taxi', 'Bus', 'Train', 'Uber'];
 
@@ -65,6 +68,10 @@ export default function RoutesScreen() {
   useEffect(() => {
     filterRoutes();
   }, [routes, routeSearchQuery, selectedTransportType]);
+
+  useEffect(() => {
+    filterHubs();
+  }, [hubs, hubSearchQuery]);
 
   const loadRoutes = async () => {
     setLoading(true);
@@ -84,6 +91,7 @@ export default function RoutesScreen() {
   };
 
   const loadHubs = async () => {
+    setLoadingHubs(true);
     try {
       const { data, error } = await supabase
         .from('hubs')
@@ -92,8 +100,11 @@ export default function RoutesScreen() {
 
       if (error) throw error;
       setHubs(data || []);
+      setFilteredHubs(data || []);
     } catch (err) {
       console.error('Failed to load hubs:', err);
+    } finally {
+      setLoadingHubs(false);
     }
   };
 
@@ -116,6 +127,22 @@ export default function RoutesScreen() {
     }
 
     setFilteredRoutes(filtered);
+  };
+
+  const filterHubs = () => {
+    if (!hubSearchQuery.trim()) {
+      setFilteredHubs(hubs);
+      return;
+    }
+
+    const query = hubSearchQuery.toLowerCase();
+    const filtered = hubs.filter(hub =>
+      hub.name.toLowerCase().includes(query) ||
+      (hub.address && hub.address.toLowerCase().includes(query)) ||
+      (hub.transport_type && hub.transport_type.toLowerCase().includes(query))
+    );
+
+    setFilteredHubs(filtered);
   };
 
   const findRoute = async () => {
@@ -212,6 +239,34 @@ export default function RoutesScreen() {
     router.push(`/hub/${hubId}`);
   };
 
+  // Skeleton Loader Components
+  const RouteSkeleton = () => (
+    <View style={styles.skeletonCard}>
+      <View style={styles.skeletonHeader}>
+        <View style={[styles.skeletonLine, { width: '60%', height: 16 }]} />
+        <View style={[styles.skeletonLine, { width: '30%', height: 12 }]} />
+      </View>
+      <View style={styles.skeletonFooter}>
+        <View style={[styles.skeletonLine, { width: '40%', height: 14 }]} />
+        <View style={[styles.skeletonLine, { width: '20%', height: 14 }]} />
+      </View>
+    </View>
+  );
+
+  const HubSkeleton = () => (
+    <View style={styles.skeletonCard}>
+      <View style={styles.skeletonHeader}>
+        <View style={styles.skeletonIcon} />
+        <View style={styles.skeletonInfo}>
+          <View style={[styles.skeletonLine, { width: '70%', height: 16 }]} />
+          <View style={[styles.skeletonLine, { width: '90%', height: 12 }]} />
+          <View style={[styles.skeletonLine, { width: '30%', height: 12 }]} />
+        </View>
+      </View>
+      <View style={[styles.skeletonLine, { width: '50%', height: 12, marginTop: 12 }]} />
+    </View>
+  );
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'planner':
@@ -304,7 +359,10 @@ export default function RoutesScreen() {
               </Text>
 
               {loading ? (
-                <Text style={styles.loadingText}>Loading routes...</Text>
+                // Skeleton Loader for Routes
+                Array.from({ length: 5 }).map((_, index) => (
+                  <RouteSkeleton key={index} />
+                ))
               ) : filteredRoutes.length === 0 ? (
                 <Text style={styles.noDataText}>No routes found</Text>
               ) : (
@@ -343,15 +401,34 @@ export default function RoutesScreen() {
       case 'hubs':
         return (
           <ScrollView style={styles.tabContent}>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Transport Hubs ({hubs.length})</Text>
+            {/* Search for Hubs */}
+            <View style={styles.filterSection}>
+              <View style={styles.searchContainer}>
+                <Search size={20} color="#666666" />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search hubs..."
+                  placeholderTextColor="#666666"
+                  value={hubSearchQuery}
+                  onChangeText={setHubSearchQuery}
+                />
+              </View>
+            </View>
 
-              {loading ? (
-                <Text style={styles.loadingText}>Loading hubs...</Text>
-              ) : hubs.length === 0 ? (
-                <Text style={styles.noDataText}>No hubs available</Text>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                Transport Hubs ({filteredHubs.length})
+              </Text>
+
+              {loadingHubs ? (
+                // Skeleton Loader for Hubs
+                Array.from({ length: 5 }).map((_, index) => (
+                  <HubSkeleton key={index} />
+                ))
+              ) : filteredHubs.length === 0 ? (
+                <Text style={styles.noDataText}>No hubs found</Text>
               ) : (
-                hubs.map((hub) => (
+                filteredHubs.map((hub) => (
                   <TouchableOpacity
                     key={hub.id}
                     style={styles.hubCard}
@@ -689,5 +766,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     paddingVertical: 20,
+  },
+  // Skeleton Loader Styles
+  skeletonCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  skeletonHeader: {
+    marginBottom: 12,
+  },
+  skeletonFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  skeletonLine: {
+    backgroundColor: '#333333',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonIcon: {
+    width: 24,
+    height: 24,
+    backgroundColor: '#333333',
+    borderRadius: 12,
+    marginRight: 12,
+  },
+  skeletonInfo: {
+    flex: 1,
   },
 });

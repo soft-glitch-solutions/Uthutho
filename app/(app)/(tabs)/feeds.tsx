@@ -583,7 +583,7 @@ export default function FeedsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('communities')}</Text>
+        <Text style={styles.headerTitle}>{t('Communities')}</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.notificationButton }  onPress={() => router.push('/notification')}>
             <Bell size={24} color="#ffffff" />
@@ -634,15 +634,15 @@ export default function FeedsScreen() {
                 onPress={createPost}
                 disabled={!newPost.trim()}
               >
-                <Text style={styles.postButtonText}>{t('post')}</Text>
+                <Text style={styles.postButtonText}>{t('Post')}</Text>
               </TouchableOpacity>
             </View>
           ) : null
         }
         ListEmptyComponent={
           <View style={styles.emptyPosts}>
-            <Text style={styles.emptyPostsText}>{t('noPostsYet')}</Text>
-            <Text style={styles.emptyPostsSubtext}>{t('beFirstToPost')}</Text>
+            <Text style={styles.emptyPostsText}>{t('No Posts Yet')}</Text>
+            <Text style={styles.emptyPostsSubtext}>{t('Be First To Post')}</Text>
           </View>
         }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
