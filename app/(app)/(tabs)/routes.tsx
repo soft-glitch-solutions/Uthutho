@@ -1,300 +1,693 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-  TextInput,
-} from 'react-native';
-import { useTheme } from '../../../context/ThemeContext';
-import { PlusCircle, Heart } from 'lucide-react-native'; // Icons
-import { supabase } from '../../../lib/supabase'; // Adjust the path
-import { useRouter } from 'expo-router'; // Use useRouter for navigation
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, TextInput } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { useRouter } from 'expo-router';
+import { Search, Clock, MapPin, Filter, Route as RouteIcon } from 'lucide-react-native';
+import { supabase } from '@/lib/supabase';
+import LocationAutocomplete from '@/components/LocationAutocomplete';
+import RouteInstructions from '@/components/RouteInstructions';
+
+interface Route {
+  id: string;
+  name: string;
+  start_point: string;
+  end_point: string;
+  cost: number;
+  transport_type: string;
+}
+
+interface Hub {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  address?: string;
+  transport_type?: string;
+  image?: string;
+}
+
+interface Location {
+  display_name: string;
+  lat: string;
+  lon: string;
+  place_id: string;
+}
 
 export default function RoutesScreen() {
-  const { colors } = useTheme();
-  const router = useRouter(); // Initialize the router
-  const [routes, setRoutes] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [userFavorites, setUserFavorites] = useState([]);
-  const [userSession, setUserSession] = useState(null);
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'planner' | 'routes' | 'hubs'>('planner');
 
-  // Fetch routes from Supabase
-  const fetchRoutes = async () => {
+  // Route Planner State
+  const [fromText, setFromText] = useState('');
+  const [toText, setToText] = useState('');
+  const [fromLocation, setFromLocation] = useState<Location | null>(null);
+  const [toLocation, setToLocation] = useState<Location | null>(null);
+  const [searchingRoute, setSearchingRoute] = useState(false);
+  const [routeInstructions, setRouteInstructions] = useState<any>(null);
+
+  // Routes State
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [filteredRoutes, setFilteredRoutes] = useState<Route[]>([]);
+  const [routeSearchQuery, setRouteSearchQuery] = useState('');
+  const [selectedTransportType, setSelectedTransportType] = useState<string>('All');
+
+  // Hubs State
+  const [hubs, setHubs] = useState<Hub[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const transportTypes = ['All', 'Taxi', 'Bus', 'Train', 'Uber'];
+
+  useEffect(() => {
+    loadRoutes();
+    loadHubs();
+  }, []);
+
+  useEffect(() => {
+    filterRoutes();
+  }, [routes, routeSearchQuery, selectedTransportType]);
+
+  const loadRoutes = async () => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('routes')
         .select('*')
-        .order('name');
+        .limit(50);
 
       if (error) throw error;
-      setRoutes(data);
-    } catch (error) {
-      console.error('Error fetching routes:', error);
+      setRoutes(data || []);
+    } catch (err) {
+      console.error('Failed to load routes:', err);
     } finally {
-      setIsLoading(false);
-      setRefreshing(false);
+      setLoading(false);
     }
   };
 
-  // Fetch the current user session
-  useEffect(() => {
-    const fetchSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      setUserSession(data.session);
-    };
+  const loadHubs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('hubs')
+        .select('*')
+        .limit(50);
 
-    fetchSession();
-  }, []);
-
-  // Fetch the user's favorites
-  useEffect(() => {
-    const fetchFavorites = async () => {
-      const userId = userSession?.user?.id;
-      if (!userId) return;
-
-      try {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('favorites')
-          .eq('id', userId)
-          .single();
-
-        if (error) throw error;
-        setUserFavorites(profile.favorites || []);
-      } catch (error) {
-        console.error('Error fetching favorites:', error);
-      }
-    };
-
-    fetchFavorites();
-  }, [userSession]);
-
-  // Initial data fetch
-  useEffect(() => {
-    fetchRoutes();
-  }, []);
-
-  // Pull-to-refresh handler
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchRoutes();
+      if (error) throw error;
+      setHubs(data || []);
+    } catch (err) {
+      console.error('Failed to load hubs:', err);
+    }
   };
 
-  // Add or remove a route from favorites
-  const handleFavorite = async (routeName) => {
-    const userId = userSession?.user?.id;
-    if (!userId) return;
+  const filterRoutes = () => {
+    let filtered = routes;
+
+    if (routeSearchQuery.trim()) {
+      const query = routeSearchQuery.toLowerCase();
+      filtered = filtered.filter(route =>
+        route.name.toLowerCase().includes(query) ||
+        route.start_point.toLowerCase().includes(query) ||
+        route.end_point.toLowerCase().includes(query)
+      );
+    }
+
+    if (selectedTransportType !== 'All') {
+      filtered = filtered.filter(route =>
+        route.transport_type === selectedTransportType
+      );
+    }
+
+    setFilteredRoutes(filtered);
+  };
+
+  const findRoute = async () => {
+    if (!fromLocation || !toLocation) return;
+
+    setSearchingRoute(true);
 
     try {
-      const { data: profile, error: fetchError } = await supabase
-        .from('profiles')
-        .select('favorites')
-        .eq('id', userId)
-        .single();
+      const { data: matchingRoutes, error } = await supabase
+        .from('routes')
+        .select('*')
+        .ilike('start_point', `%${fromLocation.display_name.split(',')[0]}%`)
+        .ilike('end_point', `%${toLocation.display_name.split(',')[0]}%`);
 
-      if (fetchError) throw fetchError;
+      if (error) throw error;
 
-      let updatedFavorites;
-      if (profile.favorites.includes(routeName)) {
-        updatedFavorites = profile.favorites.filter((favorite) => favorite !== routeName);
-        alert('Route removed from favorites!');
-      } else {
-        updatedFavorites = [...profile.favorites, routeName];
-        alert('Route added to favorites!');
-      }
+      const instructions =
+        matchingRoutes && matchingRoutes.length > 0
+          ? generateRouteInstructions(fromLocation, toLocation, matchingRoutes)
+          : generateGeneralInstructions(fromLocation, toLocation);
 
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ favorites: updatedFavorites })
-        .eq('id', userId);
-
-      if (updateError) throw updateError;
-
-      setUserFavorites(updatedFavorites);
-    } catch (error) {
-      console.error('Error updating favorites:', error);
-      alert('An error occurred. Please try again.');
+      setRouteInstructions(instructions);
+    } catch (err) {
+      console.error('Error finding route:', err);
+    } finally {
+      setSearchingRoute(false);
     }
   };
 
-  // Filter routes based on search query
-  const filteredRoutes = routes.filter((route) =>
-    route.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const generateRouteInstructions = (from: Location, to: Location, routes: Route[]) => {
+    const bestRoute = routes[0];
+    return {
+      fromLocation: from.display_name.split(',')[0],
+      toLocation: to.display_name.split(',')[0],
+      totalDuration: '45-60 min',
+      totalCost: bestRoute.cost,
+      steps: [
+        {
+          instruction: `Walk to the nearest ${bestRoute.transport_type} stop`,
+          transport_type: 'Walking',
+          duration: '5-10 min',
+        },
+        {
+          instruction: `Take ${bestRoute.name} from ${bestRoute.start_point} to ${bestRoute.end_point}`,
+          transport_type: bestRoute.transport_type,
+          duration: '30-45 min',
+          cost: bestRoute.cost,
+        },
+        {
+          instruction: 'Walk to your destination',
+          transport_type: 'Walking',
+          duration: '5-10 min',
+        },
+      ],
+    };
+  };
+
+  const generateGeneralInstructions = (from: Location, to: Location) => ({
+    fromLocation: from.display_name.split(',')[0],
+    toLocation: to.display_name.split(',')[0],
+    totalDuration: '60-90 min',
+    totalCost: 25,
+    steps: [
+      {
+        instruction: 'Walk to the nearest taxi rank or bus stop',
+        transport_type: 'Walking',
+        duration: '10-15 min',
+      },
+      {
+        instruction: 'Take a taxi or bus towards your destination area',
+        transport_type: 'Taxi/Bus',
+        duration: '40-60 min',
+        cost: 20,
+      },
+      {
+        instruction: 'Transfer to local transport if needed',
+        transport_type: 'Local Transport',
+        duration: '10-15 min',
+        cost: 5,
+      },
+      {
+        instruction: 'Walk to your final destination',
+        transport_type: 'Walking',
+        duration: '5-10 min',
+      },
+    ],
+  });
+
+  const navigateToRoute = (routeId: string) => {
+    router.push(`/route/${routeId}`);
+  };
+
+  const navigateToHub = (hubId: string) => {
+    router.push(`/hub/${hubId}`);
+  };
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'planner':
+        return (
+          <ScrollView style={styles.tabContent} keyboardShouldPersistTaps="handled">
+            {/* Search Form */}
+            <View style={styles.searchCard}>
+              <View style={{ zIndex: 2000 }}>
+                <Text style={styles.inputLabel}>From</Text>
+                <LocationAutocomplete
+                  placeholder="Your current location"
+                  value={fromText}
+                  onChangeText={setFromText}
+                  onLocationSelect={setFromLocation}
+                />
+              </View>
+
+              <View style={{ zIndex: 1000 }}>
+                <Text style={styles.inputLabel}>To</Text>
+                <LocationAutocomplete
+                  placeholder="Your destination"
+                  value={toText}
+                  onChangeText={setToText}
+                  onLocationSelect={setToLocation}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.searchButton, (!fromLocation || !toLocation) && styles.searchButtonDisabled]}
+                onPress={findRoute}
+                disabled={!fromLocation || !toLocation || searchingRoute}
+              >
+                <Search size={20} color="#ffffff" style={styles.searchIcon} />
+                <Text style={styles.searchButtonText}>
+                  {searchingRoute ? 'Finding Route...' : 'Find Route'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Route Instructions */}
+            {routeInstructions && (
+              <View style={styles.instructionsContainer}>
+                <RouteInstructions {...routeInstructions} />
+              </View>
+            )}
+          </ScrollView>
+        );
+
+      case 'routes':
+        return (
+          <ScrollView style={styles.tabContent}>
+            {/* Search and Filter */}
+            <View style={styles.filterSection}>
+              <View style={styles.searchContainer}>
+                <Search size={20} color="#666666" />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search routes..."
+                  placeholderTextColor="#666666"
+                  value={routeSearchQuery}
+                  onChangeText={setRouteSearchQuery}
+                />
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+                {transportTypes.map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.filterButton,
+                      selectedTransportType === type && styles.filterButtonActive
+                    ]}
+                    onPress={() => setSelectedTransportType(type)}
+                  >
+                    <Text style={[
+                      styles.filterButtonText,
+                      selectedTransportType === type && styles.filterButtonTextActive
+                    ]}>
+                      {type}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Routes List */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                {filteredRoutes.length} Routes Found
+              </Text>
+
+              {loading ? (
+                <Text style={styles.loadingText}>Loading routes...</Text>
+              ) : filteredRoutes.length === 0 ? (
+                <Text style={styles.noDataText}>No routes found</Text>
+              ) : (
+                filteredRoutes.map((route) => (
+                  <TouchableOpacity
+                    key={route.id}
+                    style={styles.routeCard}
+                    onPress={() => navigateToRoute(route.id)}
+                  >
+                    <View style={styles.routeHeader}>
+                      <View style={styles.routeInfo}>
+                        <Text style={styles.routeTitle}>{route.name}</Text>
+                        <Text style={styles.routeDestination}>
+                          {route.start_point} → {route.end_point}
+                        </Text>
+                      </View>
+                      <View style={styles.routeType}>
+                        <Text style={styles.routeTypeText}>{route.transport_type}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.routeFooter}>
+                      <View style={styles.routeDetail}>
+                        <Clock size={16} color="#1ea2b1" />
+                        <Text style={styles.routeDetailText}>Est. 45-60 min</Text>
+                      </View>
+                      <Text style={styles.routeCost}>R {route.cost}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          </ScrollView>
+        );
+
+      case 'hubs':
+        return (
+          <ScrollView style={styles.tabContent}>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Transport Hubs ({hubs.length})</Text>
+
+              {loading ? (
+                <Text style={styles.loadingText}>Loading hubs...</Text>
+              ) : hubs.length === 0 ? (
+                <Text style={styles.noDataText}>No hubs available</Text>
+              ) : (
+                hubs.map((hub) => (
+                  <TouchableOpacity
+                    key={hub.id}
+                    style={styles.hubCard}
+                    onPress={() => navigateToHub(hub.id)}
+                  >
+                    <View style={styles.hubHeader}>
+                      <MapPin size={24} color="#1ea2b1" />
+                      <View style={styles.hubInfo}>
+                        <Text style={styles.hubName}>{hub.name}</Text>
+                        {hub.address && (
+                          <Text style={styles.hubAddress}>{hub.address}</Text>
+                        )}
+                        {hub.transport_type && (
+                          <Text style={styles.hubType}>{hub.transport_type}</Text>
+                        )}
+                      </View>
+                    </View>
+                    <View style={styles.hubCoordinates}>
+                      <Text style={styles.coordinatesText}>
+                        {hub.latitude.toFixed(4)}, {hub.longitude.toFixed(4)}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          </ScrollView>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          colors={[colors.primary]}
-          tintColor={colors.primary}
-        />
-      }
-    >
-      {/* Header Section */}
+    <View style={styles.container}>
+      <StatusBar style="light" backgroundColor="#000000" />
+
       <View style={styles.header}>
-        <Text style={[styles.headerText, { color: colors.text }]}>Routes</Text>
-       {/* <TouchableOpacity
-          style={[styles.addButton , { backgroundColor: colors.primary }]}
-          onPress={() => router.push('/AddRoutes')}
-        >
-          <PlusCircle size={24} color={colors.text} />
- <Text style={[styles.addButtonText , { color: colors.text }]}>Add Route</Text>
-        </TouchableOpacity> */}
+        <Text style={styles.title}>Transport</Text>
+        <Text style={styles.subtitle}>Plan your journey with ease</Text>
       </View>
 
-      {/* Search Bar */}
-      <TextInput
-        style={[styles.searchBar, { backgroundColor: colors.card, color: colors.text }]}
-        placeholder="Search routes..."
-        placeholderTextColor={colors.text}
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-      />
+      {/* Tab Navigation */}
+      <View style={styles.tabNavigation}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'planner' && styles.activeTab]}
+          onPress={() => setActiveTab('planner')}
+        >
+          <Search size={20} color={activeTab === 'planner' ? '#1ea2b1' : '#666666'} />
+          <Text style={[styles.tabText, activeTab === 'planner' && styles.activeTabText]}>
+            Planner
+          </Text>
+        </TouchableOpacity>
 
-      {/* Loading State */}
-      {isLoading ? (
-        <View style={styles.grid}>
-          {Array.from({ length: 6 }).map((_, index) => (
-            <View key={index} style={[styles.routeCard, { backgroundColor: colors.card }]}>
-              <View style={[styles.skeletonText, { backgroundColor: colors.background }]} />
-              <View style={[styles.skeletonText, { backgroundColor: colors.background, width: '70%' }]} />
-              <View style={[styles.skeletonText, { backgroundColor: colors.background, width: '50%' }]} />
-            </View>
-          ))}
-        </View>
-      ) : (
-        <View style={styles.grid}>
-          {filteredRoutes.map((route) => (
-            <TouchableOpacity
-              key={route.id}
-              style={[styles.routeCard, { backgroundColor: colors.card }]}
-              onPress={() => router.push(`/route-details?routeId=${route.id}`)} // Navigate to RouteDetails
-            >
-              <Text style={[styles.routeName, { color: colors.text }]}>{route.name}</Text>
-              <View style={styles.routeDetails}>
-                <Text style={[styles.routeDetail, { color: colors.text }]}>
-                  From: {route.start_point}
-                </Text>
-                <Text style={[styles.routeDetail, { color: colors.text }]}>
-                  To: {route.end_point}
-                </Text>
-              </View>
-              <View style={styles.routeFooter}>
-                <Text style={[styles.routeType, { color: colors.text }]}>
-                  {route.transport_type}
-                </Text>
-                <Text style={[styles.routeCost, { color: colors.text }]}>
-                  R{route.cost}
-                </Text>
-              </View>
-              {/* Heart Icon */}
-              <TouchableOpacity
-                style={styles.favoriteButton}
-                onPress={() => handleFavorite(route.name)}
-              >
-                <Heart
-                  size={20}
-                  color={colors.primary}
-                  fill={userFavorites.includes(route.name) ? colors.primary : 'transparent'}
-                />
-              </TouchableOpacity>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-    </ScrollView>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'routes' && styles.activeTab]}
+          onPress={() => setActiveTab('routes')}
+        >
+          <RouteIcon size={20} color={activeTab === 'routes' ? '#1ea2b1' : '#666666'} />
+          <Text style={[styles.tabText, activeTab === 'routes' && styles.activeTabText]}>
+            Routes
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'hubs' && styles.activeTab]}
+          onPress={() => setActiveTab('hubs')}
+        >
+          <MapPin size={20} color={activeTab === 'hubs' ? '#1ea2b1' : '#666666'} />
+          <Text style={[styles.tabText, activeTab === 'hubs' && styles.activeTabText]}>
+            Hubs
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {renderTabContent()}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  content: {
-    padding: 20,
-    gap: 20,
+    backgroundColor: '#000000',
   },
   header: {
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#cccccc',
+    marginTop: 4,
+  },
+  tabNavigation: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: '#1a1a1a',
+    marginHorizontal: 20,
+    borderRadius: 12,
+    padding: 4,
     marginBottom: 20,
   },
-  headerText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  addButton: {
+  tab: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  activeTab: {
+    backgroundColor: '#000000',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#666666',
+    marginLeft: 6,
+  },
+  activeTabText: {
+    color: '#1ea2b1',
+  },
+  tabContent: {
+    flex: 1,
+  },
+  searchCard: {
+    backgroundColor: '#1a1a1a',
+    marginHorizontal: 20,
+    marginBottom: 20,
     borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#333333',
   },
-  addButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
-  },
-  searchBar: {
-    padding: 10,
-    borderRadius: 10,
-    fontSize: 16,
-  },
-  grid: {
-    gap: 20,
-  },
-  routeCard: {
-    borderRadius: 15,
-    padding: 15,
-  },
-  routeName: {
+  inputLabel: {
+    color: '#ffffff',
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 16,
   },
-  routeDetails: {
-    gap: 5,
-    marginBottom: 10,
+  searchButton: {
+    backgroundColor: '#1ea2b1',
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
   },
-  routeDetail: {
+  searchButtonDisabled: {
+    backgroundColor: '#333333',
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  instructionsContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  filterSection: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 16,
+    color: '#ffffff',
+  },
+  filterScroll: {
+    marginBottom: 8,
+  },
+  filterButton: {
+    backgroundColor: '#333333',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 12,
+  },
+  filterButtonActive: {
+    backgroundColor: '#1ea2b1',
+  },
+  filterButtonText: {
+    color: '#cccccc',
     fontSize: 14,
+    fontWeight: '500',
+  },
+  filterButtonTextActive: {
+    color: '#ffffff',
+  },
+  section: {
+    paddingHorizontal: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 16,
+  },
+  routeCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  routeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  routeInfo: {
+    flex: 1,
+  },
+  routeTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  routeDestination: {
+    fontSize: 14,
+    color: '#cccccc',
+  },
+  routeType: {
+    backgroundColor: '#1ea2b120',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  routeTypeText: {
+    color: '#1ea2b1',
+    fontSize: 12,
+    fontWeight: '600',
   },
   routeFooter: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  routeType: {
-    fontSize: 12,
-    fontWeight: '500',
+  routeDetail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  routeDetailText: {
+    color: '#cccccc',
+    fontSize: 14,
+    marginLeft: 4,
   },
   routeCost: {
-    fontSize: 14,
+    color: '#1ea2b1',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  hubCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  hubHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  hubInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  hubName: {
+    fontSize: 16,
     fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 4,
   },
-  favoriteButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  hubAddress: {
+    fontSize: 14,
+    color: '#cccccc',
+    marginBottom: 4,
   },
-  skeletonText: {
-    height: 16,
+  hubType: {
+    fontSize: 12,
+    color: '#1ea2b1',
+    backgroundColor: '#1ea2b120',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: 8,
-    marginBottom: 8,
+  },
+  hubCoordinates: {
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
+  },
+  coordinatesText: {
+    fontSize: 12,
+    color: '#666666',
+    fontFamily: 'monospace',
+  },
+  loadingText: {
+    color: '#666666',
+    fontSize: 16,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  noDataText: {
+    color: '#666666',
+    fontSize: 16,
+    textAlign: 'center',
+    paddingVertical: 20,
   },
 });
