@@ -55,10 +55,12 @@ export default function RoutesScreen() {
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [filteredHubs, setFilteredHubs] = useState<Hub[]>([]);
   const [hubSearchQuery, setHubSearchQuery] = useState('');
+  const [selectedHubType, setSelectedHubType] = useState<string>('All');
   const [loading, setLoading] = useState(false);
   const [loadingHubs, setLoadingHubs] = useState(false);
 
   const transportTypes = ['All', 'Taxi', 'Bus', 'Train', 'Uber'];
+  const hubTypes = ['All', 'Taxi', 'Bus', 'Train', 'Uber', 'Metro', 'Interchange'];
 
   useEffect(() => {
     loadRoutes();
@@ -71,7 +73,7 @@ export default function RoutesScreen() {
 
   useEffect(() => {
     filterHubs();
-  }, [hubs, hubSearchQuery]);
+  }, [hubs, hubSearchQuery, selectedHubType]);
 
   const loadRoutes = async () => {
     setLoading(true);
@@ -130,17 +132,22 @@ export default function RoutesScreen() {
   };
 
   const filterHubs = () => {
-    if (!hubSearchQuery.trim()) {
-      setFilteredHubs(hubs);
-      return;
+    let filtered = hubs;
+
+    if (hubSearchQuery.trim()) {
+      const query = hubSearchQuery.toLowerCase();
+      filtered = filtered.filter(hub =>
+        hub.name.toLowerCase().includes(query) ||
+        (hub.address && hub.address.toLowerCase().includes(query)) ||
+        (hub.transport_type && hub.transport_type.toLowerCase().includes(query))
+      );
     }
 
-    const query = hubSearchQuery.toLowerCase();
-    const filtered = hubs.filter(hub =>
-      hub.name.toLowerCase().includes(query) ||
-      (hub.address && hub.address.toLowerCase().includes(query)) ||
-      (hub.transport_type && hub.transport_type.toLowerCase().includes(query))
-    );
+    if (selectedHubType !== 'All') {
+      filtered = filtered.filter(hub =>
+        hub.transport_type === selectedHubType
+      );
+    }
 
     setFilteredHubs(filtered);
   };
@@ -401,18 +408,38 @@ export default function RoutesScreen() {
       case 'hubs':
         return (
           <ScrollView style={styles.tabContent}>
-            {/* Search for Hubs */}
+            {/* Search and Filter for Hubs */}
             <View style={styles.filterSection}>
               <View style={styles.searchContainer}>
                 <Search size={20} color="#666666" />
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="Search hubs..."
+                  placeholder="Search hubs by name, address or type..."
                   placeholderTextColor="#666666"
                   value={hubSearchQuery}
                   onChangeText={setHubSearchQuery}
                 />
               </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+                {hubTypes.map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.filterButton,
+                      selectedHubType === type && styles.filterButtonActive
+                    ]}
+                    onPress={() => setSelectedHubType(type)}
+                  >
+                    <Text style={[
+                      styles.filterButtonText,
+                      selectedHubType === type && styles.filterButtonTextActive
+                    ]}>
+                      {type}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
 
             <View style={styles.section}>

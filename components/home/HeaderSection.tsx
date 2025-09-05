@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Search } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import HeaderSkeleton from './skeletons/HeaderSkeleton';
+import { useTranslation } from '@/hook/useTranslation';
 
 interface HeaderSectionProps {
   isProfileLoading: boolean;
@@ -13,6 +14,7 @@ interface HeaderSectionProps {
 
 const HeaderSection = ({ isProfileLoading, userProfile, colors }: HeaderSectionProps) => {
   const router = useRouter();
+  const { t } = useTranslation();
 
   if (isProfileLoading) {
     return <HeaderSkeleton colors={colors} />;
@@ -24,8 +26,9 @@ const HeaderSection = ({ isProfileLoading, userProfile, colors }: HeaderSectionP
         <View style={styles.firstRow}>
           <Pressable onPress={() => router.push('/profile')}>
             <Text style={[styles.title, { color: colors.text }]}>
-              Hi {userProfile?.first_name || 'User'}
+              {t('greeting')}, {userProfile?.first_name || 'User'}
             </Text>
+            <Text style={styles.subGreeting}>{t('ready_journey')}</Text>
           </Pressable>
           <Pressable onPress={() => router.push('/favorites')} style={styles.addButton}>
             <Search size={24} color={colors.text} />
@@ -61,6 +64,11 @@ const styles = {
   },
   addButton: {
     padding: 8,
+  },
+  subGreeting: {
+    fontSize: 16,
+    color: '#cccccc',
+    marginTop: 4,
   },
 };
 

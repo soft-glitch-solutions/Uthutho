@@ -101,6 +101,27 @@ const CommunityTabSkeleton = () => (
   <View style={[styles.communityTab, styles.skeleton]} />
 );
 
+// Communities Skeleton Loader
+const CommunitiesSkeletonLoader = () => (
+  <View style={styles.container}>
+    {/* Header Skeleton */}
+    <View style={styles.header}>
+      <View style={[styles.skeleton, {width: 150, height: 24}]} />
+      <View style={styles.headerRight}>
+        <View style={[styles.skeleton, {width: 44, height: 44, borderRadius: 22, marginRight: 8}]} />
+        <View style={[styles.skeleton, {width: 44, height: 44, borderRadius: 22}]} />
+      </View>
+    </View>
+
+    {/* Empty State Skeleton */}
+    <View style={styles.emptyState}>
+      <View style={[styles.skeleton, {width: 200, height: 24, marginBottom: 12}]} />
+      <View style={[styles.skeleton, {width: 250, height: 16, marginBottom: 24}]} />
+      <View style={[styles.skeleton, {width: 160, height: 48, borderRadius: 12}]} />
+    </View>
+  </View>
+);
+
 export default function FeedsScreen() {
   const { user } = useAuth();
   const userId = user?.id ?? '';
@@ -118,6 +139,7 @@ export default function FeedsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [checkingFavorites, setCheckingFavorites] = useState(true);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   // UUID validation function
   const isValidUUID = (str: string): boolean => {
@@ -167,6 +189,7 @@ export default function FeedsScreen() {
     } finally {
       setLoading(false);
       setCheckingFavorites(false);
+      setInitialLoadComplete(true);
     }
   }, []);
 
@@ -269,6 +292,7 @@ export default function FeedsScreen() {
     } else {
       setLoading(false);
       setCheckingFavorites(false);
+      setInitialLoadComplete(true);
     }
   }, [userId, loadFavoriteCommunities]);
 
@@ -298,7 +322,6 @@ export default function FeedsScreen() {
           ? { hub_id: selectedCommunity.id }
           : { stop_id: selectedCommunity.id }),
       };
-
       const table = selectedCommunity.type === 'hub' ? 'hub_posts' : 'stop_posts';
       const { error } = await supabase.from(table).insert([postData]);
       if (error) throw error;
@@ -549,7 +572,12 @@ export default function FeedsScreen() {
     );
   }
 
-  if (communities.length === 0 && !checkingFavorites) {
+  // Show skeleton loader while loading communities
+  if (loading && !initialLoadComplete) {
+    return <CommunitiesSkeletonLoader />;
+  }
+
+  if (communities.length === 0 && initialLoadComplete) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
