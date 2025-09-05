@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext'; // Fixed path
 import StreakOverlay from '../../../components/StreakOverlay'; // Fixed path
+import { MapPin, Bus, Train, Navigation } from 'lucide-react-native'; // Import icons
 
 // Import components
 import HeaderSection from '../../../components/home/HeaderSection'; // Fixed path
@@ -46,6 +47,34 @@ const calculateWalkingTime = (lat1, lng1, lat2, lng2) => {
   const walkingTimeMinutes = Math.round(distanceKm / 0.0833);
   
   return walkingTimeMinutes;
+};
+
+// Function to get icon based on type
+const getIconForType = (type: string) => {
+  switch (type) {
+    case 'stop':
+      return <MapPin size={16} color="#1ea2b1" />;
+    case 'hub':
+      return <Navigation size={16} color="#1ea2b1" />;
+    case 'route':
+      return <Bus size={16} color="#1ea2b1" />;
+    default:
+      return <MapPin size={16} color="#1ea2b1" />;
+  }
+};
+
+// Function to get type label
+const getTypeLabel = (type: string) => {
+  switch (type) {
+    case 'stop':
+      return 'Stop';
+    case 'hub':
+      return 'Hub';
+    case 'route':
+      return 'Route';
+    default:
+      return type;
+  }
 };
 
 export default function HomeScreen() {
@@ -405,14 +434,78 @@ export default function HomeScreen() {
         calculateWalkingTime={calculateWalkingTime}
       />
 
-      {/* Favorites Section */}
-      <FavoritesSection
-        isProfileLoading={isProfileLoading}
-        favorites={favorites}
-        favoriteDetails={favoriteDetails}
-        colors={colors}
-        toggleFavorite={toggleFavorite}
-      />
+      {/* Your Community Section */}
+      <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          Your Community
+        </Text>
+        
+        {isProfileLoading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+              Loading your community...
+            </Text>
+          </View>
+        ) : favorites.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              You haven't added any locations to your community yet.
+            </Text>
+            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+              Add stops, hubs, or routes to see them here.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.communityList}>
+            {favorites.map((favorite, index) => {
+              const details = favoriteDetails.find(detail => detail.id === favorite.id);
+              const type = details?.type || favorite.type;
+              
+              return (
+                <Pressable
+                  key={favorite.id}
+                  style={[styles.communityItem, { 
+                    backgroundColor: colors.background,
+                    borderColor: colors.border 
+                  }]}
+                  onPress={() => {
+                    if (type === 'stop') {
+                      router.push(`/stop-details?stopId=${favorite.id}`);
+                    } else if (type === 'hub') {
+                      router.push(`/hub-details?hubId=${favorite.id}`);
+                    } else if (type === 'route') {
+                      router.push(`/route-details?routeId=${favorite.id}`);
+                    }
+                  }}
+                >
+                  <View style={styles.communityItemContent}>
+                    <View style={styles.communityIcon}>
+                      {getIconForType(type)}
+                    </View>
+                    <View style={styles.communityInfo}>
+                      <Text style={[styles.communityName, { color: colors.text }]}>{favorite.name}
+                      </Text>
+                      <View style={styles.communityTypeContainer}>
+                        <Text style={[styles.communityType, { color: colors.text }]}>
+                          {getTypeLabel(type)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  <Pressable
+                    style={[styles.removeButton, { backgroundColor: colors.border }]}
+                    onPress={() => toggleFavorite(favorite)}
+                  >
+                    <Text style={[styles.removeButtonText, { color: colors.text }]}>
+                      Remove
+                    </Text>
+                  </Pressable>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+      </View>
 
       {/* Gamification Section */}
       <GamificationSection
@@ -456,5 +549,83 @@ const styles = StyleSheet.create({
   pointsText: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  section: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+  },
+  emptyContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  communityList: {
+    gap: 12,
+  },
+  communityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  communityItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  communityIcon: {
+    marginRight: 12,
+  },
+  communityInfo: {
+    flex: 1,
+  },
+  communityName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  communityTypeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  communityType: {
+    fontSize: 14,
+  },
+  removeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  removeButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

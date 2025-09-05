@@ -601,7 +601,7 @@ export default function FeedsScreen() {
           <Text style={styles.emptySubtitle}>{t('joinCommunitiesToSeeFeeds')}</Text>
           <TouchableOpacity style={styles.addButton} onPress={() => setShowAddCommunity(true)}>
             <Plus size={20} color="#fff" />
-            <Text style={styles.addButtonText}>{t('addCommunity')}</Text>
+            <Text style={styles.addButtonText}>{t('Add Community')}</Text>
           </TouchableOpacity>
         </View>
       </View>

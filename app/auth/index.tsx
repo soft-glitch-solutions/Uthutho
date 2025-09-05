@@ -361,7 +361,7 @@ export default function Auth() {
       </View>
 
       {/* Social Login Section */}
-      <View style={styles.socialLoginContainer}>
+      {/* <View style={styles.socialLoginContainer}>
         <Text style={[styles.socialLoginText, { color: colors.text }]}>
           {isLogin ? 'Continue with' : 'Sign up with'}
         </Text>
@@ -389,7 +389,7 @@ export default function Auth() {
             />
           </TouchableOpacity>
         </View>
-      </View>
+      </View> */}
 
       {/* Switch between Login/Signup */}
       <TouchableOpacity

@@ -7,6 +7,7 @@ export const translations = {
     cancel: 'Cancel',
     save: 'Save',
     delete: 'Delete',
+    back: 'Back',
     
     // Home
     greeting: 'Sawubona',
@@ -33,11 +34,30 @@ export const translations = {
     no_route_available: 'No Route Available',
     too_far: 'You must be within 1km of the stop to mark as waiting',
     
-    // Posts
+    // Posts & Communities
     share_experience: 'Share your transport experience...',
     select_location: 'Select Location',
     transport_hubs: 'Transport Hubs',
     stops: 'Stops',
+    communities: 'Communities',
+    Communities: 'Communities',
+    addCommunity: 'Add Community',
+    searchCommunities: 'Search communities...',
+    join: 'Join',
+    joined: 'Joined',
+    hub: 'Hub',
+    stop: 'Stop',
+    route: 'Route',
+    whatsHappening: "What's happening?",
+    Post: 'Post',
+    justNow: 'Just now',
+    minutesAgo: 'm ago',
+    hoursAgo: 'h ago',
+    daysAgo: 'd ago',
+    noCommunities: 'No Communities',
+    joinCommunitiesToSeeFeeds: 'Join communities to see feeds',
+    NoPostsYet: 'No Posts Yet',
+    BeFirstToPost: 'Be the first to post',
     
     // Profile
     fire_received: 'Fire Received',
@@ -58,6 +78,7 @@ export const translations = {
     cancel: 'Khansela',
     save: 'Londoloza',
     delete: 'Susa',
+    back: 'Emuva',
     
     // Home
     greeting: 'Sawubona',
@@ -84,11 +105,30 @@ export const translations = {
     no_route_available: 'Ayikho Indlela',
     too_far: 'Kufanele ube eduze nesiteshi (1km) ukuze umake njengolindile',
     
-    // Posts
+    // Posts & Communities
     share_experience: 'Yabelana ngolwazi lwakho lwezokuthutha...',
     select_location: 'Khetha Indawo',
     transport_hubs: 'Ama-Hub Ezokuthutha',
     stops: 'Iziteshi',
+    communities: 'Imiphakathi',
+    Communities: 'Imiphakathi',
+    addCommunity: 'Engeza Umphakathi',
+    searchCommunities: 'Sesha imiphakathi...',
+    join: 'Joyina',
+    joined: 'Ujoyinile',
+    hub: 'I-Hub',
+    stop: 'Isiteshi',
+    route: 'Indlela',
+    whatsHappening: 'Kwenzekani?',
+    Post: 'Thumela',
+    justNow: 'Manje nje',
+    minutesAgo: 'imizuzu edlule',
+    hoursAgo: 'amahora edlule',
+    daysAgo: 'izinsuku edlule',
+    noCommunities: 'Ayikho Imiphakathi',
+    joinCommunitiesToSeeFeeds: 'Joyina imiphakathi ukuze ubone izindaba',
+    NoPostsYet: 'Awekho Okuthunyelwe Okwamanje',
+    BeFirstToPost: 'Yiba ngowokuqala ukuthumela',
     
     // Profile
     fire_received: 'Umlilo Otholiwe',
@@ -109,6 +149,7 @@ export const translations = {
     cancel: 'Kanselleer',
     save: 'Stoor',
     delete: 'Verwyder',
+    back: 'Terug',
     
     // Home
     greeting: 'Hallo',
@@ -135,11 +176,30 @@ export const translations = {
     no_route_available: 'Geen Roete Beskikbaar',
     too_far: 'Jy moet binne 1km van die stop wees om as wag te merk',
     
-    // Posts
+    // Posts & Communities
     share_experience: 'Deel jou vervoer ervaring...',
     select_location: 'Kies Ligging',
     transport_hubs: 'Vervoer Hubs',
     stops: 'Stops',
+    communities: 'Gemeenskappe',
+    Communities: 'Gemeenskappe',
+    addCommunity: 'Voeg Gemeenskap By',
+    searchCommunities: 'Soek gemeenskappe...',
+    join: 'Sluit Aan',
+    joined: 'Aangesluit',
+    hub: 'Hub',
+    stop: 'Stop',
+    route: 'Roete',
+    whatsHappening: 'Wat gebeur?',
+    Post: 'Plaas',
+    justNow: 'Nou net',
+    minutesAgo: 'min gelede',
+    hoursAgo: 'uur gelede',
+    daysAgo: 'dae gelede',
+    noCommunities: 'Geen Gemeenskappe',
+    joinCommunitiesToSeeFeeds: 'Sluit aan by gemeenskappe om nuus te sien',
+    NoPostsYet: 'Nog Geen Plasings',
+    BeFirstToPost: 'Wees die eerste om te plaas',
     
     // Profile
     fire_received: 'Vuur Ontvang',
