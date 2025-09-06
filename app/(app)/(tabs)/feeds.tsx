@@ -285,16 +285,33 @@ export default function FeedsScreen() {
     loadAllCommunities();
   }, [loadAllCommunities]);
 
-  useEffect(() => {
+useEffect(() => {
+  let mounted = true;
+
+  const init = async () => {
     if (isValidUUID(userId)) {
-      loadFavoriteCommunities(userId);
-      loadNotificationCount(userId);
-    } else {
-      setLoading(false);
-      setCheckingFavorites(false);
-      setInitialLoadComplete(true);
+      await Promise.all([
+        loadFavoriteCommunities(userId),
+        loadNotificationCount(userId),
+      ]);
     }
-  }, [userId, loadFavoriteCommunities]);
+
+    // ✅ enforce skeleton for at least 500ms
+    setTimeout(() => {
+      if (mounted) {
+        setInitialLoadComplete(true);
+        setLoading(false);
+      }
+    }, 500);
+  };
+
+  init();
+
+  return () => {
+    mounted = false;
+  };
+}, [userId, loadFavoriteCommunities, loadNotificationCount]);
+
 
   useEffect(() => {
     if (selectedCommunity) {
@@ -512,9 +529,9 @@ export default function FeedsScreen() {
   };
 
   // ---- Screens -----------------------------------------------------------
-  if (checkingFavorites) {
-    return <SkeletonLoader />;
-  }
+if (!initialLoadComplete || loading) {
+  return <SkeletonLoader />;
+}
 
   if (showAddCommunity) {
     return (
@@ -573,11 +590,11 @@ export default function FeedsScreen() {
   }
 
   // Show skeleton loader while loading communities
-  if (loading && !initialLoadComplete) {
+  if (loading) {
     return <CommunitiesSkeletonLoader />;
   }
 
-  if (communities.length === 0 && initialLoadComplete) {
+  if  (communities.length === 0) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
