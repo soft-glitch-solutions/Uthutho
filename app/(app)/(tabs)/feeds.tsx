@@ -669,8 +669,8 @@ export default function FeedsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyPosts}>
-            <Text style={styles.emptyPostsText}>{t('No Posts Yet')}</Text>
-            <Text style={styles.emptyPostsSubtext}>{t('Be First To Post')}</Text>
+            <Text style={styles.emptyPostsText}>{t('NoPostsYet')}</Text>
+            <Text style={styles.emptyPostsSubtext}>{t('BeFirstToPost')}</Text>
           </View>
         }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
