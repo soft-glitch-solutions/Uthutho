@@ -45,7 +45,11 @@
       }
     },
     "android": {
-      "package": "com.softglitchsolutions.uthutho"
+      "package": "com.softglitchsolutions.uthutho",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundColor": "#000000"
+      }
     },
     "splash": {
       "image": "./assets/images/SplashScreen.png",
