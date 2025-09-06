@@ -31,7 +31,7 @@ export default function Auth() {
   const { colors } = useTheme();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const transportOptions = ['Taxi', 'Bus', 'Train', 'Uber', 'Walking', 'Mixed'];
+  const transportOptions = ['Taxi', 'Bus', 'Train', 'Walking', 'Mixed'];
   const languageOptions = ['English', 'Zulu', 'Afrikaans', 'Xhosa', 'Sotho'];
 
   const handleGoogleSignIn = async () => {

@@ -59,8 +59,8 @@ export default function RoutesScreen() {
   const [loading, setLoading] = useState(false);
   const [loadingHubs, setLoadingHubs] = useState(false);
 
-  const transportTypes = ['All', 'Taxi', 'Bus', 'Train', 'Uber'];
-  const hubTypes = ['All', 'Taxi', 'Bus', 'Train', 'Uber', 'Metro', 'Interchange'];
+  const transportTypes = ['All', 'Taxi', 'Bus', 'Train'];
+  const hubTypes = ['All', 'Taxi', 'Bus', 'Train', 'Metro', 'Interchange'];
 
   useEffect(() => {
     loadRoutes();

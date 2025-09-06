@@ -33,7 +33,7 @@ export default function Index() {
           }
         } else {
           // Not first-time user, redirect to auth or home
-          setRedirectTo('/onboarding'); // Default to auth, or you can add session check here
+          setRedirectTo('/auth'); // Default to auth, or you can add session check here
         }
       } catch (error) {
         console.error('Error checking first launch:', error);
