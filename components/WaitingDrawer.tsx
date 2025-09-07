@@ -63,38 +63,66 @@ export default function WaitingDrawer({
 const loadRoutesForStop = async () => {
   setLoading(true);
   try {
-    // First get the route_id from the stops table
-    const { data: stopData, error: stopError } = await supabase
+    // Option 1: If using a junction table (recommended)
+    const { data: routesData, error: routesError } = await supabase
+      .from('route_stops') // your junction table
+      .select(`
+        route:routes (
+          id,
+          name,
+          transport_type,
+          cost,
+          start_point,
+          end_point
+        )
+      `)
+      .eq('stop_id', stopId);
+
+    if (routesError) throw routesError;
+
+    if (routesData && routesData.length > 0) {
+      // Extract routes from the junction table results
+      const formattedRoutes = routesData.map(item => item.route);
+      setRoutes(formattedRoutes);
+      return;
+    }
+
+    // Option 2: If using array column for stop IDs in routes table
+    const { data: routesWithStop, error: arrayError } = await supabase
+      .from('routes')
+      .select('*')
+      .contains('stop_ids', [stopId]); // assuming stop_ids is an array column
+
+    if (arrayError) throw arrayError;
+
+    if (routesWithStop && routesWithStop.length > 0) {
+      setRoutes(routesWithStop);
+      return;
+    }
+
+    // Fallback to your current single-route approach if needed
+    const { data: stopData } = await supabase
       .from('stops')
       .select('route_id')
       .eq('id', stopId)
       .maybeSingle();
 
-    if (stopError) {
-      console.error('Error fetching stop data:', stopError);
-      setRoutes([]);
-    } else if (stopData?.route_id) {
-      // Get the route this stop belongs to
-      const { data: routeData, error: routeError } = await supabase
+    if (stopData?.route_id) {
+      const { data: routeData } = await supabase
         .from('routes')
         .select('*')
         .eq('id', stopData.route_id);
       
-      if (routeError) {
-        console.error('Error fetching route data:', routeError);
-        setRoutes([]);
-      } else {
-        setRoutes(routeData || []);
-      }
+      setRoutes(routeData || []);
     } else {
-      // No route associated with this stop
       setRoutes([]);
     }
   } catch (error) {
     console.error('Error loading routes for stop:', error);
     setRoutes([]);
+  } finally {
+    setLoading(false);
   }
-  setLoading(false);
 };
 
   const startCountdown = (route: Route) => {
