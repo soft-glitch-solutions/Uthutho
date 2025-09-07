@@ -143,12 +143,31 @@ export default function FeedsScreen() {
   const [checkingFavorites, setCheckingFavorites] = useState(true);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [weekRange, setWeekRange] = useState<string>('');
+  const [showAllPosts, setShowAllPosts] = useState(false);
 
   // UUID validation function
   const isValidUUID = (str: string): boolean => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     return uuidRegex.test(str);
   };
+
+
+  const getCurrentWeekRange = () => {
+    const now = new Date();
+    const day = now.getDay(); // 0 = Sunday, 1 = Monday...
+    const diffToMonday = (day + 6) % 7; // convert so Monday = 0
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    return { monday, sunday };
+  };
+
 
   // ---- Data loaders ------------------------------------------------------
   const loadFavoriteCommunities = useCallback(async (uid: string) => {
@@ -230,64 +249,76 @@ export default function FeedsScreen() {
     }
   }, []);
 
-  const loadCommunityPosts = useCallback(async (community: Community | null) => {
+const loadCommunityPosts = useCallback(
+  async (community: Community | null) => {
     if (!community) return;
+
     try {
+      let monday: Date | undefined;
+      let sunday: Date | undefined;
+
+      if (!showAllPosts) {
+        const { monday: m, sunday: s } = getCurrentWeekRange();
+        monday = m;
+        sunday = s;
+        setWeekRange(
+          `${monday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${sunday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+        );
+      } else {
+        setWeekRange('All Posts');
+      }
+
       const baseSelect = `
-        id,
-        content,
-        created_at,
-        user_id,
-        ${community.type === 'hub' ? 'hub_id' : 'stop_id'},
-        profiles:user_id (
-          first_name,
-          last_name,
-          selected_title,
-          avatar_url
-        ),
-        post_reactions (
-          reaction_type,
-          user_id
-        ),
-        post_comments (
-          id,
-          content,
-          created_at,
-          user_id,
-          profiles:user_id (
-            first_name,
-            last_name,
-            avatar_url
-          )
-        )
+        *,
+        profiles(*),
+        post_reactions(*),
+        post_comments(*, profiles(*))
       `;
 
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const table = community.type === 'hub' ? 'hub_posts' : 'stop_posts';
+      const communityIdField = community.type === 'hub' ? 'hub_id' : 'stop_id';
 
-      if (community.type === 'hub') {
-        const { data, error } = await supabase
-          .from('hub_posts')
-          .select(baseSelect)
-          .eq('hub_id', community.id)
-          .gte('created_at', oneWeekAgo.toISOString()) // ✅ only last 7 days
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        setPosts(data || []);
-      } else {
-        const { data, error } = await supabase
-          .from('stop_posts')
-          .select(baseSelect)
-          .eq('stop_id', community.id)
-          .gte('created_at', oneWeekAgo.toISOString()) // ✅ only last 7 days
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        setPosts(data || []);
+      let query = supabase.from(table).select(baseSelect).eq(communityIdField, community.id);
+
+      if (!showAllPosts && monday && sunday) {
+        query = query.gte('created_at', monday.toISOString()).lte('created_at', sunday.toISOString());
       }
+
+      query = query.order('created_at', { ascending: false });
+
+      const { data, error } = await query;
+      console.log('Posts fetched:', data, 'Error:', error);
+
+      if (error) throw error;
+
+      const postsWithProfiles = (data || []).map((post: any) => ({
+        ...post,
+        profiles: post.profiles || {
+          first_name: 'Unknown',
+          last_name: '',
+          selected_title: '',
+          avatar_url: 'https://example.com/default-avatar.png',
+        },
+        post_comments: (post.post_comments || []).map((comment: any) => ({
+          ...comment,
+          profiles: comment.profiles || {
+            first_name: 'Unknown',
+            last_name: '',
+            avatar_url: 'https://example.com/default-avatar.png',
+          },
+        })),
+      }));
+
+      setPosts(postsWithProfiles);
     } catch (e) {
       console.error('Error loading posts:', e);
+      setPosts([]);
     }
-  }, []);
+  },
+  [showAllPosts]
+);
+
+
 
   // ---- Effects -----------------------------------------------------------
   useEffect(() => {
@@ -671,6 +702,17 @@ if (!initialLoadComplete || loading) {
         />
       </View>
 
+      {weekRange && (
+        <View style={styles.weekRangeWrapper}>
+          <Text style={styles.weekRangeText}>{weekRange}</Text>
+          <TouchableOpacity onPress={() => setShowAllPosts(!showAllPosts)}>
+            <Text style={styles.toggleText}>
+              {showAllPosts ? 'Show This Week' : 'Show All'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Post composer + feed */}
       <FlatList
         data={posts}
@@ -795,6 +837,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
   },
+weekRangeWrapper: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderBottomColor: '#333',
+  borderBottomWidth: 1,
+},
+weekRangeText: {
+  color: '#cccccc',
+  fontSize: 14,
+},
+toggleText: {
+  color: '#1ea2b1',
+  fontSize: 14,
+  fontWeight: '600',
+},
+
   searchInput: {
     flex: 1,
     marginLeft: 12,
