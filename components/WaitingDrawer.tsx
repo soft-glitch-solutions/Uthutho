@@ -3,6 +3,15 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Animated }
 import { X, Clock, DollarSign, MapPin, Users, CircleCheck as CheckCircle } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
+import { createOrJoinJourney } from '@/lib/journey';
+
+interface CompleteWaitingParams {
+  waitingRequestId: string;
+  stopId: string;
+  routeId: string;
+  stopSequence: number;
+}
+
 interface Route {
   id: string;
   name: string;
