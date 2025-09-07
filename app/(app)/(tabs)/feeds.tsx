@@ -8,10 +8,11 @@ import {
   TextInput,
   Alert,
   RefreshControl,
+  Image,
   Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Flame, MessageCircle, Plus, Search, MapPin, Bell, User } from 'lucide-react-native';
+import { Flame, MessageCircle, Plus, Search, MapPin, Bell, ArrowLeft } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import { useTranslation } from '@/hook/useTranslation';
@@ -36,6 +37,7 @@ interface Post {
     first_name: string;
     last_name: string;
     selected_title: string;
+    avatar_url?: string;
   };
   post_reactions: Array<{
     reaction_type: string;
@@ -49,6 +51,7 @@ interface Post {
     profiles: {
       first_name: string;
       last_name: string;
+      avatar_url?: string;
     };
   }>;
 }
@@ -239,7 +242,8 @@ export default function FeedsScreen() {
         profiles:user_id (
           first_name,
           last_name,
-          selected_title
+          selected_title,
+          avatar_url
         ),
         post_reactions (
           reaction_type,
@@ -252,16 +256,21 @@ export default function FeedsScreen() {
           user_id,
           profiles:user_id (
             first_name,
-            last_name
+            last_name,
+            avatar_url
           )
         )
       `;
+
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
       if (community.type === 'hub') {
         const { data, error } = await supabase
           .from('hub_posts')
           .select(baseSelect)
           .eq('hub_id', community.id)
+          .gte('created_at', oneWeekAgo.toISOString()) // ✅ only last 7 days
           .order('created_at', { ascending: false });
         if (error) throw error;
         setPosts(data || []);
@@ -270,6 +279,7 @@ export default function FeedsScreen() {
           .from('stop_posts')
           .select(baseSelect)
           .eq('stop_id', community.id)
+          .gte('created_at', oneWeekAgo.toISOString()) // ✅ only last 7 days
           .order('created_at', { ascending: false });
         if (error) throw error;
         setPosts(data || []);
@@ -485,7 +495,10 @@ useEffect(() => {
             style={styles.userInfoContainer}
           >
             <View style={styles.profilePicture}>
-              <User size={20} color="#1ea2b1" />
+              <Image
+                source={{ uri: post.profiles.avatar_url }}
+                style={{ width: 40, height: 40, borderRadius: 20 }}
+              />
             </View>
             <View>
               <Text style={styles.userName}>
@@ -538,7 +551,7 @@ if (!initialLoadComplete || loading) {
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setShowAddCommunity(false)} style={styles.backButton}>
-            <Text style={styles.backButtonText}>{t('back')}</Text>
+            <ArrowLeft size={24} color="#ffffff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('addCommunity')}</Text>
           <View style={styles.placeholder} />
@@ -553,6 +566,7 @@ if (!initialLoadComplete || loading) {
             onChangeText={(v) => setSearchQuery(v)}
           />
         </View>
+
 
         <FlatList
           data={filteredCommunities}

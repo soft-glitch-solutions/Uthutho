@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { House, User, Rss, Route, MessageCircle } from 'lucide-react-native';
+import { House, User, Rss, Route, MessageCircle , Bot } from 'lucide-react-native';
 import { View, Text } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { useNotifications } from '../../../hook/useNotifications';
@@ -66,7 +66,7 @@ export default function TabLayout() {
         name="ai"
         options={{
           title: 'AI Assistant',
-          tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <Bot color={color} size={size} />,
         }}
       />
 
