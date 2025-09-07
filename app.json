@@ -46,6 +46,8 @@
     },
     "android": {
       "package": "com.softglitchsolutions.uthutho",
+      "versionCode": 6,
+      "targetSdkVersion": 35,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#000000"
