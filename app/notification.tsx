@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { Bell, Check, CheckCheck, Users, Heart, MessageCircle, Car } from 'lucide-react-native';
+import { Bell, Check, CheckCheck, Users, Flame, MessageCircle, Car } from 'lucide-react-native';
 import { useNotifications } from '@/hook/useNotifications';
 import { useAuth } from '@/hook/useAuth';
 
@@ -16,7 +16,7 @@ export default function NotificationsScreen() {
       case 'application_response':
         return <Users size={20} color="#1ea2b1" />;
       case 'post_reaction':
-        return <Heart size={20} color="#ff6b35" />;
+        return <Flame size={20} color="#ff6b35" />;
       case 'post_comment':
         return <MessageCircle size={20} color="#1ea2b1" />;
       default:
