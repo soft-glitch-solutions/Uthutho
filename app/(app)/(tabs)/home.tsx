@@ -12,6 +12,7 @@ import {
 import { useRouter, useNavigation } from 'expo-router';
 import { supabase } from '../../../lib/supabase'; // Fixed path
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useJourney } from '@/hook/useJourney';
 import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext'; // Fixed path
 import StreakOverlay from '../../../components/StreakOverlay'; // Fixed path

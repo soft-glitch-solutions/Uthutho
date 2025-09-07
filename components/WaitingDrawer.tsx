@@ -17,7 +17,7 @@ interface WaitingDrawerProps {
   onClose: () => void;
   stopId: string;
   stopName: string;
-  onWaitingSet: (routeId: string, transportType: string) => void; // Updated prop
+  onWaitingSet: () => void;
 }
 
 export default function WaitingDrawer({ 
@@ -25,7 +25,7 @@ export default function WaitingDrawer({
   onClose, 
   stopId, 
   stopName, 
-  onWaitingSet // Add this prop
+  onWaitingSet 
 }: WaitingDrawerProps) {
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,66 +54,38 @@ export default function WaitingDrawer({
 const loadRoutesForStop = async () => {
   setLoading(true);
   try {
-    // Option 1: If using a junction table (recommended)
-    const { data: routesData, error: routesError } = await supabase
-      .from('route_stops') // your junction table
-      .select(`
-        route:routes (
-          id,
-          name,
-          transport_type,
-          cost,
-          start_point,
-          end_point
-        )
-      `)
-      .eq('stop_id', stopId);
-
-    if (routesError) throw routesError;
-
-    if (routesData && routesData.length > 0) {
-      // Extract routes from the junction table results
-      const formattedRoutes = routesData.map(item => item.route);
-      setRoutes(formattedRoutes);
-      return;
-    }
-
-    // Option 2: If using array column for stop IDs in routes table
-    const { data: routesWithStop, error: arrayError } = await supabase
-      .from('routes')
-      .select('*')
-      .contains('stop_ids', [stopId]); // assuming stop_ids is an array column
-
-    if (arrayError) throw arrayError;
-
-    if (routesWithStop && routesWithStop.length > 0) {
-      setRoutes(routesWithStop);
-      return;
-    }
-
-    // Fallback to your current single-route approach if needed
-    const { data: stopData } = await supabase
+    // First get the route_id from the stops table
+    const { data: stopData, error: stopError } = await supabase
       .from('stops')
       .select('route_id')
       .eq('id', stopId)
-      .single();
+      .maybeSingle();
 
-    if (stopData?.route_id) {
-      const { data: routeData } = await supabase
+    if (stopError) {
+      console.error('Error fetching stop data:', stopError);
+      setRoutes([]);
+    } else if (stopData?.route_id) {
+      // Get the route this stop belongs to
+      const { data: routeData, error: routeError } = await supabase
         .from('routes')
         .select('*')
         .eq('id', stopData.route_id);
       
-      setRoutes(routeData || []);
+      if (routeError) {
+        console.error('Error fetching route data:', routeError);
+        setRoutes([]);
+      } else {
+        setRoutes(routeData || []);
+      }
     } else {
+      // No route associated with this stop
       setRoutes([]);
     }
   } catch (error) {
     console.error('Error loading routes for stop:', error);
     setRoutes([]);
-  } finally {
-    setLoading(false);
   }
+  setLoading(false);
 };
 
   const startCountdown = (route: Route) => {
@@ -122,35 +94,35 @@ const loadRoutesForStop = async () => {
     setIsCountingDown(true);
   };
 
- const completeWaiting = async () => {
+  const completeWaiting = async () => {
     if (!selectedRoute) return;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const result = await createOrJoinJourney(
+        stopId,
+        selectedRoute.id,
+        selectedRoute.transport_type
+      );
 
-      const { error } = await supabase
-        .from('stop_waiting')
-        .insert([{
-          stop_id: stopId,
-          user_id: user.id,
-          transport_type: selectedRoute.transport_type,
-          route_id: selectedRoute.id,
-        }]);
-
-      if (!error) {
-        // Award 2 points for marking as waiting
+      if (result.success) {
+        // Award 2 points for starting journey
         await awardPoints(2);
-        onWaitingSet(selectedRoute.id, selectedRoute.transport_type); // Call the callback
-        onClose();
+        
+        // Navigate to journey page
+        router.push('/journey');
+        
+        onWaitingSet();
+      } else {
+        console.error('Failed to create/join journey:', result.error);
       }
     } catch (error) {
-      console.error('Error marking as waiting:', error);
+      console.error('Error creating journey:', error);
     }
     
     setIsCountingDown(false);
     setSelectedRoute(null);
     setCountdown(0);
+    onClose();
   };
 
   const awardPoints = async (points: number) => {
@@ -194,7 +166,7 @@ const loadRoutesForStop = async () => {
             <View style={styles.handle} />
             <View style={styles.headerContent}>
               <Text style={styles.title}>
-                {isCountingDown ? `Confirming... ` : 'Mark as Waiting'}
+                {isCountingDown ? `Confirming... ${countdown}` : 'Mark as Waiting'}
               </Text>
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                 <X size={24} color="#ffffff" />
@@ -240,6 +212,7 @@ const loadRoutesForStop = async () => {
                     <Text style={styles.transportType}>Unknown</Text>
                   </View>
                   <View style={styles.priceContainer}>
+                    <DollarSign size={16} color="#666666" />
                     <Text style={[styles.price, { color: '#666666' }]}>R 0</Text>
                   </View>
                 </View>
@@ -273,6 +246,7 @@ const loadRoutesForStop = async () => {
                       <Text style={styles.transportType}>{route.transport_type}</Text>
                     </View>
                     <View style={styles.priceContainer}>
+                      <DollarSign size={16} color="#1ea2b1" />
                       <Text style={styles.price}>R {route.cost}</Text>
                     </View>
                   </View>
