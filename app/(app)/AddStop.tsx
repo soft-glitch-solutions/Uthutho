@@ -3,7 +3,6 @@ import { View, Text, TextInput, Button, StyleSheet, Alert, Modal, TouchableOpaci
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
-import { Picker } from '@react-native-picker/picker';
 import { MaterialIcons } from '@expo/vector-icons';
 
 export default function AddStop() {
@@ -273,21 +272,6 @@ export default function AddStop() {
       />
 
       <Text style={[styles.label, { color: colors.text }]}>Select Route *</Text>
-      <Picker
-        selectedValue={routeId}
-        onValueChange={(itemValue) => setRouteId(itemValue)}
-        style={[styles.dropdown, { color: colors.text, backgroundColor: colors.inputBackground }]}
-        dropdownIconColor={colors.text}
-      >
-        <Picker.Item label="Select a route" value="" enabled={false} />
-        {routes.map((route) => (
-          <Picker.Item 
-            key={route.id} 
-            label={route.name} 
-            value={route.id} 
-          />
-        ))}
-      </Picker>
 
       <TouchableOpacity
         style={[styles.submitButton, { backgroundColor: colors.primary }]}

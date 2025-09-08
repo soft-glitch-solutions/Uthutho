@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+
 
 interface ProfileFormProps {
   profile: {
@@ -33,16 +33,6 @@ const ProfileForm = ({ profile, isLoading, onSubmit, onChange }: ProfileFormProp
       />
 
       <Text style={styles.label}>Preferred Transport</Text>
-      <Picker
-        selectedValue={profile.preferred_transport || ''}
-        onValueChange={(itemValue) => onChange({ ...profile, preferred_transport: itemValue })}
-        style={styles.picker}
-      >
-        <Picker.Item label="Select an option" value="" />
-        {transportOptions.map((option) => (
-          <Picker.Item key={option} label={option} value={option} />
-        ))}
-      </Picker>
 
       <TouchableOpacity style={styles.button} onPress={onSubmit} disabled={isLoading}>
         <Text style={styles.buttonText}>{isLoading ? 'Updating...' : 'Update Profile'}</Text>

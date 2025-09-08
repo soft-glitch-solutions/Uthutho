@@ -17,12 +17,12 @@ type LanguageProviderProps = {
 };
 
 export const LanguageProvider = ({ children }: LanguageProviderProps) => {
-  const [language, setLanguage] = useState<string>(Localization.locale.split('-')[0]); // Default to device locale
+  const [language, setLanguage] = useState<string>(Localization.getLocales()[0].languageCode); // Default to device locale
 
   useEffect(() => {
     // Update the language if the device locale changes
-    setLanguage(Localization.locale.split('-')[0]);
-  }, [Localization.locale]);
+    setLanguage(Localization.getLocales()[0].languageCode);
+  }, []);
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage }}>

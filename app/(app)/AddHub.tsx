@@ -3,7 +3,6 @@ import { View, Text, TextInput, Button, StyleSheet, Alert, Modal, TouchableOpaci
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
-import { Picker } from '@react-native-picker/picker';
 import { CheckCircle } from "lucide-react-native";
 import WarningModal from '@/components/WarningModal';
 
@@ -133,17 +132,7 @@ export default function AddHub() {
       />
 
       <Text style={[styles.label, { color: colors.text }]}>Transport Type</Text>
-      <Picker
-        selectedValue={transportType || ''}
-        onValueChange={(itemValue) => setTransportType(itemValue)}
-        style={[styles.dropdown, { color: colors.text, backgroundColor: colors.inputBackground }]}
-        dropdownIconColor={colors.text}
-      >
-        <Picker.Item label="Select Transport Type" value="" />
-        <Picker.Item label="Train" value="train" />
-        <Picker.Item label="Bus" value="bus" />
-        <Picker.Item label="Taxi" value="taxi" />
-      </Picker>
+
 
       <Text style={[styles.label, { color: colors.text }]}>Description</Text>
       <TextInput
