@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import * as FileSystem from "expo-file-system";
 
 export function useProfile() {
   const router = useRouter();
@@ -151,84 +152,69 @@ export function useProfile() {
   const handleImagePicker = useCallback(async () => {
     try {
       setUploading(true);
-
+  
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
+      if (status !== "granted") {
+        alert("Permission to access gallery is required!");
         return;
       }
-
+  
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 1,
       });
-
-      if (result.canceled) {
+  
+      console.log("📂 Picker result:", result);
+  
+      if (result.canceled || !result.assets?.length) {
+        console.log("⚠️ No image selected");
         return;
       }
-
-      if (!result.assets || result.assets.length === 0) {
-        throw new Error('No image selected.');
-      }
-
+  
       const file = result.assets[0];
-
-      if (!session?.user) throw new Error('No user session found');
-
+      let localUri = file.uri;
+  
+      // ✅ On iOS, convert ph:// URI to real path
+      if (localUri.startsWith("ph://")) {
+        const assetId = localUri.split("/").pop();
+        const dest = `${FileSystem.cacheDirectory}${assetId}.jpg`;
+        await FileSystem.copyAsync({ from: localUri, to: dest });
+        localUri = dest;
+        console.log("📱 iOS converted URI:", localUri);
+      }
+  
+      if (!session?.user) throw new Error("No user session found");
       const userId = session.user.id;
-
-      const fileExt = file.uri.split('.').pop();
-      const fileName = `${userId}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      const { data: existingFiles, error: listError } = await supabase.storage
-        .from('avatars')
-        .list(userId);
-
-      if (listError) {
-        throw listError;
-      }
-
-      if (existingFiles && existingFiles.length > 0) {
-        const { error: deleteError } = await supabase.storage
-          .from('avatars')
-          .remove([filePath]);
-
-        if (deleteError) {
-          throw deleteError;
-        }
-      }
-
-      const response = await fetch(file.uri);
-      if (!response.ok) {
-        throw new Error('Failed to fetch image');
-      }
+  
+      const fileExt = localUri.split(".").pop() || "jpg";
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${userId}/${fileName}`;
+  
+      // Fetch as blob
+      const response = await fetch(localUri);
       const blob = await response.blob();
-
+      console.log("📦 Blob ready:", blob.type, blob.size);
+  
+      // Upload to Supabase
       const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, blob, {
-          contentType: file.mimeType || 'image/jpeg',
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      if (!publicUrlData) {
-        throw new Error('Failed to get public URL for the uploaded image.');
-      }
-
-      const publicUrl = publicUrlData.publicUrl;
-
+        .from("avatars")
+        .upload(filePath, blob, { cacheControl: "3600", upsert: true });
+  
+      if (uploadError) throw uploadError;
+  
+      console.log("✅ Uploaded file:", filePath);
+  
+      const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      if (!data) throw new Error("Failed to retrieve public URL");
+  
+      const publicUrl = data.publicUrl;
+      console.log("🌍 Public URL:", publicUrl);
+  
       await handleAvatarUpload(publicUrl);
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      console.error("❌ Error in handleImagePicker:", error.message || error);
     } finally {
       setUploading(false);
     }
