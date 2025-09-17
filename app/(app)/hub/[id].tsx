@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert , Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { MapPin, Clock, Users, Heart, HeartOff, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon } from 'lucide-react-native';
@@ -34,6 +34,57 @@ interface Post {
     last_name: string;
   };
 }
+
+// Skeleton Loading Components
+const SkeletonLoader = () => {
+  return (
+    <ScrollView style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <StatusBar style="light" backgroundColor="#000000" />
+      
+      {/* Header Skeleton */}
+      <View style={styles.header}>
+        <View style={[styles.backButton, styles.skeleton]} />
+        <View style={[styles.favoriteButton, styles.skeleton]} />
+      </View>
+
+      {/* Hub Image Skeleton */}
+      <View style={[styles.imageContainer, styles.skeleton]} />
+
+      {/* Hub Info Skeleton */}
+      <View style={styles.infoSection}>
+        <View style={[styles.skeletonTextLarge, styles.skeleton, { width: '70%', marginBottom: 12 }]} />
+        <View style={[styles.skeletonTextMedium, styles.skeleton, { width: '90%', marginBottom: 8 }]} />
+        <View style={[styles.skeletonTextSmall, styles.skeleton, { width: '60%', marginBottom: 12 }]} />
+        <View style={[styles.skeletonBadge, styles.skeleton, { width: '30%' }]} />
+      </View>
+
+      {/* Action Buttons Skeleton */}
+      <View style={styles.actionButtons}>
+        <View style={[styles.actionButton, styles.skeleton]} />
+        <View style={[styles.actionButton, styles.skeleton]} />
+      </View>
+
+      {/* Routes Skeleton */}
+      <View style={styles.section}>
+        <View style={[styles.skeletonTextMedium, styles.skeleton, { width: '50%', marginBottom: 16 }]} />
+        {[1, 2].map((item) => (
+          <View key={item} style={[styles.routeItem, styles.skeleton, { height: 100 }]} />
+        ))}
+      </View>
+
+      {/* Posts Skeleton */}
+      <View style={styles.section}>
+        <View style={[styles.skeletonTextMedium, styles.skeleton, { width: '50%', marginBottom: 16 }]} />
+        {[1, 2].map((item) => (
+          <View key={item} style={[styles.postItem, styles.skeleton, { height: 80 }]} />
+        ))}
+      </View>
+
+      <View style={styles.bottomSpace} />
+    </ScrollView>
+  );
+};
 
 export default function HubDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -176,15 +227,11 @@ export default function HubDetailScreen() {
   };
 
   const navigateToRoute = (routeId: string) => {
-    router.push(`/route/${routeId}`);
+    router.push(`/route-details?routeId=${routeId}`);
   };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading hub details...</Text>
-      </View>
-    );
+    return <SkeletonLoader />;
   }
 
   if (!hub) {
@@ -334,6 +381,26 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+  // Skeleton styles
+  skeleton: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  skeletonTextLarge: {
+    height: 28,
+  },
+  skeletonTextMedium: {
+    height: 20,
+  },
+  skeletonTextSmall: {
+    height: 16,
+  },
+  skeletonBadge: {
+    height: 28,
+  },
+  // Rest of the styles remain the same
   loadingContainer: {
     flex: 1,
     backgroundColor: '#000000',
@@ -440,9 +507,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   hubImage: {
-  width: '100%',
-  height: '100%',
-  borderRadius: 16,
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
   },
   actionButton: {
     flex: 1,
