@@ -49,65 +49,7 @@ export default function SettingsScreen() {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={styles.container}>
-        <Text style={[styles.title, { color: colors.text }]}>{text.settings}</Text>
-
-        {/* Theme Settings */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{text.theme}</Text>
-        <View style={styles.themeOptions}>
-          <TouchableOpacity
-            style={[
-              styles.themeOption,
-              {
-                backgroundColor: theme === 'light' ? colors.primary : colors.card,
-              },
-            ]}
-            onPress={() => setTheme('light')}>
-            <Sun color={theme === 'light' ? 'white' : colors.text} />
-            <Text
-              style={[
-                styles.themeText,
-                { color: theme === 'light' ? 'white' : colors.text },
-              ]}>
-              {text.light}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.themeOption,
-              {
-                backgroundColor: theme === 'dark' ? colors.primary : colors.card,
-              },
-            ]}
-            onPress={() => setTheme('dark')}>
-            <Moon color={theme === 'dark' ? 'white' : colors.text} />
-            <Text
-              style={[
-                styles.themeText,
-                { color: theme === 'dark' ? 'white' : colors.text },
-              ]}>
-              {text.dark}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.themeOption,
-              {
-                backgroundColor: theme === 'system' ? colors.primary : colors.card,
-              },
-            ]}
-            onPress={() => setTheme('system')}>
-            <Smartphone color={theme === 'system' ? 'white' : colors.text} />
-            <Text
-              style={[
-                styles.themeText,
-                { color: theme === 'system' ? 'white' : colors.text },
-              ]}>
-              {text.system}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={[styles.title, { color: colors.text }]}>{text.settings}</Text>t>
 
         {/* Notification Settings */}
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{text.notifications}</Text>

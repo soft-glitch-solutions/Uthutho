@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Image } from 'react-native';
 import { Send, Smile } from 'lucide-react-native';
 
 interface ChatMessage {
@@ -11,6 +11,8 @@ interface ChatMessage {
   profiles?: {
     first_name: string;
     last_name: string;
+    selected_title: string;
+    avatar_url?: string;
   };
 }
 
@@ -38,9 +40,25 @@ export const JourneyChat = ({
         isOwnMessage && styles.ownMessageContainer
       ]}>
         {!isOwnMessage && !item.is_anonymous && item.profiles && (
-          <Text style={styles.senderName}>
-            {item.profiles.first_name} {item.profiles.last_name}
-          </Text>
+          <View style={styles.senderInfo}>
+            {item.profiles.avatar_url ? (
+              <Image 
+                source={{ uri: item.profiles.avatar_url }} 
+                style={styles.avatar}
+              />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarText}>
+                  {item.profiles.first_name?.[0]}{item.profiles.last_name?.[0]}
+                </Text>
+              </View>
+            )}
+            <View>
+              <Text style={styles.senderName}>
+                {item.profiles.selected_title || `${item.profiles.first_name} ${item.profiles.last_name}`}
+              </Text>
+            </View>
+          </View>
         )}
         
         <View style={[
@@ -81,21 +99,20 @@ export const JourneyChat = ({
         </View>
       ) : (
         <FlatList
-          data={messages}
+          data={[...messages].reverse()} // Reverse to show newest at bottom
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
           style={styles.messagesList}
-          inverted
           contentContainerStyle={styles.messagesContainer}
+          inverted={false} // Remove inverted to show normal order
         />
       )}
       
-      <View style={styles.inputContainer}>
+      {/* Fixed input container at bottom */}
+      <View style={styles.fixedInputContainer}>
         <TouchableOpacity 
           style={styles.emojiButton}
           onPress={() => {
-            // You can implement an emoji picker here
-            // For now, let's just add a common emoji to the message
             setNewMessage(prev => prev + '😊');
           }}
         >
@@ -137,10 +154,11 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     flex: 1,
+    marginBottom: 80, // Space for fixed input container
   },
   messagesContainer: {
     padding: 16,
-    paddingBottom: 8,
+    paddingBottom: 16, // Extra padding at bottom
   },
   messageContainer: {
     marginBottom: 16,
@@ -150,12 +168,36 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     alignItems: 'flex-end',
   },
+  senderInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    marginLeft: 4,
+  },
+  avatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  avatarPlaceholder: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#1ea2b1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  avatarText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   senderName: {
     color: '#1ea2b1',
     fontSize: 12,
     fontWeight: '500',
-    marginBottom: 4,
-    marginLeft: 12,
   },
   messageBubble: {
     borderRadius: 18,
@@ -194,13 +236,17 @@ const styles = StyleSheet.create({
     color: '#999999',
     textAlign: 'left',
   },
-  inputContainer: {
+  fixedInputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: 16,
     backgroundColor: '#1a1a1a',
     borderTopWidth: 1,
     borderTopColor: '#333333',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   emojiButton: {
     padding: 10,
@@ -217,6 +263,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     maxHeight: 100,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: '#333333',
   },
@@ -237,6 +284,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
+    marginBottom: 80, // Space for fixed input container
   },
   emptyChatText: {
     color: '#666666',

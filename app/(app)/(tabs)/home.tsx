@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
+  Image,
   Alert
 } from 'react-native';
 import { useRouter, useNavigation , useLocalSearchParams } from 'expo-router';
@@ -473,6 +474,10 @@ useEffect(() => {
       {/* Top Header */}
       <View style={styles.topHeader}>
         <Pressable onPress={openSidebar} style={styles.logoContainer}>
+          <Image
+            source={require('../../../assets/uthutho-logo.png')}
+            style={styles.logo}
+          />
           <Text style={[styles.uthuthoText, { color: colors.text }]}>Uthutho</Text>
         </Pressable>
         {isProfileLoading ? (
@@ -642,6 +647,11 @@ const styles = StyleSheet.create({
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  logo: {
+    width: 40,
+    height: 40,
+    marginRight: 8,
   },
   uthuthoText: {
     fontSize: 20,
