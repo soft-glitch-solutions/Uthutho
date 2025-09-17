@@ -63,16 +63,15 @@ export interface Passenger {
 
 export interface ChatMessage {
   id: string;
-  journey_id: string;
-  user_id: string;
   message: string;
-  is_anonymous: boolean;
   created_at: string;
+  is_anonymous: boolean;
+  user_id: string;
   profiles?: {
-    id: string;
     first_name: string;
     last_name: string;
-    avatar_url?: string;
+    selected_title: string; // Add this
+    avatar_url?: string;    // Add this
   };
 }
 

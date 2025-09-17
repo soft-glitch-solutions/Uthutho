@@ -356,7 +356,7 @@ useEffect(() => {
   };
 
   const handleNearestHubPress = (hubId) => {
-    router.push(`/hub-details?hubId=${hubId}`);
+    router.push(`/hub/${hubId}`);
   };
 
   // Function to handle marking as waiting with validation

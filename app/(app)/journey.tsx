@@ -226,8 +226,8 @@ const loadChatMessages = async () => {
 
   try {
     const { data: messages, error } = await supabase
-      .from('journey_messages')  // Change from journey_chat to journey_messages
-      .select('*, profiles (first_name, last_name)')
+      .from('journey_messages')
+      .select('*, profiles (first_name, last_name, selected_title, avatar_url)') // Add selected_title and avatar_url
       .eq('journey_id', activeJourney.id)
       .order('created_at', { ascending: true });
 
@@ -254,13 +254,13 @@ const subscribeToChat = () => {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'journey_messages',  // Change from journey_chat to journey_messages
+          table: 'journey_messages',
           filter: `journey_id=eq.${activeJourney.id}`
         },
         async (payload) => {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('first_name, last_name')
+            .select('first_name, last_name, selected_title, avatar_url') // Add selected_title and avatar_url
             .eq('id', payload.new.user_id)
             .single();
             
@@ -285,6 +285,7 @@ const subscribeToChat = () => {
     console.error('Error subscribing to chat:', error);
   }
 };
+
 const sendMessage = async () => {
   if (!newMessage.trim() || !activeJourney || !currentUserId) return;
 
@@ -430,52 +431,52 @@ const sendMessage = async () => {
     }
   };
 
-  const renderContent = () => {
-    if (activeTab === 'info') {
-      return (
-        <>
-          <JourneyOverview
-            routeName={activeJourney.routes.name}
-            transportType={activeJourney.routes.transport_type}
-            startPoint={activeJourney.routes.start_point}
-            endPoint={activeJourney.routes.end_point}
-            progressPercentage={getProgressPercentage()}
-            waitingTime={formatWaitingTime(waitingTime)}
-            estimatedArrival={getEstimatedArrival()}
-            passengerCount={otherPassengers.length + 1}
-            currentStop={activeJourney.current_stop_sequence || 0}
-            totalStops={journeyStops.length}
-          />
-
-          <CompleteJourneyButton onPress={handleCompleteJourney} />
-          
-          <UserStopHighlight stopName={userStopName} />
-          
-          <RouteProgress
-            stops={journeyStops}
-            onPingPassengers={pingPassengersAhead}
-          />
-          
-          <PassengersList
-            passengers={otherPassengers}
-            getPassengerWaitingTime={getPassengerWaitingTime}
-          />
-          
-
-        </>
-      );
-    } else {
-      return (
-        <JourneyChat
-          messages={chatMessages}
-          newMessage={newMessage}
-          setNewMessage={setNewMessage}
-          onSendMessage={sendMessage}
-          currentUserId={currentUserId}
+const renderContent = () => {
+  if (activeTab === 'info') {
+    return (
+      <>
+        <JourneyOverview
+          routeName={activeJourney.routes.name}
+          transportType={activeJourney.routes.transport_type}
+          startPoint={activeJourney.routes.start_point}
+          endPoint={activeJourney.routes.end_point}
+          progressPercentage={getProgressPercentage()}
+          waitingTime={formatWaitingTime(waitingTime)}
+          estimatedArrival={getEstimatedArrival()}
+          passengerCount={otherPassengers.length + 1}
+          currentStop={activeJourney.current_stop_sequence || 0}
+          totalStops={journeyStops.length}
         />
-      );
-    }
-  };
+
+        <CompleteJourneyButton onPress={handleCompleteJourney} />
+        
+        <UserStopHighlight stopName={userStopName} />
+        
+        <RouteProgress
+          stops={journeyStops}
+          onPingPassengers={pingPassengersAhead}
+        />
+        
+        <PassengersList
+          passengers={otherPassengers}
+          getPassengerWaitingTime={getPassengerWaitingTime}
+        />
+        
+
+      </>
+    );
+  } else {
+    return (
+      <JourneyChat
+        messages={chatMessages}
+        newMessage={newMessage}
+        setNewMessage={setNewMessage}
+        onSendMessage={sendMessage}
+        currentUserId={currentUserId}
+      />
+    );
+  }
+};
 
   if (loading) {
     return <JourneySkeleton />;
