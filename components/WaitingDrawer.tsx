@@ -1,16 +1,9 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Animated } from 'react-native';
-import { X, Clock, DollarSign, MapPin, Users, CircleCheck as CheckCircle } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
+import { X, Clock, DollarSign, Users, CircleCheck as CheckCircle } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-
-import { createOrJoinJourney } from '@/lib/journey';
-
-interface CompleteWaitingParams {
-  waitingRequestId: string;
-  stopId: string;
-  routeId: string;
-  stopSequence: number;
-}
+import { useRouter } from 'expo-router';
+import { useJourney } from '@/hook/useJourney';
 
 interface Route {
   id: string;
@@ -36,11 +29,13 @@ export default function WaitingDrawer({
   stopName, 
   onWaitingSet 
 }: WaitingDrawerProps) {
+  const router = useRouter();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
   const [countdown, setCountdown] = useState(0);
   const [isCountingDown, setIsCountingDown] = useState(false);
+  const { createOrJoinJourney } = useJourney();
 
   useEffect(() => {
     if (visible) {
@@ -60,70 +55,43 @@ export default function WaitingDrawer({
     return () => clearInterval(interval);
   }, [countdown, isCountingDown]);
 
-const loadRoutesForStop = async () => {
-  setLoading(true);
-  try {
-    // Option 1: If using a junction table (recommended)
-    const { data: routesData, error: routesError } = await supabase
-      .from('route_stops') // your junction table
-      .select(`
-        route:routes (
-          id,
-          name,
-          transport_type,
-          cost,
-          start_point,
-          end_point
-        )
-      `)
-      .eq('stop_id', stopId);
+  const loadRoutesForStop = async () => {
+    setLoading(true);
+    try {
+      // Query using junction table approach
+      const { data: routesData, error: routesError } = await supabase
+        .from('route_stops')
+        .select(`
+          route:routes (
+            id,
+            name,
+            transport_type,
+            cost,
+            start_point,
+            end_point
+          )
+        `)
+        .eq('stop_id', stopId);
 
-    if (routesError) throw routesError;
+      if (routesError) throw routesError;
 
-    if (routesData && routesData.length > 0) {
-      // Extract routes from the junction table results
-      const formattedRoutes = routesData.map(item => item.route);
-      setRoutes(formattedRoutes);
-      return;
-    }
+      if (routesData && routesData.length > 0) {
+        const formattedRoutes = routesData.map(item => item.route).filter(route => route !== null);
+        setRoutes(formattedRoutes);
+        return;
+      }
 
-    // Option 2: If using array column for stop IDs in routes table
-    const { data: routesWithStop, error: arrayError } = await supabase
-      .from('routes')
-      .select('*')
-      .contains('stop_ids', [stopId]); // assuming stop_ids is an array column
-
-    if (arrayError) throw arrayError;
-
-    if (routesWithStop && routesWithStop.length > 0) {
-      setRoutes(routesWithStop);
-      return;
-    }
-
-    // Fallback to your current single-route approach if needed
-    const { data: stopData } = await supabase
-      .from('stops')
-      .select('route_id')
-      .eq('id', stopId)
-      .maybeSingle();
-
-    if (stopData?.route_id) {
-      const { data: routeData } = await supabase
-        .from('routes')
-        .select('*')
-        .eq('id', stopData.route_id);
-      
-      setRoutes(routeData || []);
-    } else {
+      // Fallback if no routes found
       setRoutes([]);
+    } catch (error) {
+      console.error('Error loading routes for stop:', error);
+      Alert.alert('Error', 'Failed to load routes. Please try again.');
+      setRoutes([]);
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Error loading routes for stop:', error);
-    setRoutes([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
+
 
   const startCountdown = (route: Route) => {
     setSelectedRoute(route);
@@ -142,18 +110,15 @@ const loadRoutesForStop = async () => {
       );
 
       if (result.success) {
-        // Award 2 points for starting journey
         await awardPoints(2);
-        
-        // Navigate to journey page
-        router.push('/journey');
-        
+        router.replace('/journey');
         onWaitingSet();
       } else {
-        console.error('Failed to create/join journey:', result.error);
+        Alert.alert('Error', result.error || 'Failed to start journey');
       }
     } catch (error) {
       console.error('Error creating journey:', error);
+      Alert.alert('Error', 'Failed to start journey. Please try again.');
     }
     
     setIsCountingDown(false);
@@ -232,18 +197,7 @@ const loadRoutesForStop = async () => {
             {loading ? (
               <Text style={styles.loadingText}>Loading available routes...</Text>
             ) : routes.length === 0 ? (
-              <TouchableOpacity
-                style={styles.routeCard}
-                onPress={() => startCountdown({
-                  id: 'default',
-                  name: 'No Route Available',
-                  transport_type: 'Unknown',
-                  cost: 0,
-                  start_point: 'Unknown',
-                  end_point: 'Unknown'
-                })}
-                disabled={isCountingDown}
-              >
+              <View style={styles.routeCard}>
                 <View style={styles.routeHeader}>
                   <View style={styles.transportBadge}>
                     <Text style={styles.transportType}>Unknown</Text>
@@ -254,27 +208,19 @@ const loadRoutesForStop = async () => {
                   </View>
                 </View>
                 
-                <Text style={styles.routeName}>No Route Available</Text>
+                <Text style={styles.routeName}>No Routes Available</Text>
                 <Text style={styles.routeDestination}>
                   No transport routes found for this stop
                 </Text>
-                
-                <View style={styles.routeFooter}>
-                  <View style={styles.waitingInfo}>
-                    <Users size={16} color="#666666" />
-                    <Text style={styles.waitingCount}>0 waiting</Text>
-                  </View>
-                  <View style={styles.estimatedTime}>
-                    <Clock size={16} color="#666666" />
-                    <Text style={styles.timeText}>Unknown</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
+              </View>
             ) : (
               routes.map((route) => (
                 <TouchableOpacity
                   key={route.id}
-                  style={styles.routeCard}
+                  style={[
+                    styles.routeCard,
+                    selectedRoute?.id === route.id && isCountingDown && styles.selectedRouteCard
+                  ]}
                   onPress={() => startCountdown(route)}
                   disabled={isCountingDown}
                 >
@@ -412,16 +358,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     paddingVertical: 40,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyStateText: {
-    color: '#666666',
-    fontSize: 16,
-    marginTop: 12,
-    textAlign: 'center',
   },
   routeCard: {
     backgroundColor: '#1a1a1a',

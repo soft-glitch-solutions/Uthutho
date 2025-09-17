@@ -5,24 +5,19 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Image,
-  Platform,
   Alert
 } from 'react-native';
-import { useRouter, useNavigation } from 'expo-router';
-import { supabase } from '../../../lib/supabase'; // Fixed path
+import { useRouter, useNavigation , useLocalSearchParams } from 'expo-router';
+import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useJourney } from '@/hook/useJourney';
 import * as Location from 'expo-location';
-import { useTheme } from '../../../context/ThemeContext'; // Fixed path
-import StreakOverlay from '../../../components/StreakOverlay'; // Fixed path
-import { MapPin, Bus, Train, Navigation } from 'lucide-react-native'; // Import icons
-
-// Import components
-import HeaderSection from '../../../components/home/HeaderSection'; // Fixed path
-import NearbySection from '../../../components/home/NearbySection'; // Fixed path
-import FavoritesSection from '../../../components/home/FavoritesSection'; // Fixed path
-import GamificationSection from '../../../components/home/GamificationSection'; // Fixed path
+import { useTheme } from '@/context/ThemeContext';
+import { MapPin, Bus, Brain as Train, Navigation, Users, Clock, Flag } from 'lucide-react-native';
+import { useJourney } from '@/hook/useJourney';
+import HeaderSection from '@/components/home/HeaderSection';
+import NearbySection from '@/components/home/NearbySection';
+import FavoritesSection from '@/components/home/FavoritesSection';
+import GamificationSection from '@/components/home/GamificationSection';
 
 interface FavoriteItem {
   id: string;
@@ -32,7 +27,7 @@ interface FavoriteItem {
 }
 
 const calculateWalkingTime = (lat1, lng1, lat2, lng2) => {
-  const R = 6371; // Earth radius in km
+  const R = 6371;
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLng = (lng2 - lng1) * (Math.PI / 180);
   const a =
@@ -42,15 +37,13 @@ const calculateWalkingTime = (lat1, lng1, lat2, lng2) => {
       Math.sin(dLng / 2) *
       Math.sin(dLng / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distanceKm = R * c; // Distance in km
+  const distanceKm = R * c;
   
-  // Average walking speed is 5 km/h = 0.0833 km/min
   const walkingTimeMinutes = Math.round(distanceKm / 0.0833);
   
   return walkingTimeMinutes;
 };
 
-// Function to get icon based on type
 const getIconForType = (type: string) => {
   switch (type) {
     case 'stop':
@@ -64,7 +57,6 @@ const getIconForType = (type: string) => {
   }
 };
 
-// Function to get type label
 const getTypeLabel = (type: string) => {
   switch (type) {
     case 'stop':
@@ -81,6 +73,7 @@ const getTypeLabel = (type: string) => {
 export default function HomeScreen() {
   const router = useRouter();
   const { colors } = useTheme();
+  const params = useLocalSearchParams();
   const [userLocation, setUserLocation] = useState(null);
   const [locationError, setLocationError] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
@@ -97,24 +90,8 @@ export default function HomeScreen() {
   const [userId, setUserId] = useState(null);
   const [favoriteDetails, setFavoriteDetails] = useState([]);
   const [isStatsLoading, setIsStatsLoading] = useState(true);
-  const [showStreakOverlay, setShowStreakOverlay] = useState(false);
   const navigation = useNavigation();
-
-  // REMOVED AdMob initialization
-
-  const checkAndShowStreakOverlay = async (userId: string) => {
-    try {
-      const shownKey = `streakOverlayShown_${userId}`;
-      const hasShown = await AsyncStorage.getItem(shownKey);
-      
-      if (!hasShown) {
-        setShowStreakOverlay(true);
-        await AsyncStorage.setItem(shownKey, 'true');
-      }
-    } catch (error) {
-      console.error('Error checking streak overlay status:', error);
-    }
-  };
+  const { activeJourney, loading: journeyLoading } = useJourney();
 
   const toggleFavorite = async (item: FavoriteItem) => {
     try {
@@ -224,8 +201,6 @@ export default function HomeScreen() {
           );
           setFavoriteDetails(details.filter(Boolean));
         }
-
-        checkAndShowStreakOverlay(userId);
       } catch (error) {
         router.replace('/auth');
       } finally {
@@ -252,29 +227,25 @@ export default function HomeScreen() {
     })();
   }, []);
 
+    const fetchNearestLocations = async () => {
+    setIsNearestLoading(true);
+    try {
+      const { data: stops } = await supabase.from('stops').select('*');
+      const { data: hubs } = await supabase.from('hubs').select('*');
+
+      const nearestStop = findNearestLocation(userLocation, stops || []);
+      const nearestHub = findNearestLocation(userLocation, hubs || []);
+
+      setNearestLocations({ nearestStop, nearestHub });
+    } catch (error) {
+      console.error('Error fetching nearest locations:', error);
+    } finally {
+      setIsNearestLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!userLocation) return;
-
-    const fetchNearestLocations = async () => {
-      setIsNearestLoading(true);
-      try {
-        // Only fetch stops and hubs to avoid foreign key errors
-        const { data: stops } = await supabase.from('stops').select('*');
-        const { data: hubs } = await supabase.from('hubs').select('*');
-        // REMOVED routes query to avoid foreign key error
-
-        const nearestStop = findNearestLocation(userLocation, stops || []);
-        const nearestHub = findNearestLocation(userLocation, hubs || []);
-        // const nearestRoute = findNearestLocation(userLocation, routes || []); // REMOVED
-
-        setNearestLocations({ nearestStop, nearestHub }); // REMOVED nearestRoute
-      } catch (error) {
-        console.error('Error fetching nearest locations:', error);
-      } finally {
-        setIsNearestLoading(false);
-      }
-    };
-
     fetchNearestLocations();
   }, [userLocation]);
 
@@ -310,7 +281,6 @@ export default function HomeScreen() {
           .eq('id', user.id)
           .single();
         
-        // Use try-catch for streak data since the table might not exist
         let streak = 0;
         try {
           const { data: streakData } = await supabase
@@ -339,9 +309,17 @@ export default function HomeScreen() {
     }
   };
   
-  useEffect(() => {
+useEffect(() => {
+  // This will run whenever the refresh parameter changes
+  if (params.refresh) {
+    // Refresh your data here
     loadUserStats();
-  }, []);
+    if (userLocation) {
+      fetchNearestLocations();
+    }
+    // If you have other data that needs refreshing, add it here
+  }
+}, [params.refresh]);
 
   const openSidebar = () => {
     navigation.toggleDrawer();
@@ -353,7 +331,7 @@ export default function HomeScreen() {
         .from('hubs')
         .select('id')
         .eq('name', favoriteName)
-        .single();
+        .maybeSingle();
 
       if (hubData && !hubError) return { type: 'hub', id: hubData.id };
 
@@ -361,12 +339,10 @@ export default function HomeScreen() {
         .from('stops')
         .select('id')
         .eq('name', favoriteName)
-        .single();
+        .maybeSingle();
 
       if (stopData && !stopError) return { type: 'stop', id: stopData.id };
 
-      // Skip routes to avoid foreign key errors
-      console.log('Skipping route check');
       return null;
     } catch (error) {
       console.error('Error fetching favorite details:', error);
@@ -382,15 +358,121 @@ export default function HomeScreen() {
     router.push(`/hub-details?hubId=${hubId}`);
   };
 
+  // Function to handle marking as waiting with validation
+  const handleMarkAsWaiting = async (locationId, locationType, locationName) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert("Error", "You must be logged in to mark yourself as waiting.");
+        return;
+      }
+
+      // Check if user already has an active journey (server-side validation)
+      const { data: existingWaiting } = await supabase
+        .from('stop_waiting')
+        .select('id')
+        .eq('user_id', user.id)
+        .gt('expires_at', new Date().toISOString())
+        .single();
+
+      if (existingWaiting) {
+        Alert.alert(
+          "Active Journey",
+          "You already have an active journey. Complete your current journey before starting a new one.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
+      // Get route information for the stop
+      const { data: stopData, error: stopError } = await supabase
+        .from('stops')
+        .select('route_id')
+        .eq('id', locationId)
+        .single();
+
+      if (stopError) {
+        console.error('Error fetching stop details:', stopError);
+        Alert.alert("Error", "Could not find stop details.");
+        return;
+      }
+
+      // Check for existing journeys for this route
+      const { data: existingJourneys, error: journeyError } = await supabase
+        .from('journeys')
+        .select('id')
+        .eq('route_id', stopData.route_id)
+        .eq('status', 'in_progress')
+        .order('created_at', { ascending: false });
+
+      if (journeyError) {
+        console.error('Error checking existing journeys:', journeyError);
+      }
+
+      let journeyId;
+
+      // If there are existing journeys, join the first one
+      if (existingJourneys && existingJourneys.length > 0) {
+        journeyId = existingJourneys[0].id;
+      } else {
+        // Create new journey
+        const { data: newJourney, error: createError } = await supabase
+          .from('journeys')
+          .insert({
+            route_id: stopData.route_id,
+            current_stop_sequence: 0,
+            status: 'in_progress'
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating journey:', createError);
+          Alert.alert("Error", "Could not start journey.");
+          return;
+        }
+        journeyId = newJourney.id;
+      }
+
+      // Mark user as waiting at the stop
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 30); // Expire in 30 minutes
+
+      const { error: waitingError } = await supabase
+        .from('stop_waiting')
+        .upsert({
+          user_id: user.id,
+          stop_id: locationId,
+          journey_id: journeyId,
+          route_id: stopData.route_id,
+          transport_type: 'bus', // You might want to get this from somewhere
+          expires_at: expiresAt.toISOString(),
+        }, {
+          onConflict: 'user_id,stop_id'
+        });
+
+      if (waitingError) {
+        console.error('Error marking as waiting:', waitingError);
+        Alert.alert("Error", "Could not mark you as waiting.");
+        return;
+      }
+
+      Alert.alert(
+        "Waiting Status Updated",
+        `You've been marked as waiting at ${locationName}.`,
+        [{ text: "OK", onPress: () => router.push('/journey') }]
+      );
+    } catch (error) {
+      console.error('Error in handleMarkAsWaiting:', error);
+      Alert.alert("Error", "An unexpected error occurred.");
+    }
+  };
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Top Header */}
       <View style={styles.topHeader}>
         <Pressable onPress={openSidebar} style={styles.logoContainer}>
-          <Image
-            source={require('../../../assets/uthutho-logo.png')}
-            style={styles.logo}
-          />
           <Text style={[styles.uthuthoText, { color: colors.text }]}>Uthutho</Text>
         </Pressable>
         {isProfileLoading ? (
@@ -414,14 +496,39 @@ export default function HomeScreen() {
         colors={colors}
       />
 
-      {/* Streak Overlay */}
-      <StreakOverlay
-        visible={showStreakOverlay}
-        userId={userId}
-        onClose={() => setShowStreakOverlay(false)}
-      />
-
-      {/* REMOVED Ad Banner completely */}
+      {/* Active Journey Banner */}
+      {!journeyLoading && activeJourney && (
+        <Pressable 
+          style={styles.journeyBanner}
+          onPress={() => router.push('/journey')}
+        >
+          <View style={styles.journeyBannerContent}>
+            <View style={styles.journeyIcon}>
+              <Navigation size={20} color="#ffffff" />
+            </View>
+            <View style={styles.journeyInfo}>
+              <Text style={styles.journeyTitle}>Active Journey</Text>
+              <Text style={styles.journeyRoute}>{activeJourney.routes.name}</Text>
+              <Text style={styles.journeyProgress}>
+                Stop {activeJourney.current_stop_sequence || 0} of {activeJourney.stops?.length || 0}
+              </Text>
+            </View>
+            <View style={styles.journeyStats}>
+              <View style={styles.journeyStatItem}>
+                <Users size={14} color="#1ea2b1" />
+                <Text style={styles.journeyStatText}>Live</Text>
+              </View>
+              <View style={styles.journeyStatItem}>
+                <Clock size={14} color="#1ea2b1" />
+                <Text style={styles.journeyStatText}>Active</Text>
+              </View>
+            </View>
+          </View>
+          <View style={styles.journeyArrow}>
+            <Text style={styles.journeyArrowText}>›</Text>
+          </View>
+        </Pressable>
+      )}
 
       {/* Nearby Locations Section */}
       <NearbySection
@@ -433,6 +540,8 @@ export default function HomeScreen() {
         handleNearestStopPress={handleNearestStopPress}
         handleNearestHubPress={handleNearestHubPress}
         calculateWalkingTime={calculateWalkingTime}
+        hasActiveJourney={!!activeJourney} // Pass whether user has active journey
+        onMarkAsWaiting={handleMarkAsWaiting} // Pass the mark as waiting handler
       />
 
       {/* Your Community Section */}
@@ -534,11 +643,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  logo: {
-    width: 40,
-    height: 40,
-    marginRight: 8,
-  },
   uthuthoText: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -628,5 +732,75 @@ const styles = StyleSheet.create({
   removeButtonText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  journeyBanner: {
+    backgroundColor: '#1ea2b1',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  journeyBannerContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  journeyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  journeyInfo: {
+    flex: 1,
+  },
+  journeyTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 2,
+  },
+  journeyRoute: {
+    fontSize: 14,
+    color: '#ffffff',
+    opacity: 0.9,
+    marginBottom: 2,
+  },
+  journeyProgress: {
+    fontSize: 12,
+    color: '#ffffff',
+    opacity: 0.8,
+  },
+  journeyStats: {
+    alignItems: 'flex-end',
+  },
+  journeyStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  journeyStatText: {
+    fontSize: 12,
+    color: '#ffffff',
+    marginLeft: 4,
+    opacity: 0.9,
+  },
+  journeyArrow: {
+    marginLeft: 12,
+  },
+  journeyArrowText: {
+    fontSize: 24,
+    color: '#ffffff',
+    opacity: 0.7,
   },
 });
