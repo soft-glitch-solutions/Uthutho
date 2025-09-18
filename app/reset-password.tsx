@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator, Platform, Linking } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
@@ -30,8 +30,14 @@ export default function ResetPassword() {
       return;
     }
 
+    if (!token) {
+      Alert.alert('Error', 'Invalid or expired reset link.');
+      return;
+    }
+
     setLoading(true);
     try {
+      // Update user password using Supabase
       const { error } = await supabase.auth.updateUser({
         accessToken: token,
         password,
@@ -74,10 +80,16 @@ export default function ResetPassword() {
         onChangeText={setConfirmPassword}
       />
       {loading ? (
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#1ea2b1" />
       ) : (
-        <Button title="Reset Password" onPress={handleResetPassword} />
+        <Button title="Reset Password" onPress={handleResetPassword} color="#1ea2b1" />
       )}
+      <Text
+        style={styles.backLink}
+        onPress={() => router.replace('/auth')}
+      >
+        Back to Sign In
+      </Text>
     </View>
   );
 }
@@ -99,5 +111,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
+  },
+  backLink: {
+    marginTop: 20,
+    color: '#1ea2b1',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
 });
