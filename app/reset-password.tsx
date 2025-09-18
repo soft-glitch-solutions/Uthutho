@@ -9,8 +9,8 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Eye, EyeOff, Lock } from 'lucide-react-native';
 
 export default function ResetPassword() {
@@ -21,21 +21,25 @@ export default function ResetPassword() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    console.log('Access token from URL:', token);
     if (!token) {
       Alert.alert('Invalid Link', 'No token found in URL.');
-      console.log('Redirecting to /auth because token is missing');
       router.replace('/auth');
     }
   }, [token]);
 
-  const handleResetPassword = async () => {
-    console.log('Reset password clicked', password, confirmPassword);
+  useEffect(() => {
+    console.log('Password changed:', password);
+  }, [password]);
 
+  useEffect(() => {
+    console.log('Confirm password changed:', confirmPassword);
+  }, [confirmPassword]);
+
+  const handleResetPassword = async () => {
     if (!password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields.');
       return;
@@ -46,152 +50,143 @@ export default function ResetPassword() {
       return;
     }
 
+    if (!token) {
+      Alert.alert('Error', 'Invalid or expired reset link.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        accessToken: token,
-        password,
-      });
+      // Set session from the token first
+      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({ access_token: token });
+      if (sessionError) throw sessionError;
 
-      if (error) throw error;
+      // Now update the password
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) throw updateError;
 
       Alert.alert('Success', 'Password updated successfully.');
-      console.log('Password reset successful, redirecting to /auth');
-      router.replace('/auth');
+      router.replace('/auth'); // Redirect to login
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to reset password.');
       console.error('Reset password error:', err);
+      Alert.alert('Error', err.message || 'Failed to reset password.');
     } finally {
       setLoading(false);
     }
   };
 
+  if (!token) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.text}>Invalid reset link.</Text>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-    >
-      <View style={styles.header}>
-        <Text style={styles.title}>Reset Your Password</Text>
-        <Text style={styles.subtitle}>
-          Enter your new password below
-        </Text>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>Reset your password</Text>
+
+      <View style={styles.inputContainer}>
+        <Lock size={20} color="#1ea2b1" style={styles.icon} />
+        <TextInput
+          style={styles.input}
+          placeholder="New Password"
+          placeholderTextColor="#aaa"
+          secureTextEntry={!passwordVisible}
+          value={password}
+          onChangeText={setPassword}
+        />
+        <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
+          {passwordVisible ? <EyeOff size={24} color="#fff" /> : <Eye size={24} color="#fff" />}
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.form}>
-        <View style={styles.inputContainer}>
-          <Lock size={20} color="#1ea2b1" style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="New Password"
-            placeholderTextColor="#ccc"
-            secureTextEntry={!passwordVisible}
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              console.log('Password changed:', text);
-            }}
-          />
-          <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
-            {passwordVisible ? (
-              <EyeOff size={24} color="#fff" />
-            ) : (
-              <Eye size={24} color="#fff" />
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Lock size={20} color="#1ea2b1" style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm Password"
-            placeholderTextColor="#ccc"
-            secureTextEntry={!confirmVisible}
-            value={confirmPassword}
-            onChangeText={(text) => {
-              setConfirmPassword(text);
-              console.log('Confirm password changed:', text);
-            }}
-          />
-          <TouchableOpacity onPress={() => setConfirmVisible(!confirmVisible)}>
-            {confirmVisible ? (
-              <EyeOff size={24} color="#fff" />
-            ) : (
-              <Eye size={24} color="#fff" />
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <ActivityIndicator size="large" color="#1ea2b1" />
-        ) : (
-          <TouchableOpacity style={styles.button} onPress={handleResetPassword}>
-            <Text style={styles.buttonText}>Reset Password</Text>
-          </TouchableOpacity>
-        )}
+      <View style={styles.inputContainer}>
+        <Lock size={20} color="#1ea2b1" style={styles.icon} />
+        <TextInput
+          style={styles.input}
+          placeholder="Confirm Password"
+          placeholderTextColor="#aaa"
+          secureTextEntry={!confirmPasswordVisible}
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+        />
+        <TouchableOpacity onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}>
+          {confirmPasswordVisible ? <EyeOff size={24} color="#fff" /> : <Eye size={24} color="#fff" />}
+        </TouchableOpacity>
       </View>
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#1ea2b1" />
+      ) : (
+        <TouchableOpacity style={styles.button} onPress={handleResetPassword}>
+          <Text style={styles.buttonText}>Reset Password</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Small "Go back to login" link */}
+      <TouchableOpacity onPress={() => router.replace('/auth')} style={styles.goBackContainer}>
+        <Text style={styles.goBackText}>Go back to login</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  contentContainer: {
+    flexGrow: 1,
     padding: 20,
     justifyContent: 'center',
-    minHeight: '100%',
-  },
-  header: {
-    marginBottom: 30,
-    alignItems: 'center',
+    backgroundColor: '#000000',
   },
   title: {
-    fontSize: 28,
+    fontSize: 22,
+    color: '#ffffff',
     fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#ccc',
     textAlign: 'center',
-  },
-  form: {
-    gap: 15,
+    marginBottom: 20,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111',
-    borderRadius: 12,
-    borderWidth: 1,
     borderColor: '#333',
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
-  inputIcon: {
-    marginRight: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 16,
   },
   input: {
     flex: 1,
-    paddingVertical: 15,
-    fontSize: 16,
-    color: '#fff',
+    padding: 12,
+    color: '#ffffff',
+  },
+  icon: {
+    marginRight: 8,
   },
   button: {
     backgroundColor: '#1ea2b1',
-    paddingVertical: 15,
+    padding: 16,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 12,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: '#ffffff',
     fontWeight: 'bold',
+    fontSize: 16,
+  },
+  text: {
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  goBackContainer: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  goBackText: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    textDecorationLine: 'underline',
   },
 });
