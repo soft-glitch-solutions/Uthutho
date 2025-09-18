@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator, Platform, Linking } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
@@ -12,11 +12,23 @@ export default function ResetPassword() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Set Supabase session from token on load
   useEffect(() => {
     if (!token) {
       Alert.alert('Invalid Link', 'No token found in URL.');
       router.replace('/auth');
+      return;
     }
+
+    const setSupabaseSession = async () => {
+      const { error } = await supabase.auth.setSession(token);
+      if (error) {
+        Alert.alert('Invalid or expired token', 'Please request a new password reset.');
+        router.replace('/auth');
+      }
+    };
+
+    setSupabaseSession();
   }, [token]);
 
   const handleResetPassword = async () => {
@@ -30,18 +42,10 @@ export default function ResetPassword() {
       return;
     }
 
-    if (!token) {
-      Alert.alert('Error', 'Invalid or expired reset link.');
-      return;
-    }
-
     setLoading(true);
     try {
-      // Update user password using Supabase
-      const { error } = await supabase.auth.updateUser({
-        accessToken: token,
-        password,
-      });
+      // Update password with the session already set
+      const { error } = await supabase.auth.updateUser({ password });
 
       if (error) throw error;
 
@@ -80,16 +84,10 @@ export default function ResetPassword() {
         onChangeText={setConfirmPassword}
       />
       {loading ? (
-        <ActivityIndicator size="large" color="#1ea2b1" />
+        <ActivityIndicator size="large" />
       ) : (
-        <Button title="Reset Password" onPress={handleResetPassword} color="#1ea2b1" />
+        <Button title="Reset Password" onPress={handleResetPassword} />
       )}
-      <Text
-        style={styles.backLink}
-        onPress={() => router.replace('/auth')}
-      >
-        Back to Sign In
-      </Text>
     </View>
   );
 }
@@ -111,11 +109,5 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
-  },
-  backLink: {
-    marginTop: 20,
-    color: '#1ea2b1',
-    textAlign: 'center',
-    textDecorationLine: 'underline',
   },
 });
