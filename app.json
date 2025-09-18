@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
     "scheme": "uthutho",
+    "deepLinks": true,
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
