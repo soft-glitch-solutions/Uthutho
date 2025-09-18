@@ -7,11 +7,10 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  ScrollView,
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Eye, EyeOff, Lock } from 'lucide-react-native';
+import { Eye, EyeOff } from 'lucide-react-native';
 
 export default function ResetPassword() {
   const router = useRouter();
@@ -20,9 +19,8 @@ export default function ResetPassword() {
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordVisible, setPasswordVisible] = useState(false);
-  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -30,14 +28,6 @@ export default function ResetPassword() {
       router.replace('/auth');
     }
   }, [token]);
-
-  useEffect(() => {
-    console.log('Password changed:', password);
-  }, [password]);
-
-  useEffect(() => {
-    console.log('Confirm password changed:', confirmPassword);
-  }, [confirmPassword]);
 
   const handleResetPassword = async () => {
     if (!password || !confirmPassword) {
@@ -50,25 +40,21 @@ export default function ResetPassword() {
       return;
     }
 
-    if (!token) {
-      Alert.alert('Error', 'Invalid or expired reset link.');
-      return;
-    }
-
     setLoading(true);
-    try {
-      // Set session from the token first
-      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({ access_token: token });
-      if (sessionError) throw sessionError;
 
-      // Now update the password
-      const { error: updateError } = await supabase.auth.updateUser({ password });
-      if (updateError) throw updateError;
+    try {
+      // Use the token to update password without a session
+      const { error } = await supabase.auth.updateUser({
+        password,
+        accessToken: token,
+      });
+
+      if (error) throw error;
 
       Alert.alert('Success', 'Password updated successfully.');
-      router.replace('/auth'); // Redirect to login
+      router.replace('/auth'); // redirect to login
     } catch (err: any) {
-      console.error('Reset password error:', err);
+      console.log('Reset password error:', err);
       Alert.alert('Error', err.message || 'Failed to reset password.');
     } finally {
       setLoading(false);
@@ -84,109 +70,114 @@ export default function ResetPassword() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Reset your password</Text>
+    <View style={styles.container}>
+      <Text style={styles.header}>Reset Your Password</Text>
 
       <View style={styles.inputContainer}>
-        <Lock size={20} color="#1ea2b1" style={styles.icon} />
         <TextInput
           style={styles.input}
           placeholder="New Password"
           placeholderTextColor="#aaa"
           secureTextEntry={!passwordVisible}
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(text) => {
+            console.log('Password changed:', text);
+            setPassword(text);
+          }}
         />
-        <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
-          {passwordVisible ? <EyeOff size={24} color="#fff" /> : <Eye size={24} color="#fff" />}
+        <TouchableOpacity
+          style={styles.icon}
+          onPress={() => setPasswordVisible(!passwordVisible)}
+        >
+          {passwordVisible ? (
+            <EyeOff size={24} color="#fff" />
+          ) : (
+            <Eye size={24} color="#fff" />
+          )}
         </TouchableOpacity>
       </View>
 
-      <View style={styles.inputContainer}>
-        <Lock size={20} color="#1ea2b1" style={styles.icon} />
-        <TextInput
-          style={styles.input}
-          placeholder="Confirm Password"
-          placeholderTextColor="#aaa"
-          secureTextEntry={!confirmPasswordVisible}
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-        />
-        <TouchableOpacity onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}>
-          {confirmPasswordVisible ? <EyeOff size={24} color="#fff" /> : <Eye size={24} color="#fff" />}
-        </TouchableOpacity>
-      </View>
+      <TextInput
+        style={styles.input}
+        placeholder="Confirm Password"
+        placeholderTextColor="#aaa"
+        secureTextEntry
+        value={confirmPassword}
+        onChangeText={(text) => setConfirmPassword(text)}
+      />
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#1ea2b1" />
-      ) : (
-        <TouchableOpacity style={styles.button} onPress={handleResetPassword}>
+      <TouchableOpacity style={styles.button} onPress={handleResetPassword}>
+        {loading ? (
+          <ActivityIndicator color="#000" />
+        ) : (
           <Text style={styles.buttonText}>Reset Password</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Small "Go back to login" link */}
-      <TouchableOpacity onPress={() => router.replace('/auth')} style={styles.goBackContainer}>
-        <Text style={styles.goBackText}>Go back to login</Text>
+        )}
       </TouchableOpacity>
-    </ScrollView>
+
+      <TouchableOpacity
+        onPress={() => router.replace('/auth')}
+        style={styles.backToLogin}
+      >
+        <Text style={styles.backText}>Go back to login</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
+    flex: 1,
+    backgroundColor: '#000',
     padding: 20,
     justifyContent: 'center',
-    backgroundColor: '#000000',
   },
-  title: {
-    fontSize: 22,
-    color: '#ffffff',
-    fontWeight: 'bold',
+  header: {
+    fontSize: 24,
+    color: '#fff',
+    marginBottom: 24,
     textAlign: 'center',
-    marginBottom: 20,
+    fontWeight: 'bold',
+  },
+  text: {
+    color: '#fff',
+    textAlign: 'center',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderColor: '#333',
+    marginBottom: 12,
     borderWidth: 1,
-    borderRadius: 12,
+    borderColor: '#333',
+    borderRadius: 8,
     paddingHorizontal: 12,
-    marginBottom: 16,
+    backgroundColor: '#111',
   },
   input: {
     flex: 1,
     padding: 12,
-    color: '#ffffff',
+    color: '#fff',
   },
   icon: {
-    marginRight: 8,
+    marginLeft: 8,
   },
   button: {
     backgroundColor: '#1ea2b1',
-    padding: 16,
-    borderRadius: 12,
+    padding: 15,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 16,
   },
   buttonText: {
-    color: '#ffffff',
+    color: '#000',
     fontWeight: 'bold',
     fontSize: 16,
   },
-  text: {
-    color: '#ffffff',
-    textAlign: 'center',
-  },
-  goBackContainer: {
+  backToLogin: {
     marginTop: 12,
     alignItems: 'center',
   },
-  goBackText: {
-    color: '#1ea2b1',
+  backText: {
+    color: '#aaa',
     fontSize: 14,
-    textDecorationLine: 'underline',
   },
 });
