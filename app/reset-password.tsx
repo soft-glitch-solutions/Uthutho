@@ -29,44 +29,105 @@ export default function ResetPasswordScreen() {
 
   useEffect(() => {
     console.log('[ResetPassword] mounted. Platform:', Platform.OS);
-    console.log('[ResetPassword] tokenFromParams:', tokenFromParams);
+    console.log('[ResetPassword] tokenFromParams (raw):', tokenFromParams);
 
-    // On web, attempt to parse tokens in the URL into a session
-    // This uses Supabase's getSessionFromUrl() to convert the URL tokens into active browser session.
-    // If it succeeds, you can call updateUser() without passing accessToken.
-    const tryGetSessionFromUrl = async () => {
-      if (Platform.OS === 'web') {
-        try {
-          console.log('[ResetPassword] running supabase.auth.getSessionFromUrl() (web)');
-          const { error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
-          if (error) {
-            console.warn('[ResetPassword] getSessionFromUrl error:', error.message || error);
-          } else {
-            console.log('[ResetPassword] getSessionFromUrl completed (no error)');
+    const tryWebSession = async () => {
+      if (Platform.OS !== 'web') {
+        console.log('[ResetPassword] not web — skipping web session parse');
+        return;
+      }
+
+      try {
+        console.log('[ResetPassword] calling supabase.auth.getSessionFromUrl() (web)');
+        const { error: parseError } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+        if (parseError) {
+          console.warn('[ResetPassword] getSessionFromUrl returned error:', parseError);
+        } else {
+          console.log('[ResetPassword] getSessionFromUrl completed (no immediate error)');
+        }
+      } catch (err) {
+        console.warn('[ResetPassword] getSessionFromUrl threw:', err);
+      }
+
+      // Check if we have a session now
+      try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.warn('[ResetPassword] getSession error:', sessionError);
+        } else {
+          console.log('[ResetPassword] session after getSessionFromUrl:', sessionData?.session ?? null);
+          if (sessionData?.session) {
+            setHasBrowserSession(true);
+            setAvailableToken(null);
+            // remove token param if present for cleanliness
+            if (window?.location?.search?.includes('access_token=')) {
+              try {
+                const u = new URL(window.location.href);
+                u.searchParams.delete('access_token');
+                window.history.replaceState({}, '', u.toString());
+                console.log('[ResetPassword] removed access_token from URL');
+              } catch (err) {
+                console.warn('[ResetPassword] removing token from URL failed:', err);
+              }
+            }
+            return;
           }
+        }
+      } catch (err) {
+        console.warn('[ResetPassword] checking session threw:', err);
+      }
 
-          // Check whether there's a session now
-          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-          if (sessionError) {
-            console.warn('[ResetPassword] getSession after parsing URL error:', sessionError);
+      // If we didn't get a session but we do have an access_token in query params, try setSession
+      if (tokenFromParams) {
+        try {
+          console.log('[ResetPassword] No session yet — attempting supabase.auth.setSession({ access_token }) using tokenFromParams');
+          // supabase.auth.setSession expects { access_token, refresh_token? }
+          const setResult = await supabase.auth.setSession({ access_token: tokenFromParams });
+          // setResult may contain data/error depending on SDK version
+          // Try both shapes:
+          // v2 -> returns { data, error }
+          // older -> may throw
+          console.log('[ResetPassword] setSession result:', setResult);
+          if ((setResult as any)?.error) {
+            console.warn('[ResetPassword] setSession returned error:', (setResult as any).error);
           } else {
-            console.log('[ResetPassword] session after getSessionFromUrl:', sessionData?.session ?? null);
-            if (sessionData?.session) {
-              setHasBrowserSession(true);
-              // If there's a session, we don't need to use the token param
-              setAvailableToken(null);
+            // Confirm session now
+            const { data: sessionData2, error: sessionError2 } = await supabase.auth.getSession();
+            if (sessionError2) {
+              console.warn('[ResetPassword] getSession after setSession error:', sessionError2);
+            } else {
+              console.log('[ResetPassword] session after setSession:', sessionData2?.session ?? null);
+              if (sessionData2?.session) {
+                setHasBrowserSession(true);
+                setAvailableToken(null);
+                // remove access_token from URL for cleanliness
+                try {
+                  const u = new URL(window.location.href);
+                  u.searchParams.delete('access_token');
+                  window.history.replaceState({}, '', u.toString());
+                  console.log('[ResetPassword] removed access_token from URL after setSession');
+                } catch (err) {
+                  console.warn('[ResetPassword] removing token from URL failed:', err);
+                }
+                return;
+              }
             }
           }
         } catch (err) {
-          console.error('[ResetPassword] error in getSessionFromUrl:', err);
+          console.warn('[ResetPassword] setSession threw:', err);
+          // keep fallback token in availableToken for updateUser fallback
+          setAvailableToken(tokenFromParams);
         }
       }
+
+      // If we reach here, no browser session yet — keep availableToken as fallback
+      console.log('[ResetPassword] finished web session attempts. hasBrowserSession:', hasBrowserSession, 'availableToken:', availableToken);
     };
 
-    tryGetSessionFromUrl();
+    tryWebSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // console.log on password input changes (helpful for debugging)
   useEffect(() => {
     console.log('[ResetPassword] password changed. length=', password.length);
   }, [password]);
@@ -88,38 +149,50 @@ export default function ResetPasswordScreen() {
     setLoading(true);
 
     try {
-      let result;
+      // Branch: browser session available -> call updateUser normally
       if (hasBrowserSession) {
-        // There is an active session in the browser (web flow)
-        console.log('[ResetPassword] Using browser session flow: calling updateUser without accessToken');
-        result = await supabase.auth.updateUser({ password });
+        console.log('[ResetPassword] calling updateUser with password using browser session');
+        const { data, error } = await supabase.auth.updateUser({ password });
+        console.log('[ResetPassword] updateUser returned:', { data, error });
+        if (error) throw error;
       } else if (availableToken) {
-        // No session — use accessToken explicitly (mobile deep link / fallback)
-        console.log('[ResetPassword] No browser session. Using accessToken to update user. token length:', availableToken.length);
-        result = await supabase.auth.updateUser({ password, accessToken: availableToken });
+        // No session - pass accessToken explicitly
+        console.log('[ResetPassword] calling updateUser with accessToken fallback');
+        // Some SDK versions accept { password, accessToken }
+        // Others might throw. We'll try and log result.
+        try {
+          // @ts-ignore - accessToken param in updateUser is supported in some Supabase clients
+          const { data, error } = await supabase.auth.updateUser({ password, accessToken: availableToken });
+          console.log('[ResetPassword] updateUser(accessToken) returned:', { data, error });
+          if (error) throw error;
+        } catch (err) {
+          console.warn('[ResetPassword] updateUser(accessToken) threw, trying setSession+updateUser fallback', err);
+          // fallback: try to set session and then update user
+          try {
+            const setResult = await supabase.auth.setSession({ access_token: availableToken });
+            console.log('[ResetPassword] fallback setSession result:', setResult);
+            const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+            console.log('[ResetPassword] session after fallback setSession:', { sessionData, sessionErr });
+            if (sessionErr) throw sessionErr;
+            const { data: updData, error: updErr } = await supabase.auth.updateUser({ password });
+            console.log('[ResetPassword] fallback updateUser after setSession:', { updData, updErr });
+            if (updErr) throw updErr;
+          } catch (innerErr) {
+            console.error('[ResetPassword] fallback setSession+updateUser failed:', innerErr);
+            throw innerErr;
+          }
+        }
       } else {
-        // No token and no session — cannot proceed
-        console.error('[ResetPassword] No session and no token available. Aborting');
+        console.error('[ResetPassword] No session and no token available - cannot reset password');
         Alert.alert('Invalid link', 'No reset token or session found. Please request a new password reset email.');
         return;
       }
 
-      // result has shape { data, error } in many supabase clients; check for error
-      // In some environments supabase.auth.updateUser returns { error } or throws — handle both:
-      // If an error field exists:
-      // @ts-ignore
-      if (result?.error) {
-        // @ts-ignore
-        throw result.error;
-      }
-
-      // If supabase throws, it will end up in catch below
-      console.log('[ResetPassword] Password update result:', result);
+      console.log('[ResetPassword] password update successful');
       Alert.alert('Success', 'Password updated successfully. You can sign in now.');
       router.replace('/auth');
     } catch (err: any) {
       console.error('[ResetPassword] Reset password error:', err);
-      // Helpful message for missing session
       if (err?.message?.includes('Auth session missing')) {
         Alert.alert('Auth error', 'Session missing. Try opening link in your browser or request a new reset email.');
       } else {
@@ -135,7 +208,6 @@ export default function ResetPasswordScreen() {
     router.replace('/auth');
   };
 
-  // If no token and no session, show helpful message
   const showNoTokenWarning = !availableToken && !hasBrowserSession;
 
   return (
@@ -152,7 +224,7 @@ export default function ResetPasswordScreen() {
         {showNoTokenWarning && (
           <View style={styles.warningBox}>
             <Text style={styles.warningText}>
-              No reset token or session detected. If you clicked the link in an email, try opening the link in your browser (or request a new reset email).
+              No reset token or session detected. If you clicked the link in an email, try opening the link in your browser or request a new reset email.
             </Text>
           </View>
         )}
@@ -208,11 +280,11 @@ export default function ResetPasswordScreen() {
           <Text style={styles.backToLoginText}>Go back to login</Text>
         </TouchableOpacity>
 
-        {/* Debug info for development */}
         <View style={styles.debugBox}>
           <Text style={styles.debugText}>Platform: {Platform.OS}</Text>
           <Text style={styles.debugText}>tokenFromParams: {String(tokenFromParams ?? '—')}</Text>
           <Text style={styles.debugText}>hasBrowserSession: {String(hasBrowserSession)}</Text>
+          <Text style={styles.debugText}>availableToken: {String(availableToken ?? '—')}</Text>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -236,9 +308,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#222',
-    shadowColor: '#000',
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
   },
   title: {
     color: '#fff',
