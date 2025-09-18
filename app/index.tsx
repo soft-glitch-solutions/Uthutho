@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
 import { ActivityIndicator, View, Platform, Text, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../lib/supabase';
+import * as Linking from 'expo-linking';
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
@@ -10,34 +12,36 @@ export default function Index() {
   useEffect(() => {
     const checkFirstTime = async () => {
       try {
+        const initialUrl = await Linking.getInitialURL();
+        if (initialUrl && initialUrl.includes('reset-password')) return; // skip redirect if deep link
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setRedirectTo('/(app)/(tabs)/home');
+          return;
+        }
+
         let hasLaunched: string | null = null;
 
-        // Check if the platform is web or mobile
         if (Platform.OS === 'web') {
-          // Use localStorage for web
           hasLaunched = localStorage.getItem('hasLaunched');
         } else {
-          // Use AsyncStorage for mobile
           hasLaunched = await AsyncStorage.getItem('hasLaunched');
         }
 
         if (!hasLaunched) {
-          // First-time user, redirect to onboarding
           setRedirectTo('/onboarding');
-
-          // Set the flag for first launch
           if (Platform.OS === 'web') {
             localStorage.setItem('hasLaunched', 'true');
           } else {
             await AsyncStorage.setItem('hasLaunched', 'true');
           }
         } else {
-          // Not first-time user, redirect to auth or home
-          setRedirectTo('/auth'); // Default to auth, or you can add session check here
+          setRedirectTo('/auth');
         }
       } catch (error) {
         console.error('Error checking first launch:', error);
-        setRedirectTo('/onboarding'); // Fallback to onboarding on error
+        setRedirectTo('/onboarding');
       } finally {
         setIsLoading(false);
       }
@@ -59,13 +63,13 @@ export default function Index() {
     return <Redirect href={redirectTo} />;
   }
 
-  return <Redirect href="/onboarding" />; // Default to onboarding
+  return <Redirect href="/onboarding" />;
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -77,7 +81,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     fontSize: 16,
-    color: '#ffffff',
+    color: '#fff',
     textAlign: 'center',
   },
 });

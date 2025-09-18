@@ -13,6 +13,19 @@ export default function RootLayout() {
   const router = useRouter();
 
   useEffect(() => {
+    const handleDeepLink = (url: string) => {
+      const route = url.replace(/.*?:\/\//g, '');
+      const [path, query] = route.split('?');
+
+      if (path === 'reset-password') {
+        router.replace(query ? `/reset-password?${query}` : '/reset-password');
+      }
+
+      if (path === 'auth/callback') {
+        router.replace('/auth/callback');
+      }
+    };
+
     // Handle deep links when app is running
     const subscription = Linking.addEventListener('url', ({ url }) => {
       handleDeepLink(url);
@@ -27,21 +40,6 @@ export default function RootLayout() {
       subscription.remove();
     };
   }, []);
-
-  const handleDeepLink = (url: string) => {
-    // Extract path from URL like 'uthutho://reset-password'
-    const route = url.replace(/.*?:\/\//g, '');
-    
-    // Handle password reset deep link
-    if (route.includes('reset-password')) {
-      router.replace('/reset-password');
-    }
-    
-    // Handle OAuth callback deep link
-    if (route.includes('auth/callback')) {
-      router.replace('/auth/callback');
-    }
-  };
 
   return (
     <ThemeProvider>

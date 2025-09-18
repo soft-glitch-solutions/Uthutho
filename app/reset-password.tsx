@@ -12,23 +12,11 @@ export default function ResetPassword() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Set Supabase session from token on load
   useEffect(() => {
     if (!token) {
       Alert.alert('Invalid Link', 'No token found in URL.');
       router.replace('/auth');
-      return;
     }
-
-    const setSupabaseSession = async () => {
-      const { error } = await supabase.auth.setSession(token);
-      if (error) {
-        Alert.alert('Invalid or expired token', 'Please request a new password reset.');
-        router.replace('/auth');
-      }
-    };
-
-    setSupabaseSession();
   }, [token]);
 
   const handleResetPassword = async () => {
@@ -44,8 +32,10 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
-      // Update password with the session already set
-      const { error } = await supabase.auth.updateUser({ password });
+      const { error } = await supabase.auth.updateUser({
+        accessToken: token,
+        password,
+      });
 
       if (error) throw error;
 
