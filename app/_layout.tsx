@@ -19,25 +19,49 @@ export default function RootLayout() {
     return () => subscription.remove();
   }, []);
 
-  const handleDeepLink = (url: string) => {
-    const parsed = Linking.parse(url);
-    if (!parsed || !parsed.path) return;
+const handleDeepLink = (url: string) => {
+  console.log('[DeepLink] Handling URL:', url);
+  
+  try {
+    // Handle both query parameters and hash fragments
+    let access_token: string | null = null;
+    let refresh_token: string | null = null;
 
-    if (parsed.path.includes('reset-password')) {
-      const hashParams = new URLSearchParams(parsed.queryParams as any);
-      const access_token = hashParams.get('access_token');
-      const refresh_token = hashParams.get('refresh_token');
+    // Check for query parameters first
+    if (url.includes('?')) {
+      const urlObj = new URL(url);
+      access_token = urlObj.searchParams.get('access_token');
+      refresh_token = urlObj.searchParams.get('refresh_token');
+    }
+    
+    // If no query params found, check hash fragment
+    if ((!access_token || !refresh_token) && url.includes('#')) {
+      const hashIndex = url.indexOf('#');
+      const hash = url.substring(hashIndex + 1);
+      const hashParams = new URLSearchParams(hash);
+      access_token = hashParams.get('access_token');
+      refresh_token = hashParams.get('refresh_token');
+    }
 
+    console.log('[DeepLink] Extracted tokens:', {
+      access_token: access_token?.slice(0, 8),
+      refresh_token: refresh_token?.slice(0, 8)
+    });
+
+    if (access_token && refresh_token && url.includes('reset-password')) {
       router.replace({
         pathname: '/reset-password',
-        params: { access_token: access_token || '', refresh_token: refresh_token || '' },
+        params: { access_token, refresh_token },
       });
     }
 
-    if (parsed.path.includes('auth/callback')) {
+    if (url.includes('auth/callback')) {
       router.replace('/auth/callback');
     }
-  };
+  } catch (error) {
+    console.error('[DeepLink] Error parsing URL:', error);
+  }
+};
 
   return (
     <ThemeProvider>

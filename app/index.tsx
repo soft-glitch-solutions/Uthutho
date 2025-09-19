@@ -12,17 +12,23 @@ export default function Index() {
       try {
         // 🔑 Handle web reset-password links with hash (#)
         if (Platform.OS === 'web') {
-          const hash = window.location.hash; // e.g. "#access_token=123&refresh_token=456"
+          const hash = window.location.hash;
+          console.log('[Index] Hash:', hash);
+          
           if (hash && hash.includes('access_token')) {
-            const params = new URLSearchParams(hash.replace(/^#/, ''));
-            const access_token = params.get('access_token');
-            const refresh_token = params.get('refresh_token');
+            // Extract parameters from hash fragment
+            const hashParams = new URLSearchParams(hash.replace(/^#/, ''));
+            const access_token = hashParams.get('access_token');
+            const refresh_token = hashParams.get('refresh_token');
+
+            console.log('[Index] Extracted tokens:', {
+              access_token: access_token?.slice(0, 8),
+              refresh_token: refresh_token?.slice(0, 8)
+            });
 
             if (access_token && refresh_token) {
-              // Route directly to reset-password, preserving tokens
-              setRedirectTo(
-                `/reset-password?access_token=${access_token}&refresh_token=${refresh_token}`
-              );
+              // Convert hash to query parameters for the redirect
+              setRedirectTo(`/reset-password?access_token=${access_token}&refresh_token=${refresh_token}`);
               return;
             }
           }
@@ -39,14 +45,13 @@ export default function Index() {
 
         if (!hasLaunched) {
           setRedirectTo('/onboarding');
-
           if (Platform.OS === 'web') {
             localStorage.setItem('hasLaunched', 'true');
           } else {
             await AsyncStorage.setItem('hasLaunched', 'true');
           }
         } else {
-          setRedirectTo('/auth'); // or check Supabase session for auto-login
+          setRedirectTo('/auth');
         }
       } catch (error) {
         console.error('Error in Index init:', error);
