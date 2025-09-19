@@ -352,7 +352,7 @@ export default function Auth() {
 
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>
-          {showForgotPassword ? 'Reset Password' : isLogin ? 'Your journey to success starts here' : 'Create Account'}
+          {showForgotPassword ? 'Reset Password' : isLogin ? 'Transform Your Daily Commute' : 'Create Account'}
         </Text>
       </View>
 
