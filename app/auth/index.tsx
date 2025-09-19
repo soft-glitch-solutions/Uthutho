@@ -13,7 +13,7 @@ import {
 import { router } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
+import { Eye, EyeOff, Mail, Lock, ArrowLeft } from 'lucide-react-native';
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
@@ -21,8 +21,10 @@ export default function Auth() {
   const [facebookLoading, setFacebookLoading] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showOtpInput, setShowOtpInput] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otpCode, setOtpCode] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [preferredTransport, setPreferredTransport] = useState('');
@@ -177,7 +179,7 @@ export default function Auth() {
     }
   };
 
-  const handleForgotPassword = async () => {
+  const handleSendOtp = async () => {
     if (!email) {
       Alert.alert('Error', 'Please enter your email address');
       return;
@@ -185,19 +187,54 @@ export default function Auth() {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'myapp://reset-password',
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          // This will be handled by the OTP input flow
+          shouldCreateUser: false, // Don't create new user for password reset
+        },
       });
 
       if (error) throw error;
 
+      // Show OTP input screen
+      setShowOtpInput(true);
       Alert.alert(
-        'Email Sent',
-        'If an account exists with this email, you will receive a password reset link.'
+        'OTP Sent',
+        'Check your email for a verification code. Enter it below to reset your password.'
       );
-      setShowForgotPassword(false);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to send password reset email. Please try again.');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to send OTP. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode) {
+      Alert.alert('Error', 'Please enter the OTP code');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Verify OTP code
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token: otpCode,
+        type: 'recovery',
+      });
+
+      if (error) throw error;
+
+      // If OTP is verified, redirect to reset password page
+      Alert.alert('Success', 'OTP verified successfully');
+      router.push({
+        pathname: '/reset-password',
+        params: { email }
+      });
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Invalid OTP code. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -226,6 +263,74 @@ export default function Auth() {
       </View>
     );
   };
+
+  // OTP Input Screen
+  if (showOtpInput) {
+    return (
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.contentContainer}
+      >
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => setShowOtpInput(false)}
+        >
+          <ArrowLeft size={24} color={colors.text} />
+          <Text style={[styles.backText, { color: colors.text }]}>Back</Text>
+        </TouchableOpacity>
+
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('../../assets/images/icon.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
+
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.text }]}>
+            Enter Verification Code
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.text }]}>
+            We sent a code to {email}
+          </Text>
+        </View>
+
+        <View style={styles.form}>
+          <TextInput
+            style={[styles.otpInput, { backgroundColor: colors.card, color: colors.text }]}
+            placeholder="Enter OTP Code"
+            placeholderTextColor={colors.text}
+            value={otpCode}
+            onChangeText={setOtpCode}
+            keyboardType="number-pad"
+            maxLength={6}
+            autoFocus
+          />
+
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: colors.primary }]}
+            onPress={handleVerifyOtp}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>
+              {isLoading ? 'Verifying...' : 'Verify Code'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.resendButton}
+            onPress={handleSendOtp}
+            disabled={isLoading}
+          >
+            <Text style={[styles.resendText, { color: colors.primary }]}>
+              {isLoading ? 'Sending...' : 'Resend Code'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView
@@ -341,7 +446,7 @@ export default function Auth() {
           style={[styles.button, { backgroundColor: colors.primary }]}
           onPress={
             showForgotPassword 
-              ? handleForgotPassword 
+              ? handleSendOtp  // Changed to send OTP
               : isLogin 
                 ? handleSignIn 
                 : handleSignUp
@@ -352,7 +457,7 @@ export default function Auth() {
             {isLoading 
               ? 'Loading...' 
               : showForgotPassword 
-                ? 'Send Reset Link' 
+                ? 'Send OTP Code'  // Changed text
                 : isLogin 
                   ? 'Sign In' 
                   : 'Create Account'}
@@ -361,35 +466,37 @@ export default function Auth() {
       </View>
 
       {/* Social Login Section */}
-      <View style={styles.socialLoginContainer}>
-        <Text style={[styles.socialLoginText, { color: colors.text }]}>
-          {isLogin ? 'Continue with' : 'Sign up with'}
-        </Text>
-        
-        <View style={styles.socialButtonsRow}>
-          <TouchableOpacity
-            style={[styles.socialButton, { backgroundColor: colors.card }]}
-            onPress={handleGoogleSignIn}
-            disabled={googleLoading}
-          >
-            <Image
-              source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg' }}
-              style={styles.socialIcon}
-            />
-          </TouchableOpacity>
+      {!showForgotPassword && (
+        <View style={styles.socialLoginContainer}>
+          <Text style={[styles.socialLoginText, { color: colors.text }]}>
+            {isLogin ? 'Continue with' : 'Sign up with'}
+          </Text>
           
-          <TouchableOpacity
-            style={[styles.socialButton, { backgroundColor: colors.card }]}
-            onPress={handleFacebookSignIn}
-            disabled={facebookLoading}
-          >
-            <Image
-              source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg' }}
-              style={styles.socialIcon}
-            />
-          </TouchableOpacity>
+          <View style={styles.socialButtonsRow}>
+            <TouchableOpacity
+              style={[styles.socialButton, { backgroundColor: colors.card }]}
+              onPress={handleGoogleSignIn}
+              disabled={googleLoading}
+            >
+              <Image
+                source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg' }}
+                style={styles.socialIcon}
+              />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.socialButton, { backgroundColor: colors.card }]}
+              onPress={handleFacebookSignIn}
+              disabled={facebookLoading}
+            >
+              <Image
+                source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg' }}
+                style={styles.socialIcon}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Switch between Login/Signup */}
       <TouchableOpacity
@@ -461,6 +568,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
+  subtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    opacity: 0.8,
+    marginBottom: 10,
+  },
   form: {
     gap: 15,
   },
@@ -514,6 +627,15 @@ const styles = StyleSheet.create({
   input: {
     padding: 15,
     fontSize: 16,
+  },
+  otpInput: {
+    padding: 15,
+    fontSize: 18,
+    textAlign: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#333333',
+    marginBottom: 20,
   },
   inputIcon: {
     marginRight: 12,
@@ -604,5 +726,22 @@ const styles = StyleSheet.create({
   socialIcon: {
     width: 24,
     height: 24,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  backText: {
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  resendButton: {
+    padding: 10,
+    alignItems: 'center',
+  },
+  resendText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
