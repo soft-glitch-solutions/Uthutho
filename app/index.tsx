@@ -2,25 +2,33 @@ import { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
 import { ActivityIndicator, View, Platform, Text, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../lib/supabase';
-import * as Linking from 'expo-linking';
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
   const [redirectTo, setRedirectTo] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkFirstTime = async () => {
+    const init = async () => {
       try {
-        const initialUrl = await Linking.getInitialURL();
-        if (initialUrl && initialUrl.includes('reset-password')) return; // skip redirect if deep link
+        // 🔑 Handle web reset-password links with hash (#)
+        if (Platform.OS === 'web') {
+          const hash = window.location.hash; // e.g. "#access_token=123&refresh_token=456"
+          if (hash && hash.includes('access_token')) {
+            const params = new URLSearchParams(hash.replace(/^#/, ''));
+            const access_token = params.get('access_token');
+            const refresh_token = params.get('refresh_token');
 
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          setRedirectTo('/(app)/(tabs)/home');
-          return;
+            if (access_token && refresh_token) {
+              // Route directly to reset-password, preserving tokens
+              setRedirectTo(
+                `/reset-password?access_token=${access_token}&refresh_token=${refresh_token}`
+              );
+              return;
+            }
+          }
         }
 
+        // 🔁 Otherwise continue with first-launch / auth logic
         let hasLaunched: string | null = null;
 
         if (Platform.OS === 'web') {
@@ -31,23 +39,24 @@ export default function Index() {
 
         if (!hasLaunched) {
           setRedirectTo('/onboarding');
+
           if (Platform.OS === 'web') {
             localStorage.setItem('hasLaunched', 'true');
           } else {
             await AsyncStorage.setItem('hasLaunched', 'true');
           }
         } else {
-          setRedirectTo('/auth');
+          setRedirectTo('/auth'); // or check Supabase session for auto-login
         }
       } catch (error) {
-        console.error('Error checking first launch:', error);
+        console.error('Error in Index init:', error);
         setRedirectTo('/onboarding');
       } finally {
         setIsLoading(false);
       }
     };
 
-    checkFirstTime();
+    init();
   }, []);
 
   if (isLoading) {
@@ -55,6 +64,7 @@ export default function Index() {
       <View style={styles.container}>
         <Text style={styles.logo}>Uthutho</Text>
         <Text style={styles.tagline}>Transform Your Daily Commute</Text>
+        <ActivityIndicator color="#1ea2b1" style={{ marginTop: 16 }} />
       </View>
     );
   }
@@ -69,7 +79,7 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -81,7 +91,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     fontSize: 16,
-    color: '#fff',
+    color: '#ffffff',
     textAlign: 'center',
   },
 });
