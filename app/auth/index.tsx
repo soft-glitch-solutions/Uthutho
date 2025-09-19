@@ -8,12 +8,17 @@ import {
   ScrollView,
   Alert,
   Image,
-  Dimensions,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { Eye, EyeOff, Mail, Lock, ArrowLeft } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+
+// Required for Expo OAuth
+WebBrowser.maybeCompleteAuthSession();
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
@@ -41,39 +46,123 @@ export default function Auth() {
     setErrorMessage(null);
     
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      // Use different redirect URLs for web vs mobile
+      const redirectUrl = Platform.OS === 'web' 
+        ? 'https://www.mobile.uthutho.co.za/auth/callback'
+        : Linking.createURL('/auth/callback');
+  
+      console.log('OAuth Redirect URL:', redirectUrl);
+  
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'https://www.mobile.uthutho.co.za/auth/callback',
+          redirectTo: redirectUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
           },
+          // For mobile, use Expo's WebBrowser for better experience
+          skipBrowserRedirect: Platform.OS !== 'web',
         },
       });
-
+  
       if (error) throw error;
-    } catch (error) {
+  
+      // On mobile, open the OAuth URL in WebBrowser
+      if (Platform.OS !== 'web' && data?.url) {
+        console.log('Opening WebBrowser for OAuth');
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          redirectUrl
+        );
+  
+        console.log('WebBrowser result:', result.type);
+  
+        if (result.type === 'success') {
+          // The OAuth flow was completed successfully
+          const { url } = result;
+          console.log('OAuth success URL:', url);
+          
+          // Parse the URL to extract tokens
+          const { queryParams } = Linking.parse(url);
+          console.log('OAuth query params:', queryParams);
+          
+          if (queryParams?.error) {
+            throw new Error(queryParams.error_description || 'OAuth failed');
+          }
+          
+          // Redirect to auth callback to handle the session
+          router.replace('/auth/callback');
+        } else if (result.type === 'cancel') {
+          throw new Error('Sign-in cancelled');
+        } else if (result.type === 'dismiss') {
+          throw new Error('Sign-in dismissed');
+        }
+      }
+    } catch (error: any) {
+      console.error('Google sign-in error:', error);
       setErrorMessage(error.message || 'Google sign-in failed');
     } finally {
       setGoogleLoading(false);
     }
   };
-
+  
   const handleFacebookSignIn = async () => {
     setFacebookLoading(true);
     setErrorMessage(null);
     
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      // Use different redirect URLs for web vs mobile
+      const redirectUrl = Platform.OS === 'web' 
+        ? 'https://www.mobile.uthutho.co.za/auth/callback'
+        : Linking.createURL('/auth/callback');
+  
+      console.log('Facebook OAuth Redirect URL:', redirectUrl);
+  
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'facebook',
         options: {
-          redirectTo: 'https://www.mobile.uthutho.co.za/auth/callback',
+          redirectTo: redirectUrl,
+          // For mobile, use Expo's WebBrowser for better experience
+          skipBrowserRedirect: Platform.OS !== 'web',
         },
       });
-
+  
       if (error) throw error;
-    } catch (error) {
+  
+      // On mobile, open the OAuth URL in WebBrowser
+      if (Platform.OS !== 'web' && data?.url) {
+        console.log('Opening WebBrowser for Facebook OAuth');
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          redirectUrl
+        );
+  
+        console.log('Facebook WebBrowser result:', result.type);
+  
+        if (result.type === 'success') {
+          // The OAuth flow was completed successfully
+          const { url } = result;
+          console.log('Facebook OAuth success URL:', url);
+          
+          // Parse the URL to extract tokens
+          const { queryParams } = Linking.parse(url);
+          console.log('Facebook OAuth query params:', queryParams);
+          
+          if (queryParams?.error) {
+            throw new Error(queryParams.error_description || 'Facebook OAuth failed');
+          }
+          
+          // Redirect to auth callback to handle the session
+          router.replace('/auth/callback');
+        } else if (result.type === 'cancel') {
+          throw new Error('Sign-in cancelled');
+        } else if (result.type === 'dismiss') {
+          throw new Error('Sign-in dismissed');
+        }
+      }
+    } catch (error: any) {
+      console.error('Facebook sign-in error:', error);
       setErrorMessage(error.message || 'Facebook sign-in failed');
     } finally {
       setFacebookLoading(false);
@@ -106,7 +195,7 @@ export default function Auth() {
       }
 
       router.replace('/(app)/(tabs)/home');
-    } catch (error) {
+    } catch (error: any) {
       setErrorMessage('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
@@ -148,7 +237,7 @@ export default function Auth() {
             preferred_transport: preferredTransport,
             preferred_language: preferredLanguage,
           },
-          emailRedirectTo: 'myapp://welcome'
+          emailRedirectTo: 'uthutho://welcome'
         },
       });
 
@@ -172,7 +261,7 @@ export default function Auth() {
       setLastName('');
       setPreferredTransport('');
       setPreferredLanguage('English');
-    } catch (error) {
+    } catch (error: any) {
       setErrorMessage('Could not create account. Please try again.');
     } finally {
       setIsLoading(false);
@@ -190,7 +279,6 @@ export default function Auth() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          // This will be handled by the OTP input flow
           shouldCreateUser: false, // Don't create new user for password reset
         },
       });
@@ -248,12 +336,14 @@ export default function Auth() {
             key={option}
             style={[
               styles.optionButton,
+              { backgroundColor: colors.card, borderColor: colors.border },
               selected === option && styles.optionButtonActive,
             ]}
             onPress={() => setSelected(option)}
           >
             <Text style={[
               styles.optionText,
+              { color: colors.text },
               selected === option && styles.optionTextActive
             ]}>
               {option}
@@ -298,7 +388,7 @@ export default function Auth() {
 
         <View style={styles.form}>
           <TextInput
-            style={[styles.otpInput, { backgroundColor: colors.card, color: colors.text }]}
+            style={[styles.otpInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
             placeholder="Enter OTP Code"
             placeholderTextColor={colors.text}
             value={otpCode}
@@ -367,14 +457,14 @@ export default function Auth() {
         {!isLogin && !showForgotPassword && (
           <>
             <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
               placeholder="First Name"
               placeholderTextColor={colors.text}
               value={firstName}
               onChangeText={setFirstName}
             />
             <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
               placeholder="Last Name"
               placeholderTextColor={colors.text}
               value={lastName}
@@ -395,7 +485,7 @@ export default function Auth() {
           </>
         )}
 
-        <View style={[styles.emailContainer, { backgroundColor: colors.card, borderRadius: 10 }]}>
+        <View style={[styles.emailContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Mail size={20} color="#1ea2b1" style={styles.inputIcon} />
           <TextInput
             style={[styles.input, { flex: 1, color: colors.text }]}
@@ -409,7 +499,7 @@ export default function Auth() {
         </View>
 
         {!showForgotPassword && (
-          <View style={[styles.passwordContainer, { backgroundColor: colors.card, borderRadius: 10 }]}>
+          <View style={[styles.passwordContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Lock size={20} color="#1ea2b1" style={styles.inputIcon} />
             <TextInput
               style={[styles.input, { flex: 1, color: colors.text }]}
@@ -446,7 +536,7 @@ export default function Auth() {
           style={[styles.button, { backgroundColor: colors.primary }]}
           onPress={
             showForgotPassword 
-              ? handleSendOtp  // Changed to send OTP
+              ? handleSendOtp
               : isLogin 
                 ? handleSignIn 
                 : handleSignUp
@@ -457,7 +547,7 @@ export default function Auth() {
             {isLoading 
               ? 'Loading...' 
               : showForgotPassword 
-                ? 'Send OTP Code'  // Changed text
+                ? 'Send OTP Code'
                 : isLogin 
                   ? 'Sign In' 
                   : 'Create Account'}
@@ -479,8 +569,9 @@ export default function Auth() {
               disabled={googleLoading}
             >
               <Image
-                source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg' }}
+                source={require('../../assets/images/google-icon.png')}
                 style={styles.socialIcon}
+                resizeMode="contain"
               />
             </TouchableOpacity>
             
@@ -490,8 +581,9 @@ export default function Auth() {
               disabled={facebookLoading}
             >
               <Image
-                source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg' }}
+                source={require('../../assets/images/facebook-icon.png')}
                 style={styles.socialIcon}
+                resizeMode="contain"
               />
             </TouchableOpacity>
           </View>
@@ -610,23 +702,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: 10,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#333333',
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: 10,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#333333',
   },
   input: {
     padding: 15,
     fontSize: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    margin: 5,
   },
   otpInput: {
     padding: 15,
@@ -634,7 +727,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#333333',
     marginBottom: 20,
   },
   inputIcon: {
@@ -666,11 +758,9 @@ const styles = StyleSheet.create({
   },
   optionButton: {
     borderRadius: 20,
-    color: 'white',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#555555',
     marginBottom: 8,
   },
   optionButtonActive: {
@@ -679,7 +769,6 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 14,
-    color: '#ffffff',
     fontWeight: '500',
   },
   optionTextActive: {

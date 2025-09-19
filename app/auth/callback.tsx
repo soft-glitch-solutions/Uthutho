@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, ActivityIndicator, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Animated, Easing, Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 
 export default function AuthCallback() {
   const router = useRouter();
@@ -33,42 +34,77 @@ export default function AuthCallback() {
       try {
         setStatus('Verifying your session...');
         
-        // Check for any incoming deep link (for mobile)
+        // For mobile OAuth, close any open web browser sessions
+        if (Platform.OS !== 'web') {
+          WebBrowser.dismissAuthSession();
+        }
+
+        // Check for any incoming deep link (for mobile OAuth)
         const initialUrl = await Linking.getInitialURL();
         if (initialUrl) {
           const { queryParams } = Linking.parse(initialUrl);
+          console.log('Deep link detected:', { queryParams });
+          
           if (queryParams?.refresh_token || queryParams?.access_token) {
-            setStatus('Session detected...');
+            setStatus('OAuth session detected...');
+            
+            // Extract tokens from URL for manual session setting if needed
+            if (queryParams.access_token && queryParams.refresh_token) {
+              const { error: sessionError } = await supabase.auth.setSession({
+                access_token: queryParams.access_token as string,
+                refresh_token: queryParams.refresh_token as string,
+              });
+              
+              if (sessionError) {
+                console.error('Error setting session from URL:', sessionError);
+              }
+            }
           }
         }
 
         // Wait for Supabase to initialize the session
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         // Check if we have an active session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (sessionError) throw sessionError;
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          throw sessionError;
+        }
         
         if (session) {
           if (isMounted) {
             setStatus('Authentication successful!');
+            console.log('User authenticated:', session.user.email);
+            
             // Add a small delay before redirecting to show success message
             await new Promise(resolve => setTimeout(resolve, 1000));
             router.replace('/(app)/(tabs)/home');
           }
         } else {
-          throw new Error('No active session found');
+          // Try one more time after a delay in case session is still loading
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const { data: { session: retrySession } } = await supabase.auth.getSession();
+          
+          if (retrySession) {
+            if (isMounted) {
+              setStatus('Authentication successful!');
+              router.replace('/(app)/(tabs)/home');
+            }
+          } else {
+            throw new Error('No active session found. Please try signing in again.');
+          }
         }
 
       } catch (err: any) {
         console.error('Auth callback error:', err);
         if (isMounted) {
-          setError(err.message || 'Authentication failed');
+          setError(err.message || 'Authentication failed. Please try again.');
           // Wait a bit before redirecting to show error
           setTimeout(() => {
             router.replace('/auth');
-          }, 2000);
+          }, 3000);
         }
       }
     };

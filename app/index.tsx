@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
-import { ActivityIndicator, View, Platform, Text, StyleSheet } from 'react-native';
+import { ActivityIndicator, View, Platform, Text, StyleSheet, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../lib/supabase';
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
@@ -10,6 +11,33 @@ export default function Index() {
   useEffect(() => {
     const init = async () => {
       try {
+        // Check for any deep links first (mobile)
+        if (Platform.OS !== 'web') {
+          const initialUrl = await Linking.getInitialURL();
+          if (initialUrl) {
+            console.log('[Index] Initial URL detected:', initialUrl);
+            
+            // Handle OAuth callbacks on mobile
+            if (initialUrl.includes('auth/callback')) {
+              setRedirectTo('/auth/callback');
+              return;
+            }
+
+            // Handle password reset links on mobile
+            if (initialUrl.includes('reset-password')) {
+              // Extract tokens from URL for mobile
+              const { queryParams } = Linking.parse(initialUrl);
+              const access_token = queryParams?.access_token as string;
+              const refresh_token = queryParams?.refresh_token as string;
+
+              if (access_token && refresh_token) {
+                setRedirectTo(`/reset-password?access_token=${access_token}&refresh_token=${refresh_token}`);
+                return;
+              }
+            }
+          }
+        }
+
         // 🔑 Handle web reset-password links with hash (#)
         if (Platform.OS === 'web') {
           const hash = window.location.hash;
@@ -32,6 +60,24 @@ export default function Index() {
               return;
             }
           }
+
+          // Handle web OAuth callbacks
+          if (window.location.href.includes('auth/callback')) {
+            setRedirectTo('/auth/callback');
+            return;
+          }
+        }
+
+        // Check if user is already authenticated
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            console.log('[Index] User already authenticated, redirecting to app');
+            setRedirectTo('/(app)/(tabs)/home');
+            return;
+          }
+        } catch (authError) {
+          console.log('[Index] No active session, continuing to onboarding/auth');
         }
 
         // 🔁 Otherwise continue with first-launch / auth logic
@@ -55,7 +101,7 @@ export default function Index() {
         }
       } catch (error) {
         console.error('Error in Index init:', error);
-        setRedirectTo('/onboarding');
+        setRedirectTo('/auth');
       } finally {
         setIsLoading(false);
       }
@@ -78,7 +124,7 @@ export default function Index() {
     return <Redirect href={redirectTo} />;
   }
 
-  return <Redirect href="/onboarding" />;
+  return <Redirect href="/auth" />;
 }
 
 const styles = StyleSheet.create({
