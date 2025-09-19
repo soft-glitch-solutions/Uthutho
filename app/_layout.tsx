@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 import * as Linking from 'expo-linking';
-import { useRouter } from 'expo-router';
 import { ThemeProvider } from '../context/ThemeContext';
 import { WaitingProvider } from '../context/WaitingContext';
 import { LanguageProvider } from '../context/LanguageContext';
@@ -13,33 +12,32 @@ export default function RootLayout() {
   const router = useRouter();
 
   useEffect(() => {
-    const handleDeepLink = (url: string) => {
-      const route = url.replace(/.*?:\/\//g, '');
-      const [path, query] = route.split('?');
-
-      if (path === 'reset-password') {
-        router.replace(query ? `/reset-password?${query}` : '/reset-password');
-      }
-
-      if (path === 'auth/callback') {
-        router.replace('/auth/callback');
-      }
-    };
-
-    // Handle deep links when app is running
-    const subscription = Linking.addEventListener('url', ({ url }) => {
-      handleDeepLink(url);
-    });
-
-    // Handle deep links when app is launched from closed state
+    const subscription = Linking.addEventListener('url', ({ url }) => handleDeepLink(url));
     Linking.getInitialURL().then((url) => {
       if (url) handleDeepLink(url);
     });
-
-    return () => {
-      subscription.remove();
-    };
+    return () => subscription.remove();
   }, []);
+
+  const handleDeepLink = (url: string) => {
+    const parsed = Linking.parse(url);
+    if (!parsed || !parsed.path) return;
+
+    if (parsed.path.includes('reset-password')) {
+      const hashParams = new URLSearchParams(parsed.queryParams as any);
+      const access_token = hashParams.get('access_token');
+      const refresh_token = hashParams.get('refresh_token');
+
+      router.replace({
+        pathname: '/reset-password',
+        params: { access_token: access_token || '', refresh_token: refresh_token || '' },
+      });
+    }
+
+    if (parsed.path.includes('auth/callback')) {
+      router.replace('/auth/callback');
+    }
+  };
 
   return (
     <ThemeProvider>
