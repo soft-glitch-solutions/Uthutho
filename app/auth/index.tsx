@@ -44,12 +44,12 @@ export default function Auth() {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     setErrorMessage(null);
-    
+  
     try {
-      // Use different redirect URLs for web vs mobile
-      const redirectUrl = Platform.OS === 'web' 
-        ? 'https://www.mobile.uthutho.co.za/auth/callback'
-        : Linking.createURL('/auth/callback');
+      const redirectUrl =
+        Platform.OS === 'web'
+          ? 'https://www.mobile.uthutho.co.za/auth/callback'
+          : Linking.createURL('/auth/callback');
   
       console.log('OAuth Redirect URL:', redirectUrl);
   
@@ -57,46 +57,28 @@ export default function Auth() {
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-          // For mobile, use Expo's WebBrowser for better experience
+          queryParams: { access_type: 'offline', prompt: 'consent' },
           skipBrowserRedirect: Platform.OS !== 'web',
         },
       });
   
       if (error) throw error;
   
-      // On mobile, open the OAuth URL in WebBrowser
       if (Platform.OS !== 'web' && data?.url) {
-        console.log('Opening WebBrowser for OAuth');
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
           redirectUrl
         );
   
-        console.log('WebBrowser result:', result.type);
-  
         if (result.type === 'success') {
-          // The OAuth flow was completed successfully
-          const { url } = result;
-          console.log('OAuth success URL:', url);
-          
-          // Parse the URL to extract tokens
-          const { queryParams } = Linking.parse(url);
-          console.log('OAuth query params:', queryParams);
-          
-          if (queryParams?.error) {
-            throw new Error(queryParams.error_description || 'OAuth failed');
-          }
-          
-          // Redirect to auth callback to handle the session
-          router.replace('/auth/callback');
+          console.log('OAuth success URL:', result.url);
+  
+          // Let Supabase handle session from URL
+          await supabase.auth.getSessionFromUrl({ url: result.url });
+  
+          router.replace('/(app)/(tabs)/home');
         } else if (result.type === 'cancel') {
           throw new Error('Sign-in cancelled');
-        } else if (result.type === 'dismiss') {
-          throw new Error('Sign-in dismissed');
         }
       }
     } catch (error: any) {
@@ -106,6 +88,7 @@ export default function Auth() {
       setGoogleLoading(false);
     }
   };
+  
   
   const handleFacebookSignIn = async () => {
     setFacebookLoading(true);
@@ -718,7 +701,6 @@ const styles = StyleSheet.create({
     padding: 15,
     fontSize: 16,
     borderRadius: 10,
-    borderWidth: 1,
     margin: 5,
   },
   otpInput: {

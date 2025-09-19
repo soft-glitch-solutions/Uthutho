@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
     "scheme": "uthutho",
-    "deepLinks": true,
+    "platforms": ["ios", "android", "web"],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -23,6 +23,33 @@
         ]
       },
       "bundleIdentifier": "com.softglitchsolutions.uthutho"
+    },
+    "android": {
+      "package": "com.softglitchsolutions.uthutho",
+      "versionCode": 13,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundColor": "#000000"
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [
+            {
+              "scheme": "uthutho",
+              "host": "auth",
+              "pathPrefix": "/callback"
+            },
+            {
+              "scheme": "https",
+              "host": "www.mobile.uthutho.co.za",
+              "pathPrefix": "/auth/callback"
+            }
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/images/logo.png",
@@ -43,14 +70,6 @@
       },
       "eas": {
         "projectId": "45908a0a-a038-4ab8-8a4e-8ff5b7db2db4"
-      }
-    },
-    "android": {
-      "package": "com.softglitchsolutions.uthutho",
-      "versionCode": 13,
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/logo.png",
-        "backgroundColor": "#000000"
       }
     },
     "splash": {

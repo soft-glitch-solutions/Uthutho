@@ -11,84 +11,67 @@ export default function Index() {
   useEffect(() => {
     const init = async () => {
       try {
-        // Check for any deep links first (mobile)
+        let initialUrl: string | null = null;
+  
         if (Platform.OS !== 'web') {
-          const initialUrl = await Linking.getInitialURL();
-          if (initialUrl) {
-            console.log('[Index] Initial URL detected:', initialUrl);
-            
-            // Handle OAuth callbacks on mobile
-            if (initialUrl.includes('auth/callback')) {
-              setRedirectTo('/auth/callback');
-              return;
-            }
-
-            // Handle password reset links on mobile
-            if (initialUrl.includes('reset-password')) {
-              // Extract tokens from URL for mobile
-              const { queryParams } = Linking.parse(initialUrl);
-              const access_token = queryParams?.access_token as string;
-              const refresh_token = queryParams?.refresh_token as string;
-
-              if (access_token && refresh_token) {
-                setRedirectTo(`/reset-password?access_token=${access_token}&refresh_token=${refresh_token}`);
-                return;
-              }
-            }
-          }
-        }
-
-        // 🔑 Handle web reset-password links with hash (#)
-        if (Platform.OS === 'web') {
-          const hash = window.location.hash;
-          console.log('[Index] Hash:', hash);
-          
-          if (hash && hash.includes('access_token')) {
-            // Extract parameters from hash fragment
-            const hashParams = new URLSearchParams(hash.replace(/^#/, ''));
-            const access_token = hashParams.get('access_token');
-            const refresh_token = hashParams.get('refresh_token');
-
-            console.log('[Index] Extracted tokens:', {
-              access_token: access_token?.slice(0, 8),
-              refresh_token: refresh_token?.slice(0, 8)
-            });
-
-            if (access_token && refresh_token) {
-              // Convert hash to query parameters for the redirect
-              setRedirectTo(`/reset-password?access_token=${access_token}&refresh_token=${refresh_token}`);
-              return;
-            }
-          }
-
-          // Handle web OAuth callbacks
-          if (window.location.href.includes('auth/callback')) {
-            setRedirectTo('/auth/callback');
-            return;
-          }
-        }
-
-        // Check if user is already authenticated
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            console.log('[Index] User already authenticated, redirecting to app');
-            setRedirectTo('/(app)/(tabs)/home');
-            return;
-          }
-        } catch (authError) {
-          console.log('[Index] No active session, continuing to onboarding/auth');
-        }
-
-        // 🔁 Otherwise continue with first-launch / auth logic
-        let hasLaunched: string | null = null;
-
-        if (Platform.OS === 'web') {
-          hasLaunched = localStorage.getItem('hasLaunched');
+          initialUrl = await Linking.getInitialURL();
         } else {
-          hasLaunched = await AsyncStorage.getItem('hasLaunched');
+          initialUrl = window.location.href;
         }
-
+  
+        if (initialUrl) {
+          console.log('[Index] Initial URL detected:', initialUrl);
+  
+          // Handle OAuth callback (Supabase will extract + save session)
+          if (initialUrl.includes('auth/callback')) {
+            try {
+              const { data, error } = await supabase.auth.getSessionFromUrl({
+                url: initialUrl,
+                storeSession: true,
+              });
+  
+              if (error) throw error;
+              console.log('[Index] Session stored successfully');
+              setRedirectTo('/(app)/(tabs)/home');
+              return;
+            } catch (err) {
+              console.error('[Index] Error storing session:', err);
+              setRedirectTo('/auth');
+              return;
+            }
+          }
+  
+          // Handle password reset link
+          if (initialUrl.includes('reset-password')) {
+            const urlObj = new URL(initialUrl);
+            const access_token =
+              urlObj.searchParams.get('access_token') ||
+              new URLSearchParams(urlObj.hash.replace('#', '')).get('access_token');
+            const refresh_token =
+              urlObj.searchParams.get('refresh_token') ||
+              new URLSearchParams(urlObj.hash.replace('#', '')).get('refresh_token');
+  
+            if (access_token && refresh_token) {
+              setRedirectTo(
+                `/reset-password?access_token=${access_token}&refresh_token=${refresh_token}`
+              );
+              return;
+            }
+          }
+        }
+  
+        // Otherwise, check existing session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setRedirectTo('/(app)/(tabs)/home');
+          return;
+        }
+  
+        // Onboarding vs Auth
+        let hasLaunched = Platform.OS === 'web'
+          ? localStorage.getItem('hasLaunched')
+          : await AsyncStorage.getItem('hasLaunched');
+  
         if (!hasLaunched) {
           setRedirectTo('/onboarding');
           if (Platform.OS === 'web') {
@@ -106,9 +89,10 @@ export default function Index() {
         setIsLoading(false);
       }
     };
-
+  
     init();
   }, []);
+  
 
   if (isLoading) {
     return (

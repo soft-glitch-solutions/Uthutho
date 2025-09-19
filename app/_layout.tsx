@@ -6,6 +6,7 @@ import * as Linking from 'expo-linking';
 import { ThemeProvider } from '../context/ThemeContext';
 import { WaitingProvider } from '../context/WaitingContext';
 import { LanguageProvider } from '../context/LanguageContext';
+import { supabase } from '../lib/supabase';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -19,49 +20,50 @@ export default function RootLayout() {
     return () => subscription.remove();
   }, []);
 
-const handleDeepLink = (url: string) => {
-  console.log('[DeepLink] Handling URL:', url);
+  const handleDeepLink = async (url: string) => {
+    console.log('[DeepLink] Handling URL:', url);
   
-  try {
-    // Handle both query parameters and hash fragments
-    let access_token: string | null = null;
-    let refresh_token: string | null = null;
-
-    // Check for query parameters first
-    if (url.includes('?')) {
-      const urlObj = new URL(url);
-      access_token = urlObj.searchParams.get('access_token');
-      refresh_token = urlObj.searchParams.get('refresh_token');
+    try {
+      // Supabase handles OAuth callback + stores session
+      if (url.includes('auth/callback')) {
+        try {
+          const { error } = await supabase.auth.getSessionFromUrl({
+            url,
+            storeSession: true,
+          });
+          if (error) throw error;
+          console.log('[DeepLink] Session stored from callback');
+          router.replace('/(app)/(tabs)/home');
+          return;
+        } catch (err) {
+          console.error('[DeepLink] Error handling callback:', err);
+          router.replace('/auth');
+          return;
+        }
+      }
+  
+      // Password reset flow
+      if (url.includes('reset-password')) {
+        const urlObj = new URL(url);
+        const access_token =
+          urlObj.searchParams.get('access_token') ||
+          new URLSearchParams(urlObj.hash.replace('#', '')).get('access_token');
+        const refresh_token =
+          urlObj.searchParams.get('refresh_token') ||
+          new URLSearchParams(urlObj.hash.replace('#', '')).get('refresh_token');
+  
+        if (access_token && refresh_token) {
+          router.replace({
+            pathname: '/reset-password',
+            params: { access_token, refresh_token },
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[DeepLink] Error parsing URL:', error);
     }
-    
-    // If no query params found, check hash fragment
-    if ((!access_token || !refresh_token) && url.includes('#')) {
-      const hashIndex = url.indexOf('#');
-      const hash = url.substring(hashIndex + 1);
-      const hashParams = new URLSearchParams(hash);
-      access_token = hashParams.get('access_token');
-      refresh_token = hashParams.get('refresh_token');
-    }
-
-    console.log('[DeepLink] Extracted tokens:', {
-      access_token: access_token?.slice(0, 8),
-      refresh_token: refresh_token?.slice(0, 8)
-    });
-
-    if (access_token && refresh_token && url.includes('reset-password')) {
-      router.replace({
-        pathname: '/reset-password',
-        params: { access_token, refresh_token },
-      });
-    }
-
-    if (url.includes('auth/callback')) {
-      router.replace('/auth/callback');
-    }
-  } catch (error) {
-    console.error('[DeepLink] Error parsing URL:', error);
-  }
-};
+  };
+  
 
   return (
     <ThemeProvider>
