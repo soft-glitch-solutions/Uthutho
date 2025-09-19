@@ -20,10 +20,12 @@ const MUTED = '#666666';
 
 export default function ResetPassword() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ access_token?: string }>();
+  const params = useLocalSearchParams<{ access_token?: string; refresh_token?: string }>();
   const paramToken = params.access_token ?? null;
+  const paramRefresh = params.refresh_token ?? null;
 
   const [token, setToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [sessionAvailable, setSessionAvailable] = useState<boolean | null>(null);
 
   const [password, setPassword] = useState('');
@@ -33,104 +35,100 @@ export default function ResetPassword() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
-    // Attempt to detect token from params, hash (web), or query
     console.log('[ResetPassword] platform:', Platform.OS);
-    console.log('[ResetPassword] paramToken (from useLocalSearchParams):', paramToken);
+    console.log('[ResetPassword] params from router:', params);
 
-    const detectTokenFromHash = () => {
+    // Helper: parse URL fragment (hash) -> returns object of params
+    const parseHash = () => {
       try {
-        if (typeof window === 'undefined') return null;
+        if (typeof window === 'undefined') return {};
         const hash = window.location.hash || '';
-        if (!hash) return null;
-        // hash like "#access_token=...&type=...&refresh_token=..."
+        if (!hash) return {};
         const hashParams = new URLSearchParams(hash.replace(/^#/, ''));
-        return hashParams.get('access_token') || hashParams.get('accessToken') || null;
+        const out: Record<string, string> = {};
+        hashParams.forEach((v, k) => (out[k] = v));
+        return out;
       } catch (err) {
-        console.warn('[ResetPassword] error parsing window.location.hash', err);
-        return null;
+        console.warn('[ResetPassword] parseHash error', err);
+        return {};
       }
     };
 
-    const detectTokenFromSearch = () => {
+    // Helper: parse query string
+    const parseQuery = () => {
       try {
-        if (typeof window === 'undefined') return null;
+        if (typeof window === 'undefined') return {};
         const search = window.location.search || '';
-        if (!search) return null;
+        if (!search) return {};
         const searchParams = new URLSearchParams(search);
-        return searchParams.get('access_token') || searchParams.get('accessToken') || null;
+        const out: Record<string, string> = {};
+        searchParams.forEach((v, k) => (out[k] = v));
+        return out;
       } catch (err) {
-        console.warn('[ResetPassword] error parsing window.location.search', err);
-        return null;
+        console.warn('[ResetPassword] parseQuery error', err);
+        return {};
       }
     };
 
-    const runDetection = async () => {
-      const hashToken = Platform.OS === 'web' ? detectTokenFromHash() : null;
-      const searchToken = Platform.OS === 'web' ? detectTokenFromSearch() : null;
+    const detectTokensAndSession = async () => {
+      const hashParams = Platform.OS === 'web' ? parseHash() : {};
+      const queryParams = Platform.OS === 'web' ? parseQuery() : {};
 
-      const detected = paramToken || hashToken || searchToken;
-      console.log('[ResetPassword] detected tokens:', { paramToken, hashToken, searchToken });
+      const detectedAccessToken =
+        paramToken || hashParams['access_token'] || hashParams['accessToken'] || queryParams['access_token'] || queryParams['accessToken'] || null;
 
-      if (Platform.OS === 'web') {
-        // If there is a hash (typical for Supabase redirect), try to let Supabase parse and store a session
-        const hash = typeof window !== 'undefined' ? window.location.hash : '';
-        if (hash && hash.includes('access_token')) {
-          console.log('[ResetPassword] calling supabase.auth.getSessionFromUrl() (web hash present)');
+      const detectedRefreshToken =
+        paramRefresh || hashParams['refresh_token'] || hashParams['refreshToken'] || queryParams['refresh_token'] || queryParams['refreshToken'] || null;
+
+      console.log('[ResetPassword] detected tokens:', { detectedAccessToken, detectedRefreshToken, hashParams, queryParams });
+
+      // If web and hash contains tokens, try to set session using setSession()
+      if (Platform.OS === 'web' && (hashParams['access_token'] || hashParams['refresh_token'])) {
+        try {
+          console.log('[ResetPassword] attempting supabase.auth.setSession from fragment (web).');
+          const setRes = await supabase.auth.setSession({
+            access_token: hashParams['access_token'] || null,
+            refresh_token: hashParams['refresh_token'] || null,
+          } as any); // some SDKs / typings require casting
+          console.log('[ResetPassword] setSession result:', setRes);
+          // clear the hash so tokens are not exposed
           try {
-            // This will attempt to read and store the session that Supabase placed in the URL fragment
-            const { data, error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
-            console.log('[ResetPassword] getSessionFromUrl result:', { data, error });
-            if (error) {
-              console.warn('[ResetPassword] getSessionFromUrl error:', error);
-            }
-            const { data: sessionData, error: getSessionErr } = await supabase.auth.getSession();
-            console.log('[ResetPassword] session after getSessionFromUrl:', sessionData, getSessionErr);
-            setSessionAvailable(!!sessionData?.session);
-            if (sessionData?.session) {
-              setToken(null); // session is available so we don't need a raw token
-            } else if (detected) {
-              setToken(detected);
-            }
-            return;
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+            console.log('[ResetPassword] cleared window.location.hash');
           } catch (err) {
-            console.error('[ResetPassword] getSessionFromUrl threw:', err);
-            // fallback below
+            console.warn('[ResetPassword] failed to clear hash:', err);
           }
+        } catch (err) {
+          console.warn('[ResetPassword] setSession from fragment failed:', err);
         }
       }
 
-      // Not web hash flow or getSessionFromUrl failed: just set whatever token we detected
-      if (detected) {
-        console.log('[ResetPassword] Using detected token (no web session created):', detected);
-        setToken(detected);
-      } else {
-        console.log('[ResetPassword] No token detected from params/hash/search.');
-        setToken(null);
+      // If we have a detected access token (from params or query) but no web fragment flow, store it in state
+      if (detectedAccessToken) {
+        setToken(detectedAccessToken);
+        if (detectedRefreshToken) setRefreshToken(detectedRefreshToken);
       }
 
-      // Also try to read existing session (if any)
+      // Check if we already have a stored session in client
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         console.log('[ResetPassword] session from getSession():', sessionData);
         setSessionAvailable(!!sessionData?.session);
       } catch (err) {
-        console.warn('[ResetPassword] error checking session:', err);
+        console.warn('[ResetPassword] getSession() error:', err);
         setSessionAvailable(false);
       }
     };
 
-    runDetection();
-  }, [paramToken]);
+    detectTokensAndSession();
+  }, [paramToken, paramRefresh, params]);
 
-  // Helper that tries to reset using available session or token
   const handleResetPassword = async () => {
-    console.log('[ResetPassword] password changed. length=', password.length);
-    console.log('[ResetPassword] confirmPassword changed. length=', confirmPassword.length);
-    console.log('[ResetPassword] token state at submit:', token);
-    console.log('[ResetPassword] sessionAvailable at submit:', sessionAvailable);
+    console.log('[ResetPassword] submit pressed. token=', token ? token.slice(0, 12) + '...' : null, 'refresh=', refreshToken ? 'present' : null);
+    console.log('[ResetPassword] password len', password.length, 'confirm len', confirmPassword.length);
 
     if (!password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields.');
+      Alert.alert('Error', 'Please enter both password fields.');
       return;
     }
     if (password !== confirmPassword) {
@@ -141,56 +139,55 @@ export default function ResetPassword() {
     setLoading(true);
 
     try {
-      // If there's a valid browser session (web) or a stored session (mobile), update the user directly:
-      const { data: currentSessionData } = await supabase.auth.getSession();
-      const hasSession = !!currentSessionData?.session;
-      console.log('[ResetPassword] currentSessionData:', currentSessionData);
+      // Re-check session
+      const { data: currentSession } = await supabase.auth.getSession();
+      const hasSession = !!currentSession?.session;
+      console.log('[ResetPassword] currentSession at submit:', currentSession);
 
-      if (hasSession) {
-        console.log('[ResetPassword] Updating user using existing session...');
-        const { error } = await supabase.auth.updateUser({ password });
+      if (!hasSession && token) {
+        // If we only have access token (maybe came from mobile deep link), try to setSession manually
+        try {
+          console.log('[ResetPassword] trying supabase.auth.setSession with provided token(s)...');
+          const setRes = await supabase.auth.setSession({
+            access_token: token,
+            refresh_token: refreshToken ?? undefined,
+          } as any);
+          console.log('[ResetPassword] setSession result:', setRes);
+
+          // re-check
+          const { data: sessionAfter } = await supabase.auth.getSession();
+          console.log('[ResetPassword] sessionAfter setSession:', sessionAfter);
+        } catch (err) {
+          console.warn('[ResetPassword] setSession failed:', err);
+        }
+      }
+
+      // Now try updateUser (should work if we have a session)
+      try {
+        console.log('[ResetPassword] attempting supabase.auth.updateUser({ password })');
+        const { error } = await supabase.auth.updateUser({ password } as any);
         if (error) throw error;
 
         Alert.alert('Success', 'Password updated successfully.');
         router.replace('/auth');
         return;
+      } catch (err) {
+        console.warn('[ResetPassword] updateUser failed:', err);
       }
 
-      // No session — if we have a token we can try updateUser with accessToken (some supabase clients accept this)
-      if (token) {
-        console.log('[ResetPassword] No active session but token present. Attempting updateUser with accessToken...');
-        try {
-          // Some Supabase JS versions accept `accessToken` when updating user to authenticate the call.
-          // If your SDK doesn't support this, you'll need to establish a session on the client first
-          // or handle the reset on a server-side endpoint.
-          const { error } = await supabase.auth.updateUser({ password, accessToken: token } as any);
-          // NOTE: using `as any` because TS types may not include accessToken depending on supabase-js version
-          if (error) throw error;
-
-          Alert.alert('Success', 'Password updated successfully.');
-          router.replace('/auth');
-          return;
-        } catch (err) {
-          console.warn('[ResetPassword] updateUser with accessToken failed:', err);
-          // Fallthrough to show an explanatory message below
-        }
-      }
-
-      // If we reach here, we couldn't update password because no session and token-based update failed
-      console.error('[ResetPassword] No reset session found and token-based update failed.');
+      // If updateUser fails, provide guidance
       Alert.alert(
         'Reset failed',
-        'No reset session or valid token was found. If you clicked the link in email, try opening it in the browser (not the app), or request a new reset email.'
+        'We could not complete the reset automatically. If you clicked the link in email, open it in your browser (web) or request a new reset email. If this keeps failing, please contact support.'
       );
-    } catch (err: any) {
+    } catch (err) {
       console.error('[ResetPassword] unexpected error:', err);
-      Alert.alert('Error', err?.message || 'Failed to reset password.');
+      Alert.alert('Error', (err as any)?.message || 'Unexpected error.');
     } finally {
       setLoading(false);
     }
   };
 
-  // UI: show helpful message if no token and no session
   const showInvalid = token === null && sessionAvailable === false;
 
   return (
@@ -202,7 +199,7 @@ export default function ResetPassword() {
         {showInvalid && (
           <View style={styles.warningBox}>
             <Text style={styles.warningText}>
-              No reset token or session detected. If you clicked the link in an email, try opening the link in your device browser (web) or request a new reset email.
+              No reset token or session detected. Open the email link in a browser and try again, or request a new reset email.
             </Text>
           </View>
         )}
@@ -214,16 +211,9 @@ export default function ResetPassword() {
             placeholderTextColor={MUTED}
             secureTextEntry={!showPassword}
             value={password}
-            onChangeText={(t) => {
-              setPassword(t);
-              console.log('[ResetPassword] password onChange length=', t.length);
-            }}
+            onChangeText={(t) => setPassword(t)}
           />
-          <TouchableOpacity
-            style={styles.eyeButton}
-            onPress={() => setShowPassword(!showPassword)}
-            accessibilityLabel="Toggle password visibility"
-          >
+          <TouchableOpacity style={styles.eyeButton} onPress={() => setShowPassword(!showPassword)}>
             {showPassword ? <EyeOff size={22} color="#fff" /> : <Eye size={22} color="#fff" />}
           </TouchableOpacity>
         </View>
@@ -235,25 +225,14 @@ export default function ResetPassword() {
             placeholderTextColor={MUTED}
             secureTextEntry={!showConfirmPassword}
             value={confirmPassword}
-            onChangeText={(t) => {
-              setConfirmPassword(t);
-              console.log('[ResetPassword] confirmPassword onChange length=', t.length);
-            }}
+            onChangeText={(t) => setConfirmPassword(t)}
           />
-          <TouchableOpacity
-            style={styles.eyeButton}
-            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-            accessibilityLabel="Toggle confirm password visibility"
-          >
+          <TouchableOpacity style={styles.eyeButton} onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
             {showConfirmPassword ? <EyeOff size={22} color="#fff" /> : <Eye size={22} color="#fff" />}
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={[styles.resetButton, loading && styles.resetButtonDisabled]}
-          onPress={handleResetPassword}
-          disabled={loading}
-        >
+        <TouchableOpacity style={[styles.resetButton, loading && styles.resetButtonDisabled]} onPress={handleResetPassword} disabled={loading}>
           {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.resetButtonText}>Reset Password</Text>}
         </TouchableOpacity>
 
@@ -265,6 +244,7 @@ export default function ResetPassword() {
           <Text style={styles.debugText}>Debug Info:</Text>
           <Text style={styles.debugText}>platform={Platform.OS}</Text>
           <Text style={styles.debugText}>token={token ? token.slice(0, 12) + '...' : 'null'}</Text>
+          <Text style={styles.debugText}>refresh={refreshToken ? 'present' : 'null'}</Text>
           <Text style={styles.debugText}>sessionAvailable={String(sessionAvailable)}</Text>
           <Text style={styles.debugText}>passwordLen={password.length}</Text>
           <Text style={styles.debugText}>confirmLen={confirmPassword.length}</Text>
