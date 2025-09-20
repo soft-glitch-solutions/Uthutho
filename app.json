@@ -72,6 +72,14 @@
         "projectId": "45908a0a-a038-4ab8-8a4e-8ff5b7db2db4"
       }
     },
+    "android": {
+      "package": "com.softglitchsolutions.uthutho",
+      "versionCode": 15,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundColor": "#000000"
+      }
+    },
     "splash": {
       "image": "./assets/images/SplashScreen.png",
       "backgroundColor": "#000000"
