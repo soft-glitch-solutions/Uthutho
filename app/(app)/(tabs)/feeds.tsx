@@ -636,7 +636,7 @@ export default function FeedsScreen() {
         </Pressable>
         
         {/* Hidden share view for capturing */}
-        <SharePostView ref={viewShotRef} post={post} latestComment={latestComment} style={{ position: 'absolute', left: -1000 }} />
+       
       </View>
     );
   };
