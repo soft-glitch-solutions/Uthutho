@@ -12,10 +12,12 @@ import {
   Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Flame, MessageCircle, Plus, Search, MapPin, Bell, ArrowLeft } from 'lucide-react-native';
+import { Flame, MessageCircle, Plus, Search, MapPin, Bell, ArrowLeft, Share } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import { useTranslation } from '@/hook/useTranslation';
+import ViewShot from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 
 interface Community {
   id: string;
@@ -125,11 +127,47 @@ const CommunitiesSkeletonLoader = () => (
   </View>
 );
 
+// Share Post Component
+const SharePostView = React.forwardRef(({ post, latestComment }: { post: Post; latestComment?: any }, ref) => {
+  return (
+    <ViewShot ref={ref} options={{ format: 'png', quality: 0.9 }}>
+      <View style={styles.shareContainer}>
+        <View style={styles.shareHeader}>
+          <Image
+            source={{ uri: post.profiles.avatar_url || 'https://example.com/default-avatar.png' }}
+            style={styles.shareAvatar}
+          />
+          <View>
+            <Text style={styles.shareUserName}>
+              {post.profiles.first_name} {post.profiles.last_name}
+            </Text>
+            <Text style={styles.shareUserTitle}>{post.profiles.selected_title}</Text>
+          </View>
+        </View>
+        
+        <Text style={styles.shareContent}>{post.content}</Text>
+        
+        {latestComment && (
+          <View style={styles.shareComment}>
+            <Text style={styles.shareCommentAuthor}>{latestComment.profiles.first_name}: </Text>
+            <Text style={styles.shareCommentText}>{latestComment.content}</Text>
+          </View>
+        )}
+        
+        <View style={styles.shareFooter}>
+          <Text style={styles.shareFooterText}>Join Uthutho now and hear what's happening on your streets</Text>
+        </View>
+      </View>
+    </ViewShot>
+  );
+});
+
 export default function FeedsScreen() {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { t } = useTranslation();
   const router = useRouter();
+  const viewShotRef = useRef();
 
   const [communities, setCommunities] = useState<Community[]>([]);
   const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
@@ -145,13 +183,13 @@ export default function FeedsScreen() {
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [weekRange, setWeekRange] = useState<string>('');
   const [showAllPosts, setShowAllPosts] = useState(false);
+  const [sharingPost, setSharingPost] = useState(false);
 
   // UUID validation function
   const isValidUUID = (str: string): boolean => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     return uuidRegex.test(str);
   };
-
 
   const getCurrentWeekRange = () => {
     const now = new Date();
@@ -168,6 +206,32 @@ export default function FeedsScreen() {
     return { monday, sunday };
   };
 
+  // Share post function
+  const sharePost = async (post: Post) => {
+    try {
+      setSharingPost(true);
+      const latestComment = post.post_comments[post.post_comments.length - 1];
+      
+      // Capture the view shot
+      const uri = await viewShotRef.current.capture();
+      
+      // Share the image
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/png',
+          dialogTitle: 'Share Post',
+          UTI: 'image/png'
+        });
+      } else {
+        Alert.alert('Sharing not available', 'Sharing is not available on this device');
+      }
+    } catch (error) {
+      console.error('Error sharing post:', error);
+      Alert.alert('Error', 'Failed to share post');
+    } finally {
+      setSharingPost(false);
+    }
+  };
 
   // ---- Data loaders ------------------------------------------------------
   const loadFavoriteCommunities = useCallback(async (uid: string) => {
@@ -249,76 +313,74 @@ export default function FeedsScreen() {
     }
   }, []);
 
-const loadCommunityPosts = useCallback(
-  async (community: Community | null) => {
-    if (!community) return;
+  const loadCommunityPosts = useCallback(
+    async (community: Community | null) => {
+      if (!community) return;
 
-    try {
-      let monday: Date | undefined;
-      let sunday: Date | undefined;
+      try {
+        let monday: Date | undefined;
+        let sunday: Date | undefined;
 
-      if (!showAllPosts) {
-        const { monday: m, sunday: s } = getCurrentWeekRange();
-        monday = m;
-        sunday = s;
-        setWeekRange(
-          `${monday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${sunday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
-        );
-      } else {
-        setWeekRange('All Posts');
-      }
+        if (!showAllPosts) {
+          const { monday: m, sunday: s } = getCurrentWeekRange();
+          monday = m;
+          sunday = s;
+          setWeekRange(
+            `${monday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${sunday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+          );
+        } else {
+          setWeekRange('All Posts');
+        }
 
-      const baseSelect = `
-        *,
-        profiles(*),
-        post_reactions(*),
-        post_comments(*, profiles(*))
-      `;
+        const baseSelect = `
+          *,
+          profiles(*),
+          post_reactions(*),
+          post_comments(*, profiles(*))
+        `;
 
-      const table = community.type === 'hub' ? 'hub_posts' : 'stop_posts';
-      const communityIdField = community.type === 'hub' ? 'hub_id' : 'stop_id';
+        const table = community.type === 'hub' ? 'hub_posts' : 'stop_posts';
+        const communityIdField = community.type === 'hub' ? 'hub_id' : 'stop_id';
 
-      let query = supabase.from(table).select(baseSelect).eq(communityIdField, community.id);
+        let query = supabase.from(table).select(baseSelect).eq(communityIdField, community.id);
 
-      if (!showAllPosts && monday && sunday) {
-        query = query.gte('created_at', monday.toISOString()).lte('created_at', sunday.toISOString());
-      }
+        if (!showAllPosts && monday && sunday) {
+          query = query.gte('created_at', monday.toISOString()).lte('created_at', sunday.toISOString());
+        }
 
-      query = query.order('created_at', { ascending: false });
+        query = query.order('created_at', { ascending: false });
 
-      const { data, error } = await query;
-      console.log('Posts fetched:', data, 'Error:', error);
+        const { data, error } = await query;
+        console.log('Posts fetched:', data, 'Error:', error);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      const postsWithProfiles = (data || []).map((post: any) => ({
-        ...post,
-        profiles: post.profiles || {
-          first_name: 'Unknown',
-          last_name: '',
-          selected_title: '',
-          avatar_url: 'https://example.com/default-avatar.png',
-        },
-        post_comments: (post.post_comments || []).map((comment: any) => ({
-          ...comment,
-          profiles: comment.profiles || {
+        const postsWithProfiles = (data || []).map((post: any) => ({
+          ...post,
+          profiles: post.profiles || {
             first_name: 'Unknown',
             last_name: '',
+            selected_title: '',
             avatar_url: 'https://example.com/default-avatar.png',
           },
-        })),
-      }));
+          post_comments: (post.post_comments || []).map((comment: any) => ({
+            ...comment,
+            profiles: comment.profiles || {
+              first_name: 'Unknown',
+              last_name: '',
+              avatar_url: 'https://example.com/default-avatar.png',
+            },
+          })),
+        }));
 
-      setPosts(postsWithProfiles);
-    } catch (e) {
-      console.error('Error loading posts:', e);
-      setPosts([]);
-    }
-  },
-  [showAllPosts]
-);
-
-
+        setPosts(postsWithProfiles);
+      } catch (e) {
+        console.error('Error loading posts:', e);
+        setPosts([]);
+      }
+    },
+    [showAllPosts]
+  );
 
   // ---- Effects -----------------------------------------------------------
   useEffect(() => {
@@ -326,33 +388,32 @@ const loadCommunityPosts = useCallback(
     loadAllCommunities();
   }, [loadAllCommunities]);
 
-useEffect(() => {
-  let mounted = true;
+  useEffect(() => {
+    let mounted = true;
 
-  const init = async () => {
-    if (isValidUUID(userId)) {
-      await Promise.all([
-        loadFavoriteCommunities(userId),
-        loadNotificationCount(userId),
-      ]);
-    }
-
-    // ✅ enforce skeleton for at least 500ms
-    setTimeout(() => {
-      if (mounted) {
-        setInitialLoadComplete(true);
-        setLoading(false);
+    const init = async () => {
+      if (isValidUUID(userId)) {
+        await Promise.all([
+          loadFavoriteCommunities(userId),
+          loadNotificationCount(userId),
+        ]);
       }
-    }, 500);
-  };
 
-  init();
+      // ✅ enforce skeleton for at least 500ms
+      setTimeout(() => {
+        if (mounted) {
+          setInitialLoadComplete(true);
+          setLoading(false);
+        }
+      }, 500);
+    };
 
-  return () => {
-    mounted = false;
-  };
-}, [userId, loadFavoriteCommunities, loadNotificationCount]);
+    init();
 
+    return () => {
+      mounted = false;
+    };
+  }, [userId, loadFavoriteCommunities, loadNotificationCount]);
 
   useEffect(() => {
     if (selectedCommunity) {
@@ -386,9 +447,6 @@ useEffect(() => {
 
       setNewPost('');
       await loadCommunityPosts(selectedCommunity);
-
-      // NOTE: Prefer a DB function to increment points atomically
-      // await supabase.rpc('increment_points', { uid: userId, delta: 1 });
     } catch (e) {
       console.error('Error creating post:', e);
       Alert.alert('Error', 'Failed to create post');
@@ -515,67 +573,78 @@ useEffect(() => {
     const latestComment = post.post_comments[post.post_comments.length - 1];
 
     return (
-      <Pressable
-        onPress={() => router.push(`/post/${post.id}`)}
-        style={styles.postCard}
-        android_ripple={{ color: '#0f0f0f' }}
-      >
-        <View style={styles.postHeader}>
-          <Pressable 
-            onPress={() => router.push(`/user/${post.user_id}`)}
-            style={styles.userInfoContainer}
-          >
-            <View style={styles.profilePicture}>
-              <Image
-                source={{ uri: post.profiles.avatar_url }}
-                style={{ width: 40, height: 40, borderRadius: 20 }}
-              />
-            </View>
-            <View>
-              <Text style={styles.userName}>
-                {post.profiles.first_name} {post.profiles.last_name}
-              </Text>
-              <Text style={styles.userTitle}>{post.profiles.selected_title}</Text>
-            </View>
-          </Pressable>
-          <Text style={styles.postTime}>{formatTimeAgo(post.created_at)}</Text>
-        </View>
-
-        <Text style={styles.postContent}>{post.content}</Text>
-
-        <View style={styles.postActions}>
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => toggleReaction(post.id, 'fire')}
-          >
-            <Flame size={18} color={hasUserFired ? '#ff7b25' : '#666'} fill={hasUserFired ? '#ff7b25' : 'none'} />
-            <Text style={[styles.actionCount, hasUserFired && { color: '#ff7b25' }]}>{fireCount}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => router.push(`/post/${post.id}`)}
-          >
-            <MessageCircle size={18} color="#666" />
-            <Text style={styles.actionCount}>{post.post_comments.length}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {latestComment && (
-          <View style={styles.latestComment}>
-            <Text style={styles.commentAuthor}>{latestComment.profiles.first_name}: </Text>
-            <Text style={styles.commentText} numberOfLines={1}>
-              {latestComment.content}
-            </Text>
+      <View style={styles.postCard}>
+        <Pressable
+          onPress={() => router.push(`/post/${post.id}`)}
+          android_ripple={{ color: '#0f0f0f' }}
+        >
+          <View style={styles.postHeader}>
+            <Pressable 
+              onPress={() => router.push(`/user/${post.user_id}`)}
+              style={styles.userInfoContainer}
+            >
+              <View style={styles.profilePicture}>
+                <Image
+                  source={{ uri: post.profiles.avatar_url || 'https://example.com/default-avatar.png' }}
+                  style={{ width: 40, height: 40, borderRadius: 20 }}
+                />
+              </View>
+              <View>
+                <Text style={styles.userName}>
+                  {post.profiles.first_name} {post.profiles.last_name}
+                </Text>
+                <Text style={styles.userTitle}>{post.profiles.selected_title}</Text>
+              </View>
+            </Pressable>
+            <Text style={styles.postTime}>{formatTimeAgo(post.created_at)}</Text>
           </View>
-        )}
-      </Pressable>
+
+          <Text style={styles.postContent}>{post.content}</Text>
+
+          <View style={styles.postActions}>
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => toggleReaction(post.id, 'fire')}
+            >
+              <Flame size={18} color={hasUserFired ? '#ff7b25' : '#666'} fill={hasUserFired ? '#ff7b25' : 'none'} />
+              <Text style={[styles.actionCount, hasUserFired && { color: '#ff7b25' }]}>{fireCount}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => router.push(`/post/${post.id}`)}
+            >
+              <MessageCircle size={18} color="#666" />
+              <Text style={styles.actionCount}>{post.post_comments.length}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => sharePost(post)}
+              disabled={sharingPost}
+            >
+              <Share size={18} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          {latestComment && (
+            <View style={styles.latestComment}>
+              <Text style={styles.commentAuthor}>{latestComment.profiles.first_name}: </Text>
+              <Text style={styles.commentText} numberOfLines={1}>
+                {latestComment.content}
+              </Text>
+            </View>
+          )}
+        </Pressable>
+        
+        {/* Hidden share view for capturing */}
+        <SharePostView ref={viewShotRef} post={post} latestComment={latestComment} style={{ position: 'absolute', left: -1000 }} />
+      </View>
     );
   };
 
   // ---- Screens -----------------------------------------------------------
-if (!initialLoadComplete || loading) {
-  return <SkeletonLoader />;
-}
+  if (!initialLoadComplete || loading) {
+    return <SkeletonLoader />;
+  }
 
   if (showAddCommunity) {
     return (
@@ -597,7 +666,6 @@ if (!initialLoadComplete || loading) {
             onChangeText={(v) => setSearchQuery(v)}
           />
         </View>
-
 
         <FlatList
           data={filteredCommunities}
@@ -634,12 +702,7 @@ if (!initialLoadComplete || loading) {
     );
   }
 
-  // Show skeleton loader while loading communities
-  if (loading) {
-    return <CommunitiesSkeletonLoader />;
-  }
-
-  if  (communities.length === 0) {
+  if (communities.length === 0) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -837,25 +900,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
   },
-weekRangeWrapper: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  paddingHorizontal: 12,
-  paddingVertical: 8,
-  borderBottomColor: '#333',
-  borderBottomWidth: 1,
-},
-weekRangeText: {
-  color: '#cccccc',
-  fontSize: 14,
-},
-toggleText: {
-  color: '#1ea2b1',
-  fontSize: 14,
-  fontWeight: '600',
-},
-
+  weekRangeWrapper: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomColor: '#333',
+    borderBottomWidth: 1,
+  },
+  weekRangeText: {
+    color: '#cccccc',
+    fontSize: 14,
+  },
+  toggleText: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   searchInput: {
     flex: 1,
     marginLeft: 12,
@@ -927,7 +989,7 @@ toggleText: {
   postButtonDisabled: {
     backgroundColor: '#333333',
   },
-  postButtonText: {
+   postButtonText: {
     color: '#ffffff',
     fontWeight: '600',
     fontSize: 16,
@@ -1139,5 +1201,65 @@ toggleText: {
     minHeight: 36,
     width: 100,
     marginHorizontal: 4,
+  },
+  // Share post styles
+  shareContainer: {
+    backgroundColor: '#ffffff',
+    padding: 20,
+    borderRadius: 12,
+    width: 300,
+  },
+  shareHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  shareAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+    backgroundColor: '#1ea2b1',
+  },
+  shareUserName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#000000',
+  },
+  shareUserTitle: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  shareContent: {
+    fontSize: 16,
+    color: '#000000',
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  shareComment: {
+    backgroundColor: '#f5f5f5',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  shareCommentAuthor: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1ea2b1',
+  },
+  shareCommentText: {
+    fontSize: 14,
+    color: '#333333',
+  },
+  shareFooter: {
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingTop: 16,
+  },
+  shareFooterText: {
+    fontSize: 14,
+    color: '#1ea2b1',
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

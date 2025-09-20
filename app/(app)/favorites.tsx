@@ -14,12 +14,38 @@ interface SearchResult {
   distance?: number;
 }
 
+// Skeleton Loading Component
+const SkeletonLoader = () => {
+  return (
+    <View style={styles.skeletonContainer}>
+      {[1, 2, 3, 4, 5].map((item) => (
+        <View key={item} style={styles.skeletonCard}>
+          <View style={styles.skeletonHeader}>
+            <View style={styles.skeletonIcon} />
+            <View style={styles.skeletonTextContainer}>
+              <View style={[styles.skeletonLine, styles.skeletonTitle]} />
+              <View style={[styles.skeletonLine, styles.skeletonSubtitle]} />
+            </View>
+            <View style={styles.skeletonFavorite} />
+          </View>
+          <View style={styles.skeletonMeta}>
+            <View style={styles.skeletonTag} />
+            <View style={styles.skeletonRouteInfo} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+};
+
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'route' | 'stop' | 'hub' | 'nearby_spot'>('all');
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [recommendedNearby, setRecommendedNearby] = useState<SearchResult[]>([]);
+  const [isLoadingRecommended, setIsLoadingRecommended] = useState(false);
   
   const { favorites, addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
   const { user } = useAuth();
@@ -41,8 +67,15 @@ export default function SearchScreen() {
       performSearch();
     } else {
       setSearchResults([]);
+      loadRecommendedNearby();
     }
   }, [searchQuery, selectedFilter]);
+
+  useEffect(() => {
+    if (userLocation) {
+      loadRecommendedNearby();
+    }
+  }, [userLocation]);
 
   const getCurrentLocation = async () => {
     try {
@@ -69,6 +102,84 @@ export default function SearchScreen() {
       Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
+  };
+
+  const loadRecommendedNearby = async () => {
+    if (!userLocation) return;
+    
+    setIsLoadingRecommended(true);
+    try {
+      const results: SearchResult[] = [];
+
+      // Get nearby stops with distance calculation
+      const { data: stops } = await supabase
+        .from('stops')
+        .select('*');
+
+      if (stops) {
+        console.log('Stops found:', stops.length);
+        stops.forEach(stop => {
+          const distance = calculateDistance(
+            userLocation.latitude,
+            userLocation.longitude,
+            stop.latitude,
+            stop.longitude
+          );
+
+          results.push({
+            id: stop.id,
+            name: stop.name,
+            type: 'stop',
+            data: stop,
+            distance,
+          });
+        });
+      }
+
+      // Get nearby hubs with distance calculation
+      const { data: hubs } = await supabase
+        .from('hubs')
+        .select('*');
+
+      if (hubs) {
+        console.log('Hubs found:', hubs.length);
+        hubs.forEach(hub => {
+          const distance = calculateDistance(
+            userLocation.latitude,
+            userLocation.longitude,
+            hub.latitude,
+            hub.longitude
+          );
+
+          results.push({
+            id: hub.id,
+            name: hub.name,
+            type: 'hub',
+            data: hub,
+            distance,
+          });
+        });
+      }
+
+      // Sort by distance
+      const sortedResults = results.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+      
+      // Get a balanced mix of stops and hubs
+      const stopsOnly = sortedResults.filter(r => r.type === 'stop').slice(0, 4);
+      const hubsOnly = sortedResults.filter(r => r.type === 'hub').slice(0, 4);
+      
+      // Combine and take up to 8 results
+      const balancedResults = [...stopsOnly, ...hubsOnly]
+        .sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity))
+        .slice(0, 8);
+        
+      console.log('Final recommended results:', balancedResults);
+      setRecommendedNearby(balancedResults);
+    } catch (error) {
+      console.error('Error loading recommended nearby:', error);
+    } finally {
+      setIsLoadingRecommended(false);
+    }
   };
 
   const performSearch = async () => {
@@ -248,6 +359,51 @@ export default function SearchScreen() {
     }
   };
 
+  const renderResultItem = (result: SearchResult) => {
+    const IconComponent = getResultIcon(result.type);
+    const isResultFavorite = isFavorite(result.id);
+    
+    return (
+      <TouchableOpacity key={result.id} style={styles.resultCard}>
+        <View style={styles.resultHeader}>
+          <View style={styles.resultInfo}>
+            <IconComponent size={20} color="#1ea2b1" />
+            <View style={styles.resultDetails}>
+              <Text style={styles.resultTitle}>{result.name}</Text>
+              <Text style={styles.resultSubtitle}>{getResultSubtitle(result)}</Text>
+            </View>
+          </View>
+          
+          <TouchableOpacity
+            style={styles.favoriteButton}
+            onPress={() => handleFavoriteToggle(result)}
+          >
+            <Heart
+              size={20}
+              color={isResultFavorite ? '#ff6b35' : '#888888'}
+              fill={isResultFavorite ? '#ff6b35' : 'transparent'}
+            />
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.resultMeta}>
+          <View style={styles.resultType}>
+            <Text style={styles.resultTypeText}>
+              {result.type.charAt(0).toUpperCase() + result.type.slice(1).replace('_', ' ')}
+            </Text>
+          </View>
+          
+          {result.type === 'route' && (
+            <View style={styles.routeInfo}>
+              <Clock size={14} color="#888888" />
+              <Text style={styles.routeInfoText}>{result.data.transport_type}</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -269,77 +425,34 @@ export default function SearchScreen() {
         </View>
       </View>
 
-      {/* Filter Tabs */}
+      <View style={styles.tabsWrapper}>
       <FlatList
-      data={filters}
-      numColumns={Math.ceil(filters.length/2)} // Adjust as needed
-      renderItem={({item}) => (
-        <TouchableOpacity
-          key={item.key}
-          style={[styles.filterTab, selectedFilter === item.key && styles.activeFilterTab]}
-          onPress={() => setSelectedFilter(item.key as any)}
-        >
-          <item.icon size={16} color={selectedFilter === item.key ? '#FFFFFF' : '#888888'} />
-          <Text style={[styles.filterText, selectedFilter === item.key && styles.activeFilterText]}>
-            {item.label}
-          </Text>
-        </TouchableOpacity>
-      )}
-      keyExtractor={item => item.key}
-      contentContainerStyle={styles.filtersContainer}
-    />
+        data={filters}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        renderItem={({item}) => (
+          <TouchableOpacity
+            key={item.key}
+            style={[styles.filterTab, selectedFilter === item.key && styles.activeFilterTab]}
+            onPress={() => setSelectedFilter(item.key as any)}
+          >
+            <item.icon size={16} color={selectedFilter === item.key ? '#FFFFFF' : '#888888'} />
+            <Text style={[styles.filterText, selectedFilter === item.key && styles.activeFilterText]}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        )}
+        keyExtractor={item => item.key}
+        contentContainerStyle={styles.filtersContainer}
+      />
+      </View>
 
       {/* Search Results */}
       <ScrollView style={styles.resultsContainer} contentContainerStyle={styles.resultsContent}>
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Searching...</Text>
-          </View>
+          <SkeletonLoader />
         ) : searchResults.length > 0 ? (
-          searchResults.map((result) => {
-            const IconComponent = getResultIcon(result.type);
-            const isResultFavorite = isFavorite(result.id);
-            
-            return (
-              <TouchableOpacity key={result.id} style={styles.resultCard}>
-                <View style={styles.resultHeader}>
-                  <View style={styles.resultInfo}>
-                    <IconComponent size={20} color="#1ea2b1" />
-                    <View style={styles.resultDetails}>
-                      <Text style={styles.resultTitle}>{result.name}</Text>
-                      <Text style={styles.resultSubtitle}>{getResultSubtitle(result)}</Text>
-                    </View>
-                  </View>
-                  
-                  <TouchableOpacity
-                    style={styles.favoriteButton}
-                    onPress={() => handleFavoriteToggle(result)}
-                  >
-                    <Heart
-                      size={20}
-                      color={isResultFavorite ? '#ff6b35' : '#888888'}
-                      fill={isResultFavorite ? '#ff6b35' : 'transparent'}
-                    />
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.resultMeta}>
-                  <View style={styles.resultType}>
-                    <Text style={styles.resultTypeText}>
-                      {result.type.charAt(0).toUpperCase() + result.type.slice(1).replace('_', ' ')}
-                    </Text>
-                  </View>
-                  
-                  {result.type === 'route' && (
-                    <View style={styles.routeInfo}>
-                      <Clock size={14} color="#888888" />
-                      <Text style={styles.routeInfoText}>{result.data.transport_type}</Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })
+          searchResults.map(renderResultItem)
         ) : searchQuery.length > 2 ? (
           <View style={styles.noResultsContainer}>
             <Search size={48} color="#333333" />
@@ -350,11 +463,16 @@ export default function SearchScreen() {
           </View>
         ) : (
           <View style={styles.emptyStateContainer}>
-            <Search size={48} color="#333333" />
-            <Text style={styles.emptyStateTitle}>Start searching</Text>
-            <Text style={styles.emptyStateText}>
-              Search for routes, stops, hubs, or nearby spots to get started.
-            </Text>
+            <Text style={styles.recommendedTitle}>Recommended Nearby</Text>
+            {isLoadingRecommended ? (
+              <SkeletonLoader />
+            ) : recommendedNearby.length > 0 ? (
+              recommendedNearby.map(renderResultItem)
+            ) : (
+              <View style={styles.loadingRecommended}>
+                <Text style={styles.loadingRecommendedText}>No nearby locations found</Text>
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
@@ -400,10 +518,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
   },
+  tabsWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+    backgroundColor: '#000000',
+  },
   filtersContainer: {
-    flex: 1,
+    flex: 0,
     paddingHorizontal: 16,
-    marginBottom: 12,  // Reduced from 16
+    marginBottom: 12,
     paddingVertical: 4
   },
   filterTab: {
@@ -416,7 +539,7 @@ const styles = StyleSheet.create({
     margin: 6,
     borderWidth: 1,
     borderColor: '#333333',
-    width: 'auto', // Let content determine width
+    width: 'auto',
   },
   activeFilterTab: {
     backgroundColor: '#1ea2b1',
@@ -424,7 +547,6 @@ const styles = StyleSheet.create({
   },
   filterText: {
     color: '#888888',
-    flexGrow: 0, // Prevent text from stretching
     fontSize: 14,
     marginLeft: 6,
     fontWeight: '500',
@@ -433,6 +555,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   resultsContainer: {
+    flex: 1,
   },
   resultsContent: {
     padding: 16,
@@ -510,6 +633,7 @@ const styles = StyleSheet.create({
   },
   noResultsContainer: {
     alignItems: 'center',
+    paddingVertical: 40,
   },
   noResultsTitle: {
     color: '#FFFFFF',
@@ -525,19 +649,85 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   emptyStateContainer: {
-    alignItems: 'center',
+    flex: 1,
   },
-  emptyStateTitle: {
+  recommendedTitle: {
     color: '#FFFFFF',
     fontSize: 20,
     fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  emptyStateText: {
+  loadingRecommended: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingRecommendedText: {
     color: '#888888',
     fontSize: 16,
-    textAlign: 'center',
-    lineHeight: 22,
+  },
+  // Skeleton Loading Styles
+  skeletonContainer: {
+    flex: 1,
+  },
+  skeletonCard: {
+    backgroundColor: '#111111',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  skeletonHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  skeletonIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#333333',
+  },
+  skeletonTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  skeletonLine: {
+    backgroundColor: '#333333',
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  skeletonTitle: {
+    height: 16,
+    width: '70%',
+    marginBottom: 8,
+  },
+  skeletonSubtitle: {
+    height: 14,
+    width: '50%',
+  },
+  skeletonFavorite: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#333333',
+  },
+  skeletonMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  skeletonTag: {
+    width: 60,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: '#333333',
+  },
+  skeletonRouteInfo: {
+    width: 40,
+    height: 14,
+    borderRadius: 4,
+    backgroundColor: '#333333',
   },
 });

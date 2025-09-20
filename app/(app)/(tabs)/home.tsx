@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,18 @@ interface FavoriteItem {
   name: string;
   type: 'stop' | 'route' | 'hub';
   distance?: string;
+}
+
+interface UserStats {
+  points: number;
+  level: number;
+  streak: number;
+  title: string;
+}
+
+interface LocationCoords {
+  lat: number;
+  lng: number;
 }
 
 const calculateWalkingTime = (lat1, lng1, lat2, lng2) => {
@@ -76,27 +88,74 @@ export default function HomeScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const params = useLocalSearchParams();
-  const [userLocation, setUserLocation] = useState(null);
-  const [locationError, setLocationError] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
+  const [userLocation, setUserLocation] = useState<LocationCoords | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
-  const [nearestLocations, setNearestLocations] = useState(null);
+  const [nearestLocations, setNearestLocations] = useState<any>(null);
   const [isNearestLoading, setIsNearestLoading] = useState(false);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
-  const [userStats, setUserStats] = useState({
+  const [userStats, setUserStats] = useState<UserStats>({
     points: 0,
     level: 1,
     streak: 0,
     title: 'Newbie Explorer'
   });
-  const [userId, setUserId] = useState(null);
-  const [favoriteDetails, setFavoriteDetails] = useState([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [favoriteDetails, setFavoriteDetails] = useState<any[]>([]);
   const [isStatsLoading, setIsStatsLoading] = useState(true);
+  const [isFavoritesLoading, setIsFavoritesLoading] = useState(false);
   const navigation = useNavigation();
   const { activeJourney, loading: journeyLoading } = useJourney();
   const [showStreakOverlay, setShowStreakOverlay] = useState(false);
 
+  const fetchNearestLocations = useCallback(async () => {
+    if (!userLocation) return;
+    
+    setIsNearestLoading(true);
+    try {
+      const [stopsResult, hubsResult] = await Promise.allSettled([
+        supabase.from('stops').select('*'),
+        supabase.from('hubs').select('*')
+      ]);
+
+      const stops = stopsResult.status === 'fulfilled' ? stopsResult.value.data : [];
+      const hubs = hubsResult.status === 'fulfilled' ? hubsResult.value.data : [];
+
+      const nearestStop = findNearestLocation(userLocation, stops || []);
+      const nearestHub = findNearestLocation(userLocation, hubs || []);
+
+      setNearestLocations({ nearestStop, nearestHub });
+    } catch (error) {
+      console.error('Error fetching nearest locations:', error);
+    } finally {
+      setIsNearestLoading(false);
+    }
+  }, [userLocation]);
+
+  const findNearestLocation = useCallback((userLocation: LocationCoords, locations: any[]) => {
+    let nearestLocation = null;
+    let minDistance = Infinity;
+
+    locations.forEach((location) => {
+      const distance = calculateWalkingTime(
+        userLocation.lat,
+        userLocation.lng,
+        location.latitude,
+        location.longitude
+      );
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestLocation = location;
+      }
+    });
+
+    return nearestLocation;
+  }, []);
+
   const toggleFavorite = async (item: FavoriteItem) => {
+    setIsFavoritesLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -133,30 +192,34 @@ export default function HomeScreen() {
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
+    } finally {
+      setIsFavoritesLoading(false);
     }
   };
 
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const session = await supabase.auth.getSession();
-        const userId = session.data.session?.user.id;
-    
-        if (!userId) {
-          router.replace('/auth');
-          return;
-        }
-    
-        setUserId(userId);
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('first_name, selected_title, favorites, points')
-          .eq('id', userId)
-          .single();
-    
-        if (error) throw error;
+  const fetchUserProfile = useCallback(async () => {
+    let isMounted = true;
+    try {
+      const session = await supabase.auth.getSession();
+      const userId = session.data.session?.user.id;
+  
+      if (!userId) {
+        router.replace('/auth');
+        return;
+      }
+  
+      setUserId(userId);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('first_name, selected_title, favorites, points')
+        .eq('id', userId)
+        .single();
+  
+      if (error) throw error;
+      
+      if (isMounted) {
         setUserProfile(data);
-    
+  
         if (data?.favorites?.length) {
           const processedFavorites = data.favorites.map(fav => {
             if (typeof fav === 'object' && fav.id && fav.name && fav.type) {
@@ -185,9 +248,9 @@ export default function HomeScreen() {
               type: 'stop'
             };
           });
-    
+  
           setFavorites(processedFavorites);
-    
+  
           const details = await Promise.all(
             processedFavorites.map(async (favorite) => {
               try {
@@ -205,16 +268,26 @@ export default function HomeScreen() {
           setFavoriteDetails(details.filter(Boolean));
         }
         checkAndShowStreakOverlay(userId);
-      } catch (error) {
-        router.replace('/auth');
-      } finally {
-        setIsProfileLoading(false);
-
       }
-    };
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      if (isMounted) {
+        router.replace('/auth');
+      }
+    } finally {
+      if (isMounted) {
+        setIsProfileLoading(false);
+      }
+    }
 
-    fetchUserProfile();
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, [fetchUserProfile]);
 
   useEffect(() => {
     (async () => {
@@ -232,48 +305,9 @@ export default function HomeScreen() {
     })();
   }, []);
 
-    const fetchNearestLocations = async () => {
-    setIsNearestLoading(true);
-    try {
-      const { data: stops } = await supabase.from('stops').select('*');
-      const { data: hubs } = await supabase.from('hubs').select('*');
-
-      const nearestStop = findNearestLocation(userLocation, stops || []);
-      const nearestHub = findNearestLocation(userLocation, hubs || []);
-
-      setNearestLocations({ nearestStop, nearestHub });
-    } catch (error) {
-      console.error('Error fetching nearest locations:', error);
-    } finally {
-      setIsNearestLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (!userLocation) return;
     fetchNearestLocations();
-  }, [userLocation]);
-
-  const findNearestLocation = (userLocation, locations) => {
-    let nearestLocation = null;
-    let minDistance = Infinity;
-
-    locations.forEach((location) => {
-      const distance = calculateWalkingTime(
-        userLocation.lat,
-        userLocation.lng,
-        location.latitude,
-        location.longitude
-      );
-
-      if (distance < minDistance) {
-        minDistance = distance;
-        nearestLocation = location;
-      }
-    });
-
-    return nearestLocation;
-  };
+  }, [userLocation, fetchNearestLocations]);
 
   const checkAndShowStreakOverlay = async (userId: string) => {
     try {
@@ -289,7 +323,6 @@ export default function HomeScreen() {
     }
   };
 
-
   const loadUserStats = async () => {
     setIsStatsLoading(true);
     try {
@@ -302,12 +335,15 @@ export default function HomeScreen() {
           .single();
         
         let streak = 0;
+        let streakData = null;
+        
         try {
-          const { data: streakData } = await supabase
+          const { data: streakResult } = await supabase
             .from('login_streaks')
             .select('current_streak')
             .eq('user_id', user.id)
             .single();
+          streakData = streakResult;
           streak = streakData?.current_streak || 0;
         } catch (streakError) {
           console.log('Streak table not available, using default');
@@ -317,7 +353,7 @@ export default function HomeScreen() {
           setUserStats({
             points: profile.points || 0,
             level: Math.floor((profile.points || 0) / 100) + 1,
-            streak: streakData?.current_streak || 0,
+            streak: streak,
             title: profile.selected_title || 'Newbie Explorer'
           });
         }
@@ -330,14 +366,18 @@ export default function HomeScreen() {
   };
   
 useEffect(() => {
-  // This will run whenever the refresh parameter changes
+  if (userProfile) {
+    loadUserStats();
+  }
+}, [userProfile]);
+
+// Keep the refresh functionality for manual refreshes
+useEffect(() => {
   if (params.refresh) {
-    // Refresh your data here
     loadUserStats();
     if (userLocation) {
       fetchNearestLocations();
     }
-    // If you have other data that needs refreshing, add it here
   }
 }, [params.refresh]);
 
@@ -345,23 +385,20 @@ useEffect(() => {
     navigation.toggleDrawer();
   };
 
-  const handleFavoritePress = async (favoriteName) => {
+  const handleFavoritePress = async (favoriteName: string) => {
     try {
-      const { data: hubData, error: hubError } = await supabase
-        .from('hubs')
-        .select('id')
-        .eq('name', favoriteName)
-        .maybeSingle();
+      const [hubResult, stopResult] = await Promise.allSettled([
+        supabase.from('hubs').select('id').eq('name', favoriteName).maybeSingle(),
+        supabase.from('stops').select('id').eq('name', favoriteName).maybeSingle()
+      ]);
 
-      if (hubData && !hubError) return { type: 'hub', id: hubData.id };
+      if (hubResult.status === 'fulfilled' && hubResult.value.data) {
+        return { type: 'hub', id: hubResult.value.data.id };
+      }
 
-      const { data: stopData, error: stopError } = await supabase
-        .from('stops')
-        .select('id')
-        .eq('name', favoriteName)
-        .maybeSingle();
-
-      if (stopData && !stopError) return { type: 'stop', id: stopData.id };
+      if (stopResult.status === 'fulfilled' && stopResult.value.data) {
+        return { type: 'stop', id: stopResult.value.data.id };
+      }
 
       return null;
     } catch (error) {
@@ -370,16 +407,15 @@ useEffect(() => {
     }
   };
 
-  const handleNearestStopPress = (stopId) => {
+  const handleNearestStopPress = (stopId: string) => {
     router.push(`/stop-details?stopId=${stopId}`);
   };
 
-  const handleNearestHubPress = (hubId) => {
+  const handleNearestHubPress = (hubId: string) => {
     router.push(`/hub/${hubId}`);
   };
 
-  // Function to handle marking as waiting with validation
-  const handleMarkAsWaiting = async (locationId, locationType, locationName) => {
+  const handleMarkAsWaiting = async (locationId: string, locationType: string, locationName: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -387,7 +423,6 @@ useEffect(() => {
         return;
       }
 
-      // Check if user already has an active journey (server-side validation)
       const { data: existingWaiting } = await supabase
         .from('stop_waiting')
         .select('id')
@@ -404,7 +439,6 @@ useEffect(() => {
         return;
       }
 
-      // Get route information for the stop
       const { data: stopData, error: stopError } = await supabase
         .from('stops')
         .select('route_id')
@@ -417,7 +451,6 @@ useEffect(() => {
         return;
       }
 
-      // Check for existing journeys for this route
       const { data: existingJourneys, error: journeyError } = await supabase
         .from('journeys')
         .select('id')
@@ -431,11 +464,9 @@ useEffect(() => {
 
       let journeyId;
 
-      // If there are existing journeys, join the first one
       if (existingJourneys && existingJourneys.length > 0) {
         journeyId = existingJourneys[0].id;
       } else {
-        // Create new journey
         const { data: newJourney, error: createError } = await supabase
           .from('journeys')
           .insert({
@@ -454,9 +485,8 @@ useEffect(() => {
         journeyId = newJourney.id;
       }
 
-      // Mark user as waiting at the stop
       const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + 30); // Expire in 30 minutes
+      expiresAt.setMinutes(expiresAt.getMinutes() + 30);
 
       const { error: waitingError } = await supabase
         .from('stop_waiting')
@@ -465,7 +495,7 @@ useEffect(() => {
           stop_id: locationId,
           journey_id: journeyId,
           route_id: stopData.route_id,
-          transport_type: 'bus', // You might want to get this from somewhere
+          transport_type: 'bus',
           expires_at: expiresAt.toISOString(),
         }, {
           onConflict: 'user_id,stop_id'
@@ -490,7 +520,6 @@ useEffect(() => {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Top Header */}
       <View style={styles.topHeader}>
         <Pressable onPress={openSidebar} style={styles.logoContainer}>
           <Image
@@ -513,14 +542,12 @@ useEffect(() => {
         )}
       </View>
 
-      {/* User Header */}
       <HeaderSection
         isProfileLoading={isProfileLoading}
         userProfile={userProfile}
         colors={colors}
       />
 
-      {/* Active Journey Banner */}
       {!journeyLoading && activeJourney && (
         <Pressable 
           style={styles.journeyBanner}
@@ -554,7 +581,6 @@ useEffect(() => {
         </Pressable>
       )}
 
-      {/* Nearby Locations Section */}
       <NearbySection
         locationError={locationError}
         isNearestLoading={isNearestLoading}
@@ -564,28 +590,27 @@ useEffect(() => {
         handleNearestStopPress={handleNearestStopPress}
         handleNearestHubPress={handleNearestHubPress}
         calculateWalkingTime={calculateWalkingTime}
-        hasActiveJourney={!!activeJourney} // Pass whether user has active journey
-        onMarkAsWaiting={handleMarkAsWaiting} // Pass the mark as waiting handler
+        hasActiveJourney={!!activeJourney}
+        onMarkAsWaiting={handleMarkAsWaiting}
       />
 
-      {/* Your Community Section */}
       <View style={[styles.section, { backgroundColor: colors.card }]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           Your Community
         </Text>
         
-        {isProfileLoading ? (
+        {isProfileLoading || isFavoritesLoading ? (
           <View style={styles.loadingContainer}>
-            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            <Text style={[styles.loadingText, { color: colors.text }]}>
               Loading your community...
             </Text>
           </View>
         ) : favorites.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            <Text style={[styles.emptyText, { color: colors.text}]}>
               You haven't added any locations to your community yet.
             </Text>
-            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+            <Text style={[styles.emptySubtext, { color: colors.text }]}>
               Add stops, hubs, or routes to see them here.
             </Text>
           </View>
@@ -641,7 +666,6 @@ useEffect(() => {
         )}
       </View>
 
-      {/* Gamification Section */}
       <GamificationSection
         isStatsLoading={isStatsLoading}
         userStats={userStats}
