@@ -19,6 +19,7 @@ import HeaderSection from '@/components/home/HeaderSection';
 import NearbySection from '@/components/home/NearbySection';
 import FavoritesSection from '@/components/home/FavoritesSection';
 import GamificationSection from '@/components/home/GamificationSection';
+import StreakOverlay from '@/components/StreakOverlay';
 
 interface FavoriteItem {
   id: string;
@@ -93,6 +94,7 @@ export default function HomeScreen() {
   const [isStatsLoading, setIsStatsLoading] = useState(true);
   const navigation = useNavigation();
   const { activeJourney, loading: journeyLoading } = useJourney();
+  const [showStreakOverlay, setShowStreakOverlay] = useState(false);
 
   const toggleFavorite = async (item: FavoriteItem) => {
     try {
@@ -202,10 +204,12 @@ export default function HomeScreen() {
           );
           setFavoriteDetails(details.filter(Boolean));
         }
+        checkAndShowStreakOverlay(userId);
       } catch (error) {
         router.replace('/auth');
       } finally {
         setIsProfileLoading(false);
+
       }
     };
 
@@ -271,6 +275,21 @@ export default function HomeScreen() {
     return nearestLocation;
   };
 
+  const checkAndShowStreakOverlay = async (userId: string) => {
+    try {
+      const shownKey = `streakOverlayShown_${userId}`;
+      const hasShown = await AsyncStorage.getItem(shownKey);
+      
+      if (!hasShown) {
+        setShowStreakOverlay(true);
+        await AsyncStorage.setItem(shownKey, 'true');
+      }
+    } catch (error) {
+      console.error('Error checking streak overlay status:', error);
+    }
+  };
+
+
   const loadUserStats = async () => {
     setIsStatsLoading(true);
     try {
@@ -298,7 +317,7 @@ export default function HomeScreen() {
           setUserStats({
             points: profile.points || 0,
             level: Math.floor((profile.points || 0) / 100) + 1,
-            streak: streak,
+            streak: streakData?.current_streak || 0,
             title: profile.selected_title || 'Newbie Explorer'
           });
         }
@@ -627,6 +646,12 @@ useEffect(() => {
         isStatsLoading={isStatsLoading}
         userStats={userStats}
         colors={colors}
+      />
+
+      <StreakOverlay
+        visible={showStreakOverlay}
+        userId={userId}
+        onClose={() => setShowStreakOverlay(false)}
       />
     </ScrollView>
   );
