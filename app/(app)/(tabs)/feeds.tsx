@@ -127,47 +127,12 @@ const CommunitiesSkeletonLoader = () => (
   </View>
 );
 
-// Share Post Component
-const SharePostView = React.forwardRef(({ post, latestComment }: { post: Post; latestComment?: any }, ref) => {
-  return (
-    <ViewShot ref={ref} options={{ format: 'png', quality: 0.9 }}>
-      <View style={styles.shareContainer}>
-        <View style={styles.shareHeader}>
-          <Image
-            source={{ uri: post.profiles.avatar_url || 'https://example.com/default-avatar.png' }}
-            style={styles.shareAvatar}
-          />
-          <View>
-            <Text style={styles.shareUserName}>
-              {post.profiles.first_name} {post.profiles.last_name}
-            </Text>
-            <Text style={styles.shareUserTitle}>{post.profiles.selected_title}</Text>
-          </View>
-        </View>
-        
-        <Text style={styles.shareContent}>{post.content}</Text>
-        
-        {latestComment && (
-          <View style={styles.shareComment}>
-            <Text style={styles.shareCommentAuthor}>{latestComment.profiles.first_name}: </Text>
-            <Text style={styles.shareCommentText}>{latestComment.content}</Text>
-          </View>
-        )}
-        
-        <View style={styles.shareFooter}>
-          <Text style={styles.shareFooterText}>Join Uthutho now and hear what's happening on your streets</Text>
-        </View>
-      </View>
-    </ViewShot>
-  );
-});
-
 export default function FeedsScreen() {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { t } = useTranslation();
   const router = useRouter();
-  const viewShotRef = useRef();
+  const viewShotRefs = useRef({});
 
   const [communities, setCommunities] = useState<Community[]>([]);
   const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
@@ -210,10 +175,9 @@ export default function FeedsScreen() {
   const sharePost = async (post: Post) => {
     try {
       setSharingPost(true);
-      const latestComment = post.post_comments[post.post_comments.length - 1];
       
-      // Capture the view shot
-      const uri = await viewShotRef.current.capture();
+      // Capture the specific post card view
+      const uri = await viewShotRefs.current[post.id].capture();
       
       // Share the image
       if (await Sharing.isAvailableAsync()) {
@@ -573,7 +537,11 @@ export default function FeedsScreen() {
     const latestComment = post.post_comments[post.post_comments.length - 1];
 
     return (
-      <View style={styles.postCard}>
+      <ViewShot 
+        ref={ref => viewShotRefs.current[post.id] = ref} 
+        options={{ format: 'png', quality: 0.9 }}
+        style={styles.postCard}
+      >
         <Pressable
           onPress={() => router.push(`/post/${post.id}`)}
           android_ripple={{ color: '#0f0f0f' }}
@@ -634,10 +602,7 @@ export default function FeedsScreen() {
             </View>
           )}
         </Pressable>
-        
-        {/* Hidden share view for capturing */}
-       
-      </View>
+      </ViewShot>
     );
   };
 
@@ -989,7 +954,7 @@ const styles = StyleSheet.create({
   postButtonDisabled: {
     backgroundColor: '#333333',
   },
-   postButtonText: {
+  postButtonText: {
     color: '#ffffff',
     fontWeight: '600',
     fontSize: 16,
