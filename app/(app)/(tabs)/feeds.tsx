@@ -206,50 +206,73 @@ export default function FeedsScreen() {
   };
 
   // Share post function (shares a link with preview)
-  const sharePost = async (post: Post) => {
+// Proper share function for social media
+const sharePost = async (post: Post) => {
+  try {
+    setSharingPost(true);
+    
+    const communityName = selectedCommunity?.name || "Uthutho Community";
+    const userName = `${post.profiles.first_name} ${post.profiles.last_name}`;
+    const shareUrl = `https://mobile.uthutho.co.za/post/${post.id}`;
+
+    // For social media apps, they will scrape the URL and show their own preview
+    // The message here is just for apps that don't support URL previews
+    const message = `Check out ${userName}'s post in ${communityName} on Uthutho`;
+
+    if (Platform.OS === 'web') {
+      // Web sharing - focus on the URL since social media will scrape it
+      if (navigator.share) {
+        await navigator.share({
+          title: `Post from ${communityName}`,
+          text: message,
+          url: shareUrl,
+        });
+      } else {
+        // Fallback - copy the URL to clipboard
+        await navigator.clipboard.writeText(shareUrl);
+        Alert.alert('Link copied', 'Post link has been copied to your clipboard');
+      }
+    } else {
+      // Mobile sharing - use the built-in share sheet
+      await RNShare.share({
+        message: `${message}\n\n${shareUrl}`,
+        url: shareUrl, // Some platforms may use this for preview
+        title: `Post from ${communityName}`,
+      });
+    }
+  } catch (error) {
+    if (error.toString().includes('AbortError') || error.toString().includes('cancelled')) {
+      console.log('Share cancelled by user');
+    } else {
+      console.error('Error sharing post:', error);
+      Alert.alert('Error', 'Failed to share post');
+    }
+  } finally {
+    setSharingPost(false);
+  }
+};
+
+  // Alternative simple share function if the above doesn't work
+  const simpleSharePost = async (post: Post) => {
     try {
       setSharingPost(true);
       
       const communityName = selectedCommunity?.name || "Uthutho Community";
-      const communityType = selectedCommunity?.type === 'hub' ? 'Hub' : 'Stop';
       const userName = `${post.profiles.first_name} ${post.profiles.last_name}`;
       
       const shareUrl = `https://mobile.uthutho.co.za/post/${post.id}`;
       
-      const previewContent = post.content.length > 100 
-        ? `${post.content.substring(0, 100)}...` 
-        : post.content;
-      
-      const message = `🗣️ ${userName} posted in ${communityName} ${communityType}:\n\n"${previewContent}"\n\n${shareUrl}\n\nJoin the conversation on Uthutho - your local transport community app!`;
+      const message = `Check out ${userName}'s post in ${communityName} on Uthutho: ${shareUrl}`;
 
-      // Platform-specific sharing
       if (Platform.OS === 'web') {
-        // Web sharing using expo-sharing
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(message, {
-            dialogTitle: `Share post from ${communityName}`,
-            mimeType: 'text/plain',
-          });
-        } else {
-          // Fallback for web browsers without sharing API
-          await navigator.clipboard.writeText(message);
-          Alert.alert('Copied to clipboard', 'Share message has been copied to your clipboard');
-        }
-      } else if (Platform.OS === 'android') {
-        // Android sharing
-        await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
-          type: 'text/plain',
-          extras: {
-            'android.intent.extra.TEXT': message,
-            'android.intent.extra.SUBJECT': `Post from ${communityName}`,
-          },
-        });
+        // Simple web sharing - just copy to clipboard
+        await navigator.clipboard.writeText(message);
+        Alert.alert('Copied to clipboard', 'Post link has been copied to your clipboard');
       } else {
-        // iOS sharing using React Native's Share API
+        // Use React Native Share for mobile
         await RNShare.share({
           message: message,
           title: `Share post from ${communityName}`,
-          url: shareUrl,
         });
       }
     } catch (error) {
