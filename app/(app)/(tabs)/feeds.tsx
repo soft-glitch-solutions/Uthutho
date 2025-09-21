@@ -10,14 +10,17 @@ import {
   RefreshControl,
   Image,
   Pressable,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Flame, MessageCircle, Plus, Search, MapPin, Bell, ArrowLeft, Share } from 'lucide-react-native';
+import { Flame, MessageCircle, Plus, Search, MapPin, Bell, ArrowLeft, Share, Download } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import { useTranslation } from '@/hook/useTranslation';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
 
 interface Community {
   id: string;
@@ -171,23 +174,50 @@ export default function FeedsScreen() {
     return { monday, sunday };
   };
 
-  // Share post function
-  const sharePost = async (post: Post) => {
+  // Download post function
+  const downloadPost = async (post: Post) => {
     try {
       setSharingPost(true);
+      
+      // Request media library permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Please allow access to your photos to download images');
+        return;
+      }
       
       // Capture the specific post card view
       const uri = await viewShotRefs.current[post.id].capture();
       
-      // Share the image
+      // Download the image to media library
+      const asset = await MediaLibrary.createAssetAsync(uri);
+      await MediaLibrary.createAlbumAsync('Uthutho', asset, false);
+      
+      Alert.alert('Success', 'Post downloaded to your photos');
+    } catch (error) {
+      console.error('Error downloading post:', error);
+      Alert.alert('Error', 'Failed to download post');
+    } finally {
+      setSharingPost(false);
+    }
+  };
+
+  // Share post function (shares a link with preview)
+  const sharePost = async (post: Post) => {
+    try {
+      setSharingPost(true);
+      
+      // Create a shareable link with post ID
+      const shareUrl = `https://mobile.uthutho.co.za/post/${post.id}`;
+      const message = `Check out this post on Uthutho!\n\n${shareUrl}\n\nTry Uthutho now - hear what's happening in your local transport! Download our app at mobile.uthutho.co.za`;
+      
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'image/png',
+        await Sharing.shareAsync(message, {
           dialogTitle: 'Share Post',
-          UTI: 'image/png'
         });
       } else {
-        Alert.alert('Sharing not available', 'Sharing is not available on this device');
+        // Fallback for devices without sharing capability
+        Alert.alert('Share', message);
       }
     } catch (error) {
       console.error('Error sharing post:', error);
@@ -472,7 +502,7 @@ export default function FeedsScreen() {
           .delete()
           .eq('user_id', userId)
           .eq('reaction_type', reactionType)
-          .eq(post.hub_id ? 'post_hub_id' : 'post_stop_id', postId);
+          .eq(post.hub_id ? 'hub_post_id' : 'stop_post_id', postId);
       } else {
         const reactionData: any = {
           user_id: userId,
@@ -480,9 +510,9 @@ export default function FeedsScreen() {
         };
 
         if (post.hub_id) {
-          reactionData.post_hub_id = postId;
+          reactionData.hub_post_id = postId;
         } else {
-          reactionData.post_stop_id = postId;
+          reactionData.stop_post_id = postId;
         }
 
         await supabase
@@ -509,10 +539,10 @@ export default function FeedsScreen() {
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
 
-    if (diffInMinutes < 1) return t('justNow');
-    if (diffInMinutes < 60) return `${diffInMinutes}${t('minutesAgo')}`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}${t('hoursAgo')}`;
-    return `${Math.floor(diffInMinutes / 1440)}${t('daysAgo')}`;
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+    return `${Math.floor(diffInMinutes / 1440)}d ago`;
   };
 
   // ---- Renderers ---------------------------------------------------------
@@ -586,6 +616,13 @@ export default function FeedsScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionItem}
+              onPress={() => downloadPost(post)}
+              disabled={sharingPost}
+            >
+              <Download size={18} color="#666" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionItem}
               onPress={() => sharePost(post)}
               disabled={sharingPost}
             >
@@ -602,6 +639,7 @@ export default function FeedsScreen() {
             </View>
           )}
         </Pressable>
+        
       </ViewShot>
     );
   };
@@ -618,7 +656,7 @@ export default function FeedsScreen() {
           <TouchableOpacity onPress={() => setShowAddCommunity(false)} style={styles.backButton}>
             <ArrowLeft size={24} color="#ffffff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('addCommunity')}</Text>
+          <Text style={styles.headerTitle}>Add Community</Text>
           <View style={styles.placeholder} />
         </View>
 
@@ -626,7 +664,7 @@ export default function FeedsScreen() {
           <Search size={20} color="#666" />
           <TextInput
             style={styles.searchInput}
-            placeholder={t('searchCommunities')}
+            placeholder="Search communities..."
             value={searchQuery}
             onChangeText={(v) => setSearchQuery(v)}
           />
@@ -649,13 +687,13 @@ export default function FeedsScreen() {
                   <View style={styles.communityMeta}>
                     <MapPin size={14} color="#666" />
                     <Text style={styles.communityType}>
-                      {community.type === 'hub' ? t('hub') : t('stop')}
+                      {community.type === 'hub' ? 'Hub' : 'Stop'}
                     </Text>
                   </View>
                 </View>
                 <View style={[styles.favoriteButton, isFavorite && styles.favoriteButtonActive]}>
                   <Text style={[styles.favoriteButtonText, isFavorite && styles.favoriteButtonTextActive]}>
-                    {isFavorite ? t('joined') : t('join')}
+                    {isFavorite ? 'Joined' : 'Join'}
                   </Text>
                 </View>
               </Pressable>
@@ -671,7 +709,7 @@ export default function FeedsScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>{t('communities')}</Text>
+          <Text style={styles.headerTitle}>Communities</Text>
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.notificationButton}  onPress={() => router.push('/notification')}>
               <Bell size={24} color="#ffffff" />
@@ -687,11 +725,11 @@ export default function FeedsScreen() {
           </View>
         </View>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>{t('noCommunities')}</Text>
-          <Text style={styles.emptySubtitle}>{t('joinCommunitiesToSeeFeeds')}</Text>
+          <Text style={styles.emptyTitle}>No Communities</Text>
+          <Text style={styles.emptySubtitle}>Join communities to see feeds</Text>
           <TouchableOpacity style={styles.addButton} onPress={() => setShowAddCommunity(true)}>
             <Plus size={20} color="#fff" />
-            <Text style={styles.addButtonText}>{t('Add Community')}</Text>
+            <Text style={styles.addButtonText}>Add Community</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -701,7 +739,7 @@ export default function FeedsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('Communities')}</Text>
+        <Text style={styles.headerTitle}>Communities</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.notificationButton }  onPress={() => router.push('/notification')}>
             <Bell size={24} color="#ffffff" />
@@ -751,7 +789,7 @@ export default function FeedsScreen() {
             <View style={styles.postCreationContainer}>
               <TextInput
                 style={styles.postInput}
-                placeholder={t('whatsHappening')}
+                placeholder="What's happening?"
                 placeholderTextColor="#777"
                 value={newPost}
                 onChangeText={setNewPost}
@@ -763,15 +801,15 @@ export default function FeedsScreen() {
                 onPress={createPost}
                 disabled={!newPost.trim()}
               >
-                <Text style={styles.postButtonText}>{t('Post')}</Text>
+                <Text style={styles.postButtonText}>Post</Text>
               </TouchableOpacity>
             </View>
           ) : null
         }
         ListEmptyComponent={
           <View style={styles.emptyPosts}>
-            <Text style={styles.emptyPostsText}>{t('NoPostsYet')}</Text>
-            <Text style={styles.emptyPostsSubtext}>{t('BeFirstToPost')}</Text>
+            <Text style={styles.emptyPostsText}>No Posts Yet</Text>
+            <Text style={styles.emptyPostsSubtext}>Be the first to post in this community</Text>
           </View>
         }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -950,6 +988,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 8,
     alignSelf: 'flex-end',
+  },
+  postButtonDisabled: {
+    backgroundColor: '#333333',
   },
   postButtonDisabled: {
     backgroundColor: '#333333',
@@ -1167,6 +1208,22 @@ const styles = StyleSheet.create({
     width: 100,
     marginHorizontal: 4,
   },
+  hiddenBranding: {
+  position: 'absolute',
+  bottom: 8,
+  right: 8,
+  opacity: 0.3,
+},
+brandingText: {
+  fontSize: 10,
+  color: '#1ea2b1',
+  fontWeight: '600',
+},
+brandingSubtext: {
+  fontSize: 8,
+  color: '#666666',
+  marginTop: 2,
+},
   // Share post styles
   shareContainer: {
     backgroundColor: '#ffffff',
