@@ -7,9 +7,11 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Platform,
   RefreshControl,
   Image,
   Pressable,
+  Share as RNShare,
   Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -21,6 +23,7 @@ import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
+import * as IntentLauncher from 'expo-intent-launcher';
 
 interface Community {
   id: string;
@@ -207,17 +210,47 @@ export default function FeedsScreen() {
     try {
       setSharingPost(true);
       
-      // Create a shareable link with post ID
-      const shareUrl = `https://mobile.uthutho.co.za/post/${post.id}`;
-      const message = `Check out this post on Uthutho!\n\n${shareUrl}\n\nTry Uthutho now - hear what's happening in your local transport! Download our app at mobile.uthutho.co.za`;
+      const communityName = selectedCommunity?.name || "Uthutho Community";
+      const communityType = selectedCommunity?.type === 'hub' ? 'Hub' : 'Stop';
+      const userName = `${post.profiles.first_name} ${post.profiles.last_name}`;
       
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(message, {
-          dialogTitle: 'Share Post',
+      const shareUrl = `https://mobile.uthutho.co.za/post/${post.id}`;
+      
+      const previewContent = post.content.length > 100 
+        ? `${post.content.substring(0, 100)}...` 
+        : post.content;
+      
+      const message = `🗣️ ${userName} posted in ${communityName} ${communityType}:\n\n"${previewContent}"\n\n${shareUrl}\n\nJoin the conversation on Uthutho - your local transport community app!`;
+
+      // Platform-specific sharing
+      if (Platform.OS === 'web') {
+        // Web sharing using expo-sharing
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(message, {
+            dialogTitle: `Share post from ${communityName}`,
+            mimeType: 'text/plain',
+          });
+        } else {
+          // Fallback for web browsers without sharing API
+          await navigator.clipboard.writeText(message);
+          Alert.alert('Copied to clipboard', 'Share message has been copied to your clipboard');
+        }
+      } else if (Platform.OS === 'android') {
+        // Android sharing
+        await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
+          type: 'text/plain',
+          extras: {
+            'android.intent.extra.TEXT': message,
+            'android.intent.extra.SUBJECT': `Post from ${communityName}`,
+          },
         });
       } else {
-        // Fallback for devices without sharing capability
-        Alert.alert('Share', message);
+        // iOS sharing using React Native's Share API
+        await RNShare.share({
+          message: message,
+          title: `Share post from ${communityName}`,
+          url: shareUrl,
+        });
       }
     } catch (error) {
       console.error('Error sharing post:', error);
