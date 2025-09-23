@@ -20,12 +20,28 @@ import { Plus, Map, Share2 , MapPin, Clock, Users, Heart, HeartOff, ArrowLeft, N
 import * as Sharing from 'expo-sharing';
 import { formatTimeAgo } from '../../components/utils';
 
-
 interface StopInfo {
   last_updated: string;
   avg_wait_time: string;
   busyness_level: number;
   safety_level: number;
+  total_waiting: number;
+  waiting_users: Array<{
+    id: string;
+    user_id: string;
+    route_id: string;
+    transport_type: string;
+    created_at: string;
+    profiles: {
+      first_name: string;
+      last_name: string;
+      avatar_url: string;
+    };
+    routes: {
+      name: string;
+      transport_type: string;
+    };
+  }>;
 }
 
 export default function StopDetailsScreen() {
@@ -41,51 +57,101 @@ export default function StopDetailsScreen() {
   const [nearbyStops, setNearbyStops] = useState([]);
 
   useEffect(() => {
-    fetchStopDetails();
-    loadStopInfo();
-    fetchNearbyStops(); 
+    if (stopId) {
+      fetchStopDetails();
+      loadStopInfo();
+      fetchNearbyStops();
+      
+      // Set up real-time subscription for waiting users
+      const subscription = supabase
+        .channel('stop_waiting_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'stop_waiting',
+            filter: `stop_id=eq.${stopId}`
+          },
+          () => {
+            loadStopInfo(); // Refresh waiting data when changes occur
+          }
+        )
+        .subscribe();
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
   }, [stopId]);
 
-    const loadStopInfo = async () => {
+  const loadStopInfo = async () => {
     try {
-      // Get current day and hour for busyness data
-      const now = new Date();
-      const dayOfWeek = now.getDay();
-      const hourOfDay = now.getHours();
+      // Get current active waiting users (not expired)
+      const { data: waitingData, error } = await supabase
+        .from('stop_waiting')
+        .select(`
+          *,
+          profiles:user_id (first_name, last_name, avatar_url),
+          routes:route_id (name, transport_type)
+        `)
+        .eq('stop_id', stopId)
+        .gt('expires_at', new Date().toISOString());
 
-      const { data: busyData, error } = await supabase
-        .from('stop_busy_times')
-        .select('*')
-        .eq('stop_id', id)
-        .eq('day_of_week', dayOfWeek)
-        .eq('hour_of_day', hourOfDay)
-        .single();
+      if (error) throw error;
 
-      if (!error && busyData) {
-        setStopInfo({
-          last_updated: '2 minutes ago',
-          avg_wait_time: `${8 + Math.floor(Math.random() * 8)}-${12 + Math.floor(Math.random() * 8)} minutes`,
-          busyness_level: busyData.busyness_level,
-          safety_level: busyData.safety_level,
+      const totalWaiting = waitingData?.length || 0;
+      
+      // Calculate busyness level based on actual waiting count
+      let busynessLevel = 1;
+      if (totalWaiting >= 10) busynessLevel = 5;
+      else if (totalWaiting >= 7) busynessLevel = 4;
+      else if (totalWaiting >= 4) busynessLevel = 3;
+      else if (totalWaiting >= 2) busynessLevel = 2;
+      else busynessLevel = 1;
+
+      // Calculate average wait time based on how long people have been waiting
+      let avgWaitTime = '5-10 minutes';
+      if (waitingData && waitingData.length > 0) {
+        const now = new Date();
+        const waitTimes = waitingData.map(waiting => {
+          const waitStart = new Date(waiting.created_at);
+          const minutesWaited = Math.floor((now - waitStart) / (1000 * 60));
+          return minutesWaited;
         });
-      } else {
-        // Default values if no data
-        setStopInfo({
-          last_updated: '5 minutes ago',
-          avg_wait_time: '8-12 minutes',
-          busyness_level: 3,
-          safety_level: 4,
-        });
+        
+        const avgWait = waitTimes.reduce((a, b) => a + b, 0) / waitTimes.length;
+        const minWait = Math.max(5, Math.floor(avgWait));
+        const maxWait = Math.max(10, Math.floor(avgWait) + 5);
+        avgWaitTime = `${minWait}-${maxWait} minutes`;
       }
+
+      setStopInfo({
+        last_updated: 'Just now',
+        avg_wait_time: avgWaitTime,
+        busyness_level: busynessLevel,
+        safety_level: 4, // You can keep this from stop_busy_times or calculate differently
+        total_waiting: totalWaiting,
+        waiting_users: waitingData || []
+      });
     } catch (error) {
       console.error('Error loading stop info:', error);
+      // Fallback to default values
+      setStopInfo({
+        last_updated: 'Unknown',
+        avg_wait_time: '5-10 minutes',
+        busyness_level: 1,
+        safety_level: 4,
+        total_waiting: 0,
+        waiting_users: []
+      });
     }
   };
 
-    const toggleFavorite = async () => {
+  const toggleFavorite = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !stop) return;
+      if (!user || !stopDetails) return;
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -95,13 +161,13 @@ export default function StopDetailsScreen() {
 
       let favorites = profile?.favorites || [];
       const favoriteItem = {
-        id: stop.id,
-        name: stop.name,
+        id: stopDetails.id,
+        name: stopDetails.name,
         type: 'stop' as const,
       };
 
       if (isFavorite) {
-        favorites = favorites.filter((fav: any) => !(fav.id === stop.id && fav.type === 'stop'));
+        favorites = favorites.filter((fav: any) => !(fav.id === stopDetails.id && fav.type === 'stop'));
       } else {
         favorites = [...favorites, favoriteItem];
       }
@@ -181,11 +247,9 @@ export default function StopDetailsScreen() {
         .eq('stop_id', stopId);
   
       if (error) throw error;
-  
       setNearbyStops(data);
     } catch (error) {
       console.error('Error fetching nearby stops:', error);
-      Alert.alert('Error', 'Failed to fetch nearby stops.');
     }
   };
 
@@ -199,37 +263,20 @@ export default function StopDetailsScreen() {
     }
   };
 
-  const renderPost = ({ item }) => (
-    <TouchableOpacity onPress={() => handlePostPress(item.id)} style={[styles.postContainer, { backgroundColor: colors.card }]}>
-      <View style={styles.postHeader}>
-      
-        <Image
-          source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
-          style={styles.avatar}
-        />
-        <View style={styles.postHeaderText}>
-          <Text style={[styles.userName, { color: colors.text }]}>
-            {item.profiles.first_name} {item.profiles.last_name}
-          </Text>
-          {item.profiles.selected_title && (
-            <Text style={[styles.selectedTitle, { color: colors.primary }]}>
-              {item.profiles.selected_title}
-            </Text>
-          )}
-          <Text style={[styles.postTime, { color: colors.textSecondary }]}>
-            {formatTimeAgo(item.created_at)}
-          </Text>
-        </View>
+  const renderWaitingUser = ({ item }) => (
+    <View style={styles.waitingUser}>
+      <View style={styles.userInfo}>
+        <Text style={styles.userName}>
+          {item.profiles.first_name} {item.profiles.last_name}
+        </Text>
+        <Text style={styles.waitingFor}>
+          Waiting for {item.routes?.name || item.transport_type}
+        </Text>
       </View>
-      <Text style={[styles.postContent, { color: colors.text }]}>{item.content}</Text>
-      <TouchableOpacity
-        style={styles.shareButton}
-        onPress={() => handleSharePost(item.content)}
-      >
-        <Share2 size={18} color={colors.primary} />
-        <Text style={[styles.shareButtonText, { color: colors.primary }]}>Share</Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
+      <Text style={styles.waitingTime}>
+        {formatTimeAgo(item.created_at)}
+      </Text>
+    </View>
   );
 
   const openMap = () => {
@@ -258,8 +305,7 @@ export default function StopDetailsScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-
-          {/* Header */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft size={24} color="#ffffff" />
@@ -281,13 +327,14 @@ export default function StopDetailsScreen() {
         />
         <Text style={[styles.title, { color: colors.text }]}>{stopDetails.name}</Text>
 
-         {/* Recent Activity */}
-
-        
+        {/* Real-time Waiting Information */}
         <View style={styles.waitingCountContainer}>
-          <Text style={[styles.waitingCount, { color: colors.text }]}>
-            People waiting: {stopDetails.stop_posts.length}
-          </Text>
+          <View style={styles.waitingCountBadge}>
+            <Users size={20} color="#1ea2b1" />
+            <Text style={styles.waitingCountText}>
+              {stopInfo?.total_waiting || 0} people waiting now
+            </Text>
+          </View>
 
           <TouchableOpacity
             onPress={openMap}
@@ -297,30 +344,57 @@ export default function StopDetailsScreen() {
           </TouchableOpacity>
         </View>
 
-              <View style={styles.sectionI}>
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Clock size={16} color="#1ea2b1" />
-            <Text style={styles.infoLabel}>Last Updated:</Text>
-            <Text style={styles.infoValue}>{stopInfo?.last_updated || 'Unknown'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Users size={16} color="#1ea2b1" />
-            <Text style={styles.infoLabel}>Avg. Wait Time:</Text>
-            <Text style={styles.infoValue}>{stopInfo?.avg_wait_time || 'Unknown'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <AlertCircle size={16} color="#1ea2b1" />
-            <Text style={styles.infoLabel}>Busyness Level:</Text>
-            <Text style={styles.infoValue}>{stopInfo?.busyness_level || 0}/5</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Shield size={16} color="#1ea2b1" />
-            <Text style={styles.infoLabel}>Safety Rating:</Text>
-            <Text style={styles.infoValue}>{stopInfo?.safety_level || 0}/5</Text>
+        {/* Stop Information Card */}
+        <View style={styles.sectionI}>
+          <View style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <Clock size={16} color="#1ea2b1" />
+              <Text style={styles.infoLabel}>Last Updated:</Text>
+              <Text style={styles.infoValue}>{stopInfo?.last_updated || 'Unknown'}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Users size={16} color="#1ea2b1" />
+              <Text style={styles.infoLabel}>Avg. Wait Time:</Text>
+              <Text style={styles.infoValue}>{stopInfo?.avg_wait_time || 'Unknown'}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <AlertCircle size={16} color="#1ea2b1" />
+              <Text style={styles.infoLabel}>Busyness Level:</Text>
+              <View style={styles.busynessMeter}>
+                {[1, 2, 3, 4, 5].map((level) => (
+                  <View
+                    key={level}
+                    style={[
+                      styles.busynessDot,
+                      level <= (stopInfo?.busyness_level || 0) ? styles.busynessDotActive : styles.busynessDotInactive
+                    ]}
+                  />
+                ))}
+                <Text style={styles.busynessText}>{stopInfo?.busyness_level || 0}/5</Text>
+              </View>
+            </View>
+            <View style={styles.infoRow}>
+              <Shield size={16} color="#1ea2b1" />
+              <Text style={styles.infoLabel}>Safety Rating:</Text>
+              <Text style={styles.infoValue}>{stopInfo?.safety_level || 0}/5</Text>
+            </View>
           </View>
         </View>
-      </View>
+
+        {/* Currently Waiting People */}
+        {stopInfo?.waiting_users && stopInfo.waiting_users.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Currently Waiting ({stopInfo.waiting_users.length})
+            </Text>
+            <FlatList
+              data={stopInfo.waiting_users}
+              renderItem={renderWaitingUser}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+            />
+          </View>
+        )}
 
         <StopBlock
           stopId={stopId}
@@ -330,6 +404,7 @@ export default function StopDetailsScreen() {
           radius={0.5}
         />
 
+        {/* Nearby Stops */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Nearby Spots</Text>
           {nearbyStops.length > 0 ? (
@@ -357,11 +432,86 @@ export default function StopDetailsScreen() {
           )}
         </View>
 
+        {/* Recent Posts */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
+            <TouchableOpacity onPress={() => setShowAddPost(!showAddPost)} style={styles.addPostButton}>
+              <Plus size={24} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
 
+          {showAddPost && (
+            <View style={[styles.addPostContainer, { backgroundColor: colors.card }]}>
+              <TextInput
+                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                placeholder="Share what's happening at this stop..."
+                placeholderTextColor={colors.textSecondary}
+                value={newPostContent}
+                onChangeText={setNewPostContent}
+                multiline
+              />
+              <TouchableOpacity
+                style={[styles.postButton, { backgroundColor: colors.primary }]}
+                onPress={handleAddPost}
+              >
+                <Text style={styles.postButtonText}>Post</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {stopDetails.stop_posts.length > 0 ? (
+            <FlatList
+              data={stopDetails.stop_posts}
+              renderItem={renderPost}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+            />
+          ) : (
+            <View style={styles.noPostsContainer}>
+              <Text style={[styles.noPostsText, { color: colors.textSecondary }]}>
+                No recent activity at this stop.
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
     </ScrollView>
   );
 }
+
+// Add the renderPost function and styles from your original code...
+const renderPost = ({ item }) => (
+  <TouchableOpacity onPress={() => handlePostPress(item.id)} style={[styles.postContainer, { backgroundColor: colors.card }]}>
+    <View style={styles.postHeader}>
+      <Image
+        source={{ uri: item.profiles.avatar_url || 'https://via.placeholder.com/50' }}
+        style={styles.avatar}
+      />
+      <View style={styles.postHeaderText}>
+        <Text style={[styles.userName, { color: colors.text }]}>
+          {item.profiles.first_name} {item.profiles.last_name}
+        </Text>
+        {item.profiles.selected_title && (
+          <Text style={[styles.selectedTitle, { color: colors.primary }]}>
+            {item.profiles.selected_title}
+          </Text>
+        )}
+        <Text style={[styles.postTime, { color: colors.textSecondary }]}>
+          {formatTimeAgo(item.created_at)}
+        </Text>
+      </View>
+    </View>
+    <Text style={[styles.postContent, { color: colors.text }]}>{item.content}</Text>
+    <TouchableOpacity
+      style={styles.shareButton}
+      onPress={() => handleSharePost(item.content)}
+    >
+      <Share2 size={18} color={colors.primary} />
+      <Text style={[styles.shareButtonText, { color: colors.primary }]}>Share</Text>
+    </TouchableOpacity>
+  </TouchableOpacity>
+);
 
 const styles = StyleSheet.create({
   container: {
@@ -375,7 +525,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
   },
-    header: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -388,6 +538,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+  },
+  waitingCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1ea2b120',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  waitingCountText: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
   },
   mapButton: {
     padding: 10,
@@ -432,142 +596,56 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  postContainer: {
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
+  // ... (keep all your existing styles and add the new ones below)
+  
+  sectionI: {
+    paddingHorizontal: 0,
+    marginBottom: 20,
   },
-  nearbyStopContainer: {
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 10,
+  infoCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
+    borderColor: '#333333',
   },
-  nearbyStopName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  nearbyStopDescription: {
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  nearbyStopDistance: {
-    fontSize: 12,
-    color: '#666',
-  },
-  noNearbyStopsContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 20,
-  },
-  noNearbyStopsText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  postHeader: {
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  postHeaderText: {
+  infoLabel: {
+    fontSize: 14,
+    color: '#cccccc',
+    marginLeft: 8,
     flex: 1,
   },
-  userName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-    backButton: {
-    backgroundColor: '#1a1a1a',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backButtonText: {
-    color: '#1ea2b1',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  favoriteButton: {
-    backgroundColor: '#1a1a1a',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  postTime: {
-    fontSize: 12,
-    color: '#666',
-  },
-  postContent: {
+  infoValue: {
     fontSize: 14,
-    marginBottom: 10,
-  },
-  shareButton: {
-    flexDirection: 'row',
-    alignSelf: 'flex-end',
-    alignItems: 'center',
-    gap: 4,
-  },
-  shareButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  selectedTitle: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    marginBottom: 4,
-  },
-  noPostsContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 20,
-  },
-  noPostsText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  sectionI: {
-    paddingHorizontal: 20,
-    marginBottom: 30,
-  },
-  sectionTitleI: {
-    fontSize: 20,
-    fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 16,
+    fontWeight: '500',
   },
-  emptyState: {
+  busynessMeter: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 40,
   },
-  emptyStateText: {
-    color: '#666666',
-    fontSize: 16,
-    marginTop: 12,
-    textAlign: 'center',
+  busynessDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 1,
+  },
+  busynessDotActive: {
+    backgroundColor: '#1ea2b1',
+  },
+  busynessDotInactive: {
+    backgroundColor: '#333333',
+  },
+  busynessText: {
+    fontSize: 14,
+    color: '#ffffff',
+    fontWeight: '500',
+    marginLeft: 8,
   },
   waitingUser: {
     flexDirection: 'row',
@@ -597,30 +675,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1ea2b1',
   },
-  infoCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#cccccc',
-    marginLeft: 8,
-    flex: 1,
-  },
-  infoValue: {
-    fontSize: 14,
-    color: '#ffffff',
-    fontWeight: '500',
-  },
-  bottomSpace: {
-    height: 20,
-  },
+  // ... (keep all your other existing styles)
 });

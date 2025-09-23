@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, FlatList } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { Feather } from '@expo/vector-icons'; // For icons
+import { CheckCircle, Lock } from 'lucide-react-native'; // Lucide React Native icons
 import * as Animatable from 'react-native-animatable'; // For animations
 import { useProfile } from '@/hook/useProfile'; // Use the useProfile hook
 
@@ -62,11 +62,17 @@ const TitleEarnScreen = () => {
   // Render each title in a 3-column grid
   const renderTitleItem = ({ item }) => (
     <View style={[styles.titleTile, { backgroundColor: colors.card }]}>
-      <Feather
-        name={unlockedTitles.includes(item) ? 'check-circle' : 'lock'}
-        size={24}
-        color={unlockedTitles.includes(item) ? colors.primary : colors.text}
-      />
+      {unlockedTitles.includes(item) ? (
+        <CheckCircle
+          size={24}
+          color={colors.primary}
+        />
+      ) : (
+        <Lock
+          size={24}
+          color={colors.text}
+        />
+      )}
       <Text style={[styles.titleName, { color: colors.text }]}>{item.title}</Text>
       <Text style={[styles.titlePoints, { color: colors.text }]}>
         {item.points_required} points

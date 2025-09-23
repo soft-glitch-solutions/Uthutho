@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { Feather } from '@expo/vector-icons'; // For icons
+import { Check, Lock } from 'lucide-react-native'; // Lucide React Native icons
 import * as Animatable from 'react-native-animatable'; // For animations
 import Toast from 'react-native-toast-message'; // For toast messages
 import { useProfile } from '@/hook/useProfile';
@@ -89,7 +89,7 @@ const TitleChangeScreen = () => {
           >
             <Text style={[styles.titleText, { color: colors.text }]}>{title.title}</Text>
             {selectedTitle === title.title && (
-              <Feather name="check" size={20} color={colors.primary} />
+              <Check size={20} color={colors.primary} />
             )}
           </TouchableOpacity>
         ))}
@@ -110,10 +110,12 @@ const TitleChangeScreen = () => {
             ]}
           >
             <Text style={[styles.titleText, { color: colors.text }]}>{title.title}</Text>
-            <Feather name="lock" size={20} color={colors.text} />
-            <Text style={[styles.lockedSubtitle, { color: colors.text }]}>
-              Unlock at {title.points_required} points
-            </Text>
+            <View style={styles.lockedContainer}>
+              <Lock size={20} color={colors.text} />
+              <Text style={[styles.lockedSubtitle, { color: colors.text }]}>
+                Unlock at {title.points_required} points
+              </Text>
+            </View>
           </View>
         ))}
       </Animatable.View>
@@ -159,9 +161,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  lockedContainer: {
+    alignItems: 'flex-end',
+  },
   lockedSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     opacity: 0.8,
+    marginTop: 4,
   },
   // Skeleton Loader Styles
   skeletonHeader: {
