@@ -40,7 +40,6 @@ const SkeletonLoader = () => {
   return (
     <ScrollView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="light" backgroundColor="#000000" />
       
       {/* Header Skeleton */}
       <View style={styles.header}>
@@ -311,8 +310,7 @@ const openInMaps = () => {
   return (
     <ScrollView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="light" backgroundColor="#000000" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>

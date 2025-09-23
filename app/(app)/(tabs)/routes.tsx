@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, TextInput } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, TextInput, Animated, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { Search, Clock, MapPin, Filter, Route as RouteIcon } from 'lucide-react-native';
@@ -62,6 +62,9 @@ export default function RoutesScreen() {
 
   const transportTypes = ['All', 'Taxi', 'Bus', 'Train'];
   const hubTypes = ['All', 'Taxi', 'Bus', 'Train', 'Metro', 'Interchange'];
+
+  const searchFieldsOpacity = useRef(new Animated.Value(1)).current;
+  const [showSearchFields, setShowSearchFields] = useState(true);
 
   useEffect(() => {
     loadRoutes();
@@ -154,46 +157,51 @@ export default function RoutesScreen() {
   };
 
 const findRoute = async () => {
-  if (!fromLocation || !toLocation) {
-    console.log("❌ Missing from/to location", { fromLocation, toLocation });
-    return;
-  }
+  if (!fromLocation || !toLocation) return;
 
-  console.log("🔍 Searching route...", { from: fromLocation, to: toLocation });
-  setSearchingRoute(true);
+  // Fade out the search fields
+  Animated.timing(searchFieldsOpacity, {
+    toValue: 0,
+    duration: 400,
+    useNativeDriver: true,
+  }).start(() => {
+    setShowSearchFields(false);
+    setSearchingRoute(true);
+  });
 
-  try {
-    const fromQuery = fromLocation.display_name.split(',')[0];
-    const toQuery = toLocation.display_name.split(',')[0];
+  // Wait for fade out before searching
+  setTimeout(async () => {
+    try {
+      const fromQuery = fromLocation.display_name.split(',')[0];
+      const toQuery = toLocation.display_name.split(',')[0];
 
-    console.log("🗂 Supabase query", { fromQuery, toQuery });
+      console.log("🗂 Supabase query", { fromQuery, toQuery });
 
-    const { data: matchingRoutes, error } = await supabase
-      .from('routes')
-      .select('*')
-      .ilike('start_point', `%${fromQuery}%`)
-      .ilike('end_point', `%${toQuery}%`);
+      const { data: matchingRoutes, error } = await supabase
+        .from('routes')
+        .select('*')
+        .ilike('start_point', `%${fromQuery}%`)
+        .ilike('end_point', `%${toQuery}%`);
 
-    if (error) {
-      console.error("❌ Supabase error:", error);
-      return;
+      if (error) {
+        console.error("❌ Supabase error:", error);
+        return;
+      }
+
+      console.log("✅ Matching routes:", matchingRoutes);
+
+      const instructions =
+        matchingRoutes && matchingRoutes.length > 0
+          ? generateRouteInstructions(fromLocation, toLocation, matchingRoutes)
+          : generateGeneralInstructions(fromLocation, toLocation);
+
+      console.log("📝 Generated instructions:", instructions);
+
+      setRouteInstructions(instructions);
+    } finally {
+      setSearchingRoute(false);
     }
-
-    console.log("✅ Matching routes:", matchingRoutes);
-
-    const instructions =
-      matchingRoutes && matchingRoutes.length > 0
-        ? generateRouteInstructions(fromLocation, toLocation, matchingRoutes)
-        : generateGeneralInstructions(fromLocation, toLocation);
-
-    console.log("📝 Generated instructions:", instructions);
-
-    setRouteInstructions(instructions);
-  } catch (err) {
-    console.error("❌ Error finding route:", err);
-  } finally {
-    setSearchingRoute(false);
-  }
+  }, 400);
 };
 
 
@@ -297,45 +305,79 @@ const findRoute = async () => {
       case 'planner':
         return (
           <ScrollView style={styles.tabContent} keyboardShouldPersistTaps="handled">
-            {/* Search Form */}
-            <View style={styles.searchCard}>
-              <View style={{ zIndex: 2000 }}>
-                <Text style={styles.inputLabel}>From</Text>
-                <LocationAutocomplete
-                  placeholder="Your current location"
-                  value={fromText}
-                  onChangeText={setFromText}
-                  onLocationSelect={setFromLocation}
-                />
-              </View>
+            {activeTab === 'planner' && (
+              <ScrollView style={styles.tabContent} keyboardShouldPersistTaps="handled">
+                <View style={styles.searchCard}>
+                  {showSearchFields && (
+                    <Animated.View style={{ opacity: searchFieldsOpacity }}>
+                      {/* From/To fields and Find Route button */}
+                      <View style={{
+                        zIndex: 2000
+                      }}>
+                        <Text style={styles.inputLabel}>From</Text>
+                        <LocationAutocomplete
+                          placeholder="Your current location"
+                          value={fromText}
+                          onChangeText={setFromText}
+                          onLocationSelect={setFromLocation}
+                        />
+                      </View>
 
-              <View style={{ zIndex: 1000 }}>
-                <Text style={styles.inputLabel}>To</Text>
-                <LocationAutocomplete
-                  placeholder="Your destination"
-                  value={toText}
-                  onChangeText={setToText}
-                  onLocationSelect={setToLocation}
-                />
-              </View>
+                      <View style={{ zIndex: 1000 }}>
+                        <Text style={styles.inputLabel}>To</Text>
+                        <LocationAutocomplete
+                          placeholder="Your destination"
+                          value={toText}
+                          onChangeText={setToText}
+                          onLocationSelect={setToLocation}
+                        />
+                      </View>
 
-              <TouchableOpacity
-                style={[styles.searchButton, (!fromLocation || !toLocation) && styles.searchButtonDisabled]}
-                onPress={findRoute}
-                disabled={!fromLocation || !toLocation || searchingRoute}
-              >
-                <Search size={20} color="#ffffff" style={styles.searchIcon} />
-                <Text style={styles.searchButtonText}>
-                  {searchingRoute ? 'Finding Route...' : 'Find Route'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+                      <TouchableOpacity
+                        style={[styles.searchButton, (!fromLocation || !toLocation) && styles.searchButtonDisabled]}
+                        onPress={findRoute}
+                        disabled={!fromLocation || !toLocation || searchingRoute}
+                      >
+                        <Search size={20} color="#ffffff" style={styles.searchIcon} />
+                        <Text style={styles.searchButtonText}>
+                          {searchingRoute ? 'Finding Route...' : 'Find Route'}
+                        </Text>
+                      </TouchableOpacity>
+                    </Animated.View>
+                  )}
+                  {!showSearchFields && searchingRoute && (
+                    <View style={{ alignItems: 'center', padding: 32 }}>
+                      <ActivityIndicator size="large" color="#1ea2b1" />
+                      <Text style={{ color: '#1ea2b1', marginTop: 16, fontSize: 16 }}>
+                        Finding the best route...
+                      </Text>
+                    </View>
+                  )}
+                </View>
 
-            {/* Route Instructions */}
-            {routeInstructions && (
-              <View style={styles.instructionsContainer}>
-                <RouteInstructions {...routeInstructions} />
-              </View>
+                {/* Route Instructions */}
+                {routeInstructions && (
+                  <View>
+                    <View style={styles.instructionsContainer}>
+                      <RouteInstructions {...routeInstructions} />
+                    </View>
+                    <TouchableOpacity
+                      style={styles.searchButton}
+                      onPress={() => {
+                        setShowSearchFields(true);
+                        searchFieldsOpacity.setValue(1);
+                        setRouteInstructions(null);
+                        setFromLocation(null);
+                        setToLocation(null);
+                        setFromText('');
+                        setToText('');
+                      }}
+                    >
+                      <Text style={styles.searchButtonText}>Plan Another Route</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </ScrollView>
             )}
           </ScrollView>
         );
@@ -510,7 +552,6 @@ const findRoute = async () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" backgroundColor="#000000" />
 
       <View style={styles.header}>
         <Text style={styles.title}>Transport</Text>

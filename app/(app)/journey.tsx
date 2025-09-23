@@ -5,10 +5,14 @@ import {
   Platform,
   RefreshControl,
   Alert,
-  View
+  View,
+  Text,
+  FlatList,
+  StyleSheet
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useJourney } from '@/hook/useJourney';
 import { supabase } from '@/lib/supabase';
@@ -493,8 +497,6 @@ const renderContent = () => {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="light" backgroundColor="#000000" />
-      
       <JourneyHeader title="Active Journey" />
       
       <JourneyTabs
@@ -503,28 +505,39 @@ const renderContent = () => {
         unreadMessages={unreadMessages}
       />
       
-      <ScrollView 
-        style={styles.scrollContainer}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#1ea2b1"
-            colors={["#1ea2b1"]}
+      {activeTab === 'chat' ? (
+        <View style={{ flex: 1 }}>
+          <JourneyChat
+            messages={chatMessages}
+            newMessage={newMessage}
+            setNewMessage={setNewMessage}
+            onSendMessage={sendMessage}
+            currentUserId={currentUserId}
+            onlineCount={(otherPassengers?.length || 0) + 1}
           />
-        }
-      >
-        {connectionError && <ConnectionError />}
-        
-        {renderContent()}
-        
-        <View style={styles.bottomSpace} />
-      </ScrollView>
+        </View>
+      ) : (
+        <ScrollView 
+          style={styles.scrollContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#1ea2b1"
+              colors={["#1ea2b1"]}
+            />
+          }
+        >
+          {connectionError && <ConnectionError />}
+          {renderContent()}
+          <View style={styles.bottomSpace} />
+        </ScrollView>
+      )}
     </KeyboardAvoidingView>
   );
 }
 
-const styles = {
+const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
@@ -535,4 +548,76 @@ const styles = {
   bottomSpace: {
     height: 20,
   },
-};
+  chatContainer: {
+    flex: 1,
+  },
+  onlineBar: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  onlineText: {
+    color: '#cccccc',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  messagesList: {
+    flex: 1,
+  },
+  messagesContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingBottom: 80,
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+  },
+  inputContainer: {
+    backgroundColor: '#1a1a1a',
+    padding: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  input: {
+    flex: 1,
+    color: '#ffffff',
+    fontSize: 16,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  sendButton: {
+    padding: 10,
+  },
+  emptyChat: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyChatTitle: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  emptyChatSubtitle: {
+    color: '#888888',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+});

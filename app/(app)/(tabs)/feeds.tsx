@@ -155,6 +155,7 @@ export default function FeedsScreen() {
   const [weekRange, setWeekRange] = useState<string>('');
   const [showAllPosts, setShowAllPosts] = useState(false);
   const [sharingPost, setSharingPost] = useState(false);
+  const [postFilter, setPostFilter] = useState<'week' | 'all' | 'today'>('week');
 
   // UUID validation function
   const isValidUUID = (str: string): boolean => {
@@ -370,14 +371,22 @@ const sharePost = async (post: Post) => {
       try {
         let monday: Date | undefined;
         let sunday: Date | undefined;
+        let todayStart: Date | undefined;
+        let todayEnd: Date | undefined;
 
-        if (!showAllPosts) {
+        if (postFilter === 'week') {
           const { monday: m, sunday: s } = getCurrentWeekRange();
           monday = m;
           sunday = s;
           setWeekRange(
             `${monday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${sunday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
           );
+        } else if (postFilter === 'today') {
+          todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
+          todayEnd = new Date();
+          todayEnd.setHours(23, 59, 59, 999);
+          setWeekRange('Today');
         } else {
           setWeekRange('All Posts');
         }
@@ -394,8 +403,10 @@ const sharePost = async (post: Post) => {
 
         let query = supabase.from(table).select(baseSelect).eq(communityIdField, community.id);
 
-        if (!showAllPosts && monday && sunday) {
+        if (postFilter === 'week' && monday && sunday) {
           query = query.gte('created_at', monday.toISOString()).lte('created_at', sunday.toISOString());
+        } else if (postFilter === 'today' && todayStart && todayEnd) {
+          query = query.gte('created_at', todayStart.toISOString()).lte('created_at', todayEnd.toISOString());
         }
 
         query = query.order('created_at', { ascending: false });
@@ -429,7 +440,7 @@ const sharePost = async (post: Post) => {
         setPosts([]);
       }
     },
-    [showAllPosts]
+    [postFilter, showAllPosts]
   );
 
   // ---- Effects -----------------------------------------------------------
@@ -471,7 +482,7 @@ const sharePost = async (post: Post) => {
     } else {
       setPosts([]);
     }
-  }, [selectedCommunity, loadCommunityPosts]);
+  }, [selectedCommunity, loadCommunityPosts, postFilter]);
 
   // ---- Handlers ----------------------------------------------------------
   const onRefresh = useCallback(async () => {
@@ -827,11 +838,17 @@ const sharePost = async (post: Post) => {
       {weekRange && (
         <View style={styles.weekRangeWrapper}>
           <Text style={styles.weekRangeText}>{weekRange}</Text>
-          <TouchableOpacity onPress={() => setShowAllPosts(!showAllPosts)}>
-            <Text style={styles.toggleText}>
-              {showAllPosts ? 'Show This Week' : 'Show All'}
-            </Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity onPress={() => setPostFilter('week')}>
+              <Text style={[styles.toggleText, postFilter === 'week' && { textDecorationLine: 'underline' }]}>This Week</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setPostFilter('today')}>
+              <Text style={[styles.toggleText, postFilter === 'today' && { textDecorationLine: 'underline' }]}>Today</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setPostFilter('all')}>
+              <Text style={[styles.toggleText, postFilter === 'all' && { textDecorationLine: 'underline' }]}>All</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 

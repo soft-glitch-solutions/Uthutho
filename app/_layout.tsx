@@ -7,6 +7,7 @@ import { ThemeProvider } from '../context/ThemeContext';
 import { WaitingProvider } from '../context/WaitingContext';
 import { LanguageProvider } from '../context/LanguageContext';
 import { supabase } from '../lib/supabase';
+import NetworkGate from '@/components/NetworkGate';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -69,16 +70,24 @@ export default function RootLayout() {
     <ThemeProvider>
       <WaitingProvider>
         <LanguageProvider>
-          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" options={{ gestureEnabled: false }} />
-            <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
-            <Stack.Screen name="confirmation" options={{ gestureEnabled: false }} />
-            <Stack.Screen name="auth" options={{ gestureEnabled: false }} />
-            <Stack.Screen name="reset-password" options={{ gestureEnabled: false }} />
-            <Stack.Screen name="auth/callback" options={{ gestureEnabled: false }} />
-            <Stack.Screen name="(app)" options={{ gestureEnabled: false }} />
-          </Stack>
+          <NetworkGate>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: 'fade',              // fade in/out
+                gestureEnabled: true,
+                contentStyle: { backgroundColor: '#000' },
+              }}
+            >
+              <Stack.Screen name="index" options={{ gestureEnabled: false }} />
+              <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
+              <Stack.Screen name="confirmation" options={{ gestureEnabled: false }} />
+              <Stack.Screen name="auth" options={{ gestureEnabled: false }} />
+              <Stack.Screen name="reset-password" options={{ gestureEnabled: false }} />
+              <Stack.Screen name="auth/callback" options={{ gestureEnabled: false }} />
+              <Stack.Screen name="(app)" options={{ gestureEnabled: false }} />
+            </Stack>
+          </NetworkGate>
         </LanguageProvider>
       </WaitingProvider>
     </ThemeProvider>

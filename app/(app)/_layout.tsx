@@ -2,6 +2,7 @@ import React from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { useTheme } from '../../context/ThemeContext';
 import { Route, House, Flag , Settings, CircleHelp as HelpCircle, User , MapPin } from 'lucide-react-native';
+import NetworkGate from '@/components/NetworkGate';
 
 export default function AppLayout() {
   const { colors } = useTheme();

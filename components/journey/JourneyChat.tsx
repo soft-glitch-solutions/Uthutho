@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Image, KeyboardAvoidingView, Platform, SafeAreaView } from 'react-native';
 import { Send, Smile, Check, CheckCheck } from 'lucide-react-native';
 
 interface ChatMessage {
@@ -22,6 +22,7 @@ interface JourneyChatProps {
   setNewMessage: (message: string) => void;
   onSendMessage: () => void;
   currentUserId: string;
+  onlineCount?: number;
 }
 
 export const JourneyChat = ({
@@ -29,7 +30,8 @@ export const JourneyChat = ({
   newMessage,
   setNewMessage,
   onSendMessage,
-  currentUserId
+  currentUserId,
+  onlineCount = 1
 }: JourneyChatProps) => {
   const flatListRef = useRef<FlatList>(null);
 
@@ -153,75 +155,75 @@ export const JourneyChat = ({
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      <View style={styles.chatContainer}>
-        {messages.length === 0 ? (
-          <View style={styles.emptyChat}>
-            <Text style={styles.emptyChatTitle}>No messages yet</Text>
-            <Text style={styles.emptyChatSubtitle}>
-              Start the conversation with your fellow passengers
-            </Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
+      <KeyboardAvoidingView 
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        <View style={styles.chatContainer}>
+          <View style={styles.onlineBar}>
+            <Text style={styles.onlineText}>{onlineCount} online</Text>
           </View>
-        ) : (
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
-            style={styles.messagesList}
-            contentContainerStyle={styles.messagesContainer}
-            showsVerticalScrollIndicator={false}
-            keyboardDismissMode="interactive"
-            keyboardShouldPersistTaps="handled"
-            onContentSizeChange={() => {
-              if (messages.length > 0) {
-                flatListRef.current?.scrollToEnd({ animated: true });
-              }
-            }}
-          />
-        )}
-      </View>
-      
-      {/* Fixed WhatsApp-style input container */}
-      <View style={styles.inputContainer}>
-        <View style={styles.inputWrapper}>
-          <TouchableOpacity 
-            style={styles.emojiButton}
-            onPress={() => {
-              setNewMessage(prev => prev + '😊');
-            }}
-          >
-            <Smile size={24} color="#666666" />
-          </TouchableOpacity>
-          
-          <TextInput
-            style={styles.chatInput}
-            placeholder="Message"
-            placeholderTextColor="#999999"
-            value={newMessage}
-            onChangeText={setNewMessage}
-            multiline
-            maxLength={500}
-            textAlignVertical="center"
-            enablesReturnKeyAutomatically
-            returnKeyType="send"
-            onSubmitEditing={handleSendOptimized}
-          />
-          
-          <TouchableOpacity 
-            style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
-            onPress={handleSendOptimized}
-            disabled={!newMessage.trim()}
-          >
-            <Send size={20} color={newMessage.trim() ? "#1ea2b1" : "#666666"} />
-          </TouchableOpacity>
+          {messages.length === 0 ? (
+            <View style={styles.emptyChat}>
+              <Text style={styles.emptyChatTitle}>No messages yet</Text>
+              <Text style={styles.emptyChatSubtitle}>
+                Start the conversation with your fellow passengers
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              renderItem={renderMessage}
+              keyExtractor={(item) => item.id}
+              style={styles.messagesList}
+              contentContainerStyle={styles.messagesContainer}
+              showsVerticalScrollIndicator={false}
+              keyboardDismissMode="interactive"
+              keyboardShouldPersistTaps="handled"
+              inverted
+            />
+          )}
         </View>
-      </View>
-    </KeyboardAvoidingView>
+
+        <View style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
+            <TouchableOpacity 
+              style={styles.emojiButton}
+              onPress={() => {
+                setNewMessage(prev => prev + '😊');
+              }}
+            >
+              <Smile size={24} color="#666666" />
+            </TouchableOpacity>
+
+            <TextInput
+              style={styles.chatInput}
+              placeholder="Message"
+              placeholderTextColor="#999999"
+              value={newMessage}
+              onChangeText={setNewMessage}
+              multiline
+              maxLength={500}
+              textAlignVertical="center"
+              enablesReturnKeyAutomatically
+              returnKeyType="send"
+              onSubmitEditing={handleSendOptimized}
+            />
+
+            <TouchableOpacity 
+              style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
+              onPress={handleSendOptimized}
+              disabled={!newMessage.trim()}
+            >
+              <Send size={20} color={newMessage.trim() ? "#1ea2b1" : "#666666"} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -275,13 +277,29 @@ const styles = StyleSheet.create({
   chatContainer: {
     flex: 1,
   },
+  onlineBar: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  onlineText: {
+    color: '#cccccc',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   messagesList: {
     flex: 1,
   },
   messagesContainer: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    paddingBottom: 80, // Space for fixed input
+    paddingBottom: 80,     // space for input
+    flexGrow: 1,
+    justifyContent: 'flex-end',
   },
   timeSeparator: {
     alignItems: 'center',

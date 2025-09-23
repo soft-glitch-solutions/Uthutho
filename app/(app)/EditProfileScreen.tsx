@@ -180,7 +180,6 @@ export default function EditProfileScreen() {
   return (
     <ScrollView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="light" backgroundColor="#000000" />
       
       {/* Header */}
       <View style={styles.header}>

@@ -6,7 +6,8 @@ import {
   ScrollView,
   Pressable,
   Image,
-  Alert
+  Alert,
+  RefreshControl
 } from 'react-native';
 import { useRouter, useNavigation , useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -20,6 +21,7 @@ import NearbySection from '@/components/home/NearbySection';
 import FavoritesSection from '@/components/home/FavoritesSection';
 import GamificationSection from '@/components/home/GamificationSection';
 import StreakOverlay from '@/components/StreakOverlay';
+import ScreenTransition from '@/components/ScreenTransition';
 
 interface FavoriteItem {
   id: string;
@@ -108,6 +110,7 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const { activeJourney, loading: journeyLoading } = useJourney();
   const [showStreakOverlay, setShowStreakOverlay] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchNearestLocations = useCallback(async () => {
     if (!userLocation) return;
@@ -518,166 +521,190 @@ useEffect(() => {
     }
   };
 
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    // Re-fetch all the main data
+    await Promise.all([
+      fetchUserProfile(),
+      fetchNearestLocations(),
+      loadUserStats(),
+    ]);
+    setRefreshing(false);
+  }, [fetchUserProfile, fetchNearestLocations]);
+
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.topHeader}>
-        <Pressable onPress={openSidebar} style={styles.logoContainer}>
-          <Image
-            source={require('../../../assets/uthutho-logo.png')}
-            style={styles.logo}
+    <ScreenTransition>
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary || '#1ea2b1']}
+            tintColor={colors.primary || '#1ea2b1'}
           />
-          <Text style={[styles.uthuthoText, { color: colors.text }]}>Uthutho</Text>
-        </Pressable>
-        {isProfileLoading ? (
-          <View style={[styles.pointsContainer, { 
-            backgroundColor: colors.border,
-            width: 80,
-            height: 30,
-            borderRadius: 15
-          }]} />
-        ) : (
-          <View style={styles.pointsContainer}>
-            <Text style={[styles.pointsText, { color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
-          </View>
-        )}
-      </View>
-
-      <HeaderSection
-        isProfileLoading={isProfileLoading}
-        userProfile={userProfile}
-        colors={colors}
-      />
-
-      {!journeyLoading && activeJourney && (
-        <Pressable 
-          style={styles.journeyBanner}
-          onPress={() => router.push('/journey')}
-        >
-          <View style={styles.journeyBannerContent}>
-            <View style={styles.journeyIcon}>
-              <Navigation size={20} color="#ffffff" />
+        }
+      >
+        <View style={styles.topHeader}>
+          <Pressable onPress={openSidebar} style={styles.logoContainer}>
+            <Image
+              source={require('../../../assets/uthutho-logo.png')}
+              style={styles.logo}
+            />
+            <Text style={[styles.uthuthoText, { color: colors.text }]}>Uthutho</Text>
+          </Pressable>
+          {isProfileLoading ? (
+            <View style={[styles.pointsContainer, { 
+              backgroundColor: colors.border,
+              width: 80,
+              height: 30,
+              borderRadius: 15
+            }]} />
+          ) : (
+            <View style={styles.pointsContainer}>
+              <Text style={[styles.pointsText, { color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
             </View>
-            <View style={styles.journeyInfo}>
-              <Text style={styles.journeyTitle}>Active Journey</Text>
-              <Text style={styles.journeyRoute}>{activeJourney.routes.name}</Text>
-              <Text style={styles.journeyProgress}>
-                Stop {activeJourney.current_stop_sequence || 0} of {activeJourney.stops?.length || 0}
+          )}
+        </View>
+
+        <HeaderSection
+          isProfileLoading={isProfileLoading}
+          userProfile={userProfile}
+          colors={colors}
+        />
+
+        {!journeyLoading && activeJourney && (
+          <Pressable 
+            style={styles.journeyBanner}
+            onPress={() => router.push('/journey')}
+          >
+            <View style={styles.journeyBannerContent}>
+              <View style={styles.journeyIcon}>
+                <Navigation size={20} color="#ffffff" />
+              </View>
+              <View style={styles.journeyInfo}>
+                <Text style={styles.journeyTitle}>Active Journey</Text>
+                <Text style={styles.journeyRoute}>{activeJourney.routes.name}</Text>
+                <Text style={styles.journeyProgress}>
+                  Stop {activeJourney.current_stop_sequence || 0} of {activeJourney.stops?.length || 0}
+                </Text>
+              </View>
+              <View style={styles.journeyStats}>
+                <View style={styles.journeyStatItem}>
+                  <Users size={14} color="#1ea2b1" />
+                  <Text style={styles.journeyStatText}>Live</Text>
+                </View>
+                <View style={styles.journeyStatItem}>
+                  <Clock size={14} color="#1ea2b1" />
+                  <Text style={styles.journeyStatText}>Active</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.journeyArrow}>
+              <Text style={styles.journeyArrowText}>›</Text>
+            </View>
+          </Pressable>
+        )}
+
+        <NearbySection
+          locationError={locationError}
+          isNearestLoading={isNearestLoading}
+          userLocation={userLocation}
+          nearestLocations={nearestLocations}
+          colors={colors}
+          handleNearestStopPress={handleNearestStopPress}
+          handleNearestHubPress={handleNearestHubPress}
+          calculateWalkingTime={calculateWalkingTime}
+          hasActiveJourney={!!activeJourney}
+          onMarkAsWaiting={handleMarkAsWaiting}
+        />
+
+        <View style={[styles.section, { backgroundColor: colors.card }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Your Community
+          </Text>
+          
+          {isProfileLoading || isFavoritesLoading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={[styles.loadingText, { color: colors.text }]}>
+                Loading your community...
               </Text>
             </View>
-            <View style={styles.journeyStats}>
-              <View style={styles.journeyStatItem}>
-                <Users size={14} color="#1ea2b1" />
-                <Text style={styles.journeyStatText}>Live</Text>
-              </View>
-              <View style={styles.journeyStatItem}>
-                <Clock size={14} color="#1ea2b1" />
-                <Text style={styles.journeyStatText}>Active</Text>
-              </View>
+          ) : favorites.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, { color: colors.text}]}>
+                You haven't added any locations to your community yet.
+              </Text>
+              <Text style={[styles.emptySubtext, { color: colors.text }]}>
+                Add stops, hubs, or routes to see them here.
+              </Text>
             </View>
-          </View>
-          <View style={styles.journeyArrow}>
-            <Text style={styles.journeyArrowText}>›</Text>
-          </View>
-        </Pressable>
-      )}
-
-      <NearbySection
-        locationError={locationError}
-        isNearestLoading={isNearestLoading}
-        userLocation={userLocation}
-        nearestLocations={nearestLocations}
-        colors={colors}
-        handleNearestStopPress={handleNearestStopPress}
-        handleNearestHubPress={handleNearestHubPress}
-        calculateWalkingTime={calculateWalkingTime}
-        hasActiveJourney={!!activeJourney}
-        onMarkAsWaiting={handleMarkAsWaiting}
-      />
-
-      <View style={[styles.section, { backgroundColor: colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Your Community
-        </Text>
-        
-        {isProfileLoading || isFavoritesLoading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={[styles.loadingText, { color: colors.text }]}>
-              Loading your community...
-            </Text>
-          </View>
-        ) : favorites.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: colors.text}]}>
-              You haven't added any locations to your community yet.
-            </Text>
-            <Text style={[styles.emptySubtext, { color: colors.text }]}>
-              Add stops, hubs, or routes to see them here.
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.communityList}>
-            {favorites.map((favorite, index) => {
-              const details = favoriteDetails.find(detail => detail.id === favorite.id);
-              const type = details?.type || favorite.type;
-              
-              return (
-                <Pressable
-                  key={favorite.id}
-                  style={[styles.communityItem, { 
-                    backgroundColor: colors.background,
-                    borderColor: colors.border 
-                  }]}
-                  onPress={() => {
-                    if (type === 'stop') {
-                      router.push(`/stop-details?stopId=${favorite.id}`);
-                    } else if (type === 'hub') {
-                      router.push(`/hub/${favorite.id}`);
-                    } else if (type === 'route') {
-                      router.push(`/route-details?routeId=${favorite.id}`);
-                    }
-                  }}
-                >
-                  <View style={styles.communityItemContent}>
-                    <View style={styles.communityIcon}>
-                      {getIconForType(type)}
-                    </View>
-                    <View style={styles.communityInfo}>
-                      <Text style={[styles.communityName, { color: colors.text }]}>{favorite.name}
-                      </Text>
-                      <View style={styles.communityTypeContainer}>
-                        <Text style={[styles.communityType, { color: colors.text }]}>
-                          {getTypeLabel(type)}
+          ) : (
+            <View style={styles.communityList}>
+              {favorites.map((favorite, index) => {
+                const details = favoriteDetails.find(detail => detail.id === favorite.id);
+                const type = details?.type || favorite.type;
+                
+                return (
+                  <Pressable
+                    key={favorite.id}
+                    style={[styles.communityItem, { 
+                      backgroundColor: colors.background,
+                      borderColor: colors.border 
+                    }]}
+                    onPress={() => {
+                      if (type === 'stop') {
+                        router.push(`/stop-details?stopId=${favorite.id}`);
+                      } else if (type === 'hub') {
+                        router.push(`/hub/${favorite.id}`);
+                      } else if (type === 'route') {
+                        router.push(`/route-details?routeId=${favorite.id}`);
+                      }
+                    }}
+                  >
+                    <View style={styles.communityItemContent}>
+                      <View style={styles.communityIcon}>
+                        {getIconForType(type)}
+                      </View>
+                      <View style={styles.communityInfo}>
+                        <Text style={[styles.communityName, { color: colors.text }]}>{favorite.name}
                         </Text>
+                        <View style={styles.communityTypeContainer}>
+                          <Text style={[styles.communityType, { color: colors.text }]}>
+                            {getTypeLabel(type)}
+                          </Text>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                  <Pressable
-                    style={[styles.removeButton, { backgroundColor: colors.border }]}
-                    onPress={() => toggleFavorite(favorite)}
-                  >
-                    <Text style={[styles.removeButtonText, { color: colors.text }]}>
-                      Remove
-                    </Text>
+                    <Pressable
+                      style={[styles.removeButton, { backgroundColor: colors.border }]}
+                      onPress={() => toggleFavorite(favorite)}
+                    >
+                      <Text style={[styles.removeButtonText, { color: colors.text }]}>
+                        Remove
+                      </Text>
+                    </Pressable>
                   </Pressable>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-      </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
 
-      <GamificationSection
-        isStatsLoading={isStatsLoading}
-        userStats={userStats}
-        colors={colors}
-      />
+        <GamificationSection
+          isStatsLoading={isStatsLoading}
+          userStats={userStats}
+          colors={colors}
+        />
 
-      <StreakOverlay
-        visible={showStreakOverlay}
-        userId={userId}
-        onClose={() => setShowStreakOverlay(false)}
-      />
-    </ScrollView>
+        <StreakOverlay
+          visible={showStreakOverlay}
+          userId={userId}
+          onClose={() => setShowStreakOverlay(false)}
+        />
+      </ScrollView>
+    </ScreenTransition>
   );
 }
 

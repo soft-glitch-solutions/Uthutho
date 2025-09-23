@@ -61,7 +61,6 @@ export default function NotificationScreen() {
       }
     >
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="light" backgroundColor="#000000" />
       
       {/* Header */}
       <View style={styles.header}>
