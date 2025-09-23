@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { MapPin } from 'lucide-react-native';
 
 interface Location {
@@ -25,55 +25,88 @@ export default function LocationAutocomplete({
   const [suggestions, setSuggestions] = useState<Location[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [hasSelected, setHasSelected] = useState(false); // 👈 NEW flag
+  const [hasSelected, setHasSelected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const typingTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (hasSelected) {
-      return; // ✅ don’t search if a location was just selected
+      return;
     }
 
     if (!value || value.length < 3) {
       setSuggestions([]);
       setShowSuggestions(false);
+      setError(null);
       return;
     }
 
     if (typingTimeout.current) {
       clearTimeout(typingTimeout.current);
     }
+    
     typingTimeout.current = setTimeout(() => {
       searchLocations(value);
-    }, 500);
+    }, 1000); // Increased delay to be more polite
   }, [value, hasSelected]);
 
   const searchLocations = async (query: string) => {
     setLoading(true);
+    setError(null);
+    
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=za&limit=5&addressdetails=1`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=za&limit=5&addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'Uthutho/1.0 (shaqeel@uthutho.co.za)',
+            'Accept': 'application/json',
+          }
+        }
       );
+
+      // Check if response is OK
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Invalid response format from server');
+      }
+
       const data = await response.json();
-      setSuggestions(data);
-      setShowSuggestions(true);
+      
+      if (Array.isArray(data)) {
+        setSuggestions(data);
+        setShowSuggestions(true);
+      } else {
+        console.warn('Unexpected response format:', data);
+        setSuggestions([]);
+      }
     } catch (error) {
       console.error('Error searching locations:', error);
+      setError('Location service temporarily unavailable. Please try again shortly.');
+      setSuggestions([]);
+      setShowSuggestions(false);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleLocationSelect = (location: Location) => {
     onLocationSelect(location);
     onChangeText(location.display_name);
-
-    setHasSelected(true);     // ✅ prevent auto-search
-    setSuggestions([]);       // ✅ clear dropdown
+    setHasSelected(true);
+    setSuggestions([]);
     setShowSuggestions(false);
+    setError(null);
   };
 
   const handleChangeText = (text: string) => {
     onChangeText(text);
-    setHasSelected(false); // ✅ typing again re-enables suggestions
+    setHasSelected(false);
+    setError(null);
   };
 
   return (
@@ -85,10 +118,17 @@ export default function LocationAutocomplete({
           placeholder={placeholder}
           placeholderTextColor="#666666"
           value={value}
-          onChangeText={handleChangeText} // 👈 use custom handler
+          onChangeText={handleChangeText}
           onFocus={() => value.length > 2 && suggestions.length > 0 && setShowSuggestions(true)}
         />
+        {loading && (
+          <Text style={styles.loadingText}>Searching...</Text>
+        )}
       </View>
+      
+      {error && (
+        <Text style={styles.errorText}>{error}</Text>
+      )}
       
       {showSuggestions && suggestions.length > 0 && (
         <View style={styles.suggestionsContainer}>
@@ -163,5 +203,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginLeft: 8,
     flex: 1,
+  },
+  loadingText: {
+    color: '#1ea2b1',
+    fontSize: 12,
+    marginLeft: 8,
+  },
+  errorText: {
+    color: '#ff6b6b',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 8,
   },
 });
