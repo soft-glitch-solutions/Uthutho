@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform, Alert, Image } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { MapPin, Clock, Users, Heart, HeartOff, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon } from 'lucide-react-native';
@@ -34,6 +34,57 @@ interface Post {
     last_name: string;
   };
 }
+
+// Skeleton Loading Components
+const SkeletonLoader = () => {
+  return (
+    <ScrollView style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <StatusBar style="light" backgroundColor="#000000" />
+      
+      {/* Header Skeleton */}
+      <View style={styles.header}>
+        <View style={[styles.backButton, styles.skeleton]} />
+        <View style={[styles.favoriteButton, styles.skeleton]} />
+      </View>
+
+      {/* Hub Image Skeleton */}
+      <View style={[styles.imageContainer, styles.skeleton]} />
+
+      {/* Hub Info Skeleton */}
+      <View style={styles.infoSection}>
+        <View style={[styles.skeletonTextLarge, styles.skeleton, { width: '70%', marginBottom: 12 }]} />
+        <View style={[styles.skeletonTextMedium, styles.skeleton, { width: '90%', marginBottom: 8 }]} />
+        <View style={[styles.skeletonTextSmall, styles.skeleton, { width: '60%', marginBottom: 12 }]} />
+        <View style={[styles.skeletonBadge, styles.skeleton, { width: '30%' }]} />
+      </View>
+
+      {/* Action Buttons Skeleton */}
+      <View style={styles.actionButtons}>
+        <View style={[styles.actionButton, styles.skeleton]} />
+        <View style={[styles.actionButton, styles.skeleton]} />
+      </View>
+
+      {/* Routes Skeleton */}
+      <View style={styles.section}>
+        <View style={[styles.skeletonTextMedium, styles.skeleton, { width: '50%', marginBottom: 16 }]} />
+        {[1, 2].map((item) => (
+          <View key={item} style={[styles.routeItem, styles.skeleton, { height: 100 }]} />
+        ))}
+      </View>
+
+      {/* Posts Skeleton */}
+      <View style={styles.section}>
+        <View style={[styles.skeletonTextMedium, styles.skeleton, { width: '50%', marginBottom: 16 }]} />
+        {[1, 2].map((item) => (
+          <View key={item} style={[styles.postItem, styles.skeleton, { height: 80 }]} />
+        ))}
+      </View>
+
+      <View style={styles.bottomSpace} />
+    </ScrollView>
+  );
+};
 
 export default function HubDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -165,26 +216,85 @@ export default function HubDetailScreen() {
     }
   };
 
-  const openInMaps = () => {
-    if (hub) {
-      const url = `https://maps.google.com/?q=${hub.latitude},${hub.longitude}`;
-      Alert.alert('Open in Maps', `Would you like to open ${hub.name} in Google Maps?`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open', onPress: () => console.log('Open maps:', url) },
-      ]);
+
+const openInMaps = () => {
+  if (!hub) {
+    console.log("No hub available, skipping openInMaps.");
+    return;
+  }
+
+  const lat = hub.latitude;
+  const lng = hub.longitude;
+  const label = encodeURIComponent(hub.name);
+
+  // Native deep links
+  const iosUrl = `comgooglemaps://?q=${lat},${lng}`;
+  const androidUrl = `geo:${lat},${lng}?q=${lat},${lng}(${label})`;
+
+  // Web fallback
+  const webUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+
+  console.log("openInMaps called with hub:", hub);
+  console.log("Generated URLs:", { iosUrl, androidUrl, webUrl });
+
+  if (Platform.OS === "web") {
+    const confirm = window.confirm(`Would you like to open ${hub.name} in Google Maps?`);
+    if (confirm) {
+      console.log("Opening in browser:", webUrl);
+      window.open(webUrl, "_blank");
+    } else {
+      console.log("User cancelled on web.");
     }
-  };
+    return;
+  }
+
+  // Native platforms
+  Alert.alert(
+    "Open in Maps",
+    `Would you like to open ${hub.name} in Google Maps?`,
+    [
+      { text: "Cancel", style: "cancel", onPress: () => console.log("User cancelled openInMaps") },
+      {
+        text: "Open",
+        onPress: async () => {
+          try {
+            let url =
+              Platform.OS === "ios"
+                ? iosUrl
+                : Platform.OS === "android"
+                ? androidUrl
+                : webUrl;
+
+            console.log("Trying URL:", url);
+
+            const supported = await Linking.canOpenURL(url);
+            console.log("canOpenURL result:", supported);
+
+            if (!supported) {
+              console.log("Deep link not supported, falling back to webUrl:", webUrl);
+              url = webUrl;
+            }
+
+            await Linking.openURL(url);
+            console.log("Successfully opened URL:", url);
+          } catch (err) {
+            console.error("Error opening maps:", err);
+            Alert.alert("Error", "Unable to open Google Maps.");
+          }
+        },
+      },
+    ]
+  );
+};
+
+
 
   const navigateToRoute = (routeId: string) => {
-    router.push(`/route/${routeId}`);
+    router.push(`/route-details?routeId=${routeId}`);
   };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading hub details...</Text>
-      </View>
-    );
+    return <SkeletonLoader />;
   }
 
   if (!hub) {
@@ -219,9 +329,17 @@ export default function HubDetailScreen() {
 
       {/* Hub Image */}
       <View style={styles.imageContainer}>
-        <View style={styles.imagePlaceholder}>
-          <MapPin size={48} color="#1ea2b1" />
-        </View>
+        {hub.image ? (
+          <Image
+            source={{ uri: hub.image }}
+            style={styles.hubImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.imagePlaceholder}>
+            <Text style={styles.hubName}>{hub.name}</Text>
+          </View>
+        )}
       </View>
 
       {/* Hub Info */}
@@ -326,6 +444,26 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+  // Skeleton styles
+  skeleton: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  skeletonTextLarge: {
+    height: 28,
+  },
+  skeletonTextMedium: {
+    height: 20,
+  },
+  skeletonTextSmall: {
+    height: 16,
+  },
+  skeletonBadge: {
+    height: 28,
+  },
+  // Rest of the styles remain the same
   loadingContainer: {
     flex: 1,
     backgroundColor: '#000000',
@@ -353,7 +491,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 40,
+    paddingTop: 60,
     paddingBottom: 20,
   },
   backButton: {
@@ -430,6 +568,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 30,
     gap: 12,
+  },
+  hubImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
   },
   actionButton: {
     flex: 1,

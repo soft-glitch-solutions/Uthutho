@@ -631,7 +631,7 @@ useEffect(() => {
                     if (type === 'stop') {
                       router.push(`/stop-details?stopId=${favorite.id}`);
                     } else if (type === 'hub') {
-                      router.push(`/hub/{favorite.id}`);
+                      router.push(`/hub/${favorite.id}`);
                     } else if (type === 'route') {
                       router.push(`/route-details?routeId=${favorite.id}`);
                     }
