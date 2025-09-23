@@ -349,11 +349,11 @@ const openInMaps = () => {
           <Text style={styles.hubAddress}>{hub.address}</Text>
         )}
         
-        <View style={styles.coordinates}>
+        {/* <View style={styles.coordinates}>
           <Text style={styles.coordinatesText}>
             {hub.latitude.toFixed(6)}, {hub.longitude.toFixed(6)}
           </Text>
-        </View>
+        </View> */}
 
         {hub.transport_type && (
           <View style={styles.transportBadge}>
