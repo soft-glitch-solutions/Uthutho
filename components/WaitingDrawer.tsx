@@ -20,6 +20,7 @@ interface WaitingDrawerProps {
   stopId: string;
   stopName: string;
   onWaitingSet: () => void;
+  closeOnOverlayTap?: boolean; // New prop to control this behavior
 }
 
 export default function WaitingDrawer({ 
@@ -27,7 +28,8 @@ export default function WaitingDrawer({
   onClose, 
   stopId, 
   stopName, 
-  onWaitingSet 
+  onWaitingSet,
+  closeOnOverlayTap = true // Default to true
 }: WaitingDrawerProps) {
   const router = useRouter();
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -92,7 +94,6 @@ export default function WaitingDrawer({
     }
   };
 
-
   const startCountdown = (route: Route) => {
     setSelectedRoute(route);
     setCountdown(5);
@@ -155,6 +156,12 @@ export default function WaitingDrawer({
     setCountdown(0);
   };
 
+  const handleOverlayTap = () => {
+    if (closeOnOverlayTap && !isCountingDown) {
+      onClose();
+    }
+  };
+
   return (
     <Modal
       visible={visible}
@@ -163,6 +170,15 @@ export default function WaitingDrawer({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
+        {/* Overlay tap area - only close if not counting down */}
+        {closeOnOverlayTap && (
+          <TouchableOpacity 
+            style={styles.overlayTapArea}
+            activeOpacity={1}
+            onPress={handleOverlayTap}
+          />
+        )}
+        
         <View style={styles.drawer}>
           <View style={styles.header}>
             <View style={styles.handle} />
@@ -203,7 +219,6 @@ export default function WaitingDrawer({
                     <Text style={styles.transportType}>Unknown</Text>
                   </View>
                   <View style={styles.priceContainer}>
-                    <DollarSign size={16} color="#666666" />
                     <Text style={[styles.price, { color: '#666666' }]}>R 0</Text>
                   </View>
                 </View>
@@ -275,6 +290,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
+  },
+  overlayTapArea: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   drawer: {
     backgroundColor: '#000000',
