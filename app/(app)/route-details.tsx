@@ -421,12 +421,14 @@ export default function RouteDetailsScreen() {
         )}
 
         {/* Price Change Button */}
-        <Pressable
-          style={[styles.priceChangeButton, { backgroundColor: colors.primary }]}
-          onPress={openPriceChangeModal}>
-          <Text style={styles.buttonText}>Report Price Change</Text>
-        </Pressable>
-
+        {!hasPendingRequest && (
+          <Pressable
+            style={[styles.priceChangeButton, { backgroundColor: colors.primary }]}
+            onPress={openPriceChangeModal}>
+            <Text style={styles.buttonText}>Report Price Change</Text>
+          </Pressable>
+        )}
+        
         {/* Price Change Modal */}
         <Modal
           animationType="slide"

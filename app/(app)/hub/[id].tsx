@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform, Alert, Image } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { MapPin, Clock, Users, Heart, HeartOff, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon } from 'lucide-react-native';
@@ -216,15 +216,78 @@ export default function HubDetailScreen() {
     }
   };
 
-  const openInMaps = () => {
-    if (hub) {
-      const url = `https://maps.google.com/?q=${hub.latitude},${hub.longitude}`;
-      Alert.alert('Open in Maps', `Would you like to open ${hub.name} in Google Maps?`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open', onPress: () => console.log('Open maps:', url) },
-      ]);
+
+const openInMaps = () => {
+  if (!hub) {
+    console.log("No hub available, skipping openInMaps.");
+    return;
+  }
+
+  const lat = hub.latitude;
+  const lng = hub.longitude;
+  const label = encodeURIComponent(hub.name);
+
+  // Native deep links
+  const iosUrl = `comgooglemaps://?q=${lat},${lng}`;
+  const androidUrl = `geo:${lat},${lng}?q=${lat},${lng}(${label})`;
+
+  // Web fallback
+  const webUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+
+  console.log("openInMaps called with hub:", hub);
+  console.log("Generated URLs:", { iosUrl, androidUrl, webUrl });
+
+  if (Platform.OS === "web") {
+    const confirm = window.confirm(`Would you like to open ${hub.name} in Google Maps?`);
+    if (confirm) {
+      console.log("Opening in browser:", webUrl);
+      window.open(webUrl, "_blank");
+    } else {
+      console.log("User cancelled on web.");
     }
-  };
+    return;
+  }
+
+  // Native platforms
+  Alert.alert(
+    "Open in Maps",
+    `Would you like to open ${hub.name} in Google Maps?`,
+    [
+      { text: "Cancel", style: "cancel", onPress: () => console.log("User cancelled openInMaps") },
+      {
+        text: "Open",
+        onPress: async () => {
+          try {
+            let url =
+              Platform.OS === "ios"
+                ? iosUrl
+                : Platform.OS === "android"
+                ? androidUrl
+                : webUrl;
+
+            console.log("Trying URL:", url);
+
+            const supported = await Linking.canOpenURL(url);
+            console.log("canOpenURL result:", supported);
+
+            if (!supported) {
+              console.log("Deep link not supported, falling back to webUrl:", webUrl);
+              url = webUrl;
+            }
+
+            await Linking.openURL(url);
+            console.log("Successfully opened URL:", url);
+          } catch (err) {
+            console.error("Error opening maps:", err);
+            Alert.alert("Error", "Unable to open Google Maps.");
+          }
+        },
+      },
+    ]
+  );
+};
+
+
 
   const navigateToRoute = (routeId: string) => {
     router.push(`/route-details?routeId=${routeId}`);
