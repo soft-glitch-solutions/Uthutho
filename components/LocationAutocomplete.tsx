@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { MapPin } from 'lucide-react-native';
 
@@ -25,20 +25,31 @@ export default function LocationAutocomplete({
   const [suggestions, setSuggestions] = useState<Location[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [hasSelected, setHasSelected] = useState(false); // 👈 NEW flag
+  const typingTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (value.length > 2) {
-      searchLocations(value);
-    } else {
+    if (hasSelected) {
+      return; // ✅ don’t search if a location was just selected
+    }
+
+    if (!value || value.length < 3) {
       setSuggestions([]);
       setShowSuggestions(false);
+      return;
     }
-  }, [value]);
+
+    if (typingTimeout.current) {
+      clearTimeout(typingTimeout.current);
+    }
+    typingTimeout.current = setTimeout(() => {
+      searchLocations(value);
+    }, 500);
+  }, [value, hasSelected]);
 
   const searchLocations = async (query: string) => {
     setLoading(true);
     try {
-      // Focus on South African locations
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=za&limit=5&addressdetails=1`
       );
@@ -54,7 +65,15 @@ export default function LocationAutocomplete({
   const handleLocationSelect = (location: Location) => {
     onLocationSelect(location);
     onChangeText(location.display_name);
+
+    setHasSelected(true);     // ✅ prevent auto-search
+    setSuggestions([]);       // ✅ clear dropdown
     setShowSuggestions(false);
+  };
+
+  const handleChangeText = (text: string) => {
+    onChangeText(text);
+    setHasSelected(false); // ✅ typing again re-enables suggestions
   };
 
   return (
@@ -66,8 +85,8 @@ export default function LocationAutocomplete({
           placeholder={placeholder}
           placeholderTextColor="#666666"
           value={value}
-          onChangeText={onChangeText}
-          onFocus={() => value.length > 2 && setShowSuggestions(true)}
+          onChangeText={handleChangeText} // 👈 use custom handler
+          onFocus={() => value.length > 2 && suggestions.length > 0 && setShowSuggestions(true)}
         />
       </View>
       

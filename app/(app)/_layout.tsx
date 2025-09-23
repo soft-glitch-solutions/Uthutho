@@ -162,6 +162,8 @@ options={{
             <Drawer.Screen name="SecurityScreen" options={{ drawerItemStyle: { height: 0 }, title: 'Security Screen' }} />
             <Drawer.Screen name="notification" options={{ drawerItemStyle: { height: 0 }, title: 'Notification' }} />
             <Drawer.Screen name="carpool" options={{ drawerItemStyle: { height: 0 }, title: 'CarPool' }} />
+            <Drawer.Screen name="journeyComplete" options={{ drawerItemStyle: { height: 0 }, title: 'JourneyComplete' }} />
+          <Drawer.Screen name="journey" options={{ drawerItemStyle: { height: 0 }, title: 'journey' }} />
       <Drawer.Screen
         name="post-details"
         options={{

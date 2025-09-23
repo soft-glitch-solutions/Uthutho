@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import LocationAutocomplete from '@/components/LocationAutocomplete';
 import RouteInstructions from '@/components/RouteInstructions';
 
+
 interface Route {
   id: string;
   name: string;
@@ -152,32 +153,49 @@ export default function RoutesScreen() {
     setFilteredHubs(filtered);
   };
 
-  const findRoute = async () => {
-    if (!fromLocation || !toLocation) return;
+const findRoute = async () => {
+  if (!fromLocation || !toLocation) {
+    console.log("❌ Missing from/to location", { fromLocation, toLocation });
+    return;
+  }
 
-    setSearchingRoute(true);
+  console.log("🔍 Searching route...", { from: fromLocation, to: toLocation });
+  setSearchingRoute(true);
 
-    try {
-      const { data: matchingRoutes, error } = await supabase
-        .from('routes')
-        .select('*')
-        .ilike('start_point', `%${fromLocation.display_name.split(',')[0]}%`)
-        .ilike('end_point', `%${toLocation.display_name.split(',')[0]}%`);
+  try {
+    const fromQuery = fromLocation.display_name.split(',')[0];
+    const toQuery = toLocation.display_name.split(',')[0];
 
-      if (error) throw error;
+    console.log("🗂 Supabase query", { fromQuery, toQuery });
 
-      const instructions =
-        matchingRoutes && matchingRoutes.length > 0
-          ? generateRouteInstructions(fromLocation, toLocation, matchingRoutes)
-          : generateGeneralInstructions(fromLocation, toLocation);
+    const { data: matchingRoutes, error } = await supabase
+      .from('routes')
+      .select('*')
+      .ilike('start_point', `%${fromQuery}%`)
+      .ilike('end_point', `%${toQuery}%`);
 
-      setRouteInstructions(instructions);
-    } catch (err) {
-      console.error('Error finding route:', err);
-    } finally {
-      setSearchingRoute(false);
+    if (error) {
+      console.error("❌ Supabase error:", error);
+      return;
     }
-  };
+
+    console.log("✅ Matching routes:", matchingRoutes);
+
+    const instructions =
+      matchingRoutes && matchingRoutes.length > 0
+        ? generateRouteInstructions(fromLocation, toLocation, matchingRoutes)
+        : generateGeneralInstructions(fromLocation, toLocation);
+
+    console.log("📝 Generated instructions:", instructions);
+
+    setRouteInstructions(instructions);
+  } catch (err) {
+    console.error("❌ Error finding route:", err);
+  } finally {
+    setSearchingRoute(false);
+  }
+};
+
 
   const generateRouteInstructions = (from: Location, to: Location, routes: Route[]) => {
     const bestRoute = routes[0];

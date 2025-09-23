@@ -168,7 +168,7 @@ export default function HubsScreen() {
             <TouchableOpacity
               key={hub.id}
               style={[styles.hubCard, { backgroundColor: colors.card }]}
-              onPress={() => router.push(`/hub-details?hubId=${hub.id}`)}
+              onPress={() => router.push(`/hub/{hub.id}`)}
             >
               <Image source={{ uri: hub.image }} style={styles.hubImage} />
               <View style={styles.hubInfo}>
