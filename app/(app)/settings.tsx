@@ -51,21 +51,6 @@ export default function SettingsScreen() {
       <View style={styles.container}>
         <Text style={[styles.title, { color: colors.text }]}>{text.settings}</Text>t>
 
-        {/* Notification Settings */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{text.notifications}</Text>
-        <View style={styles.settingOption}>
-          <View style={styles.settingLeft}>
-            <Bell color={colors.text} />
-            <Text style={[styles.settingText, { color: colors.text }]}>{text.notifications}</Text>
-          </View>
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={setNotificationsEnabled}
-            thumbColor={notificationsEnabled ? colors.primary : colors.text}
-            trackColor={{ false: colors.card, true: colors.primary }}
-          />
-        </View>
-
 
         {/* Privacy Settings */}
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{text.privacy}</Text>
