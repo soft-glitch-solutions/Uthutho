@@ -407,8 +407,8 @@ export default function SearchScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Search</Text>
-        <Text style={styles.headerSubtitle}>Find routes, stops, hubs & nearby spots</Text>
+        <Text style={styles.headerTitle}>Search Community</Text>
+        <Text style={styles.headerSubtitle}>Find your community by your favorite stops.</Text>
       </View>
 
       {/* Search Input */}
