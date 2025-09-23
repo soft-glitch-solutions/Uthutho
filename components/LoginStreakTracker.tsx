@@ -18,12 +18,12 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
   const [streak, setStreak] = useState<{
     current_streak: number;
     max_streak: number;
-    points_earned?: number;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [spinning, setSpinning] = useState(false);
   const [showSpinResult, setShowSpinResult] = useState(false);
   const [spinResult, setSpinResult] = useState<number | null>(null);
+  const [hasSpunToday, setHasSpunToday] = useState(false);
 
   // Animation values
   const spinValue = new Animated.Value(0);
@@ -31,12 +31,12 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
   const fadeValue = new Animated.Value(0);
 
   const wheelSections = [
-    { points: 10, color: '#FFD700', icon: '⭐' },
-    { points: 5, color: '#C0C0C0', icon: '⚡' },
-    { points: 15, color: '#FF6B6B', icon: '🎯' },
-    { points: 8, color: '#4ECDC4', icon: '🎁' },
-    { points: 12, color: '#FFA500', icon: '🔥' },
-    { points: 7, color: '#9B59B6', icon: '✨' },
+    { points: 10, color: '#FFD700', icon: '⭐', text: '10 Points' },
+    { points: 5, color: '#C0C0C0', icon: '⚡', text: '5 Points' },
+    { points: 15, color: '#FF6B6B', icon: '🎯', text: '15 Points' },
+    { points: 8, color: '#4ECDC4', icon: '🎁', text: '8 Points' },
+    { points: 12, color: '#FFA500', icon: '🔥', text: '12 Points' },
+    { points: 7, color: '#9B59B6', icon: '✨', text: '7 Points' },
   ];
 
   useEffect(() => {
@@ -69,8 +69,8 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
       const today = new Date().toDateString();
       const lastSpinDate = await AsyncStorage.getItem(`lastSpinDate_${userId}`);
 
-      // Check if user can spin today
-      const canSpinToday = lastSpinDate !== today;
+      // Check if user has already spun today
+      setHasSpunToday(lastSpinDate === today);
 
       const { data: streakData, error: streakError } = await supabase
         .from('login_streaks')
@@ -83,10 +83,7 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
       }
 
       if (streakData) {
-        setStreak({
-          ...streakData,
-          points_earned: streakData.current_streak % 7 === 0 ? 10 : 0,
-        });
+        setStreak(streakData);
       }
     } catch (error) {
       console.error('Error fetching login streak:', error);
@@ -96,7 +93,7 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
   };
 
   const spinTheWheel = async () => {
-    if (spinning) return;
+    if (spinning || hasSpunToday) return;
 
     setSpinning(true);
     setShowSpinResult(false);
@@ -106,13 +103,6 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
 
     const userId = session.session.user.id;
     const today = new Date().toDateString();
-
-    // Check if already spun today
-    const lastSpinDate = await AsyncStorage.getItem(`lastSpinDate_${userId}`);
-    if (lastSpinDate === today) {
-      setSpinning(false);
-      return;
-    }
 
     // Spin animation
     const randomSpins = 5 + Math.random() * 3; // 5-8 full spins
@@ -125,19 +115,19 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
     Animated.parallel([
       Animated.timing(spinValue, {
         toValue: finalRotation,
-        duration: 3000,
+        duration: 4000,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.sequence([
         Animated.timing(scaleValue, {
-          toValue: 1.1,
-          duration: 1500,
+          toValue: 1.2,
+          duration: 2000,
           useNativeDriver: true,
         }),
         Animated.timing(scaleValue, {
           toValue: 1,
-          duration: 1500,
+          duration: 2000,
           useNativeDriver: true,
         }),
       ]),
@@ -145,6 +135,7 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
       const pointsWon = wheelSections[randomSection].points;
       setSpinResult(pointsWon);
       setShowSpinResult(true);
+      setHasSpunToday(true);
 
       // Save spin date
       await AsyncStorage.setItem(`lastSpinDate_${userId}`, today);
@@ -157,14 +148,6 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
         });
 
         if (error) throw error;
-
-        // Update streak with bonus points
-        if (streak) {
-          setStreak({
-            ...streak,
-            points_earned: pointsWon,
-          });
-        }
       } catch (error) {
         console.error('Error awarding points:', error);
       }
@@ -180,7 +163,7 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
 
   const getWheelSection = (index: number) => {
     const section = wheelSections[index];
-    const angle = (index * 60) - 30; // Offset to center the section
+    const angle = (index * 60); // 60 degrees per section
     return (
       <View
         key={index}
@@ -192,13 +175,17 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
           },
         ]}
       >
-        <Text style={styles.wheelSectionText}>{section.icon}</Text>
-        <Text style={styles.wheelSectionPoints}>{section.points}</Text>
+        <View style={styles.sectionContent}>
+          <Text style={styles.wheelSectionIcon}>{section.icon}</Text>
+          <Text style={styles.wheelSectionText}>{section.text}</Text>
+        </View>
       </View>
     );
   };
 
   const takeBonusPoints = async () => {
+    if (hasSpunToday) return;
+
     const { data: session } = await supabase.auth.getSession();
     if (!session.session?.user.id) return;
 
@@ -210,9 +197,13 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
 
       if (error) throw error;
 
-      setStreak(prev => prev ? { ...prev, points_earned: 10 } : null);
       setShowSpinResult(true);
       setSpinResult(10);
+      setHasSpunToday(true);
+      
+      // Save that user took bonus today
+      const today = new Date().toDateString();
+      await AsyncStorage.setItem(`lastSpinDate_${session.session.user.id}`, today);
     } catch (error) {
       console.error('Error awarding bonus points:', error);
     }
@@ -226,8 +217,8 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
           onDismiss={onClose} 
           style={[styles.dialogContainer, { backgroundColor: colors.background }]}
         >
-          <Dialog.Title style={{ color: colors.text, textAlign: 'center' }}>
-            🎉 Daily Login Bonus! 🎉
+          <Dialog.Title style={{ color: colors.text, textAlign: 'center', fontSize: 22 }}>
+            🎉 Daily Reward Wheel! 🎉
           </Dialog.Title>
           
           <Dialog.Content>
@@ -236,24 +227,24 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
                 <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={{ color: colors.text, marginTop: 10 }}>Loading your rewards...</Text>
               </View>
-            ) : streak ? (
+            ) : (
               <View style={styles.container}>
                 {/* Streak Info */}
                 <View style={styles.streakHeader}>
-                  <View style={styles.streakBadge}>
+                  <View style={[styles.streakBadge, { backgroundColor: colors.card }]}>
                     <Text style={[styles.streakNumber, { color: colors.primary }]}>
-                      {streak.current_streak}
+                      {streak?.current_streak || 0}
                     </Text>
-                    <Text style={[styles.streakLabel, { color: colors.text }]}>Days</Text>
+                    <Text style={[styles.streakLabel, { color: colors.text }]}>Day Streak</Text>
                   </View>
                   <View style={styles.streakInfo}>
                     <Text style={[styles.streakText, { color: colors.text }]}>
-                      {streak.current_streak === 1 
+                      {streak?.current_streak === 1 
                         ? "First day! 🚀" 
-                        : `🔥 ${streak.current_streak}-day streak!`}
+                        : `🔥 ${streak?.current_streak}-day streak!`}
                     </Text>
                     <Text style={[styles.streakSubText, { color: colors.text }]}>
-                      Best: {streak.max_streak} days
+                      Best: {streak?.max_streak || 0} days
                     </Text>
                   </View>
                 </View>
@@ -261,7 +252,7 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
                 {/* Lucky Spin Wheel */}
                 <View style={styles.wheelContainer}>
                   <Text style={[styles.wheelTitle, { color: colors.text }]}>
-                    Spin to Win Points!
+                    {hasSpunToday ? "Today's Reward" : "Spin to Win Points!"}
                   </Text>
                   
                   <View style={styles.wheelWrapper}>
@@ -280,30 +271,15 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
                     </Animated.View>
                     
                     <View style={styles.wheelPointer}>
-                      <Zap size={30} color={colors.primary} fill={colors.primary} />
+                      <Zap size={35} color={colors.primary} fill={colors.primary} />
                     </View>
                   </View>
 
-                  {!showSpinResult ? (
-                    <TouchableOpacity
-                      style={[styles.spinButton, { backgroundColor: colors.primary }]}
-                      onPress={spinTheWheel}
-                      disabled={spinning}
-                    >
-                      {spinning ? (
-                        <RotateCw size={24} color="#fff" />
-                      ) : (
-                        <Gift size={24} color="#fff" />
-                      )}
-                      <Text style={styles.spinButtonText}>
-                        {spinning ? 'Spinning...' : 'SPIN THE WHEEL!'}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
+                  {showSpinResult ? (
                     <Animated.View 
                       style={[
                         styles.resultContainer,
-                        { opacity: fadeValue }
+                        { opacity: fadeValue, backgroundColor: colors.card }
                       ]}
                     >
                       <View style={styles.resultContent}>
@@ -312,39 +288,63 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
                           Congratulations! 🎉
                         </Text>
                         <Text style={[styles.pointsWon, { color: colors.primary }]}>
-                          +{spinResult} Points!
+                          +{spinResult} Points Won!
                         </Text>
                         <Text style={[styles.resultSubtext, { color: colors.text }]}>
-                          Come back tomorrow for another spin!
+                          Come back tomorrow for another reward!
                         </Text>
                       </View>
                     </Animated.View>
-                  )}
-
-                  {/* Alternative: Take 10 Points Button */}
-                  {!showSpinResult && !spinning && (
-                    <TouchableOpacity
-                      style={[styles.bonusButton, { borderColor: colors.primary }]}
-                      onPress={takeBonusPoints}
-                    >
-                      <Star size={20} color={colors.primary} />
-                      <Text style={[styles.bonusButtonText, { color: colors.primary }]}>
-                        Take 10 Points Instead
+                  ) : hasSpunToday ? (
+                    <View style={[styles.alreadySpunContainer, { backgroundColor: colors.card }]}>
+                      <Text style={[styles.alreadySpunText, { color: colors.text }]}>
+                        ✅ You've already collected your daily reward today!
                       </Text>
-                    </TouchableOpacity>
+                      <Text style={[styles.alreadySpunSubtext, { color: colors.text }]}>
+                        Come back tomorrow for another spin!
+                      </Text>
+                    </View>
+                  ) : (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.spinButton, { backgroundColor: colors.primary }]}
+                        onPress={spinTheWheel}
+                        disabled={spinning}
+                      >
+                        {spinning ? (
+                          <RotateCw size={24} color="#fff" />
+                        ) : (
+                          <Gift size={24} color="#fff" />
+                        )}
+                        <Text style={styles.spinButtonText}>
+                          {spinning ? 'Spinning...' : 'SPIN THE WHEEL!'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Alternative: Take 10 Points Button */}
+                      <TouchableOpacity
+                        style={[styles.bonusButton, { borderColor: colors.primary }]}
+                        onPress={takeBonusPoints}
+                      >
+                        <Star size={20} color={colors.primary} />
+                        <Text style={[styles.bonusButtonText, { color: colors.primary }]}>
+                          Take 10 Points Instead
+                        </Text>
+                      </TouchableOpacity>
+
+                      <Text style={[styles.noteText, { color: colors.text }]}>
+                        🎯 Spin for 5-15 points or take guaranteed 10 points
+                      </Text>
+                    </>
                   )}
                 </View>
               </View>
-            ) : (
-              <Text style={{ color: colors.text, textAlign: 'center' }}>
-                Start your login streak to unlock rewards!
-              </Text>
             )}
           </Dialog.Content>
           
           <Dialog.Actions>
             <Button onPress={onClose} textColor={colors.primary}>
-              Close
+              {hasSpunToday ? 'Close' : 'Maybe Later'}
             </Button>
           </Dialog.Actions>
         </Dialog>
@@ -358,6 +358,8 @@ const styles = {
     borderRadius: 20,
     padding: 15,
     margin: 20,
+    maxWidth: 400,
+    alignSelf: 'center',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -370,26 +372,28 @@ const styles = {
   streakHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 25,
     padding: 15,
     borderRadius: 15,
     backgroundColor: 'rgba(0,0,0,0.05)',
+    width: '100%',
   },
   streakBadge: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#E0F7FA',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     marginRight: 15,
+    borderWidth: 3,
+    borderColor: '#FFD700',
   },
   streakNumber: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
   },
   streakLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
   },
   streakInfo: {
@@ -418,42 +422,48 @@ const styles = {
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 30,
+    marginBottom: 25,
   },
   wheel: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
     backgroundColor: '#fff',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 12,
+    elevation: 12,
+    overflow: 'hidden',
   },
   wheelSection: {
     position: 'absolute',
-    width: '100%',
-    height: '100%',
+    width: '50%',
+    height: '50%',
+    left: '50%',
+    top: 0,
+    transformOrigin: 'left bottom',
     alignItems: 'center',
     justifyContent: 'center',
-    borderTopLeftRadius: 100,
-    borderTopRightRadius: 100,
+  },
+  sectionContent: {
+    transform: [{ rotate: '30deg' }],
+    alignItems: 'center',
+    marginLeft: 30,
+  },
+  wheelSectionIcon: {
+    fontSize: 20,
+    marginBottom: 2,
   },
   wheelSectionText: {
-    fontSize: 24,
-    marginBottom: 5,
-    transform: [{ rotate: '30deg' }],
-  },
-  wheelSectionPoints: {
-    fontSize: 16,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#000',
-    transform: [{ rotate: '30deg' }],
+    textAlign: 'center',
   },
   wheelPointer: {
     position: 'absolute',
-    top: -15,
+    top: -10,
     zIndex: 10,
   },
   spinButton: {
@@ -463,8 +473,13 @@ const styles = {
     paddingVertical: 15,
     paddingHorizontal: 30,
     borderRadius: 25,
-    marginBottom: 15,
+    marginBottom: 12,
     minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   spinButtonText: {
     color: '#fff',
@@ -481,18 +496,25 @@ const styles = {
     borderRadius: 20,
     borderWidth: 2,
     backgroundColor: 'transparent',
+    marginBottom: 15,
   },
   bonusButtonText: {
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 8,
   },
+  noteText: {
+    fontSize: 12,
+    textAlign: 'center',
+    opacity: 0.8,
+    fontStyle: 'italic',
+  },
   resultContainer: {
     alignItems: 'center',
     padding: 20,
     borderRadius: 15,
-    backgroundColor: 'rgba(255,215,0,0.1)',
     marginBottom: 15,
+    width: '100%',
   },
   resultContent: {
     alignItems: 'center',
@@ -509,6 +531,24 @@ const styles = {
     marginBottom: 10,
   },
   resultSubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    opacity: 0.8,
+  },
+  alreadySpunContainer: {
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 15,
+    marginBottom: 15,
+    width: '100%',
+  },
+  alreadySpunText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 5,
+    textAlign: 'center',
+  },
+  alreadySpunSubtext: {
     fontSize: 14,
     textAlign: 'center',
     opacity: 0.8,
