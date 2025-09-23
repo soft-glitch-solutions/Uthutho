@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
-import { X, Clock,  Users, CircleCheck as CheckCircle } from 'lucide-react-native';
+import { X, Clock, DollarSign, Users, CircleCheck as CheckCircle } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useJourney } from '@/hook/useJourney';
@@ -14,18 +14,12 @@ interface Route {
   end_point: string;
 }
 
-interface WaitingCount {
-  route_id: string;
-  waiting_count: number;
-}
-
 interface WaitingDrawerProps {
   visible: boolean;
   onClose: () => void;
   stopId: string;
   stopName: string;
   onWaitingSet: () => void;
-  closeOnOverlayTap?: boolean;
 }
 
 export default function WaitingDrawer({ 
@@ -33,16 +27,15 @@ export default function WaitingDrawer({
   onClose, 
   stopId, 
   stopName, 
-  onWaitingSet,
-  closeOnOverlayTap = true
+  onWaitingSet 
 }: WaitingDrawerProps) {
   const router = useRouter();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
+  const [waitingCounts, setWaitingCounts] = useState<Record<string, number>>({});
   const [countdown, setCountdown] = useState(0);
   const [isCountingDown, setIsCountingDown] = useState(false);
-  const [waitingCounts, setWaitingCounts] = useState<Record<string, number>>({});
   const { createOrJoinJourney } = useJourney();
 
   useEffect(() => {
@@ -88,6 +81,7 @@ export default function WaitingDrawer({
   const loadRoutesForStop = async () => {
     setLoading(true);
     try {
+      // Query using junction table approach
       const { data: routesData, error: routesError } = await supabase
         .from('route_stops')
         .select(`
@@ -110,6 +104,7 @@ export default function WaitingDrawer({
         return;
       }
 
+      // Fallback if no routes found
       setRoutes([]);
     } catch (error) {
       console.error('Error loading routes for stop:', error);
@@ -155,6 +150,7 @@ export default function WaitingDrawer({
     return Object.values(waitingCounts).reduce((sum, count) => sum + count, 0);
   };
 
+
   const startCountdown = (route: Route) => {
     setSelectedRoute(route);
     setCountdown(5);
@@ -165,26 +161,6 @@ export default function WaitingDrawer({
     if (!selectedRoute) return;
 
     try {
-      // First, create an entry in stop_waiting table
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      // Insert waiting record
-      const { error: waitingError } = await supabase
-        .from('stop_waiting')
-        .upsert({
-          stop_id: stopId,
-          user_id: user.id,
-          route_id: selectedRoute.id,
-          transport_type: selectedRoute.transport_type,
-          expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() // 5 minutes from now
-        }, {
-          onConflict: 'stop_id,user_id'
-        });
-
-      if (waitingError) throw waitingError;
-
-      // Then create/join journey
       const result = await createOrJoinJourney(
         stopId,
         selectedRoute.id,
@@ -196,13 +172,6 @@ export default function WaitingDrawer({
         router.replace('/journey');
         onWaitingSet();
       } else {
-        // If journey creation fails, remove the waiting record
-        await supabase
-          .from('stop_waiting')
-          .delete()
-          .eq('stop_id', stopId)
-          .eq('user_id', user.id);
-        
         Alert.alert('Error', result.error || 'Failed to start journey');
       }
     } catch (error) {
@@ -244,12 +213,6 @@ export default function WaitingDrawer({
     setCountdown(0);
   };
 
-  const handleOverlayTap = () => {
-    if (closeOnOverlayTap && !isCountingDown) {
-      onClose();
-    }
-  };
-
   return (
     <Modal
       visible={visible}
@@ -258,14 +221,6 @@ export default function WaitingDrawer({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        {closeOnOverlayTap && (
-          <TouchableOpacity 
-            style={styles.overlayTapArea}
-            activeOpacity={1}
-            onPress={handleOverlayTap}
-          />
-        )}
-        
         <View style={styles.drawer}>
           <View style={styles.header}>
             <View style={styles.handle} />
@@ -283,7 +238,7 @@ export default function WaitingDrawer({
                 : `Select which transport you're waiting for at ${stopName}`
               }
             </Text>
-            {!isCountingDown && getTotalWaitingCount() > 0 && (
+              {!isCountingDown && getTotalWaitingCount() > 0 && (
               <View style={styles.totalWaitingContainer}>
                 <Users size={16} color="#1ea2b1" />
                 <Text style={styles.totalWaitingText}>
@@ -314,6 +269,7 @@ export default function WaitingDrawer({
                     <Text style={styles.transportType}>Unknown</Text>
                   </View>
                   <View style={styles.priceContainer}>
+                    <DollarSign size={16} color="#666666" />
                     <Text style={[styles.price, { color: '#666666' }]}>R 0</Text>
                   </View>
                 </View>
@@ -327,32 +283,34 @@ export default function WaitingDrawer({
               routes.map((route) => {
                 const waitingCount = getWaitingCountForRoute(route.id);
                 return (
-                  <TouchableOpacity
-                    key={route.id}
-                    style={[
-                      styles.routeCard,
+                <TouchableOpacity
+                  key={route.id}
+                  style={[
+                    styles.routeCard,
                       selectedRoute?.id === route.id && isCountingDown && styles.selectedRouteCard,
                       waitingCount > 0 && styles.routeWithWaiters
-                    ]}
-                    onPress={() => startCountdown(route)}
-                    disabled={isCountingDown}
-                  >
-                    <View style={styles.routeHeader}>
-                      <View style={styles.transportBadge}>
-                        <Text style={styles.transportType}>{route.transport_type}</Text>
-                      </View>
-                      <View style={styles.priceContainer}>
-                        <Text style={styles.price}>R {route.cost}</Text>
-                      </View>
+                  ]}
+                  onPress={() => startCountdown(route)}
+                  disabled={isCountingDown}
+                >
+                  <View style={styles.routeHeader}>
+                    <View style={styles.transportBadge}>
+                      <Text style={styles.transportType}>{route.transport_type}</Text>
                     </View>
-                    
-                    <Text style={styles.routeName}>{route.name}</Text>
-                    <Text style={styles.routeDestination}>
-                      {route.start_point} → {route.end_point}
-                    </Text>
-                    
-                    <View style={styles.routeFooter}>
-                      <View style={styles.waitingInfo}>
+                    <View style={styles.priceContainer}>
+                      <DollarSign size={16} color="#1ea2b1" />
+                      <Text style={styles.price}>R {route.cost}</Text>
+                    </View>
+                  </View>
+                  
+                  <Text style={styles.routeName}>{route.name}</Text>
+                  <Text style={styles.routeDestination}>
+                    {route.start_point} → {route.end_point}
+                  </Text>
+                  
+                  <View style={styles.routeFooter}>
+                    <View style={styles.waitingInfo}>
+                      <Users size={16} color="#666666" />
                         <Users size={16} color={waitingCount > 0 ? "#1ea2b1" : "#666666"} />
                         <Text style={[
                           styles.waitingCount,
@@ -360,22 +318,22 @@ export default function WaitingDrawer({
                         ]}>
                           {waitingCount} {waitingCount === 1 ? 'person' : 'people'} waiting
                         </Text>
-                      </View>
-                      <View style={styles.estimatedTime}>
-                        <Clock size={16} color="#666666" />
-                        <Text style={styles.timeText}>
-                          Est. {10 + Math.floor(Math.random() * 15)} min
-                        </Text>
-                      </View>
                     </View>
+                    <View style={styles.estimatedTime}>
+                      <Clock size={16} color="#666666" />
+                      <Text style={styles.timeText}>
+                        Est. {10 + Math.floor(Math.random() * 15)} min
+                      </Text>
+                    </View>
+                  </View>
 
-                    {selectedRoute?.id === route.id && isCountingDown && (
-                      <View style={styles.selectedOverlay}>
-                        <CheckCircle size={24} color="#4ade80" />
-                        <Text style={styles.selectedText}>Selected</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
+                  {selectedRoute?.id === route.id && isCountingDown && (
+                    <View style={styles.selectedOverlay}>
+                      <CheckCircle size={24} color="#4ade80" />
+                      <Text style={styles.selectedText}>Selected</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
                 );
               })
             )}
@@ -391,13 +349,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
-  },
-  overlayTapArea: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
   },
   drawer: {
     backgroundColor: '#000000',
@@ -463,6 +414,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
   },
+  routeWithWaiters: {
+    borderColor: '#1ea2b1',
+    borderWidth: 2,
+  },
+  waitingCountActive: {
+    color: '#1ea2b1',
+    fontWeight: '600',
+  },
+
   countdownCircle: {
     width: 80,
     height: 80,
@@ -510,10 +470,6 @@ const styles = StyleSheet.create({
   selectedRouteCard: {
     borderColor: '#1ea2b1',
     backgroundColor: '#1ea2b110',
-  },
-  routeWithWaiters: {
-    borderColor: '#1ea2b1',
-    borderWidth: 2,
   },
   routeHeader: {
     flexDirection: 'row',
@@ -566,10 +522,6 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontSize: 12,
     marginLeft: 4,
-  },
-  waitingCountActive: {
-    color: '#1ea2b1',
-    fontWeight: '600',
   },
   estimatedTime: {
     flexDirection: 'row',
