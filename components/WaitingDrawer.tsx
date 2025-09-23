@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
-import { X, Clock, DollarSign, Users, CircleCheck as CheckCircle } from 'lucide-react-native';
+import { X, Clock,  Users, CircleCheck as CheckCircle } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useJourney } from '@/hook/useJourney';
@@ -14,13 +14,18 @@ interface Route {
   end_point: string;
 }
 
+interface WaitingCount {
+  route_id: string;
+  waiting_count: number;
+}
+
 interface WaitingDrawerProps {
   visible: boolean;
   onClose: () => void;
   stopId: string;
   stopName: string;
   onWaitingSet: () => void;
-  closeOnOverlayTap?: boolean; // New prop to control this behavior
+  closeOnOverlayTap?: boolean;
 }
 
 export default function WaitingDrawer({ 
@@ -29,7 +34,7 @@ export default function WaitingDrawer({
   stopId, 
   stopName, 
   onWaitingSet,
-  closeOnOverlayTap = true // Default to true
+  closeOnOverlayTap = true
 }: WaitingDrawerProps) {
   const router = useRouter();
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -37,11 +42,34 @@ export default function WaitingDrawer({
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
   const [countdown, setCountdown] = useState(0);
   const [isCountingDown, setIsCountingDown] = useState(false);
+  const [waitingCounts, setWaitingCounts] = useState<Record<string, number>>({});
   const { createOrJoinJourney } = useJourney();
 
   useEffect(() => {
     if (visible) {
       loadRoutesForStop();
+      loadWaitingCounts();
+      
+      // Set up real-time subscription for waiting counts
+      const subscription = supabase
+        .channel('stop_waiting_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'stop_waiting',
+            filter: `stop_id=eq.${stopId}`
+          },
+          () => {
+            loadWaitingCounts();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        subscription.unsubscribe();
+      };
     }
   }, [visible, stopId]);
 
@@ -60,7 +88,6 @@ export default function WaitingDrawer({
   const loadRoutesForStop = async () => {
     setLoading(true);
     try {
-      // Query using junction table approach
       const { data: routesData, error: routesError } = await supabase
         .from('route_stops')
         .select(`
@@ -83,7 +110,6 @@ export default function WaitingDrawer({
         return;
       }
 
-      // Fallback if no routes found
       setRoutes([]);
     } catch (error) {
       console.error('Error loading routes for stop:', error);
@@ -92,6 +118,41 @@ export default function WaitingDrawer({
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadWaitingCounts = async () => {
+    try {
+      // Query active waiting users for this stop (not expired)
+      const { data, error } = await supabase
+        .from('stop_waiting')
+        .select('route_id')
+        .eq('stop_id', stopId)
+        .gt('expires_at', new Date().toISOString());
+
+      if (error) throw error;
+
+      // Count waiting users per route
+      const counts: Record<string, number> = {};
+      
+      if (data) {
+        data.forEach((item) => {
+          const routeId = item.route_id || 'unknown'; // Handle cases where route_id might be null
+          counts[routeId] = (counts[routeId] || 0) + 1;
+        });
+      }
+
+      setWaitingCounts(counts);
+    } catch (error) {
+      console.error('Error loading waiting counts:', error);
+    }
+  };
+
+  const getWaitingCountForRoute = (routeId: string) => {
+    return waitingCounts[routeId] || 0;
+  };
+
+  const getTotalWaitingCount = () => {
+    return Object.values(waitingCounts).reduce((sum, count) => sum + count, 0);
   };
 
   const startCountdown = (route: Route) => {
@@ -104,6 +165,26 @@ export default function WaitingDrawer({
     if (!selectedRoute) return;
 
     try {
+      // First, create an entry in stop_waiting table
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Insert waiting record
+      const { error: waitingError } = await supabase
+        .from('stop_waiting')
+        .upsert({
+          stop_id: stopId,
+          user_id: user.id,
+          route_id: selectedRoute.id,
+          transport_type: selectedRoute.transport_type,
+          expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() // 5 minutes from now
+        }, {
+          onConflict: 'stop_id,user_id'
+        });
+
+      if (waitingError) throw waitingError;
+
+      // Then create/join journey
       const result = await createOrJoinJourney(
         stopId,
         selectedRoute.id,
@@ -115,6 +196,13 @@ export default function WaitingDrawer({
         router.replace('/journey');
         onWaitingSet();
       } else {
+        // If journey creation fails, remove the waiting record
+        await supabase
+          .from('stop_waiting')
+          .delete()
+          .eq('stop_id', stopId)
+          .eq('user_id', user.id);
+        
         Alert.alert('Error', result.error || 'Failed to start journey');
       }
     } catch (error) {
@@ -170,7 +258,6 @@ export default function WaitingDrawer({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        {/* Overlay tap area - only close if not counting down */}
         {closeOnOverlayTap && (
           <TouchableOpacity 
             style={styles.overlayTapArea}
@@ -196,6 +283,14 @@ export default function WaitingDrawer({
                 : `Select which transport you're waiting for at ${stopName}`
               }
             </Text>
+            {!isCountingDown && getTotalWaitingCount() > 0 && (
+              <View style={styles.totalWaitingContainer}>
+                <Users size={16} color="#1ea2b1" />
+                <Text style={styles.totalWaitingText}>
+                  {getTotalWaitingCount()} {getTotalWaitingCount() === 1 ? 'person is' : 'people are'} waiting at this stop
+                </Text>
+              </View>
+            )}
           </View>
 
           {isCountingDown && (
@@ -229,54 +324,60 @@ export default function WaitingDrawer({
                 </Text>
               </View>
             ) : (
-              routes.map((route) => (
-                <TouchableOpacity
-                  key={route.id}
-                  style={[
-                    styles.routeCard,
-                    selectedRoute?.id === route.id && isCountingDown && styles.selectedRouteCard
-                  ]}
-                  onPress={() => startCountdown(route)}
-                  disabled={isCountingDown}
-                >
-                  <View style={styles.routeHeader}>
-                    <View style={styles.transportBadge}>
-                      <Text style={styles.transportType}>{route.transport_type}</Text>
+              routes.map((route) => {
+                const waitingCount = getWaitingCountForRoute(route.id);
+                return (
+                  <TouchableOpacity
+                    key={route.id}
+                    style={[
+                      styles.routeCard,
+                      selectedRoute?.id === route.id && isCountingDown && styles.selectedRouteCard,
+                      waitingCount > 0 && styles.routeWithWaiters
+                    ]}
+                    onPress={() => startCountdown(route)}
+                    disabled={isCountingDown}
+                  >
+                    <View style={styles.routeHeader}>
+                      <View style={styles.transportBadge}>
+                        <Text style={styles.transportType}>{route.transport_type}</Text>
+                      </View>
+                      <View style={styles.priceContainer}>
+                        <Text style={styles.price}>R {route.cost}</Text>
+                      </View>
                     </View>
-                    <View style={styles.priceContainer}>
-                      <DollarSign size={16} color="#1ea2b1" />
-                      <Text style={styles.price}>R {route.cost}</Text>
+                    
+                    <Text style={styles.routeName}>{route.name}</Text>
+                    <Text style={styles.routeDestination}>
+                      {route.start_point} → {route.end_point}
+                    </Text>
+                    
+                    <View style={styles.routeFooter}>
+                      <View style={styles.waitingInfo}>
+                        <Users size={16} color={waitingCount > 0 ? "#1ea2b1" : "#666666"} />
+                        <Text style={[
+                          styles.waitingCount,
+                          waitingCount > 0 && styles.waitingCountActive
+                        ]}>
+                          {waitingCount} {waitingCount === 1 ? 'person' : 'people'} waiting
+                        </Text>
+                      </View>
+                      <View style={styles.estimatedTime}>
+                        <Clock size={16} color="#666666" />
+                        <Text style={styles.timeText}>
+                          Est. {10 + Math.floor(Math.random() * 15)} min
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  
-                  <Text style={styles.routeName}>{route.name}</Text>
-                  <Text style={styles.routeDestination}>
-                    {route.start_point} → {route.end_point}
-                  </Text>
-                  
-                  <View style={styles.routeFooter}>
-                    <View style={styles.waitingInfo}>
-                      <Users size={16} color="#666666" />
-                      <Text style={styles.waitingCount}>
-                        {Math.floor(Math.random() * 8)} waiting
-                      </Text>
-                    </View>
-                    <View style={styles.estimatedTime}>
-                      <Clock size={16} color="#666666" />
-                      <Text style={styles.timeText}>
-                        Est. {10 + Math.floor(Math.random() * 15)} min
-                      </Text>
-                    </View>
-                  </View>
 
-                  {selectedRoute?.id === route.id && isCountingDown && (
-                    <View style={styles.selectedOverlay}>
-                      <CheckCircle size={24} color="#4ade80" />
-                      <Text style={styles.selectedText}>Selected</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))
+                    {selectedRoute?.id === route.id && isCountingDown && (
+                      <View style={styles.selectedOverlay}>
+                        <CheckCircle size={24} color="#4ade80" />
+                        <Text style={styles.selectedText}>Selected</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })
             )}
           </ScrollView>
         </View>
@@ -339,6 +440,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#cccccc',
     lineHeight: 20,
+    marginBottom: 8,
+  },
+  totalWaitingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1ea2b120',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  totalWaitingText: {
+    color: '#1ea2b1',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 6,
   },
   countdownContainer: {
     alignItems: 'center',
@@ -394,6 +511,10 @@ const styles = StyleSheet.create({
     borderColor: '#1ea2b1',
     backgroundColor: '#1ea2b110',
   },
+  routeWithWaiters: {
+    borderColor: '#1ea2b1',
+    borderWidth: 2,
+  },
   routeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -445,6 +566,10 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontSize: 12,
     marginLeft: 4,
+  },
+  waitingCountActive: {
+    color: '#1ea2b1',
+    fontWeight: '600',
   },
   estimatedTime: {
     flexDirection: 'row',
