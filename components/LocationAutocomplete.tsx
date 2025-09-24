@@ -27,6 +27,7 @@ export default function LocationAutocomplete({
   const [loading, setLoading] = useState(false);
   const [hasSelected, setHasSelected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [noResults, setNoResults] = useState(false);
   const typingTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export default function LocationAutocomplete({
       setSuggestions([]);
       setShowSuggestions(false);
       setError(null);
+      setNoResults(false);
       return;
     }
 
@@ -80,15 +82,19 @@ export default function LocationAutocomplete({
       if (Array.isArray(data)) {
         setSuggestions(data);
         setShowSuggestions(true);
+        setNoResults(data.length === 0);
       } else {
         console.warn('Unexpected response format:', data);
         setSuggestions([]);
+        setShowSuggestions(false);
+        setNoResults(false);
       }
     } catch (error) {
       console.error('Error searching locations:', error);
       setError('Location service temporarily unavailable. Please try again shortly.');
       setSuggestions([]);
       setShowSuggestions(false);
+      setNoResults(false);
     } finally {
       setLoading(false);
     }
@@ -101,12 +107,14 @@ export default function LocationAutocomplete({
     setSuggestions([]);
     setShowSuggestions(false);
     setError(null);
+    setNoResults(false);
   };
 
   const handleChangeText = (text: string) => {
     onChangeText(text);
     setHasSelected(false);
     setError(null);
+    setNoResults(false);
   };
 
   return (
@@ -128,6 +136,16 @@ export default function LocationAutocomplete({
       
       {error && (
         <Text style={styles.errorText}>{error}</Text>
+      )}
+      
+      {showSuggestions && !loading && noResults && (
+        <View style={styles.suggestionsContainer}>
+          <View style={[styles.suggestionItem, { justifyContent: 'center' }]}>
+            <Text style={[styles.suggestionText, { color: '#999' }]}>
+              Could not find the address. Try a different name or add more details.
+            </Text>
+          </View>
+        </View>
       )}
       
       {showSuggestions && suggestions.length > 0 && (
