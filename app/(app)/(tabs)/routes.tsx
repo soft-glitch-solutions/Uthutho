@@ -51,12 +51,14 @@ export default function RoutesScreen() {
   const [filteredRoutes, setFilteredRoutes] = useState<Route[]>([]);
   const [routeSearchQuery, setRouteSearchQuery] = useState('');
   const [selectedTransportType, setSelectedTransportType] = useState<string>('All');
+  const [routeFollowerCounts, setRouteFollowerCounts] = useState<Record<string, number>>({});
 
   // Hubs State
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [filteredHubs, setFilteredHubs] = useState<Hub[]>([]);
   const [hubSearchQuery, setHubSearchQuery] = useState('');
   const [selectedHubType, setSelectedHubType] = useState<string>('All');
+  const [hubFollowerCounts, setHubFollowerCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [loadingHubs, setLoadingHubs] = useState(false);
 
@@ -89,6 +91,21 @@ export default function RoutesScreen() {
 
       if (error) throw error;
       setRoutes(data || []);
+
+      const ids = (data || []).map(r => r.id);
+      if (ids.length) {
+        const { data: favs } = await supabase
+          .from('favorites')
+          .select('entity_id')
+          .eq('entity_type', 'route')
+          .in('entity_id', ids);
+
+        const map: Record<string, number> = {};
+        (favs || []).forEach(f => { map[f.entity_id] = (map[f.entity_id] || 0) + 1; });
+        setRouteFollowerCounts(map);
+      } else {
+        setRouteFollowerCounts({});
+      }
     } catch (err) {
       console.error('Failed to load routes:', err);
     } finally {
@@ -107,6 +124,21 @@ export default function RoutesScreen() {
       if (error) throw error;
       setHubs(data || []);
       setFilteredHubs(data || []);
+
+      const ids = (data || []).map(h => h.id);
+      if (ids.length) {
+        const { data: favs } = await supabase
+          .from('favorites')
+          .select('entity_id')
+          .eq('entity_type', 'hub')
+          .in('entity_id', ids);
+
+        const map: Record<string, number> = {};
+        (favs || []).forEach(f => { map[f.entity_id] = (map[f.entity_id] || 0) + 1; });
+        setHubFollowerCounts(map);
+      } else {
+        setHubFollowerCounts({});
+      }
     } catch (err) {
       console.error('Failed to load hubs:', err);
     } finally {
@@ -456,7 +488,13 @@ const findRoute = async () => {
                         <Clock size={16} color="#1ea2b1" />
                         <Text style={styles.routeDetailText}>Est. 45-60 min</Text>
                       </View>
-                      <Text style={styles.routeCost}>R {route.cost}</Text>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ color: '#1ea2b1', marginRight: 12 }}>
+                          {routeFollowerCounts[route.id] || 0}
+                        </Text>
+                        <Text style={styles.routeCost}>R {route.cost}</Text>
+                      </View>
                     </View>
                   </TouchableOpacity>
                 ))
@@ -536,6 +574,9 @@ const findRoute = async () => {
                     <View style={styles.hubCoordinates}>
                       <Text style={styles.coordinatesText}>
                         {hub.latitude.toFixed(4)}, {hub.longitude.toFixed(4)}
+                      </Text>
+                      <Text style={[styles.coordinatesText, { marginTop: 4, color: '#1ea2b1' }]}>
+                        Followers: {hubFollowerCounts[hub.id] || 0}
                       </Text>
                     </View>
                   </TouchableOpacity>

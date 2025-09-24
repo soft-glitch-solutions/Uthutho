@@ -14,7 +14,7 @@ import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useTheme } from '@/context/ThemeContext';
-import { MapPin, Bus, Brain as Train, Navigation, Users, Clock, Flag } from 'lucide-react-native';
+import { MapPin, Bus, Brain as Train, Navigation, Users, Clock, Flag, Route, BookmarkCheck, Plus } from 'lucide-react-native';
 import { useJourney } from '@/hook/useJourney';
 import HeaderSection from '@/components/home/HeaderSection';
 import NearbySection from '@/components/home/NearbySection';
@@ -111,6 +111,7 @@ export default function HomeScreen() {
   const { activeJourney, loading: journeyLoading } = useJourney();
   const [showStreakOverlay, setShowStreakOverlay] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
 
   const fetchNearestLocations = useCallback(async () => {
     if (!userLocation) return;
@@ -533,6 +534,42 @@ useEffect(() => {
     setRefreshing(false);
   }, [fetchUserProfile, fetchNearestLocations]);
 
+  // helper: fetch counts from favorites table for all resolved favorites
+  const loadFavoriteFollowerCounts = async (items: Array<{ id: string; type: 'route'|'hub'|'stop' }>) => {
+    try {
+      const byType: Record<'route'|'hub'|'stop', string[]> = { route: [], hub: [], stop: [] };
+      items.forEach(it => byType[it.type]?.push(it.id));
+
+      const newMap: Record<string, number> = {};
+
+      const fetchType = async (type: 'route'|'hub'|'stop') => {
+        if (!byType[type].length) return;
+        const { data } = await supabase
+          .from('favorites')
+          .select('entity_id')
+          .eq('entity_type', type)
+          .in('entity_id', byType[type]);
+        (data || []).forEach(row => {
+          newMap[row.entity_id] = (newMap[row.entity_id] || 0) + 1;
+        });
+      };
+
+      await Promise.all([fetchType('route'), fetchType('hub'), fetchType('stop')]);
+      setFavoritesCountMap(newMap);
+    } catch (e) {
+      console.error('Failed loading favorites follower counts:', e);
+    }
+  };
+
+  // reload counts whenever resolved favorite IDs/types change
+  useEffect(() => {
+    const resolved = favoriteDetails
+      .filter(Boolean)
+      .map(d => ({ id: d.id as string, type: d.type as 'route'|'hub'|'stop' }));
+    if (resolved.length) loadFavoriteFollowerCounts(resolved);
+    else setFavoritesCountMap({});
+  }, [favoriteDetails]);
+
   return (
     <ScreenTransition>
       <ScrollView
@@ -675,11 +712,33 @@ useEffect(() => {
                             {getTypeLabel(type)}
                           </Text>
                         </View>
+
+                        {details?.id && (
+                          <View style={{
+                            marginTop: 6,
+                            alignSelf: 'flex-start',
+                            backgroundColor: '#1ea2b120',
+                            borderRadius: 12,
+                            paddingHorizontal: 8,
+                            paddingVertical: 2,
+                          }}>
+                            <Text style={{ color: '#1ea2b1', fontSize: 12 }}>
+                              Followers: {favoritesCountMap[details.id] || 0}
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
                     <Pressable
                       style={[styles.removeButton, { backgroundColor: colors.border }]}
-                      onPress={() => toggleFavorite(favorite)}
+                      onPress={() => {
+                        const removedId = (details?.id as string) || favorite.id;
+                        setFavoritesCountMap(prev => ({
+                          ...prev,
+                          [removedId]: Math.max(0, (prev[removedId] || 0) - 1),
+                        }));
+                        toggleFavorite(favorite);
+                      }}
                     >
                       <Text style={[styles.removeButtonText, { color: colors.text }]}>
                         Remove

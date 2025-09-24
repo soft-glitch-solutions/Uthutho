@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MapPin, Flag, Route, Heart, Plus } from 'lucide-react-native';
+import { MapPin, Flag, Route, BookmarkCheck, Plus } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import FavoritesSkeleton from './skeletons/FavoritesSkeleton';
 
@@ -18,6 +18,7 @@ interface FavoritesSectionProps {
   favoriteDetails: any[];
   colors: any;
   toggleFavorite: (item: FavoriteItem) => void;
+  favoritesCountMap: Record<string, number>;
 }
 
 const FavoritesSection = ({
@@ -25,7 +26,8 @@ const FavoritesSection = ({
   favorites,
   favoriteDetails,
   colors,
-  toggleFavorite
+  toggleFavorite,
+  favoritesCountMap
 }: FavoritesSectionProps) => {
   const router = useRouter();
 
@@ -71,17 +73,24 @@ const FavoritesSection = ({
                         {favorite.distance} away
                       </Text>
                     )}
+                    {/* Followers pill */}
+                    {details.id && (
+                      <View style={{
+                        marginTop: 6,
+                        alignSelf: 'flex-start',
+                        backgroundColor: '#1ea2b120',
+                        borderRadius: 12,
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                      }}>
+                        <Text style={{ color: '#1ea2b1', fontSize: 12 }}>
+                          Followers: {favoritesCountMap[details.id] || 0}
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                  <TouchableOpacity
-                    onPress={() => toggleFavorite(favorite)}
-                    style={{ padding: 4 }}
-                  >
-                    <Heart
-                      size={20}
-                      color={colors.primary}
-                      fill={colors.primary}
-                    />
-                  </TouchableOpacity>
+                  {/* show bookmarked status */}
+                  <BookmarkCheck size={20} color={colors.primary} />
                 </View>
               </Pressable>
             );

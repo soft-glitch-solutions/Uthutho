@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
-import { Search, MapPin, Navigation, Heart, Clock, DollarSign } from 'lucide-react-native';
+import { Search, MapPin, Navigation, Bookmark, BookmarkCheck, Clock, DollarSign } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useFavorites, FavoriteItem } from '@/hook/useFavorites';
 import { useAuth } from '@/hook/useAuth';
@@ -46,6 +46,9 @@ export default function SearchScreen() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [recommendedNearby, setRecommendedNearby] = useState<SearchResult[]>([]);
   const [isLoadingRecommended, setIsLoadingRecommended] = useState(false);
+  const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
+  const [routeFollowerCounts, setRouteFollowerCounts] = useState<Record<string, number>>({});
+  const [hubFollowerCounts, setHubFollowerCounts] = useState<Record<string, number>>({});
   
   const { favorites, addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
   const { user } = useAuth();
@@ -175,6 +178,7 @@ export default function SearchScreen() {
         
       console.log('Final recommended results:', balancedResults);
       setRecommendedNearby(balancedResults);
+      populateFollowerCounts(balancedResults);
     } catch (error) {
       console.error('Error loading recommended nearby:', error);
     } finally {
@@ -306,6 +310,7 @@ export default function SearchScreen() {
       }
 
       setSearchResults(results);
+      populateFollowerCounts(results);
     } catch (error) {
       console.error('Search error:', error);
       Alert.alert('Error', 'Failed to search. Please try again.');
@@ -320,17 +325,57 @@ export default function SearchScreen() {
       return;
     }
 
-    const favoriteItem: FavoriteItem = {
-      id: result.id,
-      type: result.type,
-      name: result.name,
-      data: result.data,
-    };
+    // Map result.type to your favorites entity_type
+    const entityType: 'route' | 'hub' | 'stop' | 'nearby_spot' = result.type;
+    if (entityType === 'nearby_spot') {
+      Alert.alert('Not Supported', 'Nearby spots cannot be bookmarked yet.');
+      return;
+    }
 
-    if (isFavorite(result.id)) {
-      await removeFromFavorites(result.id);
-    } else {
-      await addToFavorites(favoriteItem);
+    const id = result.id;
+    const isFav = isFavorite(id);
+    const delta = isFav ? -1 : 1;
+
+    // Optimistic UI update
+    setFavoritesCountMap(prev => ({ ...prev, [id]: Math.max(0, (prev[id] || 0) + delta) }));
+
+    try {
+      if (isFav) {
+        const { error: favErr } = await supabase.rpc('remove_favorite', {
+          p_user_id: user.id,
+          p_entity_type: entityType,
+          p_entity_id: id,
+        });
+        if (favErr) throw favErr;
+
+        const { error: bumpErr } = await supabase.rpc('bump_favorites_count', {
+          p_user_id: user.id,
+          p_delta: -1,
+        });
+        if (bumpErr) console.warn('bump_favorites_count failed:', bumpErr);
+
+        await removeFromFavorites(id);
+      } else {
+        const { error: favErr } = await supabase.rpc('add_favorite', {
+          p_user_id: user.id,
+          p_entity_type: entityType,
+          p_entity_id: id,
+        });
+        if (favErr) throw favErr;
+
+        const { error: bumpErr } = await supabase.rpc('bump_favorites_count', {
+          p_user_id: user.id,
+          p_delta: 1,
+        });
+        if (bumpErr) console.warn('bump_favorites_count failed:', bumpErr);
+
+        await addToFavorites({ id, type: entityType, name: result.name, data: result.data });
+      }
+    } catch (e) {
+      // Revert optimistic change on error
+      setFavoritesCountMap(prev => ({ ...prev, [id]: Math.max(0, (prev[id] || 0) - delta) }));
+      console.error('Favorite toggle failed:', e);
+      Alert.alert('Error', 'Could not update favorites. Please try again.');
     }
   };
 
@@ -378,11 +423,11 @@ export default function SearchScreen() {
             style={styles.favoriteButton}
             onPress={() => handleFavoriteToggle(result)}
           >
-            <Heart
-              size={20}
-              color={isResultFavorite ? '#ff6b35' : '#888888'}
-              fill={isResultFavorite ? '#ff6b35' : 'transparent'}
-            />
+            {isResultFavorite ? (
+              <BookmarkCheck size={20} color="#22c55e" />
+            ) : (
+              <Bookmark size={20} color="#888888" />
+            )}
           </TouchableOpacity>
         </View>
         
@@ -392,16 +437,34 @@ export default function SearchScreen() {
               {result.type.charAt(0).toUpperCase() + result.type.slice(1).replace('_', ' ')}
             </Text>
           </View>
-          
-          {result.type === 'route' && (
-            <View style={styles.routeInfo}>
-              <Clock size={14} color="#888888" />
-              <Text style={styles.routeInfoText}>{result.data.transport_type}</Text>
-            </View>
+
+          {(result.type === 'route' || result.type === 'hub' || result.type === 'stop') && (
+            <Text style={{ color: '#1ea2b1', fontSize: 12 }}>
+              Followers: {favoritesCountMap[result.id] || 0}
+            </Text>
           )}
         </View>
       </TouchableOpacity>
     );
+  };
+
+  const populateFollowerCounts = async (items: SearchResult[]) => {
+    const byType: Record<'route'|'hub'|'stop', string[]> = { route: [], hub: [], stop: [] };
+    items.forEach(r => { if (r.type === 'route' || r.type === 'hub' || r.type === 'stop') byType[r.type].push(r.id); });
+
+    const newMap: Record<string, number> = {};
+    const fetchType = async (type: 'route'|'hub'|'stop') => {
+      if (!byType[type].length) return;
+      const { data } = await supabase
+        .from('favorites')
+        .select('entity_id')
+        .eq('entity_type', type)
+        .in('entity_id', byType[type]);
+      (data || []).forEach(f => { newMap[f.entity_id] = (newMap[f.entity_id] || 0) + 1; });
+    };
+
+    await Promise.all([fetchType('route'), fetchType('hub'), fetchType('stop')]);
+    setFavoritesCountMap(prev => ({ ...prev, ...newMap }));
   };
 
   return (

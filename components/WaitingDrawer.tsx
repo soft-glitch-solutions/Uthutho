@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Alert, Animated, Image } from 'react-native';
-import { X, Clock, DollarSign, Users, CircleCheck as CheckCircle, Search } from 'lucide-react-native';
+import { X, Clock,  Users, CircleCheck as CheckCircle, Search } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useJourney } from '@/hook/useJourney';
@@ -525,7 +525,6 @@ export default function WaitingDrawer({
                     <Text style={styles.transportType}>Unknown</Text>
                   </View>
                   <View style={styles.priceContainer}>
-                    <DollarSign size={16} color="#666666" />
                     <Text style={[styles.price, { color: '#666666' }]}>R 0</Text>
                   </View>
                 </View>
