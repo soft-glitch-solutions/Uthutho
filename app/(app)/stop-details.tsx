@@ -44,6 +44,71 @@ interface StopInfo {
   }>;
 }
 
+// Skeleton Loading Components
+const SkeletonLoader = ({ colors }) => (
+  <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    {/* Header Skeleton */}
+    <View style={styles.header}>
+      <View style={[styles.skeleton, { width: 40, height: 40, borderRadius: 20 }]} />
+      <View style={[styles.skeleton, { width: 40, height: 40, borderRadius: 20 }]} />
+    </View>
+
+    <View style={styles.content}>
+      {/* Image Skeleton */}
+      <View style={[styles.skeleton, { width: '100%', height: 200, borderRadius: 10, marginBottom: 20 }]} />
+      
+      {/* Title Skeleton */}
+      <View style={[styles.skeleton, { width: '70%', height: 24, marginBottom: 10 }]} />
+      
+      {/* Waiting Count Skeleton */}
+      <View style={styles.waitingCountContainer}>
+        <View style={[styles.skeleton, { width: 150, height: 32, borderRadius: 20 }]} />
+        <View style={[styles.skeleton, { width: 44, height: 44, borderRadius: 5 }]} />
+      </View>
+
+      {/* Stop Information Card Skeleton */}
+      <View style={styles.sectionI}>
+        <View style={[styles.skeletonCard, { backgroundColor: colors.card }]}>
+          {[1, 2, 3, 4].map((item) => (
+            <View key={item} style={styles.skeletonInfoRow}>
+              <View style={[styles.skeleton, { width: 16, height: 16, borderRadius: 8 }]} />
+              <View style={[styles.skeleton, { width: 80, height: 14 }]} />
+              <View style={[styles.skeleton, { width: 60, height: 14 }]} />
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Currently Waiting Skeleton */}
+      <View style={styles.section}>
+        <View style={[styles.skeleton, { width: 200, height: 18, marginBottom: 15 }]} />
+        {[1, 2].map((item) => (
+          <View key={item} style={[styles.skeleton, { width: '100%', height: 80, borderRadius: 12, marginBottom: 12 }]} />
+        ))}
+      </View>
+
+      {/* Map Block Skeleton */}
+      <View style={[styles.skeleton, { width: '100%', height: 200, borderRadius: 10, marginBottom: 20 }]} />
+
+      {/* Nearby Stops Skeleton */}
+      <View style={styles.section}>
+        <View style={[styles.skeleton, { width: 120, height: 18, marginBottom: 15 }]} />
+        {[1, 2].map((item) => (
+          <View key={item} style={[styles.skeleton, { width: '100%', height: 80, borderRadius: 8, marginBottom: 10 }]} />
+        ))}
+      </View>
+
+      {/* Recent Activity Skeleton */}
+      <View style={styles.section}>
+        <View style={[styles.skeleton, { width: 150, height: 18, marginBottom: 15 }]} />
+        {[1, 2, 3].map((item) => (
+          <View key={item} style={[styles.skeleton, { width: '100%', height: 120, borderRadius: 8, marginBottom: 10 }]} />
+        ))}
+      </View>
+    </View>
+  </ScrollView>
+);
+
 export default function StopDetailsScreen() {
   const { stopId } = useLocalSearchParams();
   const { colors } = useTheme();
@@ -287,12 +352,9 @@ export default function StopDetailsScreen() {
     Linking.openURL(url).catch((err) => console.error('Error opening map:', err));
   };
 
+  // Show skeleton loader while loading
   if (isLoading) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return <SkeletonLoader colors={colors} />;
   }
 
   if (!stopDetails) {
@@ -480,8 +542,7 @@ export default function StopDetailsScreen() {
   );
 }
 
-// Add the renderPost function and styles from your original code...
-const renderPost = ({ item }) => (
+const renderPost = ({ item, colors }) => (
   <TouchableOpacity onPress={() => handlePostPress(item.id)} style={[styles.postContainer, { backgroundColor: colors.card }]}>
     <View style={styles.postHeader}>
       <Image
@@ -596,8 +657,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  // ... (keep all your existing styles and add the new ones below)
   
+  // Skeleton Loading Styles
+  skeleton: {
+    backgroundColor: '#e1e1e1',
+    borderRadius: 4,
+  },
+  skeletonCard: {
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+  },
+  skeletonInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  
+  // Existing styles
   sectionI: {
     paddingHorizontal: 0,
     marginBottom: 20,
@@ -675,5 +753,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1ea2b1',
   },
-  // ... (keep all your other existing styles)
+  // Add other existing styles as needed...
 });

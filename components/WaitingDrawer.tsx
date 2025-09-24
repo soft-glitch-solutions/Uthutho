@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
-import { X, Clock, DollarSign, Users, CircleCheck as CheckCircle } from 'lucide-react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Alert, Animated, Image } from 'react-native';
+import { X, Clock, DollarSign, Users, CircleCheck as CheckCircle, Search } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useJourney } from '@/hook/useJourney';
@@ -34,14 +34,21 @@ export default function WaitingDrawer({
   const [loading, setLoading] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
   const [waitingCounts, setWaitingCounts] = useState<Record<string, number>>({});
-  const [countdown, setCountdown] = useState(0);
-  const [isCountingDown, setIsCountingDown] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchPhase, setSearchPhase] = useState<'searching' | 'creating'>('searching');
+  const [userProfile, setUserProfile] = useState<any>(null);
   const { createOrJoinJourney } = useJourney();
+
+  // Animation values for radar effect
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (visible) {
       loadRoutesForStop();
       loadWaitingCounts();
+      loadUserProfile();
       
       // Set up real-time subscription for waiting counts
       const subscription = supabase
@@ -67,16 +74,83 @@ export default function WaitingDrawer({
   }, [visible, stopId]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isCountingDown && countdown > 0) {
-      interval = setInterval(() => {
-        setCountdown(prev => prev - 1);
-      }, 1000);
-    } else if (countdown === 0 && isCountingDown) {
-      completeWaiting();
+    if (isSearching) {
+      startRadarAnimation();
+    } else {
+      stopRadarAnimation();
     }
-    return () => clearInterval(interval);
-  }, [countdown, isCountingDown]);
+  }, [isSearching]);
+
+  const loadUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('avatar_url, first_name, last_name')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        setUserProfile(profile);
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
+  };
+
+  const startRadarAnimation = () => {
+    // Pulse animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // Rotation animation
+    Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: true,
+      })
+    ).start();
+
+    // Scale animation for profile picture
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  };
+
+  const stopRadarAnimation = () => {
+    pulseAnim.stopAnimation();
+    rotateAnim.stopAnimation();
+    scaleAnim.stopAnimation();
+    pulseAnim.setValue(0);
+    rotateAnim.setValue(0);
+    scaleAnim.setValue(1);
+  };
 
   const loadRoutesForStop = async () => {
     setLoading(true);
@@ -131,7 +205,7 @@ export default function WaitingDrawer({
       
       if (data) {
         data.forEach((item) => {
-          const routeId = item.route_id || 'unknown'; // Handle cases where route_id might be null
+          const routeId = item.route_id || 'unknown';
           counts[routeId] = (counts[routeId] || 0) + 1;
         });
       }
@@ -150,39 +224,129 @@ export default function WaitingDrawer({
     return Object.values(waitingCounts).reduce((sum, count) => sum + count, 0);
   };
 
-
-  const startCountdown = (route: Route) => {
+  const startSearching = (route: Route) => {
     setSelectedRoute(route);
-    setCountdown(5);
-    setIsCountingDown(true);
+    setIsSearching(true);
+    setSearchPhase('searching');
+    
+    // First, try to find existing journeys to join
+    searchForExistingJourney(route);
   };
 
-  const completeWaiting = async () => {
-    if (!selectedRoute) return;
-
+  const searchForExistingJourney = async (route: Route) => {
     try {
-      const result = await createOrJoinJourney(
-        stopId,
-        selectedRoute.id,
-        selectedRoute.transport_type
-      );
+      // Look for existing active journeys with participants
+      const { data: existingJourneys, error } = await supabase
+        .from('journeys')
+        .select(`
+          id, 
+          created_at, 
+          status, 
+          last_ping_time,
+          journey_participants!inner(user_id, joined_at)
+        `)
+        .eq('route_id', route.id)
+        .eq('status', 'in_progress')
+        .eq('journey_participants.is_active', true)
+        .gte('last_ping_time', new Date(Date.now() - 10 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-      if (result.success) {
-        await awardPoints(2);
-        router.replace('/journey');
-        onWaitingSet();
+      if (error) {
+        console.error('Error searching for existing journeys:', error);
+        setTimeout(() => {
+          createNewJourney(route);
+        }, 2000);
+        return;
+      }
+
+      if (existingJourneys && existingJourneys.length > 0) {
+        const journey = existingJourneys[0];
+        await joinExistingJourney(journey.id, route);
       } else {
-        Alert.alert('Error', result.error || 'Failed to start journey');
+        setTimeout(() => {
+          createNewJourney(route);
+        }, 3000);
       }
     } catch (error) {
-      console.error('Error creating journey:', error);
-      Alert.alert('Error', 'Failed to start journey. Please try again.');
+      console.error('Error in searchForExistingJourney:', error);
+      setTimeout(() => {
+        createNewJourney(route);
+      }, 2000);
     }
+  };
+
+  const joinExistingJourney = async (journeyId: string, route: Route) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Add user to journey participants
+      const { error: joinError } = await supabase
+        .from('journey_participants')
+        .insert({
+          journey_id: journeyId,
+          user_id: user.id,
+          is_active: true
+        });
+
+      if (joinError) throw joinError;
+
+      // Award points for joining
+      await awardPoints(1);
+      
+      // Navigate to journey
+      router.replace('/journey');
+      onWaitingSet();
+      setIsSearching(false);
+      setSelectedRoute(null);
+      onClose();
+    } catch (error) {
+      console.error('Error joining existing journey:', error);
+      createNewJourney(route);
+    }
+  };
+
+  const createNewJourney = async (route: Route) => {
+    setSearchPhase('creating');
     
-    setIsCountingDown(false);
-    setSelectedRoute(null);
-    setCountdown(0);
-    onClose();
+    // Wait a bit more to show the "creating" phase
+    setTimeout(async () => {
+      try {
+        const result = await createOrJoinJourney(
+          stopId,
+          route.id,
+          route.transport_type
+        );
+
+        if (result.success) {
+          // Add the creator as a participant
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase
+              .from('journey_participants')
+              .insert({
+                journey_id: result.journeyId, // Assuming createOrJoinJourney returns the journey ID
+                user_id: user.id,
+                is_active: true
+              });
+          }
+
+          await awardPoints(2);
+          router.replace('/journey');
+          onWaitingSet();
+        } else {
+          Alert.alert('Error', result.error || 'Failed to create journey');
+        }
+      } catch (error) {
+        console.error('Error creating journey:', error);
+        Alert.alert('Error', 'Failed to create journey. Please try again.');
+      }
+      
+      setIsSearching(false);
+      setSelectedRoute(null);
+      onClose();
+    }, 2000);
   };
 
   const awardPoints = async (points: number) => {
@@ -207,10 +371,92 @@ export default function WaitingDrawer({
     }
   };
 
-  const cancelCountdown = () => {
-    setIsCountingDown(false);
+  const cancelSearching = () => {
+    setIsSearching(false);
     setSelectedRoute(null);
-    setCountdown(0);
+  };
+
+  const renderRadarAnimation = () => {
+    const pulseOpacity = pulseAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.3, 0.8],
+    });
+
+    const pulseScale = pulseAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.8, 1.2],
+    });
+
+    const rotation = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <View style={styles.radarContainer}>
+        {/* Outer radar rings */}
+        <Animated.View
+          style={[
+            styles.radarRing,
+            {
+              opacity: pulseOpacity,
+              transform: [
+                { scale: pulseScale },
+                { rotate: rotation }
+              ],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.radarRing,
+            styles.radarRing2,
+            {
+              opacity: pulseOpacity,
+              transform: [
+                { scale: pulseScale },
+                { rotate: rotation }
+              ],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.radarRing,
+            styles.radarRing3,
+            {
+              opacity: pulseOpacity,
+              transform: [
+                { scale: pulseScale },
+                { rotate: rotation }
+              ],
+            },
+          ]}
+        />
+        
+        {/* Center profile picture */}
+        <Animated.View
+          style={[
+            styles.profileContainer,
+            {
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
+          <Image
+            source={{
+              uri: userProfile?.avatar_url || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop',
+            }}
+            style={styles.profileImage}
+          />
+        </Animated.View>
+
+        {/* Search icon overlay */}
+        <View style={styles.searchIconContainer}>
+          <Search size={20} color="#1ea2b1" />
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -226,19 +472,25 @@ export default function WaitingDrawer({
             <View style={styles.handle} />
             <View style={styles.headerContent}>
               <Text style={styles.title}>
-                {isCountingDown ? `Confirming... ${countdown}` : 'Mark as Waiting'}
+                {isSearching 
+                  ? (searchPhase === 'searching' ? 'Searching for Journey...' : 'Creating New Journey...')
+                  : 'Mark as Waiting'
+                }
               </Text>
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                 <X size={24} color="#ffffff" />
               </TouchableOpacity>
             </View>
             <Text style={styles.subtitle}>
-              {isCountingDown 
-                ? `Marking you as waiting for ${selectedRoute?.name} at ${stopName}`
+              {isSearching 
+                ? (searchPhase === 'searching' 
+                    ? `Looking for existing journeys for ${selectedRoute?.name} at ${stopName}`
+                    : `Creating a new journey for ${selectedRoute?.name} at ${stopName}`
+                  )
                 : `Select which transport you're waiting for at ${stopName}`
               }
             </Text>
-              {!isCountingDown && getTotalWaitingCount() > 0 && (
+            {!isSearching && getTotalWaitingCount() > 0 && (
               <View style={styles.totalWaitingContainer}>
                 <Users size={16} color="#1ea2b1" />
                 <Text style={styles.totalWaitingText}>
@@ -248,12 +500,16 @@ export default function WaitingDrawer({
             )}
           </View>
 
-          {isCountingDown && (
-            <View style={styles.countdownContainer}>
-              <View style={styles.countdownCircle}>
-                <Text style={styles.countdownText}>{countdown}</Text>
-              </View>
-              <TouchableOpacity style={styles.cancelButton} onPress={cancelCountdown}>
+          {isSearching && (
+            <View style={styles.searchingContainer}>
+              {renderRadarAnimation()}
+              <Text style={styles.searchingText}>
+                {searchPhase === 'searching' 
+                  ? 'Looking for other travelers to join...'
+                  : 'Setting up your journey...'
+                }
+              </Text>
+              <TouchableOpacity style={styles.cancelButton} onPress={cancelSearching}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -287,11 +543,11 @@ export default function WaitingDrawer({
                   key={route.id}
                   style={[
                     styles.routeCard,
-                      selectedRoute?.id === route.id && isCountingDown && styles.selectedRouteCard,
+                      selectedRoute?.id === route.id && isSearching && styles.selectedRouteCard,
                       waitingCount > 0 && styles.routeWithWaiters
                   ]}
-                  onPress={() => startCountdown(route)}
-                  disabled={isCountingDown}
+                  onPress={() => startSearching(route)}
+                  disabled={isSearching}
                 >
                   <View style={styles.routeHeader}>
                     <View style={styles.transportBadge}>
@@ -310,8 +566,7 @@ export default function WaitingDrawer({
                   
                   <View style={styles.routeFooter}>
                     <View style={styles.waitingInfo}>
-                      <Users size={16} color="#666666" />
-                        <Users size={16} color={waitingCount > 0 ? "#1ea2b1" : "#666666"} />
+                      <Users size={16} color={waitingCount > 0 ? "#1ea2b1" : "#666666"} />
                         <Text style={[
                           styles.waitingCount,
                           waitingCount > 0 && styles.waitingCountActive
@@ -327,10 +582,10 @@ export default function WaitingDrawer({
                     </View>
                   </View>
 
-                  {selectedRoute?.id === route.id && isCountingDown && (
+                  {selectedRoute?.id === route.id && isSearching && (
                     <View style={styles.selectedOverlay}>
                       <CheckCircle size={24} color="#4ade80" />
-                      <Text style={styles.selectedText}>Selected</Text>
+                      <Text style={styles.selectedText}>Searching...</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -408,11 +663,66 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 6,
   },
-  countdownContainer: {
+  searchingContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 30,
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
+  },
+  radarContainer: {
+    width: 120,
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    position: 'relative',
+  },
+  radarRing: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 2,
+    borderColor: '#1ea2b1',
+  },
+  radarRing2: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  radarRing3: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  profileContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: '#1ea2b1',
+    backgroundColor: '#1a1a1a',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+  },
+  searchIconContainer: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#1ea2b1',
+  },
+  searchingText: {
+    color: '#1ea2b1',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 20,
   },
   routeWithWaiters: {
     borderColor: '#1ea2b1',
@@ -421,21 +731,6 @@ const styles = StyleSheet.create({
   waitingCountActive: {
     color: '#1ea2b1',
     fontWeight: '600',
-  },
-
-  countdownCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#1ea2b1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  countdownText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#ffffff',
   },
   cancelButton: {
     backgroundColor: '#ef4444',

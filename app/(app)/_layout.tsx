@@ -30,18 +30,7 @@ export default function AppLayout() {
           ),
         }}
       />
-    <Drawer.Screen name="hubs"         options={{
-          title: 'Hubs',
-          drawerIcon: ({ color, size }) => (
-            <MapPin color={color} size={size} />
-          ),
-        }} />
-   <Drawer.Screen name="stops"         options={{
-          title: 'Stop',
-          drawerIcon: ({ color, size }) => (
-            <Flag color={color} size={size} />
-          ),
-        }}/>
+
       <Drawer.Screen
         name="profile"
         options={{
@@ -165,6 +154,8 @@ options={{
             <Drawer.Screen name="carpool" options={{ drawerItemStyle: { height: 0 }, title: 'CarPool' }} />
             <Drawer.Screen name="journeyComplete" options={{ drawerItemStyle: { height: 0 }, title: 'JourneyComplete' }} />
           <Drawer.Screen name="journey" options={{ drawerItemStyle: { height: 0 }, title: 'journey' }} />
+          <Drawer.Screen name="hubs" options={{ drawerItemStyle: { height: 0 }, title: 'hubs' }} />
+          <Drawer.Screen name="stops" options={{ drawerItemStyle: { height: 0 }, title: 'stops' }} />
       <Drawer.Screen
         name="post-details"
         options={{
