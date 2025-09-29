@@ -125,7 +125,7 @@ Sign up: https://uthutho.app/driver-signup`;
 
         {/* Share Option */}
         <TouchableOpacity 
-          style={[styles.shareButton, { borderColor: colors.border }]}
+          style={[styles.shareButton, { borderColor: colors.border }, user ? { marginBottom: 16 } : null]}
           onPress={handleShare}
         >
           <Share2 size={20} color={colors.text} />
@@ -252,7 +252,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderWidth: 1,
     borderRadius: 12,
-    marginBottom: user ? 16 : 0,
   },
   shareText: {
     fontSize: 16,
