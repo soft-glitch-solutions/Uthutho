@@ -553,7 +553,6 @@ export default function WaitingDrawer({
                       <Text style={styles.transportType}>{route.transport_type}</Text>
                     </View>
                     <View style={styles.priceContainer}>
-                      <DollarSign size={16} color="#1ea2b1" />
                       <Text style={styles.price}>R {route.cost}</Text>
                     </View>
                   </View>

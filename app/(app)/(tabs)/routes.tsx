@@ -363,6 +363,9 @@ const findRoute = async () => {
                           onChangeText={setToText}
                           onLocationSelect={setToLocation}
                         />
+                        <Text style={{ color: '#666666', fontSize: 12, marginTop: 8 }}>
+                          Note: Searches are limited to South Africa addresses.
+                        </Text>
                       </View>
 
                       <TouchableOpacity

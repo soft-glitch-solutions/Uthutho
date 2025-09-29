@@ -58,7 +58,7 @@ export default function LocationAutocomplete({
     
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=za&limit=5&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=za&bounded=1&viewbox=16.45,-22.13,32.89,-34.83&limit=5&addressdetails=1`,
         {
           headers: {
             'User-Agent': 'Uthutho/1.0 (shaqeel@uthutho.co.za)',
