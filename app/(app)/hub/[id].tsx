@@ -93,6 +93,7 @@ export default function HubDetailScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [followerCount, setFollowerCount] = useState(0);
 
   useEffect(() => {
     if (id) {
@@ -100,6 +101,7 @@ export default function HubDetailScreen() {
       loadHubRoutes();
       loadHubPosts();
       checkIfFavorite();
+      loadFollowerCount();
     }
   }, [id]);
 
@@ -158,6 +160,22 @@ export default function HubDetailScreen() {
     }
   };
 
+  const loadFollowerCount = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('id')
+        .eq('entity_type', 'hub')
+        .eq('entity_id', id);
+
+      if (!error) {
+        setFollowerCount(data?.length || 0);
+      }
+    } catch (error) {
+      console.error('Error loading follower count:', error);
+    }
+  };
+
   const checkIfFavorite = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -209,12 +227,15 @@ export default function HubDetailScreen() {
 
       if (!error) {
         setIsFavorite(!isFavorite);
+        // Update follower count after toggling favorite
+        loadFollowerCount();
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
     }
   };
 
+  // ... rest of your existing functions (openInMaps, navigateToRoute) ...
 
 const openInMaps = () => {
   if (!hub) {
@@ -291,7 +312,7 @@ const openInMaps = () => {
   const navigateToRoute = (routeId: string) => {
     router.push(`/route-details?routeId=${routeId}`);
   };
-
+  
   if (loading) {
     return <SkeletonLoader />;
   }
@@ -347,11 +368,13 @@ const openInMaps = () => {
           <Text style={styles.hubAddress}>{hub.address}</Text>
         )}
         
-        {/* <View style={styles.coordinates}>
-          <Text style={styles.coordinatesText}>
-            {hub.latitude.toFixed(6)}, {hub.longitude.toFixed(6)}
+        {/* Follower Count */}
+        <View style={styles.followerContainer}>
+          <Users size={16} color="#1ea2b1" />
+          <Text style={styles.followerText}>
+            {followerCount} {followerCount === 1 ? 'follower' : 'followers'}
           </Text>
-        </View> */}
+        </View>
 
         {hub.transport_type && (
           <View style={styles.transportBadge}>
@@ -460,6 +483,23 @@ const styles = StyleSheet.create({
   },
   skeletonBadge: {
     height: 28,
+  },
+  // New follower styles
+  followerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+    backgroundColor: '#1ea2b120',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  followerText: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
   },
   // Rest of the styles remain the same
   loadingContainer: {
