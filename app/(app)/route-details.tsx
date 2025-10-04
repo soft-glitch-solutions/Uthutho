@@ -119,11 +119,13 @@ export default function RouteDetailsScreen() {
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const [routeStats, setRouteStats] = useState<RouteStats | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
 
   useEffect(() => {
     fetchRouteDetails();
     loadRouteStats();
     fetchPriceChangeRequests();
+    loadFollowerCount();
   }, [routeId]);
 
   const loadRouteStats = async () => {
@@ -137,6 +139,22 @@ export default function RouteDetailsScreen() {
       });
     } catch (error) {
       console.error('Error loading route stats:', error);
+    }
+  };
+
+  const loadFollowerCount = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('id')
+        .eq('entity_type', 'route')
+        .eq('entity_id', routeId);
+
+      if (!error) {
+        setFollowerCount(data?.length || 0);
+      }
+    } catch (error) {
+      console.error('Error loading follower count:', error);
     }
   };
 
@@ -171,6 +189,8 @@ export default function RouteDetailsScreen() {
 
       if (!error) {
         setIsFavorite(!isFavorite);
+        // Update follower count after toggling favorite
+        loadFollowerCount();
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
@@ -322,6 +342,14 @@ export default function RouteDetailsScreen() {
             <RouteIcon size={32} color="#1ea2b1" />
           </View>
           <Text style={styles.routeName}>{route.name}</Text>
+          
+          {/* Follower Count */}
+          <View style={styles.followerContainer}>
+            <Users size={16} color="#1ea2b1" />
+            <Text style={styles.followerText}>
+              {followerCount} {followerCount === 1 ? 'follower' : 'followers'}
+            </Text>
+          </View>
         </View>
 
         {/* Route Info Cards */}
@@ -544,6 +572,21 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     textAlign: 'center',
     marginBottom: 8,
+  },
+  // Follower styles
+  followerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1ea2b120',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  followerText: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
   },
   infoCards: {
     flexDirection: 'row',
