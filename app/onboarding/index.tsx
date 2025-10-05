@@ -284,7 +284,7 @@ export default function Onboarding() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        router.replace('/(tabs)');
+        router.replace('/(app)/(tabs)/home');
       } else {
         router.replace('/auth');
       }
@@ -331,11 +331,6 @@ export default function Onboarding() {
   if (isLoading) {
     return (
       <View style={styles.splashContainer}>
-        <SafeAnimation
-          src="https://lottie.host/1a2b3c4d-5e6f-7g8h-9i0j-k1l2m3n4o5p6/splash-loading.lottie"
-          style={styles.splashAnimation}
-          fallbackIcon={MapPin}
-        />
         <Text style={styles.logosplash}>Uthutho</Text>
         <Text style={styles.taglinesplash}>Transform Your Daily Commute</Text>
       </View>

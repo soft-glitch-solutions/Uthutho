@@ -24,6 +24,7 @@ import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import * as IntentLauncher from 'expo-intent-launcher';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 interface Community {
   id: string;
@@ -881,6 +882,12 @@ const sharePost = async (post: Post) => {
         }
         ListEmptyComponent={
           <View style={styles.emptyPosts}>
+            <DotLottieReact
+              src="https://lottie.host/b3c284ec-320e-4f2d-8cf4-3f95eea57111/x4PxKADBXK.lottie"
+              loop
+              autoplay
+              style={styles.lottieAnimation}
+            />
             <Text style={styles.emptyPostsText}>No Posts Yet</Text>
             <Text style={styles.emptyPostsSubtext}>Be the first to post in this community</Text>
           </View>
@@ -1269,6 +1276,12 @@ const styles = StyleSheet.create({
     color: '#cccccc',
     textAlign: 'center',
     marginTop: 40,
+  },
+  // Lottie Animation Styles
+  lottieAnimation: {
+    width: 200,
+    height: 200,
+    marginBottom: 16,
   },
   // Skeleton styles
   skeleton: {
