@@ -9,12 +9,14 @@ import {
   Animated,
   PanResponder,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { ArrowRight, MapPin, Clock, Users, Bot, ChevronLeft, MessageCircle, Heart, Navigation } from 'lucide-react-native';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import LottieView from 'lottie-react-native';
 
 const { width, height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
@@ -34,44 +36,53 @@ const verticalScale = (size: number) => {
   return (height / baseHeight) * size * scaleFactor;
 };
 
-const slides = [
-  {
-    id: 1,
-    title: 'Welcome to Uthutho',
-    subtitle: 'Your Social Transport App',
-    description: 'Connect with fellow commuters, share real-time updates, and transform your daily travel experience across South Africa.',
-    icon: MapPin,
-    color: '#1ea2b1',
-    animationUrl: 'https://lottie.host/261d0be8-1b97-44d7-9e94-9424f113cb1c/LgneVRy8Za.lottie',
-  },
-  {
-    id: 2,
-    title: 'Hubs & Stops',
-    subtitle: 'Understand Your Journey',
-    description: 'Hubs are major transport centers with multiple routes. Stops are smaller pickup points. Mark yourself as waiting to help others know when vehicles are arriving.',
-    icon: Navigation,
-    color: '#1ea2b1',
-    animationUrl: 'https://lottie.host/6a2179e4-c19b-447f-abf8-ba546671c275/buGwONChJP.lottie',
-  },
-  {
-    id: 3,
-    title: 'Real-Time Community',
-    subtitle: 'Travel Together, Smarter',
-    description: 'See how many people are waiting at your stop, share vehicle sightings, and help fellow commuters make informed decisions about their journey.',
-    icon: Users,
-    color: '#1ea2b1',
-    animationUrl: 'https://lottie.host/94a02803-32cc-4b11-9147-4b26f8cda9ee/4D5V0Q1cBG.lottie',
-  },
-  {
-    id: 4,
-    title: 'Connect & Communicate',
-    subtitle: 'Build Commuter Communities',
-    description: 'Chat with other commuters at your stop, share travel tips, coordinate rides, and make your daily commute more social and efficient.',
-    icon: MessageCircle,
-    color: '#1ea2b1',
-    animationUrl: 'https://lottie.host/37ec536f-4eb1-4c2f-a8a3-523995f5bb7a/h7PQAmfGF7.lottie',
-  },
-];
+// Different animation URLs for web vs mobile
+const getSlideConfig = () => {
+  const isMobile = Platform.OS !== 'web';
+  
+  return [
+    {
+      id: 1,
+      title: 'Welcome to Uthutho',
+      subtitle: 'Your Social Transport App',
+      description: 'Connect with fellow commuters, share real-time updates, and transform your daily travel experience across South Africa.',
+      icon: MapPin,
+      color: '#1ea2b1',
+      webAnimation: 'https://lottie.host/261d0be8-1b97-44d7-9e94-9424f113cb1c/LgneVRy8Za.lottie',
+      mobileAnimation: require('../../assets/animations/welcome.json'),
+    },
+    {
+      id: 2,
+      title: 'Hubs & Stops',
+      subtitle: 'Understand Your Journey',
+      description: 'Hubs are major transport centers with multiple routes. Stops are smaller pickup points. Mark yourself as waiting to help others know when vehicles are arriving.',
+      icon: Navigation,
+      color: '#1ea2b1',
+      webAnimation: 'https://lottie.host/6a2179e4-c19b-447f-abf8-ba546671c275/buGwONChJP.lottie',
+      mobileAnimation: require('../../assets/animations/understand.json'),
+    },
+    {
+      id: 3,
+      title: 'Real-Time Community',
+      subtitle: 'Travel Together, Smarter',
+      description: 'See how many people are waiting at your stop, share vehicle sightings, and help fellow commuters make informed decisions about their journey.',
+      icon: Users,
+      color: '#1ea2b1',
+      webAnimation: 'https://lottie.host/94a02803-32cc-4b11-9147-4b26f8cda9ee/4D5V0Q1cBG.lottie',
+      mobileAnimation: require('../../assets/animations/travel.json'),
+    },
+    {
+      id: 4,
+      title: 'Connect & Communicate',
+      subtitle: 'Build Commuter Communities',
+      description: 'Chat with other commuters at your stop, share travel tips, coordinate rides, and make your daily commute more social and efficient.',
+      icon: MessageCircle,
+      color: '#1ea2b1',
+      webAnimation: 'https://lottie.host/37ec536f-4eb1-4c2f-a8a3-523995f5bb7a/h7PQAmfGF7.lottie',
+      mobileAnimation: require('../../assets/animations/connect.json'),
+    },
+  ];
+};
 
 const BRAND_COLOR = '#1ea2b1';
 const BACKGROUND_COLOR = '#000000';
@@ -86,8 +97,8 @@ const AnimationFallback = ({ icon: Icon, size = 200 }) => {
   );
 };
 
-// Safe animation component with error handling
-const SafeAnimation = ({ src, style, loop = true, autoplay = true, fallbackIcon }) => {
+// Safe animation component with error handling for web
+const WebAnimation = ({ src, style, loop = true, autoplay = true, fallbackIcon }) => {
   const [hasError, setHasError] = useState(false);
 
   if (hasError || !src) {
@@ -101,11 +112,68 @@ const SafeAnimation = ({ src, style, loop = true, autoplay = true, fallbackIcon 
       autoplay={autoplay}
       style={style}
       onError={() => {
-        console.log('Animation failed to load, using fallback');
+        console.log('Web animation failed to load, using fallback');
         setHasError(true);
       }}
     />
   );
+};
+
+// Mobile animation component using LottieView
+const MobileAnimation = ({ source, style, loop = true, autoplay = true, fallbackIcon }) => {
+  const [hasError, setHasError] = useState(false);
+  const animationRef = useRef(null);
+
+  useEffect(() => {
+    if (autoplay && animationRef.current) {
+      animationRef.current.play();
+    }
+  }, [autoplay]);
+
+  if (hasError || !source) {
+    return <AnimationFallback icon={fallbackIcon} />;
+  }
+
+  return (
+    <LottieView
+      ref={animationRef}
+      source={source}
+      loop={loop}
+      autoPlay={autoplay}
+      style={style}
+      onAnimationFailure={() => {
+        console.log('Mobile animation failed to load, using fallback');
+        setHasError(true);
+      }}
+    />
+  );
+};
+
+// Main animation component that chooses between web and mobile
+const SafeAnimation = ({ slide, style, loop = true, autoplay = true, fallbackIcon }) => {
+  const isMobile = Platform.OS !== 'web';
+  
+  if (isMobile) {
+    return (
+      <MobileAnimation
+        source={slide.mobileAnimation}
+        style={style}
+        loop={loop}
+        autoplay={autoplay}
+        fallbackIcon={fallbackIcon}
+      />
+    );
+  } else {
+    return (
+      <WebAnimation
+        src={slide.webAnimation}
+        style={style}
+        loop={loop}
+        autoplay={autoplay}
+        fallbackIcon={fallbackIcon}
+      />
+    );
+  }
 };
 
 export default function Onboarding() {
@@ -116,6 +184,9 @@ export default function Onboarding() {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const router = useRouter();
   const { colors } = useTheme();
+
+  const slides = getSlideConfig();
+  const isMobile = Platform.OS !== 'web';
 
   // Prevent double tap zoom
   const handleDoubleTapProtection = () => {
@@ -329,6 +400,36 @@ export default function Onboarding() {
     handleButtonTransition('prev');
   };
 
+  // New function for back button with sliding animation
+  const handleBackWithAnimation = () => {
+    if (isTransitioning || currentSlide === 0) return;
+    
+    setIsTransitioning(true);
+    
+    // Animate current content out to the right
+    Animated.timing(slideAnim, {
+      toValue: width * 0.8,
+      duration: 350,
+      useNativeDriver: true,
+    }).start(() => {
+      // Go to previous slide
+      setCurrentSlide(prev => prev - 1);
+      
+      // Reset position for previous slide (coming from left)
+      slideAnim.setValue(-width * 0.5);
+      
+      // Animate previous content in from left
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }).start(() => {
+        setIsTransitioning(false);
+      });
+    });
+  };
+
   const slideStyle = {
     transform: [
       { 
@@ -383,7 +484,7 @@ export default function Onboarding() {
             {currentSlide > 0 ? (
               <TouchableOpacity 
                 style={styles.backButton} 
-                onPress={prevSlide} 
+                onPress={handleBackWithAnimation}
                 disabled={isTransitioning}
                 hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                 delayPressIn={0}
@@ -416,7 +517,7 @@ export default function Onboarding() {
             {/* Animation */}
             <View style={styles.animationContainer}>
               <SafeAnimation
-                src={currentItem.animationUrl}
+                slide={currentItem}
                 style={styles.animation}
                 loop={true}
                 autoplay={true}
@@ -531,36 +632,36 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: height * 0.5, // Reduced height for smaller screens
+    height: height * 0.5,
     opacity: 0.1,
   },
   content: {
     flex: 1,
-    paddingHorizontal: scale(16), // Reduced padding for small screens
-    paddingTop: verticalScale(40), // Reduced top padding
-    paddingBottom: verticalScale(20), // Reduced bottom padding
+    paddingHorizontal: scale(16),
+    paddingTop: verticalScale(40),
+    paddingBottom: verticalScale(20),
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: verticalScale(10), // Reduced margin
-    height: verticalScale(40), // Reduced height
+    marginBottom: verticalScale(10),
+    height: verticalScale(40),
     minHeight: verticalScale(40),
   },
   backButton: {
-    padding: scale(8), // Reduced padding
+    padding: scale(8),
     opacity: 0.9,
   },
   placeholder: {
-    width: scale(32), // Reduced size
+    width: scale(32),
     height: scale(32),
   },
   skipButton: {
-    padding: scale(8), // Reduced padding
+    padding: scale(8),
   },
   skipText: {
-    fontSize: scale(14), // Smaller font
+    fontSize: scale(14),
     fontWeight: '600',
     color: BRAND_COLOR,
     opacity: 0.9,
@@ -573,7 +674,7 @@ const styles = StyleSheet.create({
   },
   animationContainer: {
     width: isTinyScreen ? '60%' : isVerySmallScreen ? '70%' : '80%',
-    maxWidth: scale(280), // Reduced max width
+    maxWidth: scale(280),
     height: isTinyScreen ? verticalScale(120) : isVerySmallScreen ? verticalScale(150) : verticalScale(200),
     marginBottom: isTinyScreen ? verticalScale(15) : isVerySmallScreen ? verticalScale(20) : verticalScale(30),
     justifyContent: 'center',
@@ -585,7 +686,7 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     alignItems: 'center',
-    paddingHorizontal: scale(12), // Reduced padding
+    paddingHorizontal: scale(12),
     width: '100%',
     marginTop: isTinyScreen ? verticalScale(-10) : 0,
   },
@@ -593,7 +694,7 @@ const styles = StyleSheet.create({
     fontSize: isTinyScreen ? scale(22) : isVerySmallScreen ? scale(26) : scale(30),
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: verticalScale(8), // Reduced margin
+    marginBottom: verticalScale(8),
     letterSpacing: -0.5,
     color: '#ffffff',
     lineHeight: isTinyScreen ? scale(26) : isVerySmallScreen ? scale(30) : scale(36),
@@ -601,7 +702,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: isTinyScreen ? scale(14) : isVerySmallScreen ? scale(16) : scale(18),
     textAlign: 'center',
-    marginBottom: verticalScale(12), // Reduced margin
+    marginBottom: verticalScale(12),
     fontWeight: '600',
     color: BRAND_COLOR,
     opacity: 0.9,
@@ -613,59 +714,59 @@ const styles = StyleSheet.create({
     lineHeight: isTinyScreen ? scale(16) : isVerySmallScreen ? scale(18) : scale(20),
     color: '#ffffff',
     opacity: 0.7,
-    maxWidth: '95%', // Increased to use more space
+    maxWidth: '95%',
   },
   footer: {
     alignItems: 'center',
     marginTop: isTinyScreen ? verticalScale(10) : isVerySmallScreen ? verticalScale(15) : verticalScale(20),
-    paddingBottom: verticalScale(10), // Reduced padding
+    paddingBottom: verticalScale(10),
   },
   pagination: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: isTinyScreen ? verticalScale(15) : verticalScale(20),
-    height: verticalScale(16), // Reduced height
+    height: verticalScale(16),
   },
   dot: {
-    height: scale(6), // Smaller dots
+    height: scale(6),
     borderRadius: scale(3),
-    marginHorizontal: scale(4), // Reduced margin
+    marginHorizontal: scale(4),
   },
   button: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: scale(32), // Reduced padding
-    paddingVertical: verticalScale(14), // Reduced padding
-    borderRadius: scale(20), // Smaller border radius
+    paddingHorizontal: scale(32),
+    paddingVertical: verticalScale(14),
+    borderRadius: scale(20),
     backgroundColor: BRAND_COLOR,
     shadowColor: BRAND_COLOR,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 4,
-    minWidth: scale(140), // Reduced min width
-    minHeight: verticalScale(48), // Reduced height
+    minWidth: scale(140),
+    minHeight: verticalScale(48),
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
     color: 'white',
-    fontSize: scale(16), // Smaller font
+    fontSize: scale(16),
     fontWeight: 'bold',
-    marginRight: scale(6), // Reduced margin
+    marginRight: scale(6),
   },
   credit: {
     position: 'absolute',
-    bottom: verticalScale(15), // Adjusted position
+    bottom: verticalScale(15),
     left: 0,
     right: 0,
     alignItems: 'center',
   },
   creditText: {
-    fontSize: scale(10), // Smaller font
+    fontSize: scale(10),
     color: BRAND_COLOR,
     opacity: 0.5,
   },
@@ -673,17 +774,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(30, 162, 177, 0.1)',
-    borderRadius: scale(80), // Smaller radius
+    borderRadius: scale(80),
   },
   swipeHint: {
     position: 'absolute',
-    bottom: verticalScale(50), // Adjusted position
+    bottom: verticalScale(50),
     left: 0,
     right: 0,
     alignItems: 'center',
   },
   swipeHintText: {
-    fontSize: scale(12), // Smaller font
+    fontSize: scale(12),
     color: BRAND_COLOR,
     opacity: 0.5,
   }, 
