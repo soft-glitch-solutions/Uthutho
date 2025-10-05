@@ -8,49 +8,66 @@ import {
   Dimensions,
   Animated,
   PanResponder,
+  ScrollView,
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { ArrowRight, MapPin, Clock, Users, Bot, ChevronLeft } from 'lucide-react-native';
+import { ArrowRight, MapPin, Clock, Users, Bot, ChevronLeft, MessageCircle, Heart, Navigation } from 'lucide-react-native';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 const { width, height } = Dimensions.get('window');
+const isSmallScreen = height < 700;
+const isVerySmallScreen = height < 600;
+const isTinyScreen = height < 500;
+
+// More aggressive scaling for very small screens
+const scale = (size: number) => {
+  const baseWidth = 375;
+  const scaleFactor = isTinyScreen ? 0.8 : isVerySmallScreen ? 0.9 : 1;
+  return (width / baseWidth) * size * scaleFactor;
+};
+
+const verticalScale = (size: number) => {
+  const baseHeight = 667;
+  const scaleFactor = isTinyScreen ? 0.7 : isVerySmallScreen ? 0.8 : isSmallScreen ? 0.9 : 1;
+  return (height / baseHeight) * size * scaleFactor;
+};
 
 const slides = [
   {
     id: 1,
     title: 'Welcome to Uthutho',
-    subtitle: 'Your Smart Transport Companion',
-    description: 'Transform your daily commute with real-time updates and intelligent route planning across South Africa.',
+    subtitle: 'Your Social Transport App',
+    description: 'Connect with fellow commuters, share real-time updates, and transform your daily travel experience across South Africa.',
     icon: MapPin,
     color: '#1ea2b1',
     animationUrl: 'https://lottie.host/261d0be8-1b97-44d7-9e94-9424f113cb1c/LgneVRy8Za.lottie',
   },
   {
     id: 2,
-    title: 'Live Updates',
-    subtitle: 'Never Wait Again',
-    description: 'Real-time schedules, route changes, and fare information for all public transport options.',
-    icon: Clock,
+    title: 'Hubs & Stops',
+    subtitle: 'Understand Your Journey',
+    description: 'Hubs are major transport centers with multiple routes. Stops are smaller pickup points. Mark yourself as waiting to help others know when vehicles are arriving.',
+    icon: Navigation,
     color: '#1ea2b1',
     animationUrl: 'https://lottie.host/6a2179e4-c19b-447f-abf8-ba546671c275/buGwONChJP.lottie',
   },
   {
     id: 3,
-    title: 'Community Powered',
+    title: 'Real-Time Community',
     subtitle: 'Travel Together, Smarter',
-    description: 'Share real-time crowding updates and help fellow commuters make informed decisions.',
+    description: 'See how many people are waiting at your stop, share vehicle sightings, and help fellow commuters make informed decisions about their journey.',
     icon: Users,
     color: '#1ea2b1',
     animationUrl: 'https://lottie.host/94a02803-32cc-4b11-9147-4b26f8cda9ee/4D5V0Q1cBG.lottie',
   },
   {
     id: 4,
-    title: 'Uthutho AI',
-    subtitle: 'Your Personal Guide',
-    description: 'Get instant, personalized answers about routes, schedules, and travel tips.',
-    icon: Bot,
+    title: 'Connect & Communicate',
+    subtitle: 'Build Commuter Communities',
+    description: 'Chat with other commuters at your stop, share travel tips, coordinate rides, and make your daily commute more social and efficient.',
+    icon: MessageCircle,
     color: '#1ea2b1',
     animationUrl: 'https://lottie.host/37ec536f-4eb1-4c2f-a8a3-523995f5bb7a/h7PQAmfGF7.lottie',
   },
@@ -61,9 +78,10 @@ const BACKGROUND_COLOR = '#000000';
 
 // Fallback component for when animations fail to load
 const AnimationFallback = ({ icon: Icon, size = 200 }) => {
+  const scaledSize = scale(size);
   return (
-    <View style={[styles.fallbackContainer, { width: size, height: size }]}>
-      <Icon size={size * 0.6} color={BRAND_COLOR} />
+    <View style={[styles.fallbackContainer, { width: scaledSize, height: scaledSize }]}>
+      <Icon size={scaledSize * 0.6} color={BRAND_COLOR} />
     </View>
   );
 };
@@ -332,7 +350,7 @@ export default function Onboarding() {
     return (
       <View style={styles.splashContainer}>
         <Text style={styles.logosplash}>Uthutho</Text>
-        <Text style={styles.taglinesplash}>Transform Your Daily Commute</Text>
+        <Text style={styles.taglinesplash}>Connect. Commute. Community.</Text>
       </View>
     );
   }
@@ -370,7 +388,7 @@ export default function Onboarding() {
                 hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                 delayPressIn={0}
               >
-                <ChevronLeft size={28} color={BRAND_COLOR} />
+                <ChevronLeft size={scale(24)} color={BRAND_COLOR} />
               </TouchableOpacity>
             ) : (
               <View style={styles.placeholder} />
@@ -425,7 +443,7 @@ export default function Onboarding() {
                     styles.dot,
                     {
                       backgroundColor: index === currentSlide ? BRAND_COLOR : 'rgba(30, 162, 177, 0.3)',
-                      width: index === currentSlide ? 24 : 8,
+                      width: index === currentSlide ? scale(20) : scale(6),
                     },
                   ]}
                 />
@@ -447,23 +465,27 @@ export default function Onboarding() {
               <Text style={styles.buttonText}>
                 {currentSlide === slides.length - 1 ? 'Get Started' : 'Next'}
               </Text>
-              <ArrowRight size={20} color="white" />
+              <ArrowRight size={scale(18)} color="white" />
             </TouchableOpacity>
           </View>
 
-          {/* Developer Credit */}
-          <View style={styles.credit}>
-            <Text style={styles.creditText}>
-              Developed by Soft Glitch Solutions
-            </Text>
-          </View>
+          {/* Developer Credit - Only show if there's space */}
+          {!isTinyScreen && (
+            <View style={styles.credit}>
+              <Text style={styles.creditText}>
+                Developed by Soft Glitch Solutions
+              </Text>
+            </View>
+          )}
 
-          {/* Swipe Hint */}
-          <View style={styles.swipeHint}>
-            <Text style={styles.swipeHintText}>
-              Swipe to navigate
-            </Text>
-          </View>
+          {/* Swipe Hint - Only show on larger screens */}
+          {!isVerySmallScreen && (
+            <View style={styles.swipeHint}>
+              <Text style={styles.swipeHintText}>
+                Swipe to navigate
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     </View>
@@ -484,20 +506,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: BACKGROUND_COLOR,
+    paddingHorizontal: scale(24),
   },
   splashAnimation: {
-    width: 200,
-    height: 200,
-    marginBottom: 30,
+    width: scale(150),
+    height: scale(150),
+    marginBottom: verticalScale(20),
   },
   logosplash: {
-    fontSize: 48,
+    fontSize: scale(36),
     fontWeight: 'bold',
     color: BRAND_COLOR,
-    marginBottom: 16,
+    marginBottom: verticalScale(12),
+    textAlign: 'center',
   },
   taglinesplash: {
-    fontSize: 16,
+    fontSize: scale(14),
     color: '#ffffff',
     textAlign: 'center',
     opacity: 0.8,
@@ -507,35 +531,36 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: height * 0.6,
+    height: height * 0.5, // Reduced height for smaller screens
     opacity: 0.1,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 50,
-    paddingBottom: 40,
+    paddingHorizontal: scale(16), // Reduced padding for small screens
+    paddingTop: verticalScale(40), // Reduced top padding
+    paddingBottom: verticalScale(20), // Reduced bottom padding
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-    height: 50,
+    marginBottom: verticalScale(10), // Reduced margin
+    height: verticalScale(40), // Reduced height
+    minHeight: verticalScale(40),
   },
   backButton: {
-    padding: 12,
+    padding: scale(8), // Reduced padding
     opacity: 0.9,
   },
   placeholder: {
-    width: 40,
-    height: 40,
+    width: scale(32), // Reduced size
+    height: scale(32),
   },
   skipButton: {
-    padding: 12,
+    padding: scale(8), // Reduced padding
   },
   skipText: {
-    fontSize: 16,
+    fontSize: scale(14), // Smaller font
     fontWeight: '600',
     color: BRAND_COLOR,
     opacity: 0.9,
@@ -544,12 +569,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: isTinyScreen ? verticalScale(-40) : isVerySmallScreen ? verticalScale(-20) : 0,
   },
   animationContainer: {
-    width: '80%',
-    maxWidth: 320,
-    height: 240,
-    marginBottom: 50,
+    width: isTinyScreen ? '60%' : isVerySmallScreen ? '70%' : '80%',
+    maxWidth: scale(280), // Reduced max width
+    height: isTinyScreen ? verticalScale(120) : isVerySmallScreen ? verticalScale(150) : verticalScale(200),
+    marginBottom: isTinyScreen ? verticalScale(15) : isVerySmallScreen ? verticalScale(20) : verticalScale(30),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -559,86 +585,87 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: scale(12), // Reduced padding
     width: '100%',
+    marginTop: isTinyScreen ? verticalScale(-10) : 0,
   },
   title: {
-    fontSize: 32,
+    fontSize: isTinyScreen ? scale(22) : isVerySmallScreen ? scale(26) : scale(30),
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: verticalScale(8), // Reduced margin
     letterSpacing: -0.5,
     color: '#ffffff',
-    lineHeight: 38,
+    lineHeight: isTinyScreen ? scale(26) : isVerySmallScreen ? scale(30) : scale(36),
   },
   subtitle: {
-    fontSize: 20,
+    fontSize: isTinyScreen ? scale(14) : isVerySmallScreen ? scale(16) : scale(18),
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: verticalScale(12), // Reduced margin
     fontWeight: '600',
     color: BRAND_COLOR,
     opacity: 0.9,
-    lineHeight: 24,
+    lineHeight: isTinyScreen ? scale(18) : isVerySmallScreen ? scale(20) : scale(22),
   },
   description: {
-    fontSize: 16,
+    fontSize: isTinyScreen ? scale(12) : isVerySmallScreen ? scale(13) : scale(15),
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: isTinyScreen ? scale(16) : isVerySmallScreen ? scale(18) : scale(20),
     color: '#ffffff',
     opacity: 0.7,
-    maxWidth: '90%',
+    maxWidth: '95%', // Increased to use more space
   },
   footer: {
     alignItems: 'center',
-    marginTop: 30,
-    paddingBottom: 20,
+    marginTop: isTinyScreen ? verticalScale(10) : isVerySmallScreen ? verticalScale(15) : verticalScale(20),
+    paddingBottom: verticalScale(10), // Reduced padding
   },
   pagination: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 30,
-    height: 20,
+    marginBottom: isTinyScreen ? verticalScale(15) : verticalScale(20),
+    height: verticalScale(16), // Reduced height
   },
   dot: {
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 6,
+    height: scale(6), // Smaller dots
+    borderRadius: scale(3),
+    marginHorizontal: scale(4), // Reduced margin
   },
   button: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingVertical: 18,
-    borderRadius: 25,
+    paddingHorizontal: scale(32), // Reduced padding
+    paddingVertical: verticalScale(14), // Reduced padding
+    borderRadius: scale(20), // Smaller border radius
     backgroundColor: BRAND_COLOR,
     shadowColor: BRAND_COLOR,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-    minWidth: 160,
-    minHeight: 56,
+    shadowRadius: 6,
+    elevation: 4,
+    minWidth: scale(140), // Reduced min width
+    minHeight: verticalScale(48), // Reduced height
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: scale(16), // Smaller font
     fontWeight: 'bold',
-    marginRight: 8,
+    marginRight: scale(6), // Reduced margin
   },
   credit: {
     position: 'absolute',
-    bottom: 25,
+    bottom: verticalScale(15), // Adjusted position
     left: 0,
     right: 0,
     alignItems: 'center',
   },
   creditText: {
-    fontSize: 12,
+    fontSize: scale(10), // Smaller font
     color: BRAND_COLOR,
     opacity: 0.5,
   },
@@ -646,18 +673,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(30, 162, 177, 0.1)',
-    borderRadius: 100,
+    borderRadius: scale(80), // Smaller radius
   },
   swipeHint: {
     position: 'absolute',
-    bottom: 70,
+    bottom: verticalScale(50), // Adjusted position
     left: 0,
     right: 0,
     alignItems: 'center',
   },
   swipeHintText: {
-    fontSize: 14,
+    fontSize: scale(12), // Smaller font
     color: BRAND_COLOR,
     opacity: 0.5,
-  },
+  }, 
 });
