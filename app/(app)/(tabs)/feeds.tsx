@@ -25,6 +25,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import LottieView from 'lottie-react-native';
 
 interface Community {
   id: string;
@@ -64,6 +65,39 @@ interface Post {
     };
   }>;
 }
+
+// Flybox Animation Component
+const FlyboxAnimation = ({ style }) => {
+  const animationRef = useRef(null);
+  const isMobile = Platform.OS !== 'web';
+
+  useEffect(() => {
+    if (animationRef.current) {
+      animationRef.current.play();
+    }
+  }, []);
+
+  if (isMobile) {
+    return (
+      <LottieView
+        ref={animationRef}
+        source={require('../../../assets/animations/flybox.json')}
+        autoPlay
+        loop
+        style={style}
+      />
+    );
+  } else {
+    return (
+      <DotLottieReact
+        src="https://lottie.host/b3c284ec-320e-4f2d-8cf4-3f95eea57111/x4PxKADBXK.lottie"
+        loop
+        autoplay
+        style={style}
+      />
+    );
+  }
+};
 
 // Skeleton Loader Components
 const SkeletonLoader = () => (
@@ -882,12 +916,7 @@ const sharePost = async (post: Post) => {
         }
         ListEmptyComponent={
           <View style={styles.emptyPosts}>
-            <DotLottieReact
-              src="https://lottie.host/b3c284ec-320e-4f2d-8cf4-3f95eea57111/x4PxKADBXK.lottie"
-              loop
-              autoplay
-              style={styles.lottieAnimation}
-            />
+            <FlyboxAnimation style={styles.lottieAnimation} />
             <Text style={styles.emptyPostsText}>No Posts Yet</Text>
             <Text style={styles.emptyPostsSubtext}>Be the first to post in this community</Text>
           </View>

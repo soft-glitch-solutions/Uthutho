@@ -201,6 +201,50 @@ export default function Onboarding() {
     }
   };
 
+  // Unified slide transition function for both swipe and button
+  const handleSlideTransition = (direction) => {
+    if (isTransitioning) return;
+
+    setIsTransitioning(true);
+    
+    if (direction === 'next') {
+      // Next slide animation - slide left
+      const targetValue = -width * 0.8;
+
+      // Animate current content out to the left
+      Animated.timing(slideAnim, {
+        toValue: targetValue,
+        duration: 350,
+        useNativeDriver: true,
+      }).start(() => {
+        // Change slide
+        if (currentSlide < slides.length - 1) {
+          setCurrentSlide(prev => prev + 1);
+        } else {
+          // If it's the last slide and going next, go to auth
+          goToAuth();
+          return;
+        }
+
+        // Reset position for next slide (coming from right)
+        slideAnim.setValue(width * 0.5);
+        
+        // Animate new content in from right
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        }).start(() => {
+          setIsTransitioning(false);
+        });
+      });
+    } else {
+      // Previous slide animation - slide right (same as back button)
+      handleBackWithAnimation();
+    }
+  };
+
   // PanResponder for smooth swipe gestures with double-tap protection
   const panResponder = useRef(
     PanResponder.create({
@@ -253,116 +297,6 @@ export default function Onboarding() {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleSlideTransition = (direction) => {
-    if (isTransitioning) return;
-
-    setIsTransitioning(true);
-    const targetValue = direction === 'next' ? -width * 0.8 : width * 0.8;
-
-    // Animate current content out
-    Animated.timing(slideAnim, {
-      toValue: targetValue,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      // Change slide
-      if (direction === 'next') {
-        if (currentSlide < slides.length - 1) {
-          setCurrentSlide(prev => prev + 1);
-        } else {
-          // If it's the last slide and swiping next, go to auth
-          goToAuth();
-          return;
-        }
-      } else {
-        // Swipe back - go to previous slide
-        if (currentSlide > 0) {
-          setCurrentSlide(prev => prev - 1);
-        } else {
-          // If it's the first slide and swiping back, just reset
-          Animated.spring(slideAnim, {
-            toValue: 0,
-            friction: 8,
-            tension: 40,
-            useNativeDriver: true,
-          }).start(() => {
-            setIsTransitioning(false);
-          });
-          return;
-        }
-      }
-
-      // Reset position for next slide
-      const startPosition = direction === 'next' ? width * 0.5 : -width * 0.5;
-      slideAnim.setValue(startPosition);
-      
-      // Animate new content in
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }).start(() => {
-        setIsTransitioning(false);
-      });
-    });
-  };
-
-  const handleButtonTransition = (direction) => {
-    if (isTransitioning) return;
-
-    setIsTransitioning(true);
-    const targetValue = direction === 'next' ? -width * 0.8 : width * 0.8;
-
-    // Animate current content out
-    Animated.timing(slideAnim, {
-      toValue: targetValue,
-      duration: 350,
-      useNativeDriver: true,
-    }).start(() => {
-      // Change slide
-      if (direction === 'next') {
-        if (currentSlide < slides.length - 1) {
-          setCurrentSlide(prev => prev + 1);
-        } else {
-          // Last slide - go to auth
-          goToAuth();
-          return;
-        }
-      } else {
-        // Previous slide
-        if (currentSlide > 0) {
-          setCurrentSlide(prev => prev - 1);
-        } else {
-          // Already on first slide, just reset
-          Animated.spring(slideAnim, {
-            toValue: 0,
-            friction: 8,
-            tension: 40,
-            useNativeDriver: true,
-          }).start(() => {
-            setIsTransitioning(false);
-          });
-          return;
-        }
-      }
-
-      // Reset for new slide
-      const startPosition = direction === 'next' ? width * 0.5 : -width * 0.5;
-      slideAnim.setValue(startPosition);
-      
-      // Animate new content in
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }).start(() => {
-        setIsTransitioning(false);
-      });
-    });
-  };
-
   // Direct navigation to auth screen
   const goToAuth = () => {
     setIsLoading(true);
@@ -387,7 +321,7 @@ export default function Onboarding() {
 
   const nextSlide = () => {
     if (handleDoubleTapProtection() && isTransitioning) return;
-    handleButtonTransition('next');
+    handleSlideTransition('next');
   };
 
   const handleSkip = () => {
@@ -395,12 +329,7 @@ export default function Onboarding() {
     goToAuth();
   };
 
-  const prevSlide = () => {
-    if (handleDoubleTapProtection() && isTransitioning) return;
-    handleButtonTransition('prev');
-  };
-
-  // New function for back button with sliding animation
+  // Unified back slide animation for both button and swipe
   const handleBackWithAnimation = () => {
     if (isTransitioning || currentSlide === 0) return;
     
@@ -579,14 +508,7 @@ export default function Onboarding() {
             </View>
           )}
 
-          {/* Swipe Hint - Only show on larger screens */}
-          {!isVerySmallScreen && (
-            <View style={styles.swipeHint}>
-              <Text style={styles.swipeHintText}>
-                Swipe to navigate
-              </Text>
-            </View>
-          )}
+          
         </View>
       </View>
     </View>
