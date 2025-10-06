@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   Pressable,
   Image,
+  Platform,
   Alert,
   RefreshControl
 } from 'react-native';
@@ -22,6 +23,8 @@ import FavoritesSection from '@/components/home/FavoritesSection';
 import GamificationSection from '@/components/home/GamificationSection';
 import StreakOverlay from '@/components/StreakOverlay';
 import ScreenTransition from '@/components/ScreenTransition';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import LottieView from 'lottie-react-native';
 
 interface FavoriteItem {
   id: string;
@@ -138,6 +141,38 @@ export default function HomeScreen() {
       setIsNearestLoading(false);
     }
   }, [userLocation]);
+
+  const FlyboxAnimation = ({ style }) => {
+    const animationRef = useRef(null);
+    const isMobile = Platform.OS !== 'web';
+  
+    useEffect(() => {
+      if (animationRef.current) {
+        animationRef.current.play();
+      }
+    }, []);
+  
+    if (isMobile) {
+      return (
+        <LottieView
+          ref={animationRef}
+          source={require('../../../assets/animations/flybox.json')}
+          autoPlay
+          loop
+          style={style}
+        />
+      );
+    } else {
+      return (
+        <DotLottieReact
+          src="https://lottie.host/b3c284ec-320e-4f2d-8cf4-3f95eea57111/x4PxKADBXK.lottie"
+          loop
+          autoplay
+          style={style}
+        />
+      );
+    }
+  };
 
   const findNearestLocation = useCallback((userLocation: LocationCoords, locations: any[]) => {
     let nearestLocation = null;
@@ -684,6 +719,7 @@ const onRefresh = useCallback(async () => {
             </View>
           ) : favorites.length === 0 ? (
             <View style={styles.emptyContainer}>
+              <FlyboxAnimation style={styles.lottieAnimation} />
               <Text style={[styles.emptyText, { color: colors.text}]}>
                 You haven't added any locations to your community yet.
               </Text>
