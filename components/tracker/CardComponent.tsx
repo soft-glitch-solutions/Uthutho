@@ -145,7 +145,7 @@ const CardComponent: React.FC<CardComponentProps> = ({
 
           <View style={styles.cardFooter}>
             <Text style={styles.cardTypeText}>
-              {card.card_type === 'myciti' ? 'CONTACTLESS BUS CARD' : 'BUS CARD'}
+              {card.card_type === 'myciti' ? 'BUS CARD' : 'BUS CARD'}
             </Text>
             <ArrowUpRight size={16} color="rgba(255,255,255,0.7)" />
           </View>
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   },
   cardContent: {
     flex: 1,
-    padding: 20,
+    padding: 10,
     justifyContent: 'space-between',
   },
   cardHeader: {
