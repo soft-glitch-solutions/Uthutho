@@ -29,7 +29,7 @@ const CARD_TYPES = {
     pointsName: 'Rides',
     gradient: ['#f59e0b', '#d97706'],
     cardImage: null,
-    logoImage: 'https://www.gabs.co.za/Assets/Images/logo_main.png',
+    logoImage: '../../assets/golden_arrow_logo.png',
     backgroundColor: '#3c2a1a'
   }
 };
