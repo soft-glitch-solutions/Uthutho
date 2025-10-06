@@ -477,8 +477,8 @@ const findRoute = async () => {
                     <View style={styles.routeHeader}>
                       <View style={styles.routeInfo}>
                         <Text style={styles.routeTitle}>{route.name}</Text>
-                        <Text style={styles.routeDestination}>
-                          {route.start_point} → {route.end_point}
+                        <Text style={[styles.coordinatesText, { marginTop: 4, color: '#1ea2b1' }]}>
+                          Followers: {routeFollowerCounts[route.id] || 0}
                         </Text>
                       </View>
                       <View style={styles.routeType}>
@@ -493,9 +493,7 @@ const findRoute = async () => {
                       </View>
 
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={{ color: '#1ea2b1', marginRight: 12 }}>
-                          {routeFollowerCounts[route.id] || 0}
-                        </Text>
+
                         <Text style={styles.routeCost}>R {route.cost}</Text>
                       </View>
                     </View>
@@ -575,9 +573,6 @@ const findRoute = async () => {
                       </View>
                     </View>
                     <View style={styles.hubCoordinates}>
-                      <Text style={styles.coordinatesText}>
-                        {hub.latitude.toFixed(4)}, {hub.longitude.toFixed(4)}
-                      </Text>
                       <Text style={[styles.coordinatesText, { marginTop: 4, color: '#1ea2b1' }]}>
                         Followers: {hubFollowerCounts[hub.id] || 0}
                       </Text>

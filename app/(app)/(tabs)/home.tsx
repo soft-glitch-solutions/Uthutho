@@ -91,6 +91,7 @@ export default function HomeScreen() {
   const { colors } = useTheme();
   const params = useLocalSearchParams();
   const [userLocation, setUserLocation] = useState<LocationCoords | null>(null);
+  
   const [locationError, setLocationError] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
@@ -108,7 +109,8 @@ export default function HomeScreen() {
   const [isStatsLoading, setIsStatsLoading] = useState(true);
   const [isFavoritesLoading, setIsFavoritesLoading] = useState(false);
   const navigation = useNavigation();
-  const { activeJourney, loading: journeyLoading } = useJourney();
+// Update the useJourney import to include refresh function if available
+  const { activeJourney, loading: journeyLoading, refreshActiveJourney } = useJourney();
   const [showStreakOverlay, setShowStreakOverlay] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
@@ -523,16 +525,28 @@ useEffect(() => {
   };
 
   // Pull-to-refresh handler
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    // Re-fetch all the main data
-    await Promise.all([
+// Pull-to-refresh handler
+const onRefresh = useCallback(async () => {
+  setRefreshing(true);
+  try {
+    const refreshPromises = [
       fetchUserProfile(),
       fetchNearestLocations(),
       loadUserStats(),
-    ]);
+    ];
+    
+    // Add journey refresh if available
+    if (refreshActiveJourney) {
+      refreshPromises.push(refreshActiveJourney());
+    }
+    
+    await Promise.all(refreshPromises);
+  } catch (error) {
+    console.error('Error during refresh:', error);
+  } finally {
     setRefreshing(false);
-  }, [fetchUserProfile, fetchNearestLocations]);
+  }
+}, [fetchUserProfile, fetchNearestLocations, loadUserStats, refreshActiveJourney]);
 
   // helper: fetch counts from favorites table for all resolved favorites
   const loadFavoriteFollowerCounts = async (items: Array<{ id: string; type: 'route'|'hub'|'stop' }>) => {

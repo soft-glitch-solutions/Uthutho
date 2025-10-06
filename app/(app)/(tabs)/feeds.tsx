@@ -1034,7 +1034,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
     fontSize: 16,
-    color: '#ffffff',
   },
   tabsWrapper: {
     borderBottomWidth: 1,

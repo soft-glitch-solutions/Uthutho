@@ -80,7 +80,7 @@ export default function Index() {
             await AsyncStorage.setItem('hasLaunched', 'true');
           }
         } else {
-          setRedirectTo('/auth');
+          setRedirectTo('/onboarding');
         }
       } catch (error) {
         console.error('Error in Index init:', error);

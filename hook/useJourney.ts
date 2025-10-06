@@ -55,6 +55,8 @@ export function useJourney() {
     }
   }, [user]);
 
+  
+
   // Clean up stale journey participants
   const cleanupStaleJourneyParticipants = async () => {
     try {
