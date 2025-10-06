@@ -1,7 +1,7 @@
 import React from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { useTheme } from '../../context/ThemeContext';
-import { Route, House, Flag , Settings, CircleHelp as HelpCircle, User , MapPin } from 'lucide-react-native';
+import { Route, House, Flag , Settings, CircleHelp as HelpCircle, User , MapPin, Bot } from 'lucide-react-native';
 import NetworkGate from '@/components/NetworkGate';
 
 export default function AppLayout() {
@@ -27,6 +27,16 @@ export default function AppLayout() {
           title: 'Home',
           drawerIcon: ({ color, size }) => (
             <House color={color} size={size} />
+          ),
+        }}
+      />
+
+      <Drawer.Screen
+        name="ai"
+        options={{
+          title: 'AI Assistant',
+          drawerIcon: ({ color, size }) => (
+            <Bot color={color} size={size} />
           ),
         }}
       />
@@ -58,6 +68,7 @@ export default function AppLayout() {
           ),
         }}
       />
+
       
       {/* Hidden screens - they will still be accessible but won't appear in drawer */}
       <Drawer.Screen

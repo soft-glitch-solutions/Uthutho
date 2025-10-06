@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { House, User, Rss, Route, MessageCircle , Bot } from 'lucide-react-native';
+import { House, User, Rss, Route, MessageCircle , WalletCards  } from 'lucide-react-native';
 import { View, Text } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { useNotifications } from '../../../hook/useNotifications';
@@ -63,10 +63,10 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="ai"
+        name="tracker"
         options={{
-          title: 'AI Assistant',
-          tabBarIcon: ({ color, size }) => <Bot color={color} size={size} />,
+          title: 'Cards',
+          tabBarIcon: ({ color, size }) => <WalletCards color={color} size={size} />,
         }}
       />
 

@@ -825,9 +825,6 @@ export default function TrackerScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#ffffff" />
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>My Cards</Text>
         <TouchableOpacity 
           style={styles.addButton}
