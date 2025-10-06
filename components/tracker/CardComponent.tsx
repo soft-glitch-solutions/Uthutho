@@ -29,7 +29,7 @@ const CARD_TYPES = {
     pointsName: 'Rides',
     gradient: ['#f59e0b', '#d97706'],
     cardImage: null,
-    logoImage: '../../assets/golden_arrow_logo.png',
+    logoImage: 'https://upload.wikimedia.org/wikipedia/en/0/0a/Golden_Arrow_Bus_Services_logo.png',
     backgroundColor: '#3c2a1a'
   }
 };

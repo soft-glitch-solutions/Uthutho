@@ -20,7 +20,7 @@ const ActivityGraph: React.FC<ActivityGraphProps> = ({
   onYearChange 
 }) => {
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: currentYear - 2020 + 1 }, (_, i) => 2020 + i);
+  const years = Array.from({ length: currentYear - 2024 + 1 }, (_, i) => 2024 + i);
   
   const generateGitHubGrid = () => {
     const grid = [];
