@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Alert, Ani
 import { X, Clock,  Users, CircleCheck as CheckCircle, Search } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
-import { useJourney } from '@/hooks/useJourney';
+import { useJourney } from '@/hook/useJourney';
 
 interface Route {
   id: string;
