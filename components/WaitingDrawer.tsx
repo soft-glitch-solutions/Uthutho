@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Alert, Ani
 import { X, Clock,  Users, CircleCheck as CheckCircle, Search } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
-import { useJourney } from '@/hook/useJourney';
+import { useJourney } from '@/hooks/useJourney';
 
 interface Route {
   id: string;
@@ -276,78 +276,62 @@ export default function WaitingDrawer({
     }
   };
 
-  const joinExistingJourney = async (journeyId: string, route: Route) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+const joinExistingJourney = async (journeyId: string, route: Route) => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
 
-      // Add user to journey participants
-      const { error: joinError } = await supabase
-        .from('journey_participants')
-        .insert({
-          journey_id: journeyId,
-          user_id: user.id,
-          is_active: true
-        });
+    // Use createOrJoinJourney instead of manual participant insertion
+    const result = await createOrJoinJourney(
+      stopId,
+      route.id,
+      route.transport_type
+    );
 
-      if (joinError) throw joinError;
-
-      // Award points for joining
+    if (result.success) {
       await awardPoints(1);
-      
-      // Navigate to journey
       router.replace('/journey');
       onWaitingSet();
       setIsSearching(false);
       setSelectedRoute(null);
       onClose();
-    } catch (error) {
-      console.error('Error joining existing journey:', error);
-      createNewJourney(route);
+    } else {
+      throw new Error(result.error);
     }
-  };
+  } catch (error) {
+    console.error('Error joining existing journey:', error);
+    createNewJourney(route);
+  }
+};
 
-  const createNewJourney = async (route: Route) => {
-    setSearchPhase('creating');
-    
-    // Wait a bit more to show the "creating" phase
-    setTimeout(async () => {
-      try {
-        const result = await createOrJoinJourney(
-          stopId,
-          route.id,
-          route.transport_type
-        );
+// In WaitingDrawer.tsx - replace the createNewJourney function
+const createNewJourney = async (route: Route) => {
+  setSearchPhase('creating');
+  
+  try {
+    const result = await createOrJoinJourney(
+      stopId,
+      route.id,
+      route.transport_type
+    );
 
-        if (result.success) {
-          // Add the creator as a participant
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            await supabase
-              .from('journey_participants')
-              .insert({
-                journey_id: result.journeyId, // Assuming createOrJoinJourney returns the journey ID
-                user_id: user.id,
-                is_active: true
-              });
-          }
-
-          await awardPoints(2);
-          router.replace('/journey');
-          onWaitingSet();
-        } else {
-          Alert.alert('Error', result.error || 'Failed to create journey');
-        }
-      } catch (error) {
-        console.error('Error creating journey:', error);
-        Alert.alert('Error', 'Failed to create journey. Please try again.');
-      }
-      
-      setIsSearching(false);
-      setSelectedRoute(null);
-      onClose();
-    }, 2000);
-  };
+    if (result.success) {
+      // Note: The participant is now automatically added in createOrJoinJourney
+      await awardPoints(2);
+      router.replace('/journey');
+      onWaitingSet();
+    } else {
+      Alert.alert('Error', result.error || 'Failed to create journey');
+    }
+  } catch (error) {
+    console.error('Error creating journey:', error);
+    Alert.alert('Error', 'Failed to create journey. Please try again.');
+  }
+  
+  setIsSearching(false);
+  setSelectedRoute(null);
+  onClose();
+};
 
   const awardPoints = async (points: number) => {
     try {

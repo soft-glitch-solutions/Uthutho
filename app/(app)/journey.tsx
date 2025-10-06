@@ -28,6 +28,7 @@ import { JourneySkeleton } from '@/components/journey/JourneySkeleton';
 import { NoActiveJourney } from '@/components/journey/NoActiveJourney';
 import { JourneyTabs } from '@/components/journey/JourneyTabs';
 
+
 import type { JourneyStop, Passenger, ChatMessage } from '@/types/journey';
 
 export default function JourneyScreen() {
