@@ -17,8 +17,33 @@ import QuickStats from '@/components/tracker/QuickStats';
 import TransactionList from '@/components/tracker/TransactionList';
 import AddCardModal from '@/components/tracker/AddCardModal';
 import AddEntryModal from '@/components/tracker/AddEntryModal';
-import EditCardModal from '@/components/tracker/EditCardModal'; // ADD THIS IMPORT
+import EditCardModal from '@/components/tracker/EditCardModal';
 import { UserCard, CardEntry, ActivityData } from '@/types/tracker';
+
+// Skeleton Loader Component
+const CardSkeletonLoader = () => {
+  return (
+    <View style={styles.skeletonCard}>
+      <View style={styles.skeletonHeader}>
+        <View style={styles.skeletonLogo} />
+        <View style={styles.skeletonTitle} />
+        <View style={styles.skeletonMenu} />
+      </View>
+      <View style={styles.skeletonContent}>
+        <View style={styles.skeletonNumber} />
+        <View style={styles.skeletonHolder} />
+      </View>
+      <View style={styles.skeletonBalance}>
+        <View style={styles.skeletonBalanceLabel} />
+        <View style={styles.skeletonBalanceAmount} />
+      </View>
+      <View style={styles.skeletonFooter}>
+        <View style={styles.skeletonType} />
+        <View style={styles.skeletonArrow} />
+      </View>
+    </View>
+  );
+};
 
 export default function TrackerScreen() {
   const router = useRouter();
@@ -54,6 +79,7 @@ export default function TrackerScreen() {
 
   const loadUserCards = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('user_cards')
         .select('*')
@@ -71,6 +97,7 @@ export default function TrackerScreen() {
       }
     } catch (error) {
       console.error('Error loading user cards:', error);
+      Alert.alert('Error', 'Failed to load cards');
     } finally {
       setLoading(false);
     }
@@ -205,7 +232,7 @@ export default function TrackerScreen() {
   const handleCardUpdated = () => {
     setShowEditCardModal(false);
     setEditingCard(null);
-    loadUserCards(); // Refresh the cards list
+    loadUserCards();
   };
 
   const handleCardPress = (card: UserCard) => {
@@ -213,18 +240,13 @@ export default function TrackerScreen() {
     setViewMode('details');
   };
 
+  // Loading state for details view
   if (viewMode === 'details' && selectedCard) {
     return (
       <View style={styles.container}>
         <Stack.Screen options={{ headerShown: false }} />
 
         <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => setViewMode('cards')}
-          >
-            <ArrowLeft size={24} color="#ffffff" />
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>
             {selectedCard.card_type === 'myciti' ? 'MyCiti Card' : 'Golden Arrow'}
           </Text>
@@ -287,7 +309,27 @@ export default function TrackerScreen() {
       </View>
 
       <ScrollView style={styles.content}>
-        {userCards.length === 0 ? (
+        {loading ? (
+          // Skeleton Loaders while loading
+          <View style={styles.skeletonContainer}>
+            <View style={styles.dragInstructions}>
+              <Text style={styles.dragInstructionsText}>
+                💡 Long press and drag to reorder cards
+              </Text>
+            </View>
+            {[1, 2, 3].map((item) => (
+              <CardSkeletonLoader key={item} />
+            ))}
+            <View style={styles.quickActions}>
+              <View style={styles.skeletonSectionTitle} />
+              <View style={styles.actionButtons}>
+                <View style={styles.skeletonActionButton} />
+                <View style={styles.skeletonActionButton} />
+              </View>
+            </View>
+          </View>
+        ) : userCards.length === 0 ? (
+          // Empty state
           <View style={styles.emptyState}>
             <CreditCard size={64} color="#666" />
             <Text style={styles.emptyTitle}>No Cards Added</Text>
@@ -303,8 +345,8 @@ export default function TrackerScreen() {
             </TouchableOpacity>
           </View>
         ) : (
+          // Loaded state
           <>
-            {/* Drag Instructions */}
             <View style={styles.dragInstructions}>
               <Text style={styles.dragInstructionsText}>
                 💡 Long press and drag to reorder cards
@@ -377,7 +419,6 @@ export default function TrackerScreen() {
         }}
       />
 
-      {/* Edit Card Modal - ADD THIS */}
       <EditCardModal
         visible={showEditCardModal}
         card={editingCard}
@@ -506,5 +547,106 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
     marginLeft: 8,
+  },
+  // Skeleton Styles
+  skeletonContainer: {
+    gap: 16,
+  },
+  skeletonCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 16,
+    height: 180,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  skeletonHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  skeletonLogo: {
+    width: 40,
+    height: 20,
+    backgroundColor: '#333333',
+    borderRadius: 4,
+  },
+  skeletonTitle: {
+    width: 80,
+    height: 16,
+    backgroundColor: '#333333',
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  skeletonMenu: {
+    width: 18,
+    height: 18,
+    backgroundColor: '#333333',
+    borderRadius: 9,
+  },
+  skeletonContent: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  skeletonNumber: {
+    width: 120,
+    height: 20,
+    backgroundColor: '#333333',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonHolder: {
+    width: 80,
+    height: 14,
+    backgroundColor: '#333333',
+    borderRadius: 4,
+  },
+  skeletonBalance: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  skeletonBalanceLabel: {
+    width: 60,
+    height: 14,
+    backgroundColor: '#333333',
+    borderRadius: 4,
+    marginBottom: 6,
+  },
+  skeletonBalanceAmount: {
+    width: 80,
+    height: 24,
+    backgroundColor: '#333333',
+    borderRadius: 4,
+  },
+  skeletonFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  skeletonType: {
+    width: 100,
+    height: 12,
+    backgroundColor: '#333333',
+    borderRadius: 4,
+  },
+  skeletonArrow: {
+    width: 14,
+    height: 14,
+    backgroundColor: '#333333',
+    borderRadius: 7,
+  },
+  skeletonSectionTitle: {
+    width: 120,
+    height: 20,
+    backgroundColor: '#333333',
+    borderRadius: 4,
+    marginBottom: 16,
+  },
+  skeletonActionButton: {
+    flex: 1,
+    height: 50,
+    backgroundColor: '#333333',
+    borderRadius: 12,
   },
 });
