@@ -529,6 +529,27 @@ export default function ProfileScreen() {
         )}
       </View>
 
+            <View style={styles.tabs}>
+        <TouchableOpacity
+          style={[styles.tab, selectedTab === 'posts' && styles.activeTab]}
+          onPress={() => setSelectedTab('posts')}
+        >
+          <Text style={[styles.tabText, { color: colors.text }]}>Posts</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, selectedTab === 'basic-info' && styles.activeTab]}
+          onPress={() => setSelectedTab('basic-info')}
+        >
+          <Text style={[styles.tabText, { color: colors.text }]}>Basic Info</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, selectedTab === 'achievements' && styles.activeTab]}
+          onPress={() => setSelectedTab('achievements')}
+        >
+          <Text style={[styles.tabText, { color: colors.text }]}>Awards</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Linked Accounts Details - Show in Basic Info tab */}
       {selectedTab === 'basic-info' && (
         <View style={styles.linkedAccountsSection}>
@@ -571,26 +592,7 @@ export default function ProfileScreen() {
       )}
 
       {/* Tabs */}
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'posts' && styles.activeTab]}
-          onPress={() => setSelectedTab('posts')}
-        >
-          <Text style={[styles.tabText, { color: colors.text }]}>Posts</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'basic-info' && styles.activeTab]}
-          onPress={() => setSelectedTab('basic-info')}
-        >
-          <Text style={[styles.tabText, { color: colors.text }]}>Basic Info</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'achievements' && styles.activeTab]}
-          onPress={() => setSelectedTab('achievements')}
-        >
-          <Text style={[styles.tabText, { color: colors.text }]}>Awards</Text>
-        </TouchableOpacity>
-      </View>
+
 
       {/* Tab Content */}
       {selectedTab === 'posts' && (
