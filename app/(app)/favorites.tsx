@@ -4,6 +4,7 @@ import { Search, MapPin, Navigation, Bookmark, BookmarkCheck, Clock, DollarSign 
 import { supabase } from '@/lib/supabase';
 import { useFavorites, FavoriteItem } from '@/hook/useFavorites';
 import { useAuth } from '@/hook/useAuth';
+import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 
 interface SearchResult {
@@ -49,7 +50,7 @@ export default function SearchScreen() {
   const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
   const [routeFollowerCounts, setRouteFollowerCounts] = useState<Record<string, number>>({});
   const [hubFollowerCounts, setHubFollowerCounts] = useState<Record<string, number>>({});
-  
+  const router = useRouter();
   const { favorites, addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
   const { user } = useAuth();
 
@@ -407,9 +408,34 @@ export default function SearchScreen() {
   const renderResultItem = (result: SearchResult) => {
     const IconComponent = getResultIcon(result.type);
     const isResultFavorite = isFavorite(result.id);
+
+    const handlePress = () => {
+      // Navigate to appropriate detail screen based on type
+      switch (result.type) {
+        case 'hub':
+          router.push(`/hub/${result.id}`);
+          break;
+        case 'route':
+          router.push(`/route-details?routeId=${result.id}`);
+          break;
+        case 'stop':
+          router.push(`/stop-details?stopId=${result.id}`);
+          break;
+        case 'nearby_spot':
+          // You might want to create a nearby-spot-details screen
+          router.push(`/nearby/${result.id}`);
+          break;
+        default:
+          console.warn('Unknown result type:', result.type);
+      }
+    };
     
     return (
-      <TouchableOpacity key={result.id} style={styles.resultCard}>
+      <TouchableOpacity 
+        key={result.id} 
+        style={styles.resultCard}
+        onPress={handlePress}
+      >
         <View style={styles.resultHeader}>
           <View style={styles.resultInfo}>
             <IconComponent size={20} color="#1ea2b1" />
@@ -437,7 +463,7 @@ export default function SearchScreen() {
               {result.type.charAt(0).toUpperCase() + result.type.slice(1).replace('_', ' ')}
             </Text>
           </View>
-
+  
           {(result.type === 'route' || result.type === 'hub' || result.type === 'stop') && (
             <Text style={{ color: '#1ea2b1', fontSize: 12 }}>
               Followers: {favoritesCountMap[result.id] || 0}
