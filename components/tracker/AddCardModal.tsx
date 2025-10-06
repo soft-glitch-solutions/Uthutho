@@ -74,14 +74,15 @@ const AddCardModal: React.FC<AddCardModalProps> = ({
     setLoading(true);
 
     try {
-      const cardData = {
+        const cardData = {
         user_id: user?.id,
         card_type: cardType,
         card_number: cardNumber.trim(),
         card_holder: cardHolder.trim(),
         current_balance: parseFloat(initialBalance),
+        position: userCards.length, // New cards go to the end
         is_active: true
-      };
+        };
 
       const { error } = await supabase
         .from('user_cards')

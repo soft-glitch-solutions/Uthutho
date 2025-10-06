@@ -7,6 +7,7 @@ import {
   Pressable,
   Image,
   Platform,
+  TouchableOpacity,
   Alert,
   RefreshControl
 } from 'react-native';
@@ -723,9 +724,10 @@ const onRefresh = useCallback(async () => {
               <Text style={[styles.emptyText, { color: colors.text}]}>
                 You haven't added any locations to your community yet.
               </Text>
-              <Text style={[styles.emptySubtext, { color: colors.text }]}>
-                Add stops, hubs, or routes to see them here.
-              </Text>
+              <TouchableOpacity style={styles.addButton} onPress={() => setShowAddCommunity(true)}>
+                <Plus size={20} color="#fff" />
+                <Text style={styles.addButtonText}>Add Community</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.communityList}>
@@ -918,6 +920,20 @@ const styles = StyleSheet.create({
   },
   communityType: {
     fontSize: 14,
+  },
+   addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1ea2b1',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  addButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    marginLeft: 8,
+    fontSize: 16,
   },
   removeButton: {
     paddingHorizontal: 12,
