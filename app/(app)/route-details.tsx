@@ -14,7 +14,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import { Route as RouteIcon, MapPin, Clock, DollarSign, Heart, HeartOff, ArrowLeft, Users, TrendingUp, Shield } from 'lucide-react-native';
+import { Route as RouteIcon, MapPin, Clock, DollarSign, Bookmark, BookmarkCheck, ArrowLeft, Users, TrendingUp, Shield } from 'lucide-react-native';
 
 interface RouteStats {
   avg_journey_time: string;
@@ -329,9 +329,9 @@ export default function RouteDetailsScreen() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
             {isFavorite ? (
-              <Heart size={24} color="#1ea2b1" fill="#1ea2b1" />
+              <Bookmark size={24} color="#1ea2b1" fill="#1ea2b1" />
             ) : (
-              <HeartOff size={24} color="#ffffff" />
+              <BookmarkCheck size={24} color="#ffffff" />
             )}
           </TouchableOpacity>
         </View>

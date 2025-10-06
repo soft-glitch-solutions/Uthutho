@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform, Alert, Image } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { MapPin, Clock, Users, Heart, HeartOff, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon } from 'lucide-react-native';
+import { MapPin, Clock, Users, Bookmark, BookmarkCheck, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
 interface Hub {
@@ -339,9 +339,9 @@ const openInMaps = () => {
         </TouchableOpacity>
         <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
           {isFavorite ? (
-            <Heart size={24} color="#1ea2b1" fill="#1ea2b1" />
+            <Bookmark size={24} color="#1ea2b1" fill="#1ea2b1" />
           ) : (
-            <HeartOff size={24} color="#ffffff" />
+            <BookmarkCheck size={24} color="#ffffff" />
           )}
         </TouchableOpacity>
       </View>

@@ -16,7 +16,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import StopBlock from '../../components/stop/StopBlock';
-import { Plus, Map, Share2 , MapPin, Clock, Users, Heart, HeartOff, ArrowLeft, Navigation, CircleAlert as AlertCircle, Shield} from 'lucide-react-native';
+import { Plus, Map, Share2 , MapPin, Clock, Users, Bookmark, BookmarkCheck, ArrowLeft, Navigation, CircleAlert as AlertCircle, Shield} from 'lucide-react-native';
 import * as Sharing from 'expo-sharing';
 import { formatTimeAgo } from '../../components/utils';
 
@@ -374,9 +374,9 @@ export default function StopDetailsScreen() {
         </TouchableOpacity>
         <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
           {isFavorite ? (
-            <Heart size={24} color="#1ea2b1" fill="#1ea2b1" />
+            <Bookmark size={24} color="#1ea2b1" fill="#1ea2b1" />
           ) : (
-            <HeartOff size={24} color="#ffffff" />
+            <BookmarkCheck size={24} color="#ffffff" />
           )}
         </TouchableOpacity>
       </View>
