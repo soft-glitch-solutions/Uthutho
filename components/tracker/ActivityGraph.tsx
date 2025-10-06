@@ -64,6 +64,32 @@ const ActivityGraph: React.FC<ActivityGraphProps> = ({
     return colors[level] || colors[0];
   };
 
+  // Generate month labels for the activity graph
+  const getMonthLabels = () => {
+    const months = [];
+    const startDate = new Date(selectedYear, 0, 1);
+    const startOfWeek = new Date(startDate);
+    startOfWeek.setDate(startDate.getDate() - startDate.getDay());
+    
+    for (let week = 0; week < 53; week++) {
+      const currentDate = new Date(startOfWeek);
+      currentDate.setDate(startOfWeek.getDate() + (week * 7));
+      
+      // Only show label for the first week of each month
+      if (currentDate.getDate() <= 7) {
+        const monthName = currentDate.toLocaleDateString('en-US', { month: 'short' });
+        months.push({
+          weekIndex: week,
+          month: monthName
+        });
+      }
+    }
+    
+    return months;
+  };
+
+  const monthLabels = getMonthLabels();
+
   return (
     <View style={styles.activityGraph}>
       <View style={styles.graphHeader}>
@@ -89,6 +115,26 @@ const ActivityGraph: React.FC<ActivityGraphProps> = ({
             </TouchableOpacity>
           ))}
         </View>
+      </View>
+      
+      {/* Month Labels */}
+      <View style={styles.monthLabelsContainer}>
+        <View style={styles.monthLabelsSpacer} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.monthLabels}>
+            {monthLabels.map((monthLabel, index) => (
+              <View 
+                key={index} 
+                style={[
+                  styles.monthLabelContainer,
+                  { marginLeft: monthLabel.weekIndex === 0 ? 0 : monthLabel.weekIndex * 14 }
+                ]}
+              >
+                <Text style={styles.monthLabel}>{monthLabel.month}</Text>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
       </View>
       
       <View style={styles.graphContainer}>
@@ -173,6 +219,27 @@ const styles = StyleSheet.create({
   selectedYearButtonText: {
     color: '#ffffff',
   },
+  monthLabelsContainer: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  monthLabelsSpacer: {
+    width: 30, // Same width as weekLabels
+  },
+  monthLabels: {
+    flexDirection: 'row',
+    height: 16,
+  },
+  monthLabelContainer: {
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  monthLabel: {
+    fontSize: 10,
+    color: '#666',
+    fontWeight: '500',
+    minWidth: 20,
+  },
   graphContainer: {
     flexDirection: 'row',
   },
@@ -180,6 +247,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
     justifyContent: 'space-between',
     paddingVertical: 2,
+    width: 30,
   },
   weekLabel: {
     fontSize: 10,
