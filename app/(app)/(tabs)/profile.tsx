@@ -672,7 +672,7 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: '#3b82f6',
+    borderBottomColor: '#1ea2b1',
   },
   tabText: {
     fontSize: 16,
