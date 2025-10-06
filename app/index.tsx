@@ -12,35 +12,47 @@ export default function Index() {
     const init = async () => {
       try {
         let initialUrl: string | null = null;
-  
+
         if (Platform.OS !== 'web') {
           initialUrl = await Linking.getInitialURL();
         } else {
           initialUrl = window.location.href;
         }
-  
+
         if (initialUrl) {
           console.log('[Index] Initial URL detected:', initialUrl);
-  
-          // Handle OAuth callback (Supabase will extract + save session)
+
+          // Handle OAuth callback - NEW APPROACH
           if (initialUrl.includes('auth/callback')) {
             try {
-              const { data, error } = await supabase.auth.getSessionFromUrl({
-                url: initialUrl,
-                storeSession: true,
-              });
-  
-              if (error) throw error;
-              console.log('[Index] Session stored successfully');
-              setRedirectTo('/(app)/(tabs)/home');
-              return;
+              // Parse URL parameters manually
+              const url = new URL(initialUrl);
+              const hashParams = new URLSearchParams(url.hash.substring(1));
+              const searchParams = new URLSearchParams(url.search);
+              
+              const access_token = hashParams.get('access_token') || searchParams.get('access_token');
+              const refresh_token = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+              
+              if (access_token && refresh_token) {
+                console.log('[Index] Setting session from URL tokens');
+                const { error } = await supabase.auth.setSession({
+                  access_token,
+                  refresh_token
+                });
+                
+                if (error) throw error;
+                
+                console.log('[Index] Session stored successfully');
+                setRedirectTo('/(app)/(tabs)/home');
+                return;
+              } else {
+                console.log('[Index] No tokens found in URL, checking for existing session');
+              }
             } catch (err) {
-              console.error('[Index] Error storing session:', err);
-              setRedirectTo('/auth');
-              return;
+              console.error('[Index] Error storing session from URL:', err);
             }
           }
-  
+
           // Handle password reset link
           if (initialUrl.includes('reset-password')) {
             const urlObj = new URL(initialUrl);
@@ -50,7 +62,7 @@ export default function Index() {
             const refresh_token =
               urlObj.searchParams.get('refresh_token') ||
               new URLSearchParams(urlObj.hash.replace('#', '')).get('refresh_token');
-  
+
             if (access_token && refresh_token) {
               setRedirectTo(
                 `/reset-password?access_token=${access_token}&refresh_token=${refresh_token}`
@@ -59,19 +71,19 @@ export default function Index() {
             }
           }
         }
-  
+
         // Otherwise, check existing session
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           setRedirectTo('/(app)/(tabs)/home');
           return;
         }
-  
+
         // Onboarding vs Auth
         let hasLaunched = Platform.OS === 'web'
           ? localStorage.getItem('hasLaunched')
           : await AsyncStorage.getItem('hasLaunched');
-  
+
         if (!hasLaunched) {
           setRedirectTo('/onboarding');
           if (Platform.OS === 'web') {
@@ -89,10 +101,9 @@ export default function Index() {
         setIsLoading(false);
       }
     };
-  
+
     init();
   }, []);
-  
 
   if (isLoading) {
     return (
