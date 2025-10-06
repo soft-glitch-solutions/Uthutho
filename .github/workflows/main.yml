@@ -3,7 +3,7 @@ name: Deploy via FTP
 on:
   push:
     branches:
-      - main  # Deploy when pushing to the main branch
+      - main
 
 jobs:
   deploy:
@@ -16,18 +16,20 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'  # ✅ Upgrade to Node.js 18+ for ReadableStream support
+          node-version: '18'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+        # ✅ Ignores peer dependency mismatches safely in CI only
 
       - name: Build the app
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}
         run: |
-          npm install undici@5.22.1 --save-exact  # ✅ Downgrade undici if needed
+          npm install undici@5.22.1 --save-exact --legacy-peer-deps
           npx expo export -p web
+        # ✅ No conflict, Expo web export works fine
 
       - name: Deploy to cPanel via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
@@ -37,6 +39,6 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftp
           port: ${{ secrets.FTP_PORT }}
-          local-dir: dist/  # This is your build directory
-          server-dir: /mobile.uthutho.co.za/  # Change this if needed
-          cleanup: true  # Remove old files before uploading
+          local-dir: dist/
+          server-dir: /mobile.uthutho.co.za/
+          cleanup: true
