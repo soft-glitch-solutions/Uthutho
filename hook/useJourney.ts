@@ -31,7 +31,7 @@ export function useJourney() {
     if (user) {
       loadActiveJourney();
       cleanupStaleJourneyParticipants(); // Clean up on load
-      
+            // Subscribe to journey updates
       // Subscribe to journey updates
       const subscription = supabase
         .channel('user_journey')
