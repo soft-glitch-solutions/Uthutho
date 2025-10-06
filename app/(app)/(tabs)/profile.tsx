@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView,  ActivityI
 import { useTheme } from '@/context/ThemeContext';
 import { formatTimeAgo } from '../../../components/utils';
 import { router } from 'expo-router';
-import { Settings, LogOut, Camera, Captions, Edit, Badge, Star, MessageSquare, MapPin, Flame, Trash, MoreVertical } from 'lucide-react-native';
+import { Settings, LogOut, Camera, Captions, Edit, Badge, Star, MessageSquare, MapPin, Flame, Trash, MoreVertical, Mail, Globe, Facebook } from 'lucide-react-native';
 import { useProfile } from '@/hook/useProfile';
 import { Animated } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -38,16 +38,16 @@ const Shimmer = ({ children, colors }) => {
   });
 
   return (
-    <View style={{ overflow: 'hidden' }}>{/* Keep the surrounding View for overflow hiding */}
+    <View style={{ overflow: 'hidden' }}>
       <>
       {children}
       <Animated.View
         style={{
           position: 'absolute',
           top: 0,
-          left: '-100%', // Start off-screen to the left
-          right: '-100%', // Extend off-screen to the right
-          bottom: 0, // Cover the height of the child content
+          left: '-100%',
+          right: '-100%',
+          bottom: 0,
           backgroundColor: colors.text,
           opacity: 0.1,
           transform: [{ translateX }],
@@ -118,8 +118,14 @@ interface UserPost {
   comments_count: number;
 }
 
+interface LinkedAccount {
+  provider: 'google' | 'facebook' | 'email';
+  connected: boolean;
+  email?: string;
+}
+
 export default function ProfileScreen() {
-  const { formatTimeAgo } = require('../../../components/utils.tsx'); // Assuming the path to utils.tsx
+  const { formatTimeAgo } = require('../../../components/utils.tsx');
   const { colors } = useTheme();
   const {
     loading,
@@ -135,13 +141,71 @@ export default function ProfileScreen() {
   const [userPosts, setUserPosts] = useState<UserPost[]>([]);
   const [postsLoading, setPostsLoading] = useState(true);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (profile?.id) {
+      loadLinkedAccounts();
+    }
+  }, [profile?.id]);
 
   useEffect(() => {
     if (selectedTab === 'posts' && profile?.id) {
       loadUserPosts();
     }
   }, [selectedTab, profile?.id]);
+
+  const loadLinkedAccounts = async () => {
+    try {
+      setAccountsLoading(true);
+      
+      // Get current session to check auth providers
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) throw error;
+      
+      if (session?.user) {
+        const { user } = session;
+        const accounts: LinkedAccount[] = [];
+        
+        // Check email provider
+        if (user.email) {
+          accounts.push({
+            provider: 'email',
+            connected: true,
+            email: user.email
+          });
+        }
+        
+        // Check if user has identities from OAuth providers
+        const identities = user.identities || [];
+        
+        // Check Google
+        const hasGoogle = identities.some(identity => identity.provider === 'google');
+        accounts.push({
+          provider: 'google',
+          connected: hasGoogle,
+          email: hasGoogle ? user.email : undefined
+        });
+        
+        // Check Facebook
+        const hasFacebook = identities.some(identity => identity.provider === 'facebook');
+        accounts.push({
+          provider: 'facebook',
+          connected: hasFacebook,
+          email: hasFacebook ? user.email : undefined
+        });
+        
+        setLinkedAccounts(accounts);
+      }
+    } catch (error) {
+      console.error('Error loading linked accounts:', error);
+    } finally {
+      setAccountsLoading(false);
+    }
+  };
 
   const loadUserPosts = async () => {
     try {
@@ -227,7 +291,6 @@ export default function ProfileScreen() {
     if (Platform.OS === 'web') {
       fileInputRef.current?.click();
     } else {
-      // Native: use expo-image-picker
       let result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -237,7 +300,6 @@ export default function ProfileScreen() {
   
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        // You may need to convert the asset to a blob or base64 depending on your uploadAvatar implementation
         await uploadAvatar(asset.uri);
       }
     }
@@ -271,7 +333,7 @@ export default function ProfileScreen() {
               }
 
               setUserPosts(userPosts.filter(post => post.id !== postId));
-              setActiveMenu(null); // Close the menu after deletion
+              setActiveMenu(null);
               console.log('Post deleted successfully');
             } catch (error) {
               console.error('Error deleting post:', error);
@@ -293,6 +355,37 @@ export default function ProfileScreen() {
       router.push(`/post/${postId}`);
     } else {
       router.push(`/post/${postId}`);
+    }
+  };
+
+  const getProviderIcon = (provider: string, size: number = 16) => {
+    switch (provider) {
+      case 'google':
+        return (
+          <Image
+            source={require('../../../assets/images/google-icon.png')}
+            style={{ width: size, height: size }}
+          />
+        );
+      case 'facebook':
+        return <Facebook size={size} color="#1877F2" />;
+      case 'email':
+        return <Mail size={size} color="#666" />;
+      default:
+        return <Globe size={size} color="#666" />;
+    }
+  };
+
+  const getProviderName = (provider: string) => {
+    switch (provider) {
+      case 'google':
+        return 'Google';
+      case 'facebook':
+        return 'Facebook';
+      case 'email':
+        return 'Email';
+      default:
+        return provider;
     }
   };
 
@@ -329,10 +422,7 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Header Skeleton */}
         <ProfileHeaderSkeleton colors={colors} />
-
-        {/* Tabs Skeleton */}
         <View style={styles.tabs}>
           {['Posts', 'Basic Info', 'Awards'].map((tab, index) => (
             <Shimmer key={index} colors={colors}>
@@ -340,20 +430,14 @@ export default function ProfileScreen() {
             </Shimmer>
           ))}
         </View>
-
-        {/* Menu Items Skeleton */}
         <View style={styles.menuContainer}>
           {[1, 2].map((item) => (
             <MenuItemSkeleton key={item} colors={colors} />
           ))}
         </View>
-
-        {/* Sign Out Button Skeleton */}
         <Shimmer colors={colors}>
           <View style={[styles.skeletonSignOut, { backgroundColor: colors.border }]} />
         </Shimmer>
-
-        {/* App Info Skeleton */}
         <View style={styles.appInfo}>
           <Shimmer colors={colors}>
             <View style={[styles.skeletonAppInfo, { backgroundColor: colors.border }]} />
@@ -381,6 +465,23 @@ export default function ProfileScreen() {
 
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card }]}>
+        {/* Linked Accounts Badge - Top Right Corner */}
+        <View style={styles.linkedAccountsContainer}>
+          {accountsLoading ? (
+            <Shimmer colors={colors}>
+              <View style={[styles.skeletonLinkedAccounts, { backgroundColor: colors.border }]} />
+            </Shimmer>
+          ) : (
+            <View style={styles.linkedAccountsBadge}>
+              {linkedAccounts.filter(account => account.connected).map((account, index) => (
+                <View key={account.provider} style={styles.providerIcon}>
+                  {getProviderIcon(account.provider, 20)}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
         <TouchableOpacity
           style={styles.avatarContainer}
           onPress={handleImagePicker}
@@ -427,6 +528,47 @@ export default function ProfileScreen() {
           <Text style={[styles.userTitle, { color: colors.primary }]}>{profile?.selected_title}</Text>
         )}
       </View>
+
+      {/* Linked Accounts Details - Show in Basic Info tab */}
+      {selectedTab === 'basic-info' && (
+        <View style={styles.linkedAccountsSection}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Linked Accounts</Text>
+          {accountsLoading ? (
+            <View style={styles.accountsLoading}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.loadingText, { color: colors.text }]}>Loading accounts...</Text>
+            </View>
+          ) : (
+            <View style={styles.accountsList}>
+              {linkedAccounts.map((account, index) => (
+                <View key={account.provider} style={[styles.accountItem, { backgroundColor: colors.card }]}>
+                  <View style={styles.accountInfo}>
+                    <View style={styles.accountProvider}>
+                      {getProviderIcon(account.provider, 24)}
+                      <Text style={[styles.providerName, { color: colors.text }]}>
+                        {getProviderName(account.provider)}
+                      </Text>
+                    </View>
+                    <View style={[
+                      styles.connectionStatus,
+                      { backgroundColor: account.connected ? '#10b981' : '#6b7280' }
+                    ]}>
+                      <Text style={styles.statusText}>
+                        {account.connected ? 'Connected' : 'Not Connected'}
+                      </Text>
+                    </View>
+                  </View>
+                  {account.connected && account.email && (
+                    <Text style={[styles.accountEmail, { color: colors.text }]}>
+                      {account.email}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Tabs */}
       <View style={styles.tabs}>
@@ -552,7 +694,7 @@ export default function ProfileScreen() {
 
       {selectedTab === 'achievements' && (
         <View style={styles.menuContainer}>
-                    {rankMenuItems.map((item, index) => (
+          {rankMenuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
               style={[styles.menuItem, { backgroundColor: colors.card }]}
@@ -918,5 +1060,85 @@ const styles = StyleSheet.create({
     width: 40,
     height: 14,
     borderRadius: 4,
+  },
+  // Linked Accounts Styles
+  linkedAccountsContainer: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+  },
+  linkedAccountsBadge: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+    padding: 8,
+    gap: 6,
+  },
+  providerIcon: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  skeletonLinkedAccounts: {
+    width: 80,
+    height: 32,
+    borderRadius: 20,
+  },
+  linkedAccountsSection: {
+    padding: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  accountsLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginLeft: 12,
+    fontSize: 14,
+  },
+  accountsList: {
+    gap: 12,
+  },
+  accountItem: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  accountInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  accountProvider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  providerName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  connectionStatus: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  accountEmail: {
+    fontSize: 14,
+    opacity: 0.8,
   },
 });
