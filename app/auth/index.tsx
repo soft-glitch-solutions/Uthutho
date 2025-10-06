@@ -9,13 +9,13 @@ import {
   Alert,
   Image,
   Platform,
+  Linking,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import { Eye, EyeOff, Mail, Lock, ArrowLeft } from 'lucide-react-native';
+import { Eye, EyeOff, Mail, Lock, ArrowLeft, Check } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 
 // Required for Expo OAuth
 WebBrowser.maybeCompleteAuthSession();
@@ -37,9 +37,26 @@ export default function Auth() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const { colors } = useTheme();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Terms and Privacy states
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
 
   const transportOptions = ['Taxi', 'Bus', 'Train', 'Uber', 'Walking', 'Mixed'];
   const languageOptions = ['English', 'Zulu', 'Afrikaans', 'Xhosa', 'Sotho'];
+
+  // URLs for Terms and Privacy Policy
+  const termsUrl = 'https://www.uthutho.co.za/terms-and-conditions';
+  const privacyUrl = 'https://www.uthutho.co.za/privacy-policy';
+
+  const handleOpenLink = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      console.error('Error opening URL:', error);
+      Alert.alert('Error', 'Could not open link. Please try again.');
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
@@ -201,6 +218,8 @@ export default function Auth() {
 
   const handleSignUp = async () => {
     setErrorMessage(null);
+    
+    // Validation
     if (!firstName.trim()) {
       setErrorMessage('First name is required');
       return;
@@ -221,6 +240,16 @@ export default function Auth() {
       setErrorMessage('Please select your preferred language');
       return;
     }
+    
+    // Check if terms and privacy are accepted
+    if (!acceptedTerms) {
+      setErrorMessage('Please accept the Terms and Conditions');
+      return;
+    }
+    if (!acceptedPrivacy) {
+      setErrorMessage('Please accept the Privacy Policy');
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -233,6 +262,9 @@ export default function Auth() {
             last_name: lastName,
             preferred_transport: preferredTransport,
             preferred_language: preferredLanguage,
+            accepted_terms: true,
+            accepted_privacy: true,
+            accepted_terms_at: new Date().toISOString(),
           },
           emailRedirectTo: 'uthutho://welcome'
         },
@@ -252,12 +284,15 @@ export default function Auth() {
         params: { email }
       });
 
+      // Reset form
       setEmail('');
       setPassword('');
       setFirstName('');
       setLastName('');
       setPreferredTransport('');
       setPreferredLanguage('English');
+      setAcceptedTerms(false);
+      setAcceptedPrivacy(false);
     } catch (error: any) {
       setErrorMessage('Could not create account. Please try again.');
     } finally {
@@ -348,6 +383,48 @@ export default function Auth() {
           </TouchableOpacity>
         ))}
       </View>
+    );
+  };
+
+  // Checkbox Component
+  const Checkbox = ({ 
+    label, 
+    checked, 
+    onPress, 
+    linkUrl,
+    onLinkPress 
+  }: {
+    label: string;
+    checked: boolean;
+    onPress: () => void;
+    linkUrl?: string;
+    onLinkPress?: (url: string) => void;
+  }) => {
+    return (
+      <TouchableOpacity 
+        style={styles.checkboxContainer} 
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <View style={[
+          styles.checkbox,
+          { borderColor: colors.border },
+          checked && styles.checkboxChecked
+        ]}>
+          {checked && <Check size={14} color="#ffffff" />}
+        </View>
+        <Text style={[styles.checkboxLabel, { color: colors.text }]}>
+          {label}
+          {linkUrl && (
+            <Text 
+              style={styles.linkText}
+              onPress={() => onLinkPress?.(linkUrl)}
+            >
+              {' '}Terms and Conditions
+            </Text>
+          )}
+        </Text>
+      </TouchableOpacity>
     );
   };
 
@@ -479,6 +556,29 @@ export default function Auth() {
                 {renderOptionButtons(languageOptions, preferredLanguage, setPreferredLanguage)}
               </View>
             </View>
+
+            {/* Terms and Privacy Checkboxes */}
+            <View style={styles.checkboxesContainer}>
+              <Text style={[styles.agreementTitle, { color: colors.text }]}>
+                Agreement
+              </Text>
+              
+              <Checkbox
+                label="I accept the"
+                checked={acceptedTerms}
+                onPress={() => setAcceptedTerms(!acceptedTerms)}
+                linkUrl={termsUrl}
+                onLinkPress={handleOpenLink}
+              />
+              
+              <Checkbox
+                label="I accept the Privacy Policy"
+                checked={acceptedPrivacy}
+                onPress={() => setAcceptedPrivacy(!acceptedPrivacy)}
+                linkUrl={privacyUrl}
+                onLinkPress={handleOpenLink}
+              />
+            </View>
           </>
         )}
 
@@ -530,7 +630,11 @@ export default function Auth() {
         )}
 
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.primary }]}
+          style={[
+            styles.button, 
+            { backgroundColor: colors.primary },
+            !isLogin && (!acceptedTerms || !acceptedPrivacy) && styles.buttonDisabled
+          ]}
           onPress={
             showForgotPassword 
               ? handleSendOtp
@@ -538,7 +642,12 @@ export default function Auth() {
                 ? handleSignIn 
                 : handleSignUp
           }
-          disabled={isLoading || googleLoading || facebookLoading}
+          disabled={
+            isLoading || 
+            googleLoading || 
+            facebookLoading || 
+            (!isLogin && (!acceptedTerms || !acceptedPrivacy))
+          }
         >
           <Text style={styles.buttonText}>
             {isLoading 
@@ -595,6 +704,11 @@ export default function Auth() {
             setShowForgotPassword(false);
           } else {
             setIsLogin(!isLogin);
+            // Reset agreement states when switching to sign up
+            if (!isLogin) {
+              setAcceptedTerms(false);
+              setAcceptedPrivacy(false);
+            }
           }
         }}
         disabled={isLoading || googleLoading || facebookLoading}
@@ -671,6 +785,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 10,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   buttonText: {
     color: 'white',
@@ -828,5 +945,43 @@ const styles = StyleSheet.create({
   resendText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  // Checkbox Styles
+  checkboxesContainer: {
+    marginBottom: 10,
+  },
+  agreementTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingVertical: 4,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#1ea2b1',
+    borderColor: '#1ea2b1',
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+  linkText: {
+    color: '#1ea2b1',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });
