@@ -39,6 +39,6 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftp
           port: ${{ secrets.FTP_PORT }}
-          local-dir: web-build/  # ✅ Expo SDK 49+ uses 'web-build'
+          local-dir: dist/
           server-dir: /mobile.uthutho.co.za/
           cleanup: true
