@@ -551,7 +551,7 @@ export default function ProfileScreen() {
                     </View>
                     <View style={[
                       styles.connectionStatus,
-                      { backgroundColor: account.connected ? '#10b981' : '#6b7280' }
+                      { backgroundColor: account.connected ? '#1ea2b1' : '#6b7280' }
                     ]}>
                       <Text style={styles.statusText}>
                         {account.connected ? 'Connected' : 'Not Connected'}
