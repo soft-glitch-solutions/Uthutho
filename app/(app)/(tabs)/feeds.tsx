@@ -191,12 +191,48 @@ export default function FeedsScreen() {
   const [showAllPosts, setShowAllPosts] = useState(false);
   const [sharingPost, setSharingPost] = useState(false);
   const [postFilter, setPostFilter] = useState<'week' | 'all' | 'today'>('week');
+  const [followerCounts, setFollowerCounts] = useState<Record<string, number>>({});
 
   // UUID validation function
   const isValidUUID = (str: string): boolean => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     return uuidRegex.test(str);
   };
+
+  const loadFollowerCounts = useCallback(async (communityIds: string[]) => {
+    if (communityIds.length === 0) return;
+    
+    try {
+      // Load counts from favorites table for hubs and stops
+      const { data: hubFavorites } = await supabase
+        .from('favorites')
+        .select('entity_id')
+        .eq('entity_type', 'hub')
+        .in('entity_id', communityIds);
+      
+      const { data: stopFavorites } = await supabase
+        .from('favorites')
+        .select('entity_id')
+        .eq('entity_type', 'stop')
+        .in('entity_id', communityIds);
+  
+      const counts: Record<string, number> = {};
+      
+      // Count hub followers
+      (hubFavorites || []).forEach(fav => {
+        counts[fav.entity_id] = (counts[fav.entity_id] || 0) + 1;
+      });
+      
+      // Count stop followers
+      (stopFavorites || []).forEach(fav => {
+        counts[fav.entity_id] = (counts[fav.entity_id] || 0) + 1;
+      });
+      
+      setFollowerCounts(counts);
+    } catch (error) {
+      console.error('Error loading follower counts:', error);
+    }
+  }, []);
 
   const getCurrentWeekRange = () => {
     const now = new Date();
@@ -329,33 +365,36 @@ const sharePost = async (post: Post) => {
         .eq('id', uid)
         .single();
       if (error) throw error;
-
+  
       const favorites = (profile?.favorites ?? []) as Array<string | { id: string; type?: 'hub' | 'stop' }>; 
       const favoriteIds = favorites
         .map((f) => (typeof f === 'string' ? f : f?.id))
         .filter((id): id is string => !!id && isValidUUID(id));
-
+  
       if (favoriteIds.length === 0) {
         setCommunities([]);
         setSelectedCommunity(null);
         return;
       }
-
+  
       const [{ data: hubs }, { data: stops }] = await Promise.all([
         supabase.from('hubs').select('id, name, latitude, longitude, address').in('id', favoriteIds),
         supabase.from('stops').select('id, name, latitude, longitude').in('id', favoriteIds),
       ]);
-
+  
       const allFavorites: Community[] = [
         ...(hubs || []).map((hub) => ({ ...hub, type: 'hub' as const })),
         ...(stops || []).map((stop) => ({ ...stop, type: 'stop' as const })),
       ];
-
+  
       // Keep a stable order by name
       allFavorites.sort((a, b) => a.name.localeCompare(b.name));
-
+  
       setCommunities(allFavorites);
       setSelectedCommunity((cur) => cur && allFavorites.find((c) => c.id === cur.id) ? cur : allFavorites[0] ?? null);
+      
+      // Load follower counts for these communities
+      await loadFollowerCounts(favoriteIds);
     } catch (e) {
       console.error('Error loading favorite communities:', e);
     } finally {
@@ -363,7 +402,7 @@ const sharePost = async (post: Post) => {
       setCheckingFavorites(false);
       setInitialLoadComplete(true);
     }
-  }, []);
+  }, [loadFollowerCounts]);
 
   const loadAllCommunities = useCallback(async () => {
     try {
@@ -377,10 +416,14 @@ const sharePost = async (post: Post) => {
       ];
       all.sort((a, b) => a.name.localeCompare(b.name));
       setAllCommunities(all);
+      
+      // Load follower counts for all communities
+      const allIds = all.map(c => c.id);
+      await loadFollowerCounts(allIds);
     } catch (e) {
       console.error('Error loading all communities:', e);
     }
-  }, []);
+  }, [loadFollowerCounts]);
 
   const loadNotificationCount = useCallback(async (uid: string) => {
     if (!uid || !isValidUUID(uid)) return;
@@ -522,10 +565,17 @@ const sharePost = async (post: Post) => {
   // ---- Handlers ----------------------------------------------------------
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    if (isValidUUID(userId)) await loadFavoriteCommunities(userId);
+    if (isValidUUID(userId)) {
+      await loadFavoriteCommunities(userId);
+    }
     await loadCommunityPosts(selectedCommunity);
+    
+    // Also refresh follower counts for all communities
+    const allCommunityIds = [...communities.map(c => c.id), ...allCommunities.map(c => c.id)];
+    await loadFollowerCounts(allCommunityIds);
+    
     setRefreshing(false);
-  }, [userId, selectedCommunity, loadCommunityPosts, loadFavoriteCommunities]);
+  }, [userId, selectedCommunity, loadCommunityPosts, loadFavoriteCommunities, loadFollowerCounts, communities, allCommunities]);
 
   const createPost = useCallback(async () => {
     if (!newPost.trim() || !selectedCommunity || !isValidUUID(userId)) return;
@@ -650,19 +700,27 @@ const sharePost = async (post: Post) => {
   // ---- Renderers ---------------------------------------------------------
   const renderCommunityTab = ({ item }: { item: Community }) => {
     const selected = selectedCommunity?.id === item.id;
+    const followerCount = followerCounts[item.id] || 0;
+    
     return (
       <Pressable
         onPress={() => setSelectedCommunity(item)}
         android_ripple={{ color: '#0f3e45', borderless: false }}
         style={[styles.communityTab, selected && styles.selectedTab]}
       >
-        <Text style={[styles.communityTabText, selected && styles.selectedTabText]} numberOfLines={1}>
-          {item.name}
-        </Text>
+        <View style={styles.communityTabContent}>
+          <Text style={[styles.communityTabText, selected && styles.selectedTabText]} numberOfLines={1}>
+            {item.name}
+          </Text>
+          {followerCount > 0 && (
+            <Text style={[styles.followerCount, selected && styles.selectedFollowerCount]}>
+              Followers : {followerCount}
+            </Text>
+          )}
+        </View>
       </Pressable>
     );
   };
-
   const renderPost = ({ item: post }: { item: Post }) => {
     const fireCount = post.post_reactions.filter((r) => r.reaction_type === 'fire').length;
     const hasUserFired = post.post_reactions.some((r) => r.reaction_type === 'fire' && r.user_id === userId);
@@ -776,31 +834,39 @@ const sharePost = async (post: Post) => {
           data={filteredCommunities}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.communitiesListContent}
-          renderItem={({ item: community }) => {
-            const isFavorite = communities.some((c) => c.id === community.id);
-            return (
-              <Pressable
-                style={[styles.communityItem, isFavorite && styles.favoriteItem]}
-                onPress={() => toggleFavorite(community.id)}
-                android_ripple={{ color: '#0f3e45' }}
-              >
-                <View style={styles.communityInfo}>
-                  <Text style={styles.communityName}>{community.name}</Text>
-                  <View style={styles.communityMeta}>
-                    <MapPin size={14} color="#666" />
-                    <Text style={styles.communityType}>
-                      {community.type === 'hub' ? 'Hub' : 'Stop'}
-                    </Text>
-                  </View>
-                </View>
-                <View style={[styles.favoriteButton, isFavorite && styles.favoriteButtonActive]}>
-                  <Text style={[styles.favoriteButtonText, isFavorite && styles.favoriteButtonTextActive]}>
-                    {isFavorite ? 'Joined' : 'Join'}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          }}
+// In the showAddCommunity section, update the community item renderer:
+renderItem={({ item: community }) => {
+  const isFavorite = communities.some((c) => c.id === community.id);
+  const followerCount = followerCounts[community.id] || 0;
+  
+  return (
+    <Pressable
+      style={[styles.communityItem, isFavorite && styles.favoriteItem]}
+      onPress={() => toggleFavorite(community.id)}
+      android_ripple={{ color: '#0f3e45' }}
+    >
+      <View style={styles.communityInfo}>
+        <Text style={styles.communityName}>{community.name}</Text>
+        <View style={styles.communityMeta}>
+          <MapPin size={14} color="#666" />
+          <Text style={styles.communityType}>
+            {community.type === 'hub' ? 'Hub' : 'Stop'}
+          </Text>
+          {followerCount > 0 && (
+            <Text style={styles.communityFollowers}>
+              • {followerCount} {followerCount === 1 ? 'follower' : 'followers'}
+            </Text>
+          )}
+        </View>
+      </View>
+      <View style={[styles.favoriteButton, isFavorite && styles.favoriteButtonActive]}>
+        <Text style={[styles.favoriteButtonText, isFavorite && styles.favoriteButtonTextActive]}>
+          {isFavorite ? 'Unfollow' : 'Follow'}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         />
       </View>
@@ -1357,6 +1423,24 @@ brandingSubtext: {
     marginRight: 12,
     backgroundColor: '#1ea2b1',
   },
+  // Add these new styles to your StyleSheet
+communityTabContent: {
+  alignItems: 'center',
+},
+followerCount: {
+  fontSize: 10,
+  color: '#666666',
+  marginTop: 2,
+  fontWeight: '600',
+},
+selectedFollowerCount: {
+  color: '#ffffff',
+},
+communityFollowers: {
+  fontSize: 12,
+  color: '#666666',
+  marginLeft: 4,
+},
   shareUserName: {
     fontSize: 16,
     fontWeight: 'bold',

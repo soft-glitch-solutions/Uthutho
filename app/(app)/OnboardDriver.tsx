@@ -129,7 +129,7 @@ Sign up: https://uthutho.app/driver-signup`;
         {user && (
           <TouchableOpacity 
             style={styles.existingDriver}
-            onPress={() => router.push('/driver-dashboard')}
+            onPress={() => router.push('/(app)/driver/signup')}
           >
             <Users size={20} color={colors.primary} />
             <Text style={[styles.existingDriverText, { color: colors.primary }]}>
