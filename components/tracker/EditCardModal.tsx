@@ -6,6 +6,8 @@ import {
   TextInput,
   Image,
   TouchableOpacity,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { CreditCard } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
@@ -43,30 +45,45 @@ const EditCardModal: React.FC<EditCardModalProps> = ({
   const [cardHolder, setCardHolder] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{cardHolder?: string; cardNumber?: string}>({});
 
   useEffect(() => {
     if (card) {
       setCardHolder(card.card_holder);
       setCardNumber(card.card_number);
+      setErrors({}); // Clear errors when card changes
     }
   }, [card]);
+
+  const validateForm = (): boolean => {
+    const newErrors: {cardHolder?: string; cardNumber?: string} = {};
+
+    if (!cardHolder.trim()) {
+      newErrors.cardHolder = 'Card holder name is required';
+    }
+
+    if (!cardNumber.trim()) {
+      newErrors.cardNumber = 'Card number is required';
+    } else if (cardNumber.trim().length < 4) {
+      newErrors.cardNumber = 'Card number must be at least 4 characters';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const resetForm = () => {
     setCardHolder('');
     setCardNumber('');
     setLoading(false);
+    setErrors({});
   };
 
   const handleUpdateCard = async () => {
     if (!card) return;
 
-    if (!cardHolder.trim()) {
-      // We'll handle this with the modal system
-      return;
-    }
-
-    if (!cardNumber.trim()) {
-      // We'll handle this with the modal system
+    // Validate form
+    if (!validateForm()) {
       return;
     }
 
@@ -78,16 +95,27 @@ const EditCardModal: React.FC<EditCardModalProps> = ({
         .update({
           card_holder: cardHolder.trim(),
           card_number: cardNumber.trim(),
+          updated_at: new Date().toISOString(),
         })
         .eq('id', card.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw new Error(error.message || 'Failed to update card');
+      }
 
-      resetForm();
+      // Success - update parent and close
       onCardUpdated();
+      resetForm();
+      onClose(); // Close modal after successful update
+      
     } catch (error) {
       console.error('Error updating card:', error);
-      throw error;
+      Alert.alert(
+        'Update Failed',
+        error instanceof Error ? error.message : 'Failed to update card. Please try again.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setLoading(false);
     }
@@ -98,30 +126,61 @@ const EditCardModal: React.FC<EditCardModalProps> = ({
     onClose();
   };
 
-  if (!card || !visible) return null;
+  // Don't render if not visible or no card
+  if (!visible || !card) return null;
 
   const cardType = CARD_TYPES[card.card_type];
 
   return (
     <View style={styles.container}>
+      {/* Card Holder Input */}
       <Text style={styles.inputLabel}>Card Holder Name</Text>
       <TextInput
-        style={styles.textInput}
+        style={[
+          styles.textInput,
+          errors.cardHolder && styles.inputError
+        ]}
         placeholder="Enter card holder name"
         value={cardHolder}
-        onChangeText={setCardHolder}
+        onChangeText={(text) => {
+          setCardHolder(text);
+          // Clear error when user starts typing
+          if (errors.cardHolder) {
+            setErrors(prev => ({ ...prev, cardHolder: undefined }));
+          }
+        }}
         placeholderTextColor="#666"
+        editable={!loading}
       />
+      {errors.cardHolder && (
+        <Text style={styles.errorText}>{errors.cardHolder}</Text>
+      )}
 
+      {/* Card Number Input */}
       <Text style={[styles.inputLabel, { marginTop: 16 }]}>Card Number</Text>
       <TextInput
-        style={styles.textInput}
+        style={[
+          styles.textInput,
+          errors.cardNumber && styles.inputError
+        ]}
         placeholder="Enter card number"
         value={cardNumber}
-        onChangeText={setCardNumber}
+        onChangeText={(text) => {
+          setCardNumber(text);
+          // Clear error when user starts typing
+          if (errors.cardNumber) {
+            setErrors(prev => ({ ...prev, cardNumber: undefined }));
+          }
+        }}
         placeholderTextColor="#666"
+        editable={!loading}
+        keyboardType="numeric"
       />
+      {errors.cardNumber && (
+        <Text style={styles.errorText}>{errors.cardNumber}</Text>
+      )}
 
+      {/* Card Preview */}
       <View style={styles.cardPreview}>
         <Text style={styles.previewLabel}>Preview:</Text>
         <View style={[styles.previewCard, { backgroundColor: cardType.backgroundColor }]}>
@@ -145,29 +204,36 @@ const EditCardModal: React.FC<EditCardModalProps> = ({
             <Text style={styles.previewNumber}>
               •••• {cardNumber.slice(-4) || '••••'}
             </Text>
-            <Text style={styles.previewHolder}>{cardHolder || 'Card Holder'}</Text>
+            <Text style={styles.previewHolder}>
+              {cardHolder || 'Card Holder'}
+            </Text>
           </View>
         </View>
       </View>
 
+      {/* Action Buttons */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity 
-          style={styles.cancelButton}
+          style={[styles.cancelButton, loading && styles.buttonDisabled]}
           onPress={handleClose}
+          disabled={loading}
         >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
+        
         <TouchableOpacity 
           style={[
             styles.saveButton,
-            (!cardHolder.trim() || !cardNumber.trim()) && styles.saveButtonDisabled
+            (!cardHolder.trim() || !cardNumber.trim() || loading) && styles.saveButtonDisabled
           ]}
           onPress={handleUpdateCard}
           disabled={!cardHolder.trim() || !cardNumber.trim() || loading}
         >
-          <Text style={styles.saveButtonText}>
-            {loading ? 'Updating...' : 'Update Card'}
-          </Text>
+          {loading ? (
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <Text style={styles.saveButtonText}>Update Card</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -176,7 +242,7 @@ const EditCardModal: React.FC<EditCardModalProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 8,
+    padding: 20,
   },
   inputLabel: {
     fontSize: 16,
@@ -192,6 +258,15 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     color: '#ffffff',
+  },
+  inputError: {
+    borderColor: '#ef4444',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
   },
   cardPreview: {
     marginTop: 20,
@@ -272,9 +347,15 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   saveButtonDisabled: {
     backgroundColor: '#333333',
+    opacity: 0.6,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   saveButtonText: {
     color: '#ffffff',

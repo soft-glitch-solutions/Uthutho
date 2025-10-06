@@ -377,7 +377,8 @@ const CardComponent: React.FC<CardComponentProps> = ({
                 {card.card_holder}
               </Text>
             </View>
-
+          </View>
+          
             <View style={styles.balanceSection}>
               <Text style={[
                 styles.balanceLabel,
@@ -398,7 +399,7 @@ const CardComponent: React.FC<CardComponentProps> = ({
                 {cardType.pointsName.toLowerCase()}
               </Text>
             </View>
-          </View>
+
 
           {/* Compact Footer */}
           <View style={styles.cardFooter}>
@@ -609,12 +610,12 @@ const styles = StyleSheet.create({
   },
   cardDetails: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
     marginVertical: 8,
   },
   cardNumberSection: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
   cardNumber: {

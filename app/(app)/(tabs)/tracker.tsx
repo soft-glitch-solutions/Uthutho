@@ -17,6 +17,7 @@ import QuickStats from '@/components/tracker/QuickStats';
 import TransactionList from '@/components/tracker/TransactionList';
 import AddCardModal from '@/components/tracker/AddCardModal';
 import AddEntryModal from '@/components/tracker/AddEntryModal';
+import EditCardModal from '@/components/tracker/EditCardModal'; // ADD THIS IMPORT
 import { UserCard, CardEntry, ActivityData } from '@/types/tracker';
 
 export default function TrackerScreen() {
@@ -51,29 +52,30 @@ export default function TrackerScreen() {
     }
   }, [selectedCard, selectedYear]);
 
-const loadUserCards = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('user_cards')
-      .select('*')
-      .eq('user_id', user?.id)
-      .eq('is_active', true)
-      .order('position', { ascending: true }) // Order by position first
-      .order('created_at', { ascending: false });
+  const loadUserCards = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_cards')
+        .select('*')
+        .eq('user_id', user?.id)
+        .eq('is_active', true)
+        .order('position', { ascending: true })
+        .order('created_at', { ascending: false });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    setUserCards(data || []);
-    
-    if (data && data.length > 0) {
-      setSelectedCard(data[0]);
+      setUserCards(data || []);
+      
+      if (data && data.length > 0) {
+        setSelectedCard(data[0]);
+      }
+    } catch (error) {
+      console.error('Error loading user cards:', error);
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Error loading user cards:', error);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
+
   const loadCardEntries = async (cardId: string) => {
     try {
       const { data, error } = await supabase
@@ -125,51 +127,42 @@ const loadUserCards = async () => {
   };
 
   // Drag and drop functionality
-// Drag and drop functionality
-// More efficient version - only updates cards that actually changed position
-// Drag and drop functionality
-const handlePositionChange = async (fromIndex: number, toIndex: number) => {
-  // Ensure the new index is within bounds
-  const newIndex = Math.max(0, Math.min(toIndex, userCards.length - 1));
-  
-  if (fromIndex === newIndex) return;
-
-  const newCards = [...userCards];
-  const [movedCard] = newCards.splice(fromIndex, 1);
-  newCards.splice(newIndex, 0, movedCard);
-  
-  // Update local state immediately for smooth UI
-  setUserCards(newCards);
-
-  try {
-    // Update ALL card positions to maintain consistency
-    // This ensures the order is always correct in the database
-    const updatePromises = newCards.map((card, index) =>
-      supabase
-        .from('user_cards')
-        .update({ 
-          position: index,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', card.id)
-        .eq('user_id', user?.id) // Extra safety check
-    );
-
-    const results = await Promise.all(updatePromises);
+  const handlePositionChange = async (fromIndex: number, toIndex: number) => {
+    const newIndex = Math.max(0, Math.min(toIndex, userCards.length - 1));
     
-    // Check for any errors
-    const hasError = results.some(result => result.error);
-    if (hasError) {
-      const errors = results.filter(result => result.error).map(result => result.error);
-      console.error('Position update errors:', errors);
-      throw new Error('Failed to update some card positions');
+    if (fromIndex === newIndex) return;
+
+    const newCards = [...userCards];
+    const [movedCard] = newCards.splice(fromIndex, 1);
+    newCards.splice(newIndex, 0, movedCard);
+    
+    setUserCards(newCards);
+
+    try {
+      const updatePromises = newCards.map((card, index) =>
+        supabase
+          .from('user_cards')
+          .update({ 
+            position: index,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', card.id)
+          .eq('user_id', user?.id)
+      );
+
+      const results = await Promise.all(updatePromises);
+      
+      const hasError = results.some(result => result.error);
+      if (hasError) {
+        const errors = results.filter(result => result.error).map(result => result.error);
+        console.error('Position update errors:', errors);
+        throw new Error('Failed to update some card positions');
+      }
+    } catch (error) {
+      console.error('Error updating card positions:', error);
+      loadUserCards();
     }
-  } catch (error) {
-    console.error('Error updating card positions:', error);
-    // Revert local state if database update fails
-    loadUserCards();
-  }
-};
+  };
 
   const removeCard = async (cardId: string) => {
     Alert.alert(
@@ -212,7 +205,7 @@ const handlePositionChange = async (fromIndex: number, toIndex: number) => {
   const handleCardUpdated = () => {
     setShowEditCardModal(false);
     setEditingCard(null);
-    loadUserCards();
+    loadUserCards(); // Refresh the cards list
   };
 
   const handleCardPress = (card: UserCard) => {
@@ -384,13 +377,16 @@ const handlePositionChange = async (fromIndex: number, toIndex: number) => {
         }}
       />
 
-      {/* Edit Card Modal - You'll need to create this component */}
-      {/* <EditCardModal
+      {/* Edit Card Modal - ADD THIS */}
+      <EditCardModal
         visible={showEditCardModal}
         card={editingCard}
-        onClose={() => setShowEditCardModal(false)}
+        onClose={() => {
+          setShowEditCardModal(false);
+          setEditingCard(null);
+        }}
         onCardUpdated={handleCardUpdated}
-      /> */}
+      />
     </View>
   );
 }
