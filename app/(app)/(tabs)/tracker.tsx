@@ -247,6 +247,9 @@ export default function TrackerScreen() {
         <Stack.Screen options={{ headerShown: false }} />
 
         <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <ArrowLeft size={24} color="#ffffff" />
+        </TouchableOpacity>
           <Text style={styles.headerTitle}>
             {selectedCard.card_type === 'myciti' ? 'MyCiti Card' : 'Golden Arrow'}
           </Text>
@@ -296,9 +299,6 @@ export default function TrackerScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#ffffff" />
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>My Cards</Text>
         <TouchableOpacity 
           style={styles.addButton}
