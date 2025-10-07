@@ -322,11 +322,11 @@ export default function JourneyScreen() {
       if (!user) return;
 
       const { data: passengers } = await supabase
-        .from('journey_participants')
+        .from('stop_waiting')
         .select('*, profiles (first_name, last_name), stops (name, order_number)')
         .eq('journey_id', activeJourney.id)
         .neq('user_id', user.id)
-        .eq('is_active', true);
+        .gt('expires_at', new Date().toISOString());
 
       setOtherPassengers(passengers || []);
     } catch (error) {
