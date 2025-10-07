@@ -9,6 +9,8 @@ export interface Journey {
   status: string;
   last_ping_time: string;
   created_at: string;
+  driver_id?: string;
+  has_driver?: boolean;
   routes: {
     name: string;
     transport_type: string;
@@ -20,6 +22,13 @@ export interface Journey {
     name: string;
     order_number: number;
   }>;
+  drivers?: {
+    user_id: string;
+    profiles: {
+      first_name: string;
+      last_name: string;
+    };
+  };
 }
 
 export function useJourney() {
@@ -30,8 +39,8 @@ export function useJourney() {
   useEffect(() => {
     if (user) {
       loadActiveJourney();
-      cleanupStaleJourneyParticipants(); // Clean up on load
-            // Subscribe to journey updates
+      cleanupStaleJourneyParticipants();
+      
       // Subscribe to journey updates
       const subscription = supabase
         .channel('user_journey')
@@ -55,7 +64,110 @@ export function useJourney() {
     }
   }, [user]);
 
-  
+  // Driver assignment function
+  const checkAndAssignJourneyDriver = async (journeyId: string) => {
+    try {
+      // First check if journey already has a driver
+      const { data: currentJourney, error: journeyError } = await supabase
+        .from('journeys')
+        .select('driver_id, has_driver')
+        .eq('id', journeyId)
+        .single();
+
+      if (journeyError) {
+        console.error('Error checking journey driver:', journeyError);
+        return;
+      }
+
+      if (currentJourney?.has_driver) {
+        return; // Journey already has a driver
+      }
+
+      // Look for verified drivers in journey participants using a direct join
+      const { data: driverParticipants, error } = await supabase
+        .from('journey_participants')
+        .select(`
+          user_id,
+          profiles (
+            first_name,
+            last_name
+          ),
+          drivers!inner (
+            id,
+            is_verified,
+            is_active
+          )
+        `)
+        .eq('journey_id', journeyId)
+        .eq('is_active', true)
+        .eq('drivers.is_verified', true)
+        .eq('drivers.is_active', true)
+        .limit(1);
+
+      if (error) {
+        console.error('Error checking driver participants:', error);
+        return;
+      }
+
+      if (driverParticipants && driverParticipants.length > 0) {
+        // Found verified driver - assign them
+        const driverParticipant = driverParticipants[0];
+        
+        // Update the journey with the driver
+        const { error: updateError } = await supabase
+          .from('journeys')
+          .update({
+            driver_id: driverParticipant.drivers.id,
+            has_driver: true
+          })
+          .eq('id', journeyId);
+
+        if (updateError) {
+          console.error('Error assigning driver to journey:', updateError);
+          return;
+        }
+
+        console.log('Driver assigned to journey:', driverParticipant.user_id);
+        
+        // Send notification to passengers
+        await notifyPassengersDriverJoined(journeyId, driverParticipant.profiles);
+      }
+    } catch (error) {
+      console.error('Error in checkAndAssignJourneyDriver:', error);
+    }
+  };
+
+  const notifyPassengersDriverJoined = async (journeyId: string, driverProfile: any) => {
+    try {
+      const { data: passengers, error } = await supabase
+        .from('journey_participants')
+        .select('user_id')
+        .eq('journey_id', journeyId)
+        .eq('is_active', true)
+        .neq('user_id', user?.id); // Don't notify the driver themselves
+
+      if (error || !passengers) return;
+
+      const driverName = `${driverProfile.first_name} ${driverProfile.last_name}`;
+      const notifications = passengers.map(passenger => ({
+        user_id: passenger.user_id,
+        type: 'driver_joined',
+        title: 'Driver Joined! 🎉',
+        message: `${driverName} has joined as your driver`,
+        data: { 
+          journey_id: journeyId,
+          driver_name: driverName
+        }
+      }));
+
+      await supabase
+        .from('notifications')
+        .insert(notifications);
+
+    } catch (error) {
+      console.error('Error notifying passengers:', error);
+    }
+  };
 
   // Clean up stale journey participants
   const cleanupStaleJourneyParticipants = async () => {
@@ -76,7 +188,7 @@ export function useJourney() {
         `)
         .eq('user_id', user.id)
         .eq('is_active', true)
-        .or('journeys.status.neq.in_progress,journeys.last_ping_time.lt.2024-01-01T00:00:00Z') // Adjust date as needed
+        .or('journeys.status.neq.in_progress,journeys.last_ping_time.lt.2024-01-01T00:00:00Z')
         .limit(10);
 
       if (error) {
@@ -85,7 +197,6 @@ export function useJourney() {
       }
 
       if (staleParticipants && staleParticipants.length > 0) {
-        // Deactivate all stale participants
         const participantIds = staleParticipants.map(p => p.id);
         
         const { error: updateError } = await supabase
@@ -127,6 +238,13 @@ export function useJourney() {
               transport_type,
               start_point,
               end_point
+            ),
+            drivers (
+              user_id,
+              profiles (
+                first_name,
+                last_name
+              )
             )
           )
         `)
@@ -150,10 +268,15 @@ export function useJourney() {
           .eq('route_id', waitingData.journeys.route_id)
           .order('order_number', { ascending: true });
 
-        setActiveJourney({
+        const journeyWithStops = {
           ...waitingData.journeys,
           stops: stopsData || [],
-        });
+        };
+
+        setActiveJourney(journeyWithStops);
+
+        // Check and assign driver for this journey
+        await checkAndAssignJourneyDriver(waitingData.journeys.id);
       } else {
         setActiveJourney(null);
       }
@@ -218,7 +341,6 @@ export function useJourney() {
 
         if (participantError) {
           console.error('Error adding participant:', participantError);
-          // Continue anyway - don't fail the whole operation
         }
       } else {
         // Create new journey
@@ -247,7 +369,6 @@ export function useJourney() {
 
         if (participantError) {
           console.error('Error adding participant:', participantError);
-          // Continue anyway
         }
       }
 
@@ -260,12 +381,15 @@ export function useJourney() {
           stop_id: stopId,
           route_id: routeId,
           transport_type: transportType,
-          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutes
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString()
         }, {
           onConflict: 'user_id,stop_id'
         });
 
       if (waitingUpsertError) throw waitingUpsertError;
+
+      // Check for drivers after creating/joining journey
+      await checkAndAssignJourneyDriver(journeyId);
 
       // Reload active journey
       await loadActiveJourney();
@@ -328,7 +452,6 @@ export function useJourney() {
 
       if (deactivateError) {
         console.error('Error deactivating journey participant:', deactivateError);
-        // Continue anyway - don't fail the operation
       } else {
         console.log('Deactivated user from journey participants');
       }
@@ -429,5 +552,6 @@ export function useJourney() {
     completeJourney,
     refreshActiveJourney: loadActiveJourney,
     cleanupStaleJourneyParticipants,
+    checkAndAssignJourneyDriver,
   };
 }

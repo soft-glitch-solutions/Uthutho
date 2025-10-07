@@ -92,8 +92,10 @@ export default function JourneyScreen() {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [participantStatus, setParticipantStatus] = useState<'waiting' | 'picked_up' | 'arrived'>('waiting');
   const [isDriver, setIsDriver] = useState(false);
-  const [hasDriverInJourney, setHasDriverInJourney] = useState(false);
-  const [journeyDriver, setJourneyDriver] = useState(null);
+
+  // Get driver info from activeJourney
+  const hasDriverInJourney = activeJourney?.has_driver || false;
+  const journeyDriver = activeJourney?.drivers;
 
   useEffect(() => {
     getCurrentUser();
@@ -101,7 +103,6 @@ export default function JourneyScreen() {
     
     if (activeJourney) {
       loadJourneyData();
-      checkJourneyDriver();
       subscribeToDriverChanges();
     }
   }, [activeJourney]);
@@ -131,185 +132,12 @@ export default function JourneyScreen() {
     }
   };
 
-  const checkJourneyDriver = async () => {
-    if (!activeJourney) return;
-
-    try {
-      // First check if journey already has a driver assigned
-      const { data: journeyWithDriver } = await supabase
-        .from('journeys')
-        .select('driver_id, has_driver, drivers(user_id, profiles(first_name, last_name))')
-        .eq('id', activeJourney.id)
-        .maybeSingle();
-
-      if (journeyWithDriver && journeyWithDriver.has_driver) {
-        // Journey already has a driver assigned
-        setHasDriverInJourney(true);
-        setJourneyDriver(journeyWithDriver.drivers);
-        return;
-      }
-
-      // If no driver assigned, check if any verified drivers have joined as participants
-      const { data: driverParticipants, error } = await supabase
-        .from('journey_participants')
-        .select(`
-          user_id,
-          profiles (
-            first_name,
-            last_name
-          ),
-          drivers!inner (
-            id,
-            is_verified,
-            is_active
-          )
-        `)
-        .eq('journey_id', activeJourney.id)
-        .eq('is_active', true)
-        .eq('drivers.is_verified', true)
-        .eq('drivers.is_active', true)
-        .limit(1);
-
-      if (error) {
-        console.error('Error checking driver participants:', error);
-        return;
-      }
-
-      if (driverParticipants && driverParticipants.length > 0) {
-        // Found a verified driver in participants - assign them as the journey driver
-        const driverParticipant = driverParticipants[0];
-        await assignDriverToJourney(driverParticipant.user_id, driverParticipant);
-      } else {
-        // No driver found
-        setHasDriverInJourney(false);
-        setJourneyDriver(null);
-      }
-    } catch (error) {
-      console.error('Error checking journey driver:', error);
-    }
-  };
-
-  const assignDriverToJourney = async (driverUserId: string, driverData: any) => {
-    if (!activeJourney) return;
-
-    try {
-      // First get the driver ID from the drivers table
-      const { data: driverRecord, error: driverError } = await supabase
-        .from('drivers')
-        .select('id')
-        .eq('user_id', driverUserId)
-        .eq('is_verified', true)
-        .eq('is_active', true)
-        .single();
-
-      if (driverError || !driverRecord) {
-        console.error('Error finding driver record:', driverError);
-        return;
-      }
-
-      // Update the journey to assign the driver
-      const { error: updateError } = await supabase
-        .from('journeys')
-        .update({
-          driver_id: driverRecord.id,
-          has_driver: true
-        })
-        .eq('id', activeJourney.id);
-
-      if (updateError) {
-        console.error('Error assigning driver to journey:', updateError);
-        return;
-      }
-
-      // Update local state
-      setHasDriverInJourney(true);
-      setJourneyDriver({
-        user_id: driverUserId,
-        profiles: driverData.profiles
-      });
-
-      console.log('Driver assigned to journey:', driverUserId);
-      
-      // Send notification to passengers that a driver has joined
-      await notifyPassengersDriverJoined(driverData.profiles);
-    } catch (error) {
-      console.error('Error in assignDriverToJourney:', error);
-    }
-  };
-
-  const notifyPassengersDriverJoined = async (driverProfile: any) => {
-    if (!activeJourney) return;
-
-    try {
-      const { data: passengers, error } = await supabase
-        .from('journey_participants')
-        .select('user_id')
-        .eq('journey_id', activeJourney.id)
-        .eq('is_active', true)
-        .neq('user_id', currentUserId); // Don't notify the driver themselves
-
-      if (error || !passengers) return;
-
-      const driverName = `${driverProfile.first_name} ${driverProfile.last_name}`;
-      const notifications = passengers.map(passenger => ({
-        user_id: passenger.user_id,
-        type: 'driver_joined',
-        title: 'Driver Joined! 🎉',
-        message: `${driverName} has joined as your driver for the ${activeJourney.routes.transport_type} journey`,
-        data: { 
-          journey_id: activeJourney.id,
-          driver_name: driverName
-        }
-      }));
-
-      await supabase
-        .from('notifications')
-        .insert(notifications);
-
-    } catch (error) {
-      console.error('Error notifying passengers:', error);
-    }
-  };
-
   const subscribeToDriverChanges = () => {
     if (!activeJourney) return;
 
     try {
-      // Subscribe to journey participant changes to detect when drivers join
       const subscription = supabase
-        .channel('journey-driver-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'journey_participants',
-            filter: `journey_id=eq.${activeJourney.id}`
-          },
-          async (payload) => {
-            console.log('New participant joined:', payload.new);
-            
-            // Check if the new participant is a verified driver
-            const { data: driverCheck, error } = await supabase
-              .from('drivers')
-              .select('id, is_verified, is_active')
-              .eq('user_id', payload.new.user_id)
-              .eq('is_verified', true)
-              .eq('is_active', true)
-              .maybeSingle();
-
-            if (driverCheck && !hasDriverInJourney) {
-              // Found a new verified driver - assign them to the journey
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('first_name, last_name')
-                .eq('id', payload.new.user_id)
-                .single();
-
-              await assignDriverToJourney(payload.new.user_id, { profiles: profile });
-            }
-          }
-        )
+        .channel('journey-driver-updates')
         .on(
           'postgres_changes',
           {
@@ -319,9 +147,9 @@ export default function JourneyScreen() {
             filter: `id=eq.${activeJourney.id}`
           },
           (payload) => {
-            // Journey was updated - refresh driver status
-            if (payload.new.has_driver !== hasDriverInJourney) {
-              checkJourneyDriver();
+            // Refresh journey data when driver is assigned
+            if (payload.new.has_driver && !payload.old.has_driver) {
+              refreshActiveJourney();
             }
           }
         )
@@ -343,12 +171,10 @@ export default function JourneyScreen() {
         loadOtherPassengers(),
         loadCurrentUserStop(),
         loadChatMessages(),
-        loadParticipantStatus(),
-        checkJourneyDriver()
+        loadParticipantStatus()
       ]);
       startWaitingTimer();
       subscribeToChat();
-      subscribeToDriverChanges();
     } catch (error) {
       console.error('Error loading journey data:', error);
       setConnectionError(true);
