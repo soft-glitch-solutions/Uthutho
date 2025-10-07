@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Navigation, Timer, Clock, Users, MapPin } from 'lucide-react-native';
+import { Navigation, Timer, Clock, Users, MapPin, UserCheck, UserX } from 'lucide-react-native';
 
 interface JourneyOverviewProps {
   routeName: string;
@@ -13,6 +13,8 @@ interface JourneyOverviewProps {
   passengerCount: number;
   currentStop: number;
   totalStops: number;
+  hasDriver?: boolean;
+  driverName?: string | null;
 }
 
 export const JourneyOverview = ({
@@ -25,7 +27,9 @@ export const JourneyOverview = ({
   estimatedArrival,
   passengerCount,
   currentStop,
-  totalStops
+  totalStops,
+  hasDriver = false,
+  driverName = null
 }: JourneyOverviewProps) => {
   return (
     <View style={styles.journeyCard}>
@@ -41,6 +45,28 @@ export const JourneyOverview = ({
       <Text style={styles.routeDestination}>
         {startPoint} → {endPoint}
       </Text>
+
+      {/* Driver Status */}
+      <View style={[
+        styles.driverStatus, 
+        hasDriver ? styles.driverPresent : styles.driverMissing
+      ]}>
+        {hasDriver ? (
+          <>
+            <UserCheck size={16} color="#34d399" />
+            <Text style={styles.driverPresentText}>
+              Driver: {driverName || 'Available'}
+            </Text>
+          </>
+        ) : (
+          <>
+            <UserX size={16} color="#fca5a5" />
+            <Text style={styles.driverMissingText}>
+              No driver assigned
+            </Text>
+          </>
+        )}
+      </View>
       
       {/* Progress Bar */}
       <View style={styles.progressContainer}>
@@ -124,7 +150,32 @@ const styles = StyleSheet.create({
   routeDestination: {
     fontSize: 14,
     color: '#cccccc',
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  driverStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  driverPresent: {
+    backgroundColor: '#065f46',
+  },
+  driverMissing: {
+    backgroundColor: '#7f1d1d',
+  },
+  driverPresentText: {
+    color: '#34d399',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  driverMissingText: {
+    color: '#fca5a5',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   progressContainer: {
     marginBottom: 20,

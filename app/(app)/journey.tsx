@@ -8,11 +8,14 @@ import {
   View,
   Text,
   FlatList,
-  StyleSheet
+  StyleSheet,
+  TouchableOpacity,
+  Share
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Share2, UserPlus, Award } from 'lucide-react-native';
 
 import { useJourney } from '@/hook/useJourney';
 import { supabase } from '@/lib/supabase';
@@ -28,8 +31,49 @@ import { JourneySkeleton } from '@/components/journey/JourneySkeleton';
 import { NoActiveJourney } from '@/components/journey/NoActiveJourney';
 import { JourneyTabs } from '@/components/journey/JourneyTabs';
 
-
 import type { JourneyStop, Passenger, ChatMessage } from '@/types/journey';
+
+// No Driver Promotion Component
+const NoDriverPromotion = ({ onShare, onDriverSignup, routeName, transportType }) => {
+  return (
+    <View style={styles.noDriverContainer}>
+      <View style={styles.noDriverHeader}>
+        <Text style={styles.noDriverTitle}>🚨 Oh no, no driver!</Text>
+        <Text style={styles.noDriverSubtitle}>
+          Get your driver to join Uthutho and earn <Text style={styles.pointsHighlight}>200 points</Text>
+        </Text>
+      </View>
+      
+      <View style={styles.pointsBadge}>
+        <Award size={20} color="#fbbf24" />
+        <Text style={styles.pointsText}>200 POINTS REWARD</Text>
+      </View>
+      
+      <View style={styles.noDriverBenefits}>
+        <Text style={styles.noDriverBenefit}>• Real-time journey tracking</Text>
+        <Text style={styles.noDriverBenefit}>• Connect with passengers</Text>
+        <Text style={styles.noDriverBenefit}>• Earn rewards and points</Text>
+        <Text style={styles.noDriverBenefit}>• Build your driver reputation</Text>
+      </View>
+
+      <TouchableOpacity 
+        style={styles.shareButton}
+        onPress={onShare}
+      >
+        <Share2 size={20} color="#ffffff" />
+        <Text style={styles.shareButtonText}>Share with Driver</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={styles.driverSignupButton}
+        onPress={onDriverSignup}
+      >
+        <UserPlus size={20} color="#1ea2b1" />
+        <Text style={styles.driverSignupButtonText}>Become a Driver</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 export default function JourneyScreen() {
   const router = useRouter();
@@ -46,12 +90,18 @@ export default function JourneyScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [participantStatus, setParticipantStatus] = useState<'waiting' | 'picked_up' | 'arrived'>('waiting');
+  const [isDriver, setIsDriver] = useState(false);
+  const [hasDriverInJourney, setHasDriverInJourney] = useState(false);
+  const [journeyDriver, setJourneyDriver] = useState(null);
 
   useEffect(() => {
     getCurrentUser();
+    checkIfDriver();
     
     if (activeJourney) {
       loadJourneyData();
+      checkJourneyDriver();
     }
   }, [activeJourney]);
 
@@ -61,6 +111,45 @@ export default function JourneyScreen() {
     }
   }, [activeTab]);
 
+  const checkIfDriver = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: driverData } = await supabase
+        .from('drivers')
+        .select('id, is_verified, is_active')
+        .eq('user_id', user.id)
+        .eq('is_verified', true)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      setIsDriver(!!driverData);
+    } catch (error) {
+      console.error('Error checking driver status:', error);
+    }
+  };
+
+  const checkJourneyDriver = async () => {
+    if (!activeJourney) return;
+
+    try {
+      // Check if journey has a driver assigned
+      const { data: journeyWithDriver } = await supabase
+        .from('journeys')
+        .select('driver_id, has_driver, drivers(user_id, profiles(first_name, last_name))')
+        .eq('id', activeJourney.id)
+        .maybeSingle();
+
+      if (journeyWithDriver) {
+        setHasDriverInJourney(journeyWithDriver.has_driver || false);
+        setJourneyDriver(journeyWithDriver.drivers);
+      }
+    } catch (error) {
+      console.error('Error checking journey driver:', error);
+    }
+  };
+
   const loadJourneyData = async () => {
     setConnectionError(false);
     try {
@@ -68,7 +157,9 @@ export default function JourneyScreen() {
         loadJourneyStops(),
         loadOtherPassengers(),
         loadCurrentUserStop(),
-        loadChatMessages()
+        loadChatMessages(),
+        loadParticipantStatus(),
+        checkJourneyDriver()
       ]);
       startWaitingTimer();
       subscribeToChat();
@@ -133,22 +224,36 @@ export default function JourneyScreen() {
     }
   };
 
+  const loadParticipantStatus = async () => {
+    if (!activeJourney || !currentUserId) return;
+
+    try {
+      const { data: participant } = await supabase
+        .from('journey_participants')
+        .select('status')
+        .eq('journey_id', activeJourney.id)
+        .eq('user_id', currentUserId)
+        .maybeSingle();
+
+      if (participant) {
+        setParticipantStatus(participant.status || 'waiting');
+      }
+    } catch (error) {
+      console.error('Error loading participant status:', error);
+    }
+  };
+
   const startWaitingTimer = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: waitingData, error } = await supabase
+      const { data: waitingData } = await supabase
         .from('stop_waiting')
         .select('created_at')
         .eq('user_id', user.id)
         .eq('journey_id', activeJourney?.id)
-        .single();
-
-      if (error) {
-        console.error('Error getting waiting data:', error);
-        return;
-      }
+        .maybeSingle();
 
       if (waitingData) {
         const startTime = new Date(waitingData.created_at).getTime();
@@ -186,11 +291,20 @@ export default function JourneyScreen() {
         return;
       }
 
+      // Get user's stop for highlighting
+      const { data: userStop } = await supabase
+        .from('stop_waiting')
+        .select('stop_id')
+        .eq('user_id', currentUserId)
+        .eq('journey_id', activeJourney.id)
+        .maybeSingle();
+
       const processedStops = stops.map(stop => ({
         ...stop,
         passed: stop.order_number < currentStopSequence,
         current: stop.order_number === currentStopSequence,
         upcoming: stop.order_number > currentStopSequence,
+        isUserStop: userStop?.stop_id === stop.id,
       }));
 
       setJourneyStops(processedStops);
@@ -207,17 +321,12 @@ export default function JourneyScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: passengers, error } = await supabase
-        .from('stop_waiting')
+      const { data: passengers } = await supabase
+        .from('journey_participants')
         .select('*, profiles (first_name, last_name), stops (name, order_number)')
         .eq('journey_id', activeJourney.id)
         .neq('user_id', user.id)
-        .gt('expires_at', new Date().toISOString());
-
-      if (error) {
-        console.error('Error loading other passengers:', error);
-        return;
-      }
+        .eq('is_active', true);
 
       setOtherPassengers(passengers || []);
     } catch (error) {
@@ -226,96 +335,172 @@ export default function JourneyScreen() {
     }
   };
 
-const loadChatMessages = async () => {
-  if (!activeJourney) return;
+  const loadChatMessages = async () => {
+    if (!activeJourney) return;
 
-  try {
-    const { data: messages, error } = await supabase
-      .from('journey_messages')
-      .select('*, profiles (first_name, last_name, selected_title, avatar_url)') // Add selected_title and avatar_url
-      .eq('journey_id', activeJourney.id)
-      .order('created_at', { ascending: true });
+    try {
+      const { data: messages, error } = await supabase
+        .from('journey_messages')
+        .select('*, profiles (first_name, last_name, selected_title, avatar_url)')
+        .eq('journey_id', activeJourney.id)
+        .order('created_at', { ascending: true });
 
-    if (error) {
+      if (error) {
+        console.error('Error loading chat messages:', error);
+        return;
+      }
+
+      setChatMessages(messages || []);
+    } catch (error) {
       console.error('Error loading chat messages:', error);
-      return;
+      throw error;
     }
+  };
 
-    setChatMessages(messages || []);
-  } catch (error) {
-    console.error('Error loading chat messages:', error);
-    throw error;
-  }
-};
+  const subscribeToChat = () => {
+    if (!activeJourney) return;
 
-const subscribeToChat = () => {
-  if (!activeJourney) return;
-
-  try {
-    const subscription = supabase
-      .channel('journey-chat-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'journey_messages',
-          filter: `journey_id=eq.${activeJourney.id}`
-        },
-        async (payload) => {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('first_name, last_name, selected_title, avatar_url') // Add selected_title and avatar_url
-            .eq('id', payload.new.user_id)
-            .single();
+    try {
+      const subscription = supabase
+        .channel('journey-chat-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'journey_messages',
+            filter: `journey_id=eq.${activeJourney.id}`
+          },
+          async (payload) => {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('first_name, last_name, selected_title, avatar_url')
+              .eq('id', payload.new.user_id)
+              .single();
+              
+            const newMessage = {
+              ...payload.new as ChatMessage,
+              profiles: profile
+            };
             
-          const newMessage = {
-            ...payload.new as ChatMessage,
-            profiles: profile
-          };
-          
-          setChatMessages(prev => [...prev, newMessage]);
-          
-          if (activeTab !== 'chat') {
-            setUnreadMessages(prev => prev + 1);
+            setChatMessages(prev => [...prev, newMessage]);
+            
+            if (activeTab !== 'chat') {
+              setUnreadMessages(prev => prev + 1);
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  } catch (error) {
-    console.error('Error subscribing to chat:', error);
-  }
-};
+      return () => {
+        subscription.unsubscribe();
+      };
+    } catch (error) {
+      console.error('Error subscribing to chat:', error);
+    }
+  };
 
-const sendMessage = async () => {
-  if (!newMessage.trim() || !activeJourney || !currentUserId) return;
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !activeJourney || !currentUserId) return;
 
-  try {
-    const { error } = await supabase
-      .from('journey_messages')  // Change from journey_chat to journey_messages
-      .insert({
-        journey_id: activeJourney.id,
-        user_id: currentUserId,
-        message: newMessage.trim(),
-        is_anonymous: true
-      });
+    try {
+      const { error } = await supabase
+        .from('journey_messages')
+        .insert({
+          journey_id: activeJourney.id,
+          user_id: currentUserId,
+          message: newMessage.trim(),
+          is_anonymous: true
+        });
 
-    if (error) {
+      if (error) {
+        console.error('Error sending message:', error);
+        Alert.alert('Error', 'Failed to send message');
+        return;
+      }
+
+      setNewMessage('');
+    } catch (error) {
       console.error('Error sending message:', error);
       Alert.alert('Error', 'Failed to send message');
-      return;
     }
+  };
 
-    setNewMessage('');
-  } catch (error) {
-    console.error('Error sending message:', error);
-    Alert.alert('Error', 'Failed to send message');
-  }
-};
+  const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
+    if (!activeJourney) return;
+
+    try {
+      const { error } = await supabase
+        .from('journey_participants')
+        .update({ status: newStatus })
+        .eq('journey_id', activeJourney.id)
+        .eq('user_id', currentUserId);
+
+      if (error) {
+        console.error('Error updating participant status:', error);
+        Alert.alert('Error', 'Failed to update status');
+        return;
+      }
+
+      setParticipantStatus(newStatus);
+      
+      // Award points for status changes
+      if (newStatus === 'picked_up') {
+        await awardPoints(2);
+      } else if (newStatus === 'arrived') {
+        await awardPoints(5);
+      }
+    } catch (error) {
+      console.error('Error updating participant status:', error);
+      Alert.alert('Error', 'Failed to update status');
+    }
+  };
+
+  const awardPoints = async (points: number) => {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('points')
+        .eq('id', currentUserId)
+        .maybeSingle();
+
+      if (profile) {
+        await supabase
+          .from('profiles')
+          .update({ points: (profile.points || 0) + points })
+          .eq('id', currentUserId);
+      }
+    } catch (error) {
+      console.error('Error awarding points:', error);
+    }
+  };
+
+  const handleShareWithDriver = async () => {
+    const shareMessage = `Join me on Uthutho for our ${activeJourney?.routes?.transport_type} journey on route ${activeJourney?.routes?.name}!
+
+🚗 Drive with Uthutho and earn 200 points!
+• Real-time journey tracking
+• Connect with passengers
+• Build your driver reputation
+• Earn rewards and recognition
+
+Sign up: https://uthutho.app/driver-signup
+
+Current route: ${activeJourney?.routes?.start_point} to ${activeJourney?.routes?.end_point}`;
+
+    try {
+      await Share.share({
+        message: shareMessage,
+        title: 'Join Uthutho as a Driver'
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to share');
+    }
+  };
+
+  const handleDriverSignup = () => {
+    router.push('/onboard-driver');
+  };
 
   const handleCompleteJourney = async () => {
     try {
@@ -436,52 +621,93 @@ const sendMessage = async () => {
     }
   };
 
-const renderContent = () => {
-  if (activeTab === 'info') {
-    return (
-      <>
-        <JourneyOverview
-          routeName={activeJourney.routes.name}
-          transportType={activeJourney.routes.transport_type}
-          startPoint={activeJourney.routes.start_point}
-          endPoint={activeJourney.routes.end_point}
-          progressPercentage={getProgressPercentage()}
-          waitingTime={formatWaitingTime(waitingTime)}
-          estimatedArrival={getEstimatedArrival()}
-          passengerCount={otherPassengers.length + 1}
-          currentStop={activeJourney.current_stop_sequence || 0}
-          totalStops={journeyStops.length}
-        />
+  const renderContent = () => {
+    if (activeTab === 'info') {
+      return (
+        <>
+          <JourneyOverview
+            routeName={activeJourney.routes.name}
+            transportType={activeJourney.routes.transport_type}
+            startPoint={activeJourney.routes.start_point}
+            endPoint={activeJourney.routes.end_point}
+            progressPercentage={getProgressPercentage()}
+            waitingTime={formatWaitingTime(waitingTime)}
+            estimatedArrival={getEstimatedArrival()}
+            passengerCount={otherPassengers.length + 1}
+            currentStop={activeJourney.current_stop_sequence || 0}
+            totalStops={journeyStops.length}
+            hasDriver={hasDriverInJourney}
+            driverName={journeyDriver?.profiles ? 
+              `${journeyDriver.profiles.first_name} ${journeyDriver.profiles.last_name}` : 
+              null
+            }
+          />
 
-        <CompleteJourneyButton onPress={handleCompleteJourney} />
-        
-        <UserStopHighlight stopName={userStopName} />
-        
-        <RouteProgress
-          stops={journeyStops}
-          onPingPassengers={pingPassengersAhead}
-        />
-        
-        <PassengersList
-          passengers={otherPassengers}
-          getPassengerWaitingTime={getPassengerWaitingTime}
-        />
-        
+          {/* Show driver promotion if no driver */}
+          {!hasDriverInJourney && (
+            <NoDriverPromotion 
+              onShare={handleShareWithDriver}
+              onDriverSignup={handleDriverSignup}
+              routeName={activeJourney.routes.name}
+              transportType={activeJourney.routes.transport_type}
+            />
+          )}
 
-      </>
-    );
-  } else {
-    return (
-      <JourneyChat
-        messages={chatMessages}
-        newMessage={newMessage}
-        setNewMessage={setNewMessage}
-        onSendMessage={sendMessage}
-        currentUserId={currentUserId}
-      />
-    );
-  }
-};
+          {/* Journey Status Buttons */}
+          <View style={styles.statusContainer}>
+            {participantStatus === 'waiting' && (
+              <TouchableOpacity
+                style={styles.statusButton}
+                onPress={() => updateParticipantStatus('picked_up')}
+              >
+                <Text style={styles.statusButtonText}>Mark as Picked Up</Text>
+              </TouchableOpacity>
+            )}
+            
+            {participantStatus === 'picked_up' && (
+              <TouchableOpacity
+                style={[styles.statusButton, styles.arrivedButton]}
+                onPress={() => updateParticipantStatus('arrived')}
+              >
+                <Text style={styles.statusButtonText}>I've Arrived</Text>
+              </TouchableOpacity>
+            )}
+            
+            {participantStatus === 'arrived' && (
+              <TouchableOpacity
+                style={[styles.statusButton, styles.completeButton]}
+                onPress={handleCompleteJourney}
+              >
+                <Text style={styles.statusButtonText}>Complete Journey</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          <UserStopHighlight stopName={userStopName} />
+          
+          <RouteProgress
+            stops={journeyStops}
+            onPingPassengers={pingPassengersAhead}
+          />
+          
+          <PassengersList
+            passengers={otherPassengers}
+            getPassengerWaitingTime={getPassengerWaitingTime}
+          />
+        </>
+      );
+    } else {
+      return (
+        <JourneyChat
+          messages={chatMessages}
+          newMessage={newMessage}
+          setNewMessage={setNewMessage}
+          onSendMessage={sendMessage}
+          currentUserId={currentUserId}
+        />
+      );
+    }
+  };
 
   if (loading) {
     return <JourneySkeleton />;
@@ -549,76 +775,109 @@ const styles = StyleSheet.create({
   bottomSpace: {
     height: 20,
   },
-  chatContainer: {
-    flex: 1,
+  statusContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
-  onlineBar: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  statusButton: {
+    backgroundColor: '#1ea2b1',
+    borderRadius: 12,
+    paddingVertical: 16,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1a1a1a',
-    borderBottomWidth: 1,
-    borderBottomColor: '#333333',
+    marginBottom: 12,
   },
-  onlineText: {
-    color: '#cccccc',
-    fontSize: 12,
+  arrivedButton: {
+    backgroundColor: '#fbbf24',
+  },
+  completeButton: {
+    backgroundColor: '#4ade80',
+  },
+  statusButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
     fontWeight: '600',
   },
-  messagesList: {
-    flex: 1,
-  },
-  messagesContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    paddingBottom: 80,
-    flexGrow: 1,
-    justifyContent: 'flex-end',
-  },
-  inputContainer: {
+  // No Driver Promotion Styles
+  noDriverContainer: {
     backgroundColor: '#1a1a1a',
-    padding: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#333333',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 20,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#f59e0b',
   },
-  inputWrapper: {
+  noDriverHeader: {
+    marginBottom: 16,
+  },
+  noDriverTitle: {
+    color: '#f59e0b',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  noDriverSubtitle: {
+    color: '#ffffff',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  pointsHighlight: {
+    color: '#fbbf24',
+    fontWeight: 'bold',
+  },
+  pointsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2a2a2a',
+    backgroundColor: '#78350f',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    marginBottom: 16,
   },
-  input: {
-    flex: 1,
-    color: '#ffffff',
-    fontSize: 16,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-  },
-  sendButton: {
-    padding: 10,
-  },
-  emptyChat: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyChatTitle: {
-    color: '#ffffff',
-    fontSize: 20,
+  pointsText: {
+    color: '#fbbf24',
+    fontSize: 12,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginLeft: 6,
   },
-  emptyChatSubtitle: {
-    color: '#888888',
+  noDriverBenefits: {
+    marginBottom: 20,
+  },
+  noDriverBenefit: {
+    color: '#cccccc',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  shareButton: {
+    backgroundColor: '#1ea2b1',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    paddingVertical: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  shareButtonText: {
+    color: '#ffffff',
     fontSize: 16,
-    textAlign: 'center',
+    fontWeight: '600',
+  },
+  driverSignupButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#1ea2b1',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  driverSignupButtonText: {
+    color: '#1ea2b1',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
