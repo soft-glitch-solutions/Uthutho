@@ -767,7 +767,7 @@ export default function ProfileScreen() {
 
       {/* App Info */}
       <View style={styles.appInfo}>
-        <Text style={[styles.appInfoText, { color: colors.text }]}>Uthutho v0.0.1</Text>
+        <Text style={[styles.appInfoText, { color: colors.text }]}>Uthutho v1.0.1</Text>
         <Text style={[styles.motto, { color: colors.primary }]}>"Izindlela zakho ziqinisekisa impumelelo!"</Text>
       </View>
     </ScrollView>
