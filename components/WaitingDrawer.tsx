@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Alert, Animated, Image } from 'react-native';
-import { X, Clock, Users, CircleCheck as CheckCircle, Search, UserPlus } from 'lucide-react-native';
+import { Clock, Users, CircleCheck as CheckCircle, Search, UserPlus, ChevronRight } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useJourney } from '@/hook/useJourney';
@@ -38,6 +38,7 @@ export default function WaitingDrawer({
   const [searchPhase, setSearchPhase] = useState<'searching' | 'joining' | 'creating'>('searching');
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isDriver, setIsDriver] = useState(false);
+  const [currentStep, setCurrentStep] = useState<'select' | 'confirm'>('select');
   const { createOrJoinJourney } = useJourney();
 
   // Animation values for radar effect
@@ -51,8 +52,9 @@ export default function WaitingDrawer({
       loadWaitingCounts();
       loadUserProfile();
       checkIfDriver();
+      setCurrentStep('select');
+      setSelectedRoute(null);
       
-      // Set up real-time subscription for waiting counts
       const subscription = supabase
         .channel('stop_waiting_changes')
         .on(
@@ -122,7 +124,6 @@ export default function WaitingDrawer({
   };
 
   const startRadarAnimation = () => {
-    // Pulse animation
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -138,7 +139,6 @@ export default function WaitingDrawer({
       ])
     ).start();
 
-    // Rotation animation
     Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
@@ -147,7 +147,6 @@ export default function WaitingDrawer({
       })
     ).start();
 
-    // Scale animation for profile picture
     Animated.loop(
       Animated.sequence([
         Animated.timing(scaleAnim, {
@@ -176,7 +175,6 @@ export default function WaitingDrawer({
   const loadRoutesForStop = async () => {
     setLoading(true);
     try {
-      // Query using junction table approach
       const { data: routesData, error: routesError } = await supabase
         .from('route_stops')
         .select(`
@@ -199,7 +197,6 @@ export default function WaitingDrawer({
         return;
       }
 
-      // Fallback if no routes found
       setRoutes([]);
     } catch (error) {
       console.error('Error loading routes for stop:', error);
@@ -212,7 +209,6 @@ export default function WaitingDrawer({
 
   const loadWaitingCounts = async () => {
     try {
-      // Query active waiting users for this stop (not expired)
       const { data, error } = await supabase
         .from('stop_waiting')
         .select('route_id')
@@ -221,7 +217,6 @@ export default function WaitingDrawer({
 
       if (error) throw error;
 
-      // Count waiting users per route
       const counts: Record<string, number> = {};
       
       if (data) {
@@ -245,23 +240,31 @@ export default function WaitingDrawer({
     return Object.values(waitingCounts).reduce((sum, count) => sum + count, 0);
   };
 
-  const startSearching = (route: Route) => {
+  const handleRouteSelect = (route: Route) => {
     setSelectedRoute(route);
+    setCurrentStep('confirm');
+  };
+
+  const handleBackToSelect = () => {
+    setSelectedRoute(null);
+    setCurrentStep('select');
+  };
+
+  const handleConfirmWaiting = () => {
+    if (!selectedRoute) return;
+    
     setIsSearching(true);
     setSearchPhase('searching');
     
-    // If user is a driver, they can create driver journey immediately
     if (isDriver) {
-      createDriverJourney(route);
+      createDriverJourney(selectedRoute);
     } else {
-      // For passengers, first try to find existing journeys to join
-      searchForExistingJourney(route);
+      searchForExistingJourney(selectedRoute);
     }
   };
 
   const searchForExistingJourney = async (route: Route) => {
     try {
-      // Look for existing active journeys with participants
       const { data: existingJourneys, error } = await supabase
         .from('journeys')
         .select(`
@@ -310,7 +313,6 @@ export default function WaitingDrawer({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Use createOrJoinJourney instead of manual participant insertion
       const result = await createOrJoinJourney(
         stopId,
         route.id,
@@ -344,7 +346,6 @@ export default function WaitingDrawer({
       );
 
       if (result.success) {
-        // If user is a driver, create driver journey entry
         if (isDriver) {
           await createDriverJourneyEntry(route, result.journeyId);
         }
@@ -398,8 +399,7 @@ export default function WaitingDrawer({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Get driver record
-      const { data: driverData, error: driverError } = await supabase
+      const { data: driverData } = await supabase
         .from('drivers')
         .select('id')
         .eq('user_id', user.id)
@@ -407,13 +407,12 @@ export default function WaitingDrawer({
         .eq('is_active', true)
         .single();
 
-      if (driverError || !driverData) {
+      if (!driverData) {
         console.error('Driver not found or not verified');
         return;
       }
 
-      // Get the first stop for this route
-      const { data: firstStop, error: stopError } = await supabase
+      const { data: firstStop } = await supabase
         .from('stops')
         .select('id')
         .eq('route_id', route.id)
@@ -421,11 +420,6 @@ export default function WaitingDrawer({
         .limit(1)
         .single();
 
-      if (stopError) {
-        console.error('Error getting first stop:', stopError);
-      }
-
-      // Create driver_journey entry
       const { error: createError } = await supabase
         .from('driver_journeys')
         .insert({
@@ -440,8 +434,6 @@ export default function WaitingDrawer({
         console.error('Error creating driver journey entry:', createError);
         throw createError;
       }
-
-      console.log('Driver journey entry created successfully');
     } catch (error) {
       console.error('Error in createDriverJourneyEntry:', error);
       throw error;
@@ -473,6 +465,7 @@ export default function WaitingDrawer({
   const cancelSearching = () => {
     setIsSearching(false);
     setSelectedRoute(null);
+    setCurrentStep('select');
   };
 
   const renderRadarAnimation = () => {
@@ -493,7 +486,6 @@ export default function WaitingDrawer({
 
     return (
       <View style={styles.radarContainer}>
-        {/* Outer radar rings */}
         <Animated.View
           style={[
             styles.radarRing,
@@ -533,7 +525,6 @@ export default function WaitingDrawer({
           ]}
         />
         
-        {/* Center profile picture */}
         <Animated.View
           style={[
             styles.profileContainer,
@@ -550,14 +541,12 @@ export default function WaitingDrawer({
           />
         </Animated.View>
 
-        {/* Driver badge if user is a driver */}
         {isDriver && (
           <View style={styles.driverBadge}>
             <Text style={styles.driverBadgeText}>🚗 Driver</Text>
           </View>
         )}
 
-        {/* Search icon overlay */}
         <View style={styles.searchIconContainer}>
           {searchPhase === 'joining' ? (
             <UserPlus size={20} color="#4ade80" />
@@ -569,18 +558,147 @@ export default function WaitingDrawer({
     );
   };
 
+  const renderSelectStep = () => (
+    <ScrollView style={styles.content}>
+      {loading ? (
+        <Text style={styles.loadingText}>Loading available routes...</Text>
+      ) : routes.length === 0 ? (
+        <View style={styles.routeCard}>
+          <View style={styles.routeHeader}>
+            <View style={styles.transportBadge}>
+              <Text style={styles.transportType}>Unknown</Text>
+            </View>
+            <View style={styles.priceContainer}>
+              <Text style={[styles.price, { color: '#666666' }]}>R 0</Text>
+            </View>
+          </View>
+          
+          <Text style={styles.routeName}>No Routes Available</Text>
+          <Text style={styles.routeDestination}>
+            No transport routes found for this stop
+          </Text>
+        </View>
+      ) : (
+        routes.map((route) => {
+          const waitingCount = getWaitingCountForRoute(route.id);
+          return (
+            <TouchableOpacity
+              key={route.id}
+              style={[
+                styles.routeCard,
+                waitingCount > 0 && styles.routeWithWaiters,
+                isDriver && styles.driverRouteCard
+              ]}
+              onPress={() => handleRouteSelect(route)}
+            >
+              <View style={styles.routeHeader}>
+                <View style={styles.transportBadge}>
+                  <Text style={styles.transportType}>{route.transport_type}</Text>
+                </View>
+                <View style={styles.priceContainer}>
+                  <Text style={styles.price}>R {route.cost}</Text>
+                  <ChevronRight size={16} color="#666666" />
+                </View>
+              </View>
+              
+              <Text style={styles.routeName}>{route.name}</Text>
+              <Text style={styles.routeDestination}>
+                {route.start_point} → {route.end_point}
+              </Text>
+              
+              <View style={styles.routeFooter}>
+                <View style={styles.waitingInfo}>
+                  <Users size={16} color={waitingCount > 0 ? "#1ea2b1" : "#666666"} />
+                  <Text style={[
+                    styles.waitingCount,
+                    waitingCount > 0 && styles.waitingCountActive
+                  ]}>
+                    {waitingCount} {waitingCount === 1 ? 'person' : 'people'} waiting
+                  </Text>
+                </View>
+                <View style={styles.estimatedTime}>
+                  <Clock size={16} color="#666666" />
+                  <Text style={styles.timeText}>
+                    Est. {10 + Math.floor(Math.random() * 15)} min
+                  </Text>
+                </View>
+              </View>
+
+              {isDriver && (
+                <View style={styles.driverRouteBadge}>
+                  <Text style={styles.driverRouteBadgeText}>Drive This Route</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })
+      )}
+    </ScrollView>
+  );
+
+  const renderConfirmStep = () => (
+    <View style={styles.confirmContainer}>
+      {selectedRoute && (
+        <>
+          <View style={styles.selectedRoutePreview}>
+            <View style={styles.routeHeader}>
+              <View style={styles.transportBadge}>
+                <Text style={styles.transportType}>{selectedRoute.transport_type}</Text>
+              </View>
+              <View style={styles.priceContainer}>
+                <Text style={styles.price}>R {selectedRoute.cost}</Text>
+              </View>
+            </View>
+            
+            <Text style={styles.routeName}>{selectedRoute.name}</Text>
+            <Text style={styles.routeDestination}>
+              {selectedRoute.start_point} → {selectedRoute.end_point}
+            </Text>
+            
+            <View style={styles.routeFooter}>
+              <View style={styles.waitingInfo}>
+                <Users size={16} color="#1ea2b1" />
+                <Text style={[styles.waitingCount, styles.waitingCountActive]}>
+                  {getWaitingCountForRoute(selectedRoute.id)} people waiting
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.confirmActions}>
+            <TouchableOpacity 
+              style={styles.confirmButton}
+              onPress={handleConfirmWaiting}
+            >
+              <Text style={styles.confirmButtonText}>
+                {isDriver ? 'Start as Driver' : 'Confirm Waiting'}
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={handleBackToSelect}
+            >
+              <Text style={styles.backButtonText}>Choose different route</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+    </View>
+  );
+
   const getSearchPhaseText = () => {
     switch (searchPhase) {
       case 'searching':
         return isDriver 
-          ? `Starting as driver for ${selectedRoute?.name} at ${stopName}`
-          : `Looking for existing journeys for ${selectedRoute?.name} at ${stopName}`;
+          ? `Starting as driver for ${selectedRoute?.name}`
+          : `Looking for existing journeys for ${selectedRoute?.name}`;
       case 'joining':
-        return `Found an existing journey! Joining now for ${selectedRoute?.name} at ${stopName}`;
+        return `Found an existing journey! Joining now`;
       case 'creating':
-        return `Creating a new journey for ${selectedRoute?.name} at ${stopName}`;
+        return `Creating a new journey for ${selectedRoute?.name}`;
       default:
-        return `Select which transport you're waiting for at ${stopName}`;
+        return `Select which transport you're waiting for`;
     }
   };
 
@@ -606,8 +724,18 @@ export default function WaitingDrawer({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.drawer}>
+      {/* NOTE: Tapping anywhere outside the drawer will close it */}
+      <TouchableOpacity 
+        style={styles.overlay} 
+        activeOpacity={1} 
+        onPressOut={onClose}
+      >
+        {/* Prevent taps inside the drawer from closing it */}
+        <TouchableOpacity 
+          style={styles.drawer} 
+          activeOpacity={1} 
+          onPress={(e) => e.stopPropagation()}
+        >
           <View style={styles.header}>
             <View style={styles.handle} />
             <View style={styles.headerContent}>
@@ -619,20 +747,26 @@ export default function WaitingDrawer({
                       ? 'Joining Journey...'
                       : 'Creating New Journey...'
                     )
-                  : 'Mark as Waiting'
+                  : currentStep === 'select' 
+                    ? 'Select Route'
+                    : 'Confirm Waiting'
                 }
               </Text>
-              <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                <X size={24} color="#ffffff" />
-              </TouchableOpacity>
             </View>
+            
             <Text style={[
               styles.subtitle,
               searchPhase === 'joining' && styles.joiningSubtitle
             ]}>
-              {isSearching ? getSearchPhaseText() : `Select which transport you're waiting for at ${stopName}`}
+              {isSearching 
+                ? getSearchPhaseText()
+                : currentStep === 'select'
+                  ? `Choose your route at ${stopName}`
+                  : `Ready to start waiting for ${selectedRoute?.name}`
+              }
             </Text>
-            {!isSearching && getTotalWaitingCount() > 0 && (
+            
+            {!isSearching && currentStep === 'select' && getTotalWaitingCount() > 0 && (
               <View style={styles.totalWaitingContainer}>
                 <Users size={16} color="#1ea2b1" />
                 <Text style={styles.totalWaitingText}>
@@ -640,7 +774,8 @@ export default function WaitingDrawer({
                 </Text>
               </View>
             )}
-            {isDriver && !isSearching && (
+            
+            {isDriver && !isSearching && currentStep === 'select' && (
               <View style={styles.driverIndicator}>
                 <Text style={styles.driverIndicatorText}>
                   🚗 You are registered as a driver
@@ -667,97 +802,11 @@ export default function WaitingDrawer({
             </View>
           )}
 
-          <ScrollView style={styles.content}>
-            {loading ? (
-              <Text style={styles.loadingText}>Loading available routes...</Text>
-            ) : routes.length === 0 ? (
-              <View style={styles.routeCard}>
-                <View style={styles.routeHeader}>
-                  <View style={styles.transportBadge}>
-                    <Text style={styles.transportType}>Unknown</Text>
-                  </View>
-                  <View style={styles.priceContainer}>
-                    <Text style={[styles.price, { color: '#666666' }]}>R 0</Text>
-                  </View>
-                </View>
-                
-                <Text style={styles.routeName}>No Routes Available</Text>
-                <Text style={styles.routeDestination}>
-                  No transport routes found for this stop
-                </Text>
-              </View>
-            ) : (
-              routes.map((route) => {
-                const waitingCount = getWaitingCountForRoute(route.id);
-                return (
-                <TouchableOpacity
-                  key={route.id}
-                  style={[
-                    styles.routeCard,
-                      selectedRoute?.id === route.id && isSearching && styles.selectedRouteCard,
-                      waitingCount > 0 && styles.routeWithWaiters,
-                      isDriver && styles.driverRouteCard
-                  ]}
-                  onPress={() => startSearching(route)}
-                  disabled={isSearching}
-                >
-                  <View style={styles.routeHeader}>
-                    <View style={styles.transportBadge}>
-                      <Text style={styles.transportType}>{route.transport_type}</Text>
-                    </View>
-                    <View style={styles.priceContainer}>
-                      <Text style={styles.price}>R {route.cost}</Text>
-                    </View>
-                  </View>
-                  
-                  <Text style={styles.routeName}>{route.name}</Text>
-                  <Text style={styles.routeDestination}>
-                    {route.start_point} → {route.end_point}
-                  </Text>
-                  
-                  <View style={styles.routeFooter}>
-                    <View style={styles.waitingInfo}>
-                      <Users size={16} color={waitingCount > 0 ? "#1ea2b1" : "#666666"} />
-                        <Text style={[
-                          styles.waitingCount,
-                          waitingCount > 0 && styles.waitingCountActive
-                        ]}>
-                          {waitingCount} {waitingCount === 1 ? 'person' : 'people'} waiting
-                        </Text>
-                    </View>
-                    <View style={styles.estimatedTime}>
-                      <Clock size={16} color="#666666" />
-                      <Text style={styles.timeText}>
-                        Est. {10 + Math.floor(Math.random() * 15)} min
-                      </Text>
-                    </View>
-                  </View>
-
-                  {isDriver && (
-                    <View style={styles.driverRouteBadge}>
-                      <Text style={styles.driverRouteBadgeText}>Drive This Route</Text>
-                    </View>
-                  )}
-
-                  {selectedRoute?.id === route.id && isSearching && (
-                    <View style={styles.selectedOverlay}>
-                      <CheckCircle size={24} color={
-                        searchPhase === 'joining' ? '#4ade80' : 
-                        searchPhase === 'creating' ? '#fbbf24' : '#1ea2b1'
-                      } />
-                      <Text style={styles.selectedText}>
-                        {searchPhase === 'joining' ? 'Joining...' : 
-                         searchPhase === 'creating' ? 'Creating...' : 'Searching...'}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                );
-              })
-            )}
-          </ScrollView>
-        </View>
-      </View>
+          {!isSearching && (
+            currentStep === 'select' ? renderSelectStep() : renderConfirmStep()
+          )}
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }
@@ -793,7 +842,7 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
@@ -801,15 +850,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#ffffff',
-  },
-  closeButton: {
-    padding: 4,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
     color: '#cccccc',
     lineHeight: 20,
     marginBottom: 8,
+    textAlign: 'center',
   },
   joiningSubtitle: {
     color: '#4ade80',
@@ -822,7 +870,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
+    marginTop: 8,
   },
   totalWaitingText: {
     color: '#1ea2b1',
@@ -837,7 +886,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     marginTop: 8,
   },
   driverIndicatorText: {
@@ -927,6 +976,47 @@ const styles = StyleSheet.create({
   joiningText: {
     color: '#4ade80',
   },
+  content: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  confirmContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  selectedRoutePreview: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#1ea2b1',
+  },
+  confirmActions: {
+    gap: 12,
+  },
+  confirmButton: {
+    backgroundColor: '#10b981',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  confirmButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  backButton: {
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  backButtonText: {
+    color: '#cccccc',
+    fontSize: 14,
+  },
   routeWithWaiters: {
     borderColor: '#1ea2b1',
     borderWidth: 2,
@@ -950,10 +1040,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
   loadingText: {
     color: '#666666',
     fontSize: 16,
@@ -968,10 +1054,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
     position: 'relative',
-  },
-  selectedRouteCard: {
-    borderColor: '#1ea2b1',
-    backgroundColor: '#1ea2b110',
   },
   routeHeader: {
     flexDirection: 'row',
@@ -993,12 +1075,12 @@ const styles = StyleSheet.create({
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   price: {
     color: '#1ea2b1',
     fontSize: 16,
     fontWeight: 'bold',
-    marginLeft: 4,
   },
   routeName: {
     fontSize: 16,
@@ -1047,22 +1129,5 @@ const styles = StyleSheet.create({
     color: '#fbbf24',
     fontSize: 10,
     fontWeight: '600',
-  },
-  selectedOverlay: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4ade8020',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  selectedText: {
-    color: '#4ade80',
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
   },
 });
