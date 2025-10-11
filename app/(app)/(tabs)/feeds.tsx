@@ -887,7 +887,7 @@ renderItem={({ item: community }) => {
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.addIconButton} onPress={() => setShowAddCommunity(true)}>
+            <TouchableOpacity style={styles.addIconButton} onPress={() => router.push('/favorites')}>
               <Plus size={24} color="#1ea2b1" />
             </TouchableOpacity>
           </View>
@@ -895,7 +895,7 @@ renderItem={({ item: community }) => {
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>No Communities</Text>
           <Text style={styles.emptySubtitle}>Join communities to see feeds</Text>
-          <TouchableOpacity style={styles.addButton} onPress={() => setShowAddCommunity(true)}>
+          <TouchableOpacity style={styles.addButton} onPress={() => router.push('/favorites')}>
             <Plus size={20} color="#fff" />
             <Text style={styles.addButtonText}>Add Community</Text>
           </TouchableOpacity>
