@@ -678,7 +678,7 @@ Current route: ${activeJourney?.routes?.start_point} to ${activeJourney?.routes?
   };
 
   const handleDriverSignup = () => {
-    router.push('/onboard-driver');
+    router.push('/OnboardDriver');
   };
 
   const handleCompleteJourney = async () => {
