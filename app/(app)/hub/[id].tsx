@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { MapPin, Clock, Users, Bookmark, BookmarkCheck, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
+import { useFavorites } from '@/hook/useFavorites'; // Add this import
 
 interface Hub {
   id: string;
@@ -90,6 +91,7 @@ export default function HubDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { favorites, addToFavorites, removeFromFavorites, isFavorite } = useFavorites(); // Add useFavorites hook
   const [hub, setHub] = useState<Hub | null>(null);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -205,6 +207,11 @@ export default function HubDetailScreen() {
     try {
       if (!user) return;
 
+      // Use the useFavorites hook to check if it's already in favorites
+      const isFav = isFavorite(id as string);
+      setIsFollowing(isFav);
+
+      // Also check the database directly as a fallback
       const { data, error } = await supabase
         .from('favorites')
         .select('id')
@@ -218,7 +225,10 @@ export default function HubDetailScreen() {
         return;
       }
 
-      setIsFollowing(!!data);
+      // If database check differs from hook, update both
+      if (!!data !== isFav) {
+        setIsFollowing(!!data);
+      }
     } catch (error) {
       console.error('Error checking follow status:', error);
     }
@@ -259,6 +269,9 @@ export default function HubDetailScreen() {
             p_delta: -1,
           });
           if (bumpErr) console.warn('bump_favorites_count failed:', bumpErr);
+
+          // Remove from local favorites state
+          await removeFromFavorites(entityId);
         } else {
           // Add to favorites/followers
           const { error: favErr } = await supabase.rpc('add_favorite', {
@@ -273,6 +286,14 @@ export default function HubDetailScreen() {
             p_delta: 1,
           });
           if (bumpErr) console.warn('bump_favorites_count failed:', bumpErr);
+
+          // Add to local favorites state
+          await addToFavorites({ 
+            id: entityId, 
+            type: entityType, 
+            name: hub.name, 
+            data: hub 
+          });
         }
       } catch (e) {
         // Revert optimistic change on error
