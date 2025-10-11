@@ -724,7 +724,7 @@ const onRefresh = useCallback(async () => {
               <Text style={[styles.emptyText, { color: colors.text}]}>
                 You haven't added any locations to your community yet.
               </Text>
-              <TouchableOpacity style={styles.addButton} onPress={() => setShowAddCommunity(true)}>
+              <TouchableOpacity style={styles.addButton} onPress={() => router.push('/favorites')}>
                 <Plus size={20} color="#fff" />
                 <Text style={styles.addButtonText}>Add Community</Text>
               </TouchableOpacity>
