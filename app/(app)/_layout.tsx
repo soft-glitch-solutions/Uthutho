@@ -158,6 +158,7 @@ options={{
       <Drawer.Screen name="help/ManagingProfileScreen" options={{ drawerItemStyle: { height: 0 }, title: 'Managing Profile' }} />
             <Drawer.Screen name="post/[id]" options={{ drawerItemStyle: { height: 0 }, title: 'Managing Profile' }} />
             <Drawer.Screen name="user/[id]" options={{ drawerItemStyle: { height: 0 }, title: 'Managing Profile' }} />
+                        <Drawer.Screen name="card/[id]" options={{ drawerItemStyle: { height: 0 }, title: 'Card' }} />
                         <Drawer.Screen name="hub/[id]" options={{ drawerItemStyle: { height: 0 }, title: 'Managing Profile' }} />
             <Drawer.Screen name="nearby/[id]" options={{ drawerItemStyle: { height: 0 }, title: 'Nearby' }} />
             <Drawer.Screen name="PrivacyScreen" options={{ drawerItemStyle: { height: 0 }, title: 'Privacy Screen' }} />
