@@ -917,7 +917,7 @@ renderItem={({ item: community }) => {
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.addIconButton} onPress={() => setShowAddCommunity(true)}>
+          <TouchableOpacity style={styles.addIconButton} onPress={() => router.push('/favorites')}>
             <Plus size={24} color="#1ea2b1" />
           </TouchableOpacity>
         </View>

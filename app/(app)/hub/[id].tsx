@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { MapPin, Clock, Users, Bookmark, BookmarkCheck, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hook/useAuth';
 
 interface Hub {
   id: string;
@@ -88,20 +89,23 @@ const SkeletonLoader = () => {
 export default function HubDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [hub, setHub] = useState<Hub | null>(null);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [followerCount, setFollowerCount] = useState(0);
+  const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (id) {
       loadHubDetails();
       loadHubRoutes();
       loadHubPosts();
-      checkIfFavorite();
+      checkIfFollowing();
       loadFollowerCount();
+      populateFollowerCounts();
     }
   }, [id]);
 
@@ -176,138 +180,185 @@ export default function HubDetailScreen() {
     }
   };
 
-  const checkIfFavorite = async () => {
+  const populateFollowerCounts = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const newMap: Record<string, number> = {};
+      
+      // Get follower counts for this hub
+      const { data } = await supabase
+        .from('favorites')
+        .select('entity_id')
+        .eq('entity_type', 'hub')
+        .eq('entity_id', id);
+
+      (data || []).forEach(f => { 
+        newMap[f.entity_id] = (newMap[f.entity_id] || 0) + 1; 
+      });
+
+      setFavoritesCountMap(prev => ({ ...prev, ...newMap }));
+    } catch (error) {
+      console.error('Error populating follower counts:', error);
+    }
+  };
+
+  const checkIfFollowing = async () => {
+    try {
       if (!user) return;
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('favorites')
-        .eq('id', user.id)
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('id')
+        .eq('entity_type', 'hub')
+        .eq('entity_id', id)
+        .eq('user_id', user.id)
         .single();
 
-      if (profile && profile.favorites) {
-        const favorites = profile.favorites;
-        setIsFavorite(favorites.some((fav: any) => fav.id === id && fav.type === 'hub'));
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error('Error checking follow status:', error);
+        return;
       }
+
+      setIsFollowing(!!data);
     } catch (error) {
-      console.error('Error checking favorite status:', error);
+      console.error('Error checking follow status:', error);
     }
   };
 
-  const toggleFavorite = async () => {
+  const toggleFollow = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !hub) return;
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('favorites')
-        .eq('id', user.id)
-        .single();
-
-      let favorites = profile?.favorites || [];
-      const favoriteItem = {
-        id: hub.id,
-        name: hub.name,
-        type: 'hub' as const,
-      };
-
-      if (isFavorite) {
-        favorites = favorites.filter((fav: any) => !(fav.id === hub.id && fav.type === 'hub'));
-      } else {
-        favorites = [...favorites, favoriteItem];
+      if (!user || !hub) {
+        Alert.alert('Login Required', 'Please login to follow hubs.');
+        return;
       }
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({ favorites })
-        .eq('id', user.id);
+      const entityType = 'hub';
+      const entityId = hub.id;
+      const isCurrentlyFollowing = isFollowing;
+      const delta = isCurrentlyFollowing ? -1 : 1;
 
-      if (!error) {
-        setIsFavorite(!isFavorite);
-        // Update follower count after toggling favorite
-        loadFollowerCount();
+      // Optimistic UI update
+      setIsFollowing(!isCurrentlyFollowing);
+      setFollowerCount(prev => Math.max(0, prev + delta));
+      setFavoritesCountMap(prev => ({ 
+        ...prev, 
+        [entityId]: Math.max(0, (prev[entityId] || 0) + delta) 
+      }));
+
+      try {
+        if (isCurrentlyFollowing) {
+          // Remove from favorites/followers
+          const { error: favErr } = await supabase.rpc('remove_favorite', {
+            p_user_id: user.id,
+            p_entity_type: entityType,
+            p_entity_id: entityId,
+          });
+          if (favErr) throw favErr;
+
+          const { error: bumpErr } = await supabase.rpc('bump_favorites_count', {
+            p_user_id: user.id,
+            p_delta: -1,
+          });
+          if (bumpErr) console.warn('bump_favorites_count failed:', bumpErr);
+        } else {
+          // Add to favorites/followers
+          const { error: favErr } = await supabase.rpc('add_favorite', {
+            p_user_id: user.id,
+            p_entity_type: entityType,
+            p_entity_id: entityId,
+          });
+          if (favErr) throw favErr;
+
+          const { error: bumpErr } = await supabase.rpc('bump_favorites_count', {
+            p_user_id: user.id,
+            p_delta: 1,
+          });
+          if (bumpErr) console.warn('bump_favorites_count failed:', bumpErr);
+        }
+      } catch (e) {
+        // Revert optimistic change on error
+        setIsFollowing(isCurrentlyFollowing);
+        setFollowerCount(prev => Math.max(0, prev - delta));
+        setFavoritesCountMap(prev => ({ 
+          ...prev, 
+          [entityId]: Math.max(0, (prev[entityId] || 0) - delta) 
+        }));
+        console.error('Follow toggle failed:', e);
+        Alert.alert('Error', 'Could not update follow status. Please try again.');
       }
     } catch (error) {
-      console.error('Error toggling favorite:', error);
+      console.error('Error in toggleFollow:', error);
     }
   };
 
-  // ... rest of your existing functions (openInMaps, navigateToRoute) ...
-
-const openInMaps = () => {
-  if (!hub) {
-    console.log("No hub available, skipping openInMaps.");
-    return;
-  }
-
-  const lat = hub.latitude;
-  const lng = hub.longitude;
-  const label = encodeURIComponent(hub.name);
-
-  // Native deep links
-  const iosUrl = `comgooglemaps://?q=${lat},${lng}`;
-  const androidUrl = `geo:${lat},${lng}?q=${lat},${lng}(${label})`;
-
-  // Web fallback
-  const webUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-
-  console.log("openInMaps called with hub:", hub);
-  console.log("Generated URLs:", { iosUrl, androidUrl, webUrl });
-
-  if (Platform.OS === "web") {
-    const confirm = window.confirm(`Would you like to open ${hub.name} in Google Maps?`);
-    if (confirm) {
-      console.log("Opening in browser:", webUrl);
-      window.open(webUrl, "_blank");
-    } else {
-      console.log("User cancelled on web.");
+  const openInMaps = () => {
+    if (!hub) {
+      console.log("No hub available, skipping openInMaps.");
+      return;
     }
-    return;
-  }
 
-  // Native platforms
-  Alert.alert(
-    "Open in Maps",
-    `Would you like to open ${hub.name} in Google Maps?`,
-    [
-      { text: "Cancel", style: "cancel", onPress: () => console.log("User cancelled openInMaps") },
-      {
-        text: "Open",
-        onPress: async () => {
-          try {
-            let url =
-              Platform.OS === "ios"
-                ? iosUrl
-                : Platform.OS === "android"
-                ? androidUrl
-                : webUrl;
+    const lat = hub.latitude;
+    const lng = hub.longitude;
+    const label = encodeURIComponent(hub.name);
 
-            console.log("Trying URL:", url);
+    // Native deep links
+    const iosUrl = `comgooglemaps://?q=${lat},${lng}`;
+    const androidUrl = `geo:${lat},${lng}?q=${lat},${lng}(${label})`;
 
-            const supported = await Linking.canOpenURL(url);
-            console.log("canOpenURL result:", supported);
+    // Web fallback
+    const webUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 
-            if (!supported) {
-              console.log("Deep link not supported, falling back to webUrl:", webUrl);
-              url = webUrl;
+    console.log("openInMaps called with hub:", hub);
+    console.log("Generated URLs:", { iosUrl, androidUrl, webUrl });
+
+    if (Platform.OS === "web") {
+      const confirm = window.confirm(`Would you like to open ${hub.name} in Google Maps?`);
+      if (confirm) {
+        console.log("Opening in browser:", webUrl);
+        window.open(webUrl, "_blank");
+      } else {
+        console.log("User cancelled on web.");
+      }
+      return;
+    }
+
+    // Native platforms
+    Alert.alert(
+      "Open in Maps",
+      `Would you like to open ${hub.name} in Google Maps?`,
+      [
+        { text: "Cancel", style: "cancel", onPress: () => console.log("User cancelled openInMaps") },
+        {
+          text: "Open",
+          onPress: async () => {
+            try {
+              let url =
+                Platform.OS === "ios"
+                  ? iosUrl
+                  : Platform.OS === "android"
+                  ? androidUrl
+                  : webUrl;
+
+              console.log("Trying URL:", url);
+
+              const supported = await Linking.canOpenURL(url);
+              console.log("canOpenURL result:", supported);
+
+              if (!supported) {
+                console.log("Deep link not supported, falling back to webUrl:", webUrl);
+                url = webUrl;
+              }
+
+              await Linking.openURL(url);
+              console.log("Successfully opened URL:", url);
+            } catch (err) {
+              console.error("Error opening maps:", err);
+              Alert.alert("Error", "Unable to open Google Maps.");
             }
-
-            await Linking.openURL(url);
-            console.log("Successfully opened URL:", url);
-          } catch (err) {
-            console.error("Error opening maps:", err);
-            Alert.alert("Error", "Unable to open Google Maps.");
-          }
+          },
         },
-      },
-    ]
-  );
-};
-
-
+      ]
+    );
+  };
 
   const navigateToRoute = (routeId: string) => {
     router.push(`/route-details?routeId=${routeId}`);
@@ -337,11 +388,11 @@ const openInMaps = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft size={24} color="#ffffff" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
-          {isFavorite ? (
-            <Bookmark size={24} color="#1ea2b1" fill="#1ea2b1" />
+        <TouchableOpacity style={styles.favoriteButton} onPress={toggleFollow}>
+          {isFollowing ? (
+            <BookmarkCheck size={24} color="#1ea2b1" fill="#1ea2b1" />
           ) : (
-            <BookmarkCheck size={24} color="#ffffff" />
+            <Bookmark size={24} color="#ffffff" />
           )}
         </TouchableOpacity>
       </View>
@@ -372,7 +423,7 @@ const openInMaps = () => {
         <View style={styles.followerContainer}>
           <Users size={16} color="#1ea2b1" />
           <Text style={styles.followerText}>
-            {followerCount} {followerCount === 1 ? 'follower' : 'followers'}
+            {favoritesCountMap[hub.id] || followerCount} {favoritesCountMap[hub.id] === 1 ? 'follower' : 'followers'}
           </Text>
         </View>
 
