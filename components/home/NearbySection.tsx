@@ -3,6 +3,7 @@ import { View, Text, Pressable } from 'react-native';
 import { Flag, MapPin } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import StopBlock from '@/components/stop/StopBlock';
+import HubFollowButton from '@/components/hub/HubFollowButton'; // Updated import
 import NearestLocationsSkeleton from './skeletons/NearestLocationsSkeleton';
 
 interface NearbySectionProps {
@@ -37,6 +38,7 @@ const NearbySection = ({
         <NearestLocationsSkeleton colors={colors} />
       ) : (
         <View style={styles.grid}>
+          {/* Nearest Stop Card */}
           <Pressable
             style={[styles.card, { backgroundColor: colors.primary }]}
             onPress={() => nearestLocations?.nearestStop && handleNearestStopPress(nearestLocations.nearestStop.id)}
@@ -74,6 +76,7 @@ const NearbySection = ({
             )}
           </Pressable>
 
+          {/* Nearest Hub Card */}
           <Pressable
             style={[styles.card, { backgroundColor: colors.primary }]}
             onPress={() => nearestLocations?.nearestHub && handleNearestHubPress(nearestLocations.nearestHub.id)}
@@ -95,6 +98,13 @@ const NearbySection = ({
                     nearestLocations.nearestHub.longitude
                   )} min walk
                 </Text>
+                
+                {/* Simple Follow Button */}
+                <HubFollowButton
+                  hubId={nearestLocations.nearestHub.id}
+                  hubName={nearestLocations.nearestHub.name}
+                  colors={colors}
+                />
               </>
             ) : (
               <Text style={[styles.emptyText, { color: colors.text }]}>No hubs found.</Text>

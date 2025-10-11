@@ -195,7 +195,7 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
             onPress={handleMarkAsWaiting}
           >
             <Hand size={20} color="white" />
-            <Text style={styles.buttonText}>Mark as Waiting</Text>
+            <Text style={styles.buttonText}>Waiting</Text>
           </TouchableOpacity>
           
           <WaitingDrawer
