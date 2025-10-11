@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Alert, Animated, Image } from 'react-native';
-import { X, Clock,  Users, CircleCheck as CheckCircle, Search } from 'lucide-react-native';
+import { X, Clock, Users, CircleCheck as CheckCircle, Search, UserPlus } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useJourney } from '@/hook/useJourney';
@@ -35,8 +35,9 @@ export default function WaitingDrawer({
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
   const [waitingCounts, setWaitingCounts] = useState<Record<string, number>>({});
   const [isSearching, setIsSearching] = useState(false);
-  const [searchPhase, setSearchPhase] = useState<'searching' | 'creating'>('searching');
+  const [searchPhase, setSearchPhase] = useState<'searching' | 'joining' | 'creating'>('searching');
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [isDriver, setIsDriver] = useState(false);
   const { createOrJoinJourney } = useJourney();
 
   // Animation values for radar effect
@@ -49,6 +50,7 @@ export default function WaitingDrawer({
       loadRoutesForStop();
       loadWaitingCounts();
       loadUserProfile();
+      checkIfDriver();
       
       // Set up real-time subscription for waiting counts
       const subscription = supabase
@@ -80,6 +82,25 @@ export default function WaitingDrawer({
       stopRadarAnimation();
     }
   }, [isSearching]);
+
+  const checkIfDriver = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: driverData } = await supabase
+        .from('drivers')
+        .select('id, is_verified, is_active')
+        .eq('user_id', user.id)
+        .eq('is_verified', true)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      setIsDriver(!!driverData);
+    } catch (error) {
+      console.error('Error checking driver status:', error);
+    }
+  };
 
   const loadUserProfile = async () => {
     try {
@@ -229,8 +250,13 @@ export default function WaitingDrawer({
     setIsSearching(true);
     setSearchPhase('searching');
     
-    // First, try to find existing journeys to join
-    searchForExistingJourney(route);
+    // If user is a driver, they can create driver journey immediately
+    if (isDriver) {
+      createDriverJourney(route);
+    } else {
+      // For passengers, first try to find existing journeys to join
+      searchForExistingJourney(route);
+    }
   };
 
   const searchForExistingJourney = async (route: Route) => {
@@ -262,7 +288,10 @@ export default function WaitingDrawer({
 
       if (existingJourneys && existingJourneys.length > 0) {
         const journey = existingJourneys[0];
-        await joinExistingJourney(journey.id, route);
+        setSearchPhase('joining');
+        setTimeout(() => {
+          joinExistingJourney(journey.id, route);
+        }, 1500);
       } else {
         setTimeout(() => {
           createNewJourney(route);
@@ -276,62 +305,148 @@ export default function WaitingDrawer({
     }
   };
 
-const joinExistingJourney = async (journeyId: string, route: Route) => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+  const joinExistingJourney = async (journeyId: string, route: Route) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
 
-    // Use createOrJoinJourney instead of manual participant insertion
-    const result = await createOrJoinJourney(
-      stopId,
-      route.id,
-      route.transport_type
-    );
+      // Use createOrJoinJourney instead of manual participant insertion
+      const result = await createOrJoinJourney(
+        stopId,
+        route.id,
+        route.transport_type
+      );
 
-    if (result.success) {
-      await awardPoints(1);
-      router.replace('/journey');
-      onWaitingSet();
-      setIsSearching(false);
-      setSelectedRoute(null);
-      onClose();
-    } else {
-      throw new Error(result.error);
+      if (result.success) {
+        await awardPoints(1);
+        router.replace('/journey');
+        onWaitingSet();
+        setIsSearching(false);
+        setSelectedRoute(null);
+        onClose();
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Error joining existing journey:', error);
+      createNewJourney(route);
     }
-  } catch (error) {
-    console.error('Error joining existing journey:', error);
-    createNewJourney(route);
-  }
-};
+  };
 
-// In WaitingDrawer.tsx - replace the createNewJourney function
-const createNewJourney = async (route: Route) => {
-  setSearchPhase('creating');
-  
-  try {
-    const result = await createOrJoinJourney(
-      stopId,
-      route.id,
-      route.transport_type
-    );
+  const createNewJourney = async (route: Route) => {
+    setSearchPhase('creating');
+    
+    try {
+      const result = await createOrJoinJourney(
+        stopId,
+        route.id,
+        route.transport_type
+      );
 
-    if (result.success) {
-      // Note: The participant is now automatically added in createOrJoinJourney
-      await awardPoints(2);
-      router.replace('/journey');
-      onWaitingSet();
-    } else {
-      Alert.alert('Error', result.error || 'Failed to create journey');
+      if (result.success) {
+        // If user is a driver, create driver journey entry
+        if (isDriver) {
+          await createDriverJourneyEntry(route, result.journeyId);
+        }
+        
+        await awardPoints(2);
+        router.replace('/journey');
+        onWaitingSet();
+      } else {
+        Alert.alert('Error', result.error || 'Failed to create journey');
+      }
+    } catch (error) {
+      console.error('Error creating journey:', error);
+      Alert.alert('Error', 'Failed to create journey. Please try again.');
     }
-  } catch (error) {
-    console.error('Error creating journey:', error);
-    Alert.alert('Error', 'Failed to create journey. Please try again.');
-  }
-  
-  setIsSearching(false);
-  setSelectedRoute(null);
-  onClose();
-};
+    
+    setIsSearching(false);
+    setSelectedRoute(null);
+    onClose();
+  };
+
+  const createDriverJourney = async (route: Route) => {
+    setSearchPhase('creating');
+    
+    try {
+      const result = await createOrJoinJourney(
+        stopId,
+        route.id,
+        route.transport_type
+      );
+
+      if (result.success) {
+        await createDriverJourneyEntry(route, result.journeyId);
+        await awardPoints(2);
+        router.replace('/journey');
+        onWaitingSet();
+      } else {
+        Alert.alert('Error', result.error || 'Failed to create driver journey');
+      }
+    } catch (error) {
+      console.error('Error creating driver journey:', error);
+      Alert.alert('Error', 'Failed to create driver journey. Please try again.');
+    }
+    
+    setIsSearching(false);
+    setSelectedRoute(null);
+    onClose();
+  };
+
+  const createDriverJourneyEntry = async (route: Route, journeyId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Get driver record
+      const { data: driverData, error: driverError } = await supabase
+        .from('drivers')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('is_verified', true)
+        .eq('is_active', true)
+        .single();
+
+      if (driverError || !driverData) {
+        console.error('Driver not found or not verified');
+        return;
+      }
+
+      // Get the first stop for this route
+      const { data: firstStop, error: stopError } = await supabase
+        .from('stops')
+        .select('id')
+        .eq('route_id', route.id)
+        .order('order_number', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (stopError) {
+        console.error('Error getting first stop:', stopError);
+      }
+
+      // Create driver_journey entry
+      const { error: createError } = await supabase
+        .from('driver_journeys')
+        .insert({
+          driver_id: driverData.id,
+          journey_id: journeyId,
+          route_id: route.id,
+          current_stop_id: firstStop?.id || null,
+          status: 'active'
+        });
+
+      if (createError) {
+        console.error('Error creating driver journey entry:', createError);
+        throw createError;
+      }
+
+      console.log('Driver journey entry created successfully');
+    } catch (error) {
+      console.error('Error in createDriverJourneyEntry:', error);
+      throw error;
+    }
+  };
 
   const awardPoints = async (points: number) => {
     try {
@@ -435,12 +550,53 @@ const createNewJourney = async (route: Route) => {
           />
         </Animated.View>
 
+        {/* Driver badge if user is a driver */}
+        {isDriver && (
+          <View style={styles.driverBadge}>
+            <Text style={styles.driverBadgeText}>🚗 Driver</Text>
+          </View>
+        )}
+
         {/* Search icon overlay */}
         <View style={styles.searchIconContainer}>
-          <Search size={20} color="#1ea2b1" />
+          {searchPhase === 'joining' ? (
+            <UserPlus size={20} color="#4ade80" />
+          ) : (
+            <Search size={20} color="#1ea2b1" />
+          )}
         </View>
       </View>
     );
+  };
+
+  const getSearchPhaseText = () => {
+    switch (searchPhase) {
+      case 'searching':
+        return isDriver 
+          ? `Starting as driver for ${selectedRoute?.name} at ${stopName}`
+          : `Looking for existing journeys for ${selectedRoute?.name} at ${stopName}`;
+      case 'joining':
+        return `Found an existing journey! Joining now for ${selectedRoute?.name} at ${stopName}`;
+      case 'creating':
+        return `Creating a new journey for ${selectedRoute?.name} at ${stopName}`;
+      default:
+        return `Select which transport you're waiting for at ${stopName}`;
+    }
+  };
+
+  const getSearchingText = () => {
+    switch (searchPhase) {
+      case 'searching':
+        return isDriver 
+          ? 'Setting up your driver journey...'
+          : 'Looking for other travelers to join...';
+      case 'joining':
+        return 'Joining existing journey...';
+      case 'creating':
+        return 'Setting up your journey...';
+      default:
+        return 'Searching...';
+    }
   };
 
   return (
@@ -457,7 +613,12 @@ const createNewJourney = async (route: Route) => {
             <View style={styles.headerContent}>
               <Text style={styles.title}>
                 {isSearching 
-                  ? (searchPhase === 'searching' ? 'Searching for Journey...' : 'Creating New Journey...')
+                  ? (searchPhase === 'searching' 
+                      ? (isDriver ? 'Starting as Driver...' : 'Searching for Journey...')
+                      : searchPhase === 'joining'
+                      ? 'Joining Journey...'
+                      : 'Creating New Journey...'
+                    )
                   : 'Mark as Waiting'
                 }
               </Text>
@@ -465,14 +626,11 @@ const createNewJourney = async (route: Route) => {
                 <X size={24} color="#ffffff" />
               </TouchableOpacity>
             </View>
-            <Text style={styles.subtitle}>
-              {isSearching 
-                ? (searchPhase === 'searching' 
-                    ? `Looking for existing journeys for ${selectedRoute?.name} at ${stopName}`
-                    : `Creating a new journey for ${selectedRoute?.name} at ${stopName}`
-                  )
-                : `Select which transport you're waiting for at ${stopName}`
-              }
+            <Text style={[
+              styles.subtitle,
+              searchPhase === 'joining' && styles.joiningSubtitle
+            ]}>
+              {isSearching ? getSearchPhaseText() : `Select which transport you're waiting for at ${stopName}`}
             </Text>
             {!isSearching && getTotalWaitingCount() > 0 && (
               <View style={styles.totalWaitingContainer}>
@@ -482,16 +640,26 @@ const createNewJourney = async (route: Route) => {
                 </Text>
               </View>
             )}
+            {isDriver && !isSearching && (
+              <View style={styles.driverIndicator}>
+                <Text style={styles.driverIndicatorText}>
+                  🚗 You are registered as a driver
+                </Text>
+              </View>
+            )}
           </View>
 
           {isSearching && (
-            <View style={styles.searchingContainer}>
+            <View style={[
+              styles.searchingContainer,
+              searchPhase === 'joining' && styles.joiningContainer
+            ]}>
               {renderRadarAnimation()}
-              <Text style={styles.searchingText}>
-                {searchPhase === 'searching' 
-                  ? 'Looking for other travelers to join...'
-                  : 'Setting up your journey...'
-                }
+              <Text style={[
+                styles.searchingText,
+                searchPhase === 'joining' && styles.joiningText
+              ]}>
+                {getSearchingText()}
               </Text>
               <TouchableOpacity style={styles.cancelButton} onPress={cancelSearching}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -527,7 +695,8 @@ const createNewJourney = async (route: Route) => {
                   style={[
                     styles.routeCard,
                       selectedRoute?.id === route.id && isSearching && styles.selectedRouteCard,
-                      waitingCount > 0 && styles.routeWithWaiters
+                      waitingCount > 0 && styles.routeWithWaiters,
+                      isDriver && styles.driverRouteCard
                   ]}
                   onPress={() => startSearching(route)}
                   disabled={isSearching}
@@ -564,10 +733,22 @@ const createNewJourney = async (route: Route) => {
                     </View>
                   </View>
 
+                  {isDriver && (
+                    <View style={styles.driverRouteBadge}>
+                      <Text style={styles.driverRouteBadgeText}>Drive This Route</Text>
+                    </View>
+                  )}
+
                   {selectedRoute?.id === route.id && isSearching && (
                     <View style={styles.selectedOverlay}>
-                      <CheckCircle size={24} color="#4ade80" />
-                      <Text style={styles.selectedText}>Searching...</Text>
+                      <CheckCircle size={24} color={
+                        searchPhase === 'joining' ? '#4ade80' : 
+                        searchPhase === 'creating' ? '#fbbf24' : '#1ea2b1'
+                      } />
+                      <Text style={styles.selectedText}>
+                        {searchPhase === 'joining' ? 'Joining...' : 
+                         searchPhase === 'creating' ? 'Creating...' : 'Searching...'}
+                      </Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -630,6 +811,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 8,
   },
+  joiningSubtitle: {
+    color: '#4ade80',
+    fontWeight: '600',
+  },
   totalWaitingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -645,11 +830,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 6,
   },
+  driverIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fbbf2420',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+  },
+  driverIndicatorText: {
+    color: '#fbbf24',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   searchingContainer: {
     alignItems: 'center',
     paddingVertical: 30,
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
+  },
+  joiningContainer: {
+    backgroundColor: '#4ade8010',
+    borderBottomColor: '#4ade80',
   },
   radarContainer: {
     width: 120,
@@ -690,6 +894,20 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  driverBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#fbbf24',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  driverBadgeText: {
+    color: '#000000',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
   searchIconContainer: {
     position: 'absolute',
     bottom: 5,
@@ -706,9 +924,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 20,
   },
+  joiningText: {
+    color: '#4ade80',
+  },
   routeWithWaiters: {
     borderColor: '#1ea2b1',
     borderWidth: 2,
+  },
+  driverRouteCard: {
+    borderLeftColor: '#fbbf24',
+    borderLeftWidth: 4,
   },
   waitingCountActive: {
     color: '#1ea2b1',
@@ -808,6 +1033,20 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontSize: 12,
     marginLeft: 4,
+  },
+  driverRouteBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#fbbf2420',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  driverRouteBadgeText: {
+    color: '#fbbf24',
+    fontSize: 10,
+    fontWeight: '600',
   },
   selectedOverlay: {
     position: 'absolute',

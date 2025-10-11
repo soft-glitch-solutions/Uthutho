@@ -22,13 +22,17 @@ export interface Journey {
     name: string;
     order_number: number;
   }>;
-  drivers?: {
-    user_id: string;
-    profiles: {
-      first_name: string;
-      last_name: string;
+  driver_journeys?: {
+    driver_id: string;
+    status: string;
+    drivers: {
+      user_id: string;
+      profiles: {
+        first_name: string;
+        last_name: string;
+      };
     };
-  };
+  }[];
 }
 
 export function useJourney() {
@@ -64,76 +68,164 @@ export function useJourney() {
     }
   }, [user]);
 
-  // Driver assignment function
+  // Driver assignment function using driver_journeys table
   const checkAndAssignJourneyDriver = async (journeyId: string) => {
     try {
-      // First check if journey already has a driver
-      const { data: currentJourney, error: journeyError } = await supabase
-        .from('journeys')
-        .select('driver_id, has_driver')
-        .eq('id', journeyId)
-        .single();
-
-      if (journeyError) {
-        console.error('Error checking journey driver:', journeyError);
+      // First check if journey already has an active driver in driver_journeys
+      const { data: existingDriverJourney, error: existingError } = await supabase
+        .from('driver_journeys')
+        .select(`
+          driver_id,
+          status,
+          drivers (
+            user_id,
+            profiles (
+              first_name,
+              last_name
+            )
+          )
+        `)
+        .eq('journey_id', journeyId)
+        .eq('status', 'active')
+        .maybeSingle();
+  
+      if (existingError) {
+        console.error('Error checking existing driver journey:', existingError);
         return;
       }
-
-      if (currentJourney?.has_driver) {
-        return; // Journey already has a driver
+  
+      if (existingDriverJourney) {
+        // Journey already has an active driver
+        await updateJourneyWithDriver(journeyId, existingDriverJourney.driver_id);
+        return;
       }
-
-      // Look for verified drivers in journey participants using a direct join
-      const { data: driverParticipants, error } = await supabase
+  
+      // Look for verified drivers in journey participants using proper join through profiles
+      const { data: participants, error } = await supabase
         .from('journey_participants')
         .select(`
           user_id,
           profiles (
             first_name,
             last_name
-          ),
-          drivers!inner (
-            id,
-            is_verified,
-            is_active
           )
         `)
         .eq('journey_id', journeyId)
-        .eq('is_active', true)
-        .eq('drivers.is_verified', true)
-        .eq('drivers.is_active', true)
-        .limit(1);
-
+        .eq('is_active', true);
+  
       if (error) {
-        console.error('Error checking driver participants:', error);
+        console.error('Error checking journey participants:', error);
         return;
       }
-
-      if (driverParticipants && driverParticipants.length > 0) {
-        // Found verified driver - assign them
-        const driverParticipant = driverParticipants[0];
-        
-        // Update the journey with the driver
-        const { error: updateError } = await supabase
-          .from('journeys')
-          .update({
-            driver_id: driverParticipant.drivers.id,
-            has_driver: true
-          })
-          .eq('id', journeyId);
-
-        if (updateError) {
-          console.error('Error assigning driver to journey:', updateError);
-          return;
-        }
-
-        console.log('Driver assigned to journey:', driverParticipant.user_id);
-        
-        // Send notification to passengers
-        await notifyPassengersDriverJoined(journeyId, driverParticipant.profiles);
+  
+      if (!participants || participants.length === 0) {
+        return;
+      }
+  
+      // Get user IDs from participants
+      const participantUserIds = participants.map(p => p.user_id);
+  
+      // Check which of these users are verified drivers
+      const { data: drivers, error: driversError } = await supabase
+        .from('drivers')
+        .select(`
+          id,
+          user_id,
+          profiles (
+            first_name,
+            last_name
+          )
+        `)
+        .in('user_id', participantUserIds)
+        .eq('is_verified', true)
+        .eq('is_active', true)
+        .limit(1);
+  
+      if (driversError) {
+        console.error('Error checking drivers:', driversError);
+        return;
+      }
+  
+      if (drivers && drivers.length > 0) {
+        // Found verified driver - create driver_journey entry
+        const driver = drivers[0];
+        await createDriverJourney(journeyId, driver);
       }
     } catch (error) {
       console.error('Error in checkAndAssignJourneyDriver:', error);
+    }
+  };
+
+  const createDriverJourney = async (journeyId: string, driverParticipant: any) => {
+    try {
+      // Get journey details to get route_id
+      const { data: journey, error: journeyError } = await supabase
+        .from('journeys')
+        .select('route_id')
+        .eq('id', journeyId)
+        .single();
+
+      if (journeyError) {
+        console.error('Error getting journey details:', journeyError);
+        return;
+      }
+
+      // Get the first stop for this route
+      const { data: firstStop, error: stopError } = await supabase
+        .from('stops')
+        .select('id')
+        .eq('route_id', journey.route_id)
+        .order('order_number', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (stopError) {
+        console.error('Error getting first stop:', stopError);
+      }
+
+      // Create driver_journey entry
+      const { error: createError } = await supabase
+        .from('driver_journeys')
+        .insert({
+          driver_id: driverParticipant.drivers.id,
+          journey_id: journeyId,
+          route_id: journey.route_id,
+          current_stop_id: firstStop?.id || null,
+          status: 'active'
+        });
+
+      if (createError) {
+        console.error('Error creating driver journey:', createError);
+        return;
+      }
+
+      // Update the main journey table
+      await updateJourneyWithDriver(journeyId, driverParticipant.drivers.id);
+
+      // Send notification to passengers
+      await notifyPassengersDriverJoined(journeyId, driverParticipant.profiles);
+
+      console.log('Driver journey created for:', driverParticipant.user_id);
+    } catch (error) {
+      console.error('Error in createDriverJourney:', error);
+    }
+  };
+
+  const updateJourneyWithDriver = async (journeyId: string, driverId: string) => {
+    try {
+      const { error: updateError } = await supabase
+        .from('journeys')
+        .update({
+          driver_id: driverId,
+          has_driver: true
+        })
+        .eq('id', journeyId);
+
+      if (updateError) {
+        console.error('Error updating journey with driver:', updateError);
+      }
+    } catch (error) {
+      console.error('Error in updateJourneyWithDriver:', error);
     }
   };
 
@@ -144,7 +236,7 @@ export function useJourney() {
         .select('user_id')
         .eq('journey_id', journeyId)
         .eq('is_active', true)
-        .neq('user_id', user?.id); // Don't notify the driver themselves
+        .neq('user_id', user?.id);
 
       if (error || !passengers) return;
 
@@ -239,11 +331,15 @@ export function useJourney() {
               start_point,
               end_point
             ),
-            drivers (
-              user_id,
-              profiles (
-                first_name,
-                last_name
+            driver_journeys (
+              driver_id,
+              status,
+              drivers (
+                user_id,
+                profiles (
+                  first_name,
+                  last_name
+                )
               )
             )
           )
@@ -401,6 +497,63 @@ export function useJourney() {
     }
   };
 
+  // Add function to update driver's current stop
+  const updateDriverCurrentStop = async (driverId: string, journeyId: string, stopId: string) => {
+    try {
+      // Get next stop
+      const { data: currentStop } = await supabase
+        .from('stops')
+        .select('order_number')
+        .eq('id', stopId)
+        .single();
+
+      if (!currentStop) return;
+
+      const { data: nextStop } = await supabase
+        .from('stops')
+        .select('id')
+        .eq('route_id', activeJourney?.route_id)
+        .eq('order_number', currentStop.order_number + 1)
+        .single();
+
+      const { error } = await supabase
+        .from('driver_journeys')
+        .update({
+          current_stop_id: stopId,
+          next_stop_id: nextStop?.id || null
+        })
+        .eq('driver_id', driverId)
+        .eq('journey_id', journeyId)
+        .eq('status', 'active');
+
+      if (error) {
+        console.error('Error updating driver current stop:', error);
+      }
+    } catch (error) {
+      console.error('Error in updateDriverCurrentStop:', error);
+    }
+  };
+
+  // Add function to complete driver journey
+  const completeDriverJourney = async (driverId: string, journeyId: string) => {
+    try {
+      const { error } = await supabase
+        .from('driver_journeys')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('driver_id', driverId)
+        .eq('journey_id', journeyId);
+
+      if (error) {
+        console.error('Error completing driver journey:', error);
+      }
+    } catch (error) {
+      console.error('Error in completeDriverJourney:', error);
+    }
+  };
+
   const completeJourney = async () => {
     console.log('Starting completeJourney', { activeJourneyId: activeJourney?.id, userId: user?.id });
 
@@ -410,6 +563,19 @@ export function useJourney() {
     }
 
     try {
+      // Check if user is a driver and complete driver journey if so
+      const { data: driverData } = await supabase
+        .from('drivers')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('is_verified', true)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (driverData && activeJourney.driver_id === driverData.id) {
+        await completeDriverJourney(driverData.id, activeJourney.id);
+      }
+
       // 1) Get the stop_waiting record to compute ride duration
       const { data: waitingRow, error: waitingError } = await supabase
         .from('stop_waiting')
@@ -553,5 +719,7 @@ export function useJourney() {
     refreshActiveJourney: loadActiveJourney,
     cleanupStaleJourneyParticipants,
     checkAndAssignJourneyDriver,
+    updateDriverCurrentStop,
+    completeDriverJourney,
   };
 }
