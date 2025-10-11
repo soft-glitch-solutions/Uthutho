@@ -280,9 +280,9 @@ export default function UserProfileScreen() {
 
   const navigateToPost = (postId: string, postType: 'hub' | 'stop') => {
     if (postType === 'hub') {
-      router.push(`/hub-post-details?postId=${postId}`);
+      router.push(`/post/{postId}`);
     } else {
-      router.push(`/stop-post-details?postId=${postId}`);
+      router.push(`/post/{postId}`);
     }
   };
 

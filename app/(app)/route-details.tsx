@@ -15,6 +15,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { Route as RouteIcon, MapPin, Clock, DollarSign, Bookmark, BookmarkCheck, ArrowLeft, Users, TrendingUp, Shield } from 'lucide-react-native';
+import { useAuth } from '@/hook/useAuth';
+import { useFavorites } from '@/hook/useFavorites'; // Add this import
 
 interface RouteStats {
   avg_journey_time: string;
@@ -110,6 +112,8 @@ export default function RouteDetailsScreen() {
   const { routeId } = useLocalSearchParams();
   const { colors } = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
+  const { favorites, addToFavorites, removeFromFavorites, isFavorite } = useFavorites(); // Add useFavorites hook
   const [route, setRoute] = useState(null);
   const [stops, setStops] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -118,14 +122,17 @@ export default function RouteDetailsScreen() {
   const [priceChangeRequests, setPriceChangeRequests] = useState([]);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const [routeStats, setRouteStats] = useState<RouteStats | null>(null);
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
+  const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchRouteDetails();
     loadRouteStats();
     fetchPriceChangeRequests();
+    checkIfFollowing();
     loadFollowerCount();
+    populateFollowerCounts();
   }, [routeId]);
 
   const loadRouteStats = async () => {
@@ -158,42 +165,132 @@ export default function RouteDetailsScreen() {
     }
   };
 
-  const toggleFavorite = async () => {
+  const populateFollowerCounts = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !route) return;
+      const newMap: Record<string, number> = {};
+      
+      // Get follower counts for this route
+      const { data } = await supabase
+        .from('favorites')
+        .select('entity_id')
+        .eq('entity_type', 'route')
+        .eq('entity_id', routeId);
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('favorites')
-        .eq('id', user.id)
+      (data || []).forEach(f => { 
+        newMap[f.entity_id] = (newMap[f.entity_id] || 0) + 1; 
+      });
+
+      setFavoritesCountMap(prev => ({ ...prev, ...newMap }));
+    } catch (error) {
+      console.error('Error populating follower counts:', error);
+    }
+  };
+
+  const checkIfFollowing = async () => {
+    try {
+      if (!user) return;
+
+      // Use the useFavorites hook to check if it's already in favorites
+      const isFav = isFavorite(routeId as string);
+      setIsFollowing(isFav);
+
+      // Also check the database directly as a fallback
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('id')
+        .eq('entity_type', 'route')
+        .eq('entity_id', routeId)
+        .eq('user_id', user.id)
         .single();
 
-      let favorites = profile?.favorites || [];
-      const favoriteItem = {
-        id: route.id,
-        name: route.name,
-        type: 'route' as const,
-      };
-
-      if (isFavorite) {
-        favorites = favorites.filter((fav: any) => !(fav.id === route.id && fav.type === 'route'));
-      } else {
-        favorites = [...favorites, favoriteItem];
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error('Error checking follow status:', error);
+        return;
       }
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({ favorites })
-        .eq('id', user.id);
-
-      if (!error) {
-        setIsFavorite(!isFavorite);
-        // Update follower count after toggling favorite
-        loadFollowerCount();
+      // If database check differs from hook, update both
+      if (!!data !== isFav) {
+        setIsFollowing(!!data);
       }
     } catch (error) {
-      console.error('Error toggling favorite:', error);
+      console.error('Error checking follow status:', error);
+    }
+  };
+
+  const toggleFollow = async () => {
+    try {
+      if (!user || !route) {
+        Alert.alert('Login Required', 'Please login to follow routes.');
+        return;
+      }
+
+      const entityType = 'route';
+      const entityId = route.id;
+      const isCurrentlyFollowing = isFollowing;
+      const delta = isCurrentlyFollowing ? -1 : 1;
+
+      // Optimistic UI update
+      setIsFollowing(!isCurrentlyFollowing);
+      setFollowerCount(prev => Math.max(0, prev + delta));
+      setFavoritesCountMap(prev => ({ 
+        ...prev, 
+        [entityId]: Math.max(0, (prev[entityId] || 0) + delta) 
+      }));
+
+      try {
+        if (isCurrentlyFollowing) {
+          // Remove from favorites/followers
+          const { error: favErr } = await supabase.rpc('remove_favorite', {
+            p_user_id: user.id,
+            p_entity_type: entityType,
+            p_entity_id: entityId,
+          });
+          if (favErr) throw favErr;
+
+          const { error: bumpErr } = await supabase.rpc('bump_favorites_count', {
+            p_user_id: user.id,
+            p_delta: -1,
+          });
+          if (bumpErr) console.warn('bump_favorites_count failed:', bumpErr);
+
+          // Remove from local favorites state
+          await removeFromFavorites(entityId);
+        } else {
+          // Add to favorites/followers
+          const { error: favErr } = await supabase.rpc('add_favorite', {
+            p_user_id: user.id,
+            p_entity_type: entityType,
+            p_entity_id: entityId,
+          });
+          if (favErr) throw favErr;
+
+          const { error: bumpErr } = await supabase.rpc('bump_favorites_count', {
+            p_user_id: user.id,
+            p_delta: 1,
+          });
+          if (bumpErr) console.warn('bump_favorites_count failed:', bumpErr);
+
+          // Add to local favorites state
+          await addToFavorites({ 
+            id: entityId, 
+            type: entityType, 
+            name: route.name, 
+            data: route 
+          });
+        }
+      } catch (e) {
+        // Revert optimistic change on error
+        setIsFollowing(isCurrentlyFollowing);
+        setFollowerCount(prev => Math.max(0, prev - delta));
+        setFavoritesCountMap(prev => ({ 
+          ...prev, 
+          [entityId]: Math.max(0, (prev[entityId] || 0) - delta) 
+        }));
+        console.error('Follow toggle failed:', e);
+        Alert.alert('Error', 'Could not update follow status. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error in toggleFollow:', error);
     }
   };
 
@@ -327,11 +424,11 @@ export default function RouteDetailsScreen() {
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <ArrowLeft size={24} color="#ffffff" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
-            {isFavorite ? (
-              <Bookmark size={24} color="#1ea2b1" fill="#1ea2b1" />
+          <TouchableOpacity style={styles.favoriteButton} onPress={toggleFollow}>
+            {isFollowing ? (
+              <BookmarkCheck size={24} color="#1ea2b1" fill="#1ea2b1" />
             ) : (
-              <BookmarkCheck size={24} color="#ffffff" />
+              <Bookmark size={24} color="#ffffff" />
             )}
           </TouchableOpacity>
         </View>
@@ -347,7 +444,7 @@ export default function RouteDetailsScreen() {
           <View style={styles.followerContainer}>
             <Users size={16} color="#1ea2b1" />
             <Text style={styles.followerText}>
-              {followerCount} {followerCount === 1 ? 'follower' : 'followers'}
+              {favoritesCountMap[route.id] || followerCount} {favoritesCountMap[route.id] === 1 ? 'follower' : 'followers'}
             </Text>
           </View>
         </View>
