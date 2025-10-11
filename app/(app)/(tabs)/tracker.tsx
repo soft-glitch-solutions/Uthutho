@@ -8,17 +8,14 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
-import { ArrowLeft, Plus, CreditCard, Receipt } from 'lucide-react-native';
+import { Plus, CreditCard } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import CardComponent from '@/components/tracker/CardComponent';
-import ActivityGraph from '@/components/tracker/ActivityGraph';
-import QuickStats from '@/components/tracker/QuickStats';
-import TransactionList from '@/components/tracker/TransactionList';
 import AddCardModal from '@/components/tracker/AddCardModal';
 import AddEntryModal from '@/components/tracker/AddEntryModal';
 import EditCardModal from '@/components/tracker/EditCardModal';
-import { UserCard, CardEntry, ActivityData } from '@/types/tracker';
+import { UserCard } from '@/types/tracker';
 
 // Skeleton Loader Component
 const CardSkeletonLoader = () => {
@@ -50,15 +47,11 @@ export default function TrackerScreen() {
   const { user } = useAuth();
   
   const [userCards, setUserCards] = useState<UserCard[]>([]);
-  const [entries, setEntries] = useState<CardEntry[]>([]);
-  const [activityData, setActivityData] = useState<ActivityData[]>([]);
   const [showAddCardModal, setShowAddCardModal] = useState(false);
   const [showAddEntryModal, setShowAddEntryModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedCard, setSelectedCard] = useState<UserCard | null>(null);
   const [selectedAction, setSelectedAction] = useState<'purchase' | 'ride'>('ride');
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [viewMode, setViewMode] = useState<'cards' | 'details'>('cards');
 
   // Edit card state
   const [editingCard, setEditingCard] = useState<UserCard | null>(null);
@@ -69,13 +62,6 @@ export default function TrackerScreen() {
       loadUserCards();
     }
   }, [user]);
-
-  useEffect(() => {
-    if (selectedCard) {
-      loadCardEntries(selectedCard.id);
-      loadActivityData(selectedCard.id);
-    }
-  }, [selectedCard, selectedYear]);
 
   const loadUserCards = async () => {
     try {
@@ -100,56 +86,6 @@ export default function TrackerScreen() {
       Alert.alert('Error', 'Failed to load cards');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadCardEntries = async (cardId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('card_entries')
-        .select('*')
-        .eq('card_id', cardId)
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setEntries(data || []);
-    } catch (error) {
-      console.error('Error loading card entries:', error);
-    }
-  };
-
-  const loadActivityData = async (cardId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('card_entries')
-        .select('date, action')
-        .eq('card_id', cardId)
-        .gte('date', `${selectedYear}-01-01`)
-        .lte('date', `${selectedYear}-12-31`);
-
-      if (error) throw error;
-
-      const activityMap = new Map();
-      data?.forEach(entry => {
-        const date = entry.date;
-        activityMap.set(date, (activityMap.get(date) || 0) + 1);
-      });
-
-      const activity: ActivityData[] = [];
-      activityMap.forEach((count, date) => {
-        let level = 0;
-        if (count >= 4) level = 4;
-        else if (count >= 3) level = 3;
-        else if (count >= 2) level = 2;
-        else if (count >= 1) level = 1;
-        
-        activity.push({ date, count, level });
-      });
-
-      setActivityData(activity);
-    } catch (error) {
-      console.error('Error loading activity data:', error);
     }
   };
 
@@ -236,63 +172,8 @@ export default function TrackerScreen() {
   };
 
   const handleCardPress = (card: UserCard) => {
-    setSelectedCard(card);
-    setViewMode('details');
+    router.push(`/card/${card.id}`);
   };
-
-  // Loading state for details view
-  if (viewMode === 'details' && selectedCard) {
-    return (
-      <View style={styles.container}>
-        <Stack.Screen options={{ headerShown: false }} />
-
-        <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#ffffff" />
-        </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {selectedCard.card_type === 'myciti' ? 'MyCiti Card' : 'Golden Arrow'}
-          </Text>
-          <TouchableOpacity 
-            style={styles.addButton}
-            onPress={() => setShowAddEntryModal(true)}
-          >
-            <Plus size={24} color="#1ea2b1" />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.content}>
-          <ActivityGraph 
-            data={activityData} 
-            selectedYear={selectedYear}
-            onYearChange={setSelectedYear}
-          />
-          
-          <QuickStats 
-            card={selectedCard}
-            entries={entries}
-          />
-
-          <TransactionList 
-            entries={entries}
-            cardType={selectedCard.card_type}
-            onAddEntry={() => setShowAddEntryModal(true)}
-          />
-        </ScrollView>
-
-        <AddEntryModal
-          visible={showAddEntryModal}
-          onClose={() => setShowAddEntryModal(false)}
-          selectedCard={selectedCard}
-          onEntryAdded={() => {
-            setShowAddEntryModal(false);
-            loadCardEntries(selectedCard.id);
-            loadUserCards();
-          }}
-        />
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -413,7 +294,6 @@ export default function TrackerScreen() {
         onEntryAdded={() => {
           setShowAddEntryModal(false);
           if (selectedCard) {
-            loadCardEntries(selectedCard.id);
             loadUserCards();
           }
         }}
@@ -444,14 +324,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
-  },
-  backButton: {
-    backgroundColor: '#1a1a1a',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 24,
