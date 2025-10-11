@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Image, KeyboardAvoidingView, Platform, SafeAreaView } from 'react-native';
-import { Send, Smile, Check, CheckCheck } from 'lucide-react-native';
+import { Send, Smile, Check, CheckCheck, Circle } from 'lucide-react-native';
 
 interface ChatMessage {
   id: string;
@@ -163,7 +163,12 @@ export const JourneyChat = ({
       >
         <View style={styles.chatContainer}>
           <View style={styles.onlineBar}>
-            <Text style={styles.onlineText}>{onlineCount} online</Text>
+            <View style={styles.onlineIndicatorContainer}>
+              <View style={styles.onlineIndicator}>
+                <Circle size={8} color="#22c55e" fill="#22c55e" />
+              </View>
+              <Text style={styles.onlineText}>{onlineCount} online</Text>
+            </View>
           </View>
           {messages.length === 0 ? (
             <View style={styles.emptyChat}>
@@ -285,6 +290,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
+  },
+  onlineIndicatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  onlineIndicator: {
+    marginRight: 6,
+    shadowColor: '#22c55e',
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+    elevation: 4,
   },
   onlineText: {
     color: '#cccccc',
