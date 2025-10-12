@@ -526,8 +526,6 @@ export default function Auth() {
         </View>
       )}
 
-      {/* Email/Password Form */}
-      <View style={styles.form}>
         {!isLogin && !showForgotPassword && (
           <>
             <TextInput
@@ -557,28 +555,6 @@ export default function Auth() {
               </View>
             </View>
 
-            {/* Terms and Privacy Checkboxes */}
-            <View style={styles.checkboxesContainer}>
-              <Text style={[styles.agreementTitle, { color: colors.text }]}>
-                Agreement
-              </Text>
-              
-              <Checkbox
-                label="I accept the"
-                checked={acceptedTerms}
-                onPress={() => setAcceptedTerms(!acceptedTerms)}
-                linkUrl={termsUrl}
-                onLinkPress={handleOpenLink}
-              />
-              
-              <Checkbox
-                label="I accept the Privacy Policy"
-                checked={acceptedPrivacy}
-                onPress={() => setAcceptedPrivacy(!acceptedPrivacy)}
-                linkUrl={privacyUrl}
-                onLinkPress={handleOpenLink}
-              />
-            </View>
           </>
         )}
 
@@ -616,6 +592,36 @@ export default function Auth() {
               )}
             </TouchableOpacity>
           </View>
+        )}
+
+              {/* Email/Password Form */}
+      <View style={styles.form}>
+        {!isLogin && !showForgotPassword && (
+          <>
+
+            {/* Terms and Privacy Checkboxes */}
+            <View style={styles.checkboxesContainer}>
+              <Text style={[styles.agreementTitle, { color: colors.text }]}>
+                Agreement
+              </Text>
+              
+              <Checkbox
+                label="I accept the"
+                checked={acceptedTerms}
+                onPress={() => setAcceptedTerms(!acceptedTerms)}
+                linkUrl={termsUrl}
+                onLinkPress={handleOpenLink}
+              />
+              
+              <Checkbox
+                label="I accept the Privacy Policy"
+                checked={acceptedPrivacy}
+                onPress={() => setAcceptedPrivacy(!acceptedPrivacy)}
+                linkUrl={privacyUrl}
+                onLinkPress={handleOpenLink}
+              />
+            </View>
+          </>
         )}
 
         {isLogin && !showForgotPassword && (
