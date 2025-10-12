@@ -22,17 +22,35 @@ const { width, height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
 const isVerySmallScreen = height < 600;
 const isTinyScreen = height < 500;
+const isTablet = width >= 768;
+const isDesktop = width >= 1024;
+const isLargeDesktop = width >= 1440;
 
-// More aggressive scaling for very small screens
+// Enhanced scaling for all screen sizes
 const scale = (size: number) => {
   const baseWidth = 375;
-  const scaleFactor = isTinyScreen ? 0.8 : isVerySmallScreen ? 0.9 : 1;
+  let scaleFactor = 1;
+  
+  if (isTinyScreen) scaleFactor = 0.8;
+  else if (isVerySmallScreen) scaleFactor = 0.9;
+  else if (isTablet) scaleFactor = 1.2;
+  else if (isDesktop) scaleFactor = 1.4;
+  else if (isLargeDesktop) scaleFactor = 1.6;
+  
   return (width / baseWidth) * size * scaleFactor;
 };
 
 const verticalScale = (size: number) => {
   const baseHeight = 667;
-  const scaleFactor = isTinyScreen ? 0.7 : isVerySmallScreen ? 0.8 : isSmallScreen ? 0.9 : 1;
+  let scaleFactor = 1;
+  
+  if (isTinyScreen) scaleFactor = 0.7;
+  else if (isVerySmallScreen) scaleFactor = 0.8;
+  else if (isSmallScreen) scaleFactor = 0.9;
+  else if (isTablet) scaleFactor = 1.1;
+  else if (isDesktop) scaleFactor = 1.2;
+  else if (isLargeDesktop) scaleFactor = 1.3;
+  
   return (height / baseHeight) * size * scaleFactor;
 };
 
@@ -188,6 +206,9 @@ export default function Onboarding() {
   const slides = getSlideConfig();
   const isMobile = Platform.OS !== 'web';
 
+  // Calculate max content width for desktop
+  const maxContentWidth = isDesktop ? 600 : isTablet ? 500 : '100%';
+
   // Prevent double tap zoom
   const handleDoubleTapProtection = () => {
     const now = Date.now();
@@ -240,12 +261,42 @@ export default function Onboarding() {
         });
       });
     } else {
-      // Previous slide animation - slide right (same as back button)
+      // Previous slide animation - slide right
       handleBackWithAnimation();
     }
   };
 
-  // PanResponder for smooth swipe gestures with double-tap protection
+  // Fixed back slide animation
+  const handleBackWithAnimation = () => {
+    if (isTransitioning || currentSlide === 0) return;
+    
+    setIsTransitioning(true);
+    
+    // Animate current content out to the right
+    Animated.timing(slideAnim, {
+      toValue: width * 0.8,
+      duration: 350,
+      useNativeDriver: true,
+    }).start(() => {
+      // Go to previous slide
+      setCurrentSlide(prev => prev - 1);
+      
+      // Reset position for previous slide (coming from left)
+      slideAnim.setValue(-width * 0.5);
+      
+      // Animate previous content in from left
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }).start(() => {
+        setIsTransitioning(false);
+      });
+    });
+  };
+
+  // Fixed PanResponder for smooth swipe gestures
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: (evt, gestureState) => {
@@ -269,13 +320,25 @@ export default function Onboarding() {
 
         const swipeThreshold = width * 0.15;
         const currentDX = gestureState.dx;
+        const swipeVelocity = Math.abs(gestureState.vx);
         
-        if (currentDX < -swipeThreshold) {
+        // Check if swipe is significant enough or has enough velocity
+        if (currentDX < -swipeThreshold || (currentDX < -10 && swipeVelocity > 0.5)) {
           // Swipe left - next slide
           handleSlideTransition('next');
-        } else if (currentDX > swipeThreshold) {
+        } else if (currentDX > swipeThreshold || (currentDX > 10 && swipeVelocity > 0.5)) {
           // Swipe right - previous slide
-          handleSlideTransition('prev');
+          if (currentSlide > 0) {
+            handleSlideTransition('prev');
+          } else {
+            // Reset if on first slide
+            Animated.spring(slideAnim, {
+              toValue: 0,
+              friction: 7,
+              tension: 40,
+              useNativeDriver: true,
+            }).start();
+          }
         } else {
           // Reset if not enough swipe
           Animated.spring(slideAnim, {
@@ -329,36 +392,6 @@ export default function Onboarding() {
     goToAuth();
   };
 
-  // Unified back slide animation for both button and swipe
-  const handleBackWithAnimation = () => {
-    if (isTransitioning || currentSlide === 0) return;
-    
-    setIsTransitioning(true);
-    
-    // Animate current content out to the right
-    Animated.timing(slideAnim, {
-      toValue: width * 0.8,
-      duration: 350,
-      useNativeDriver: true,
-    }).start(() => {
-      // Go to previous slide
-      setCurrentSlide(prev => prev - 1);
-      
-      // Reset position for previous slide (coming from left)
-      slideAnim.setValue(-width * 0.5);
-      
-      // Animate previous content in from left
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }).start(() => {
-        setIsTransitioning(false);
-      });
-    });
-  };
-
   const slideStyle = {
     transform: [
       { 
@@ -403,7 +436,7 @@ export default function Onboarding() {
         onStartShouldSetResponder={() => true}
       >
         <View 
-          style={styles.content} 
+          style={[styles.content, { maxWidth: maxContentWidth }]} 
           {...panResponder.panHandlers}
           onStartShouldSetResponder={() => true}
           onResponderTerminationRequest={() => false}
@@ -519,10 +552,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BACKGROUND_COLOR,
+    alignItems: 'center', // Center content on desktop
   },
   contentContainer: {
     flex: 1,
     overflow: 'hidden',
+    width: '100%',
+    maxWidth: 1200, // Maximum width for very large screens
   },
   splashContainer: {
     flex: 1,
@@ -559,9 +595,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: scale(16),
+    paddingHorizontal: isDesktop ? scale(40) : isTablet ? scale(32) : scale(16),
     paddingTop: verticalScale(40),
     paddingBottom: verticalScale(20),
+    alignSelf: 'center', // Center the content
+    width: '100%',
   },
   header: {
     flexDirection: 'row',
@@ -595,10 +633,10 @@ const styles = StyleSheet.create({
     marginTop: isTinyScreen ? verticalScale(-40) : isVerySmallScreen ? verticalScale(-20) : 0,
   },
   animationContainer: {
-    width: isTinyScreen ? '60%' : isVerySmallScreen ? '70%' : '80%',
-    maxWidth: scale(280),
-    height: isTinyScreen ? verticalScale(120) : isVerySmallScreen ? verticalScale(150) : verticalScale(200),
-    marginBottom: isTinyScreen ? verticalScale(15) : isVerySmallScreen ? verticalScale(20) : verticalScale(30),
+    width: isDesktop ? '50%' : isTablet ? '60%' : isTinyScreen ? '60%' : isVerySmallScreen ? '70%' : '80%',
+    maxWidth: isDesktop ? scale(400) : isTablet ? scale(320) : scale(280),
+    height: isDesktop ? verticalScale(300) : isTablet ? verticalScale(250) : isTinyScreen ? verticalScale(120) : isVerySmallScreen ? verticalScale(150) : verticalScale(200),
+    marginBottom: isDesktop ? verticalScale(40) : isTablet ? verticalScale(30) : isTinyScreen ? verticalScale(15) : isVerySmallScreen ? verticalScale(20) : verticalScale(30),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -608,59 +646,60 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     alignItems: 'center',
-    paddingHorizontal: scale(12),
+    paddingHorizontal: isDesktop ? scale(40) : isTablet ? scale(24) : scale(12),
     width: '100%',
     marginTop: isTinyScreen ? verticalScale(-10) : 0,
   },
   title: {
-    fontSize: isTinyScreen ? scale(22) : isVerySmallScreen ? scale(26) : scale(30),
+    fontSize: isDesktop ? scale(36) : isTablet ? scale(32) : isTinyScreen ? scale(22) : isVerySmallScreen ? scale(26) : scale(30),
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: verticalScale(8),
     letterSpacing: -0.5,
     color: '#ffffff',
-    lineHeight: isTinyScreen ? scale(26) : isVerySmallScreen ? scale(30) : scale(36),
+    lineHeight: isDesktop ? scale(42) : isTablet ? scale(38) : isTinyScreen ? scale(26) : isVerySmallScreen ? scale(30) : scale(36),
   },
   subtitle: {
-    fontSize: isTinyScreen ? scale(14) : isVerySmallScreen ? scale(16) : scale(18),
+    fontSize: isDesktop ? scale(20) : isTablet ? scale(18) : isTinyScreen ? scale(14) : isVerySmallScreen ? scale(16) : scale(18),
     textAlign: 'center',
-    marginBottom: verticalScale(12),
+    marginBottom: isDesktop ? verticalScale(16) : isTablet ? verticalScale(14) : verticalScale(12),
     fontWeight: '600',
     color: BRAND_COLOR,
     opacity: 0.9,
-    lineHeight: isTinyScreen ? scale(18) : isVerySmallScreen ? scale(20) : scale(22),
+    lineHeight: isDesktop ? scale(24) : isTablet ? scale(22) : isTinyScreen ? scale(18) : isVerySmallScreen ? scale(20) : scale(22),
   },
   description: {
-    fontSize: isTinyScreen ? scale(12) : isVerySmallScreen ? scale(13) : scale(15),
+    fontSize: isDesktop ? scale(16) : isTablet ? scale(15) : isTinyScreen ? scale(12) : isVerySmallScreen ? scale(13) : scale(15),
     textAlign: 'center',
-    lineHeight: isTinyScreen ? scale(16) : isVerySmallScreen ? scale(18) : scale(20),
+    lineHeight: isDesktop ? scale(24) : isTablet ? scale(22) : isTinyScreen ? scale(16) : isVerySmallScreen ? scale(18) : scale(20),
     color: '#ffffff',
     opacity: 0.7,
-    maxWidth: '95%',
+    maxWidth: isDesktop ? '80%' : isTablet ? '90%' : '95%',
   },
   footer: {
     alignItems: 'center',
-    marginTop: isTinyScreen ? verticalScale(10) : isVerySmallScreen ? verticalScale(15) : verticalScale(20),
+    marginTop: isDesktop ? verticalScale(30) : isTablet ? verticalScale(25) : isTinyScreen ? verticalScale(10) : isVerySmallScreen ? verticalScale(15) : verticalScale(20),
     paddingBottom: verticalScale(10),
   },
   pagination: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: isTinyScreen ? verticalScale(15) : verticalScale(20),
+    marginBottom: isDesktop ? verticalScale(25) : isTablet ? verticalScale(20) : isTinyScreen ? verticalScale(15) : verticalScale(20),
     height: verticalScale(16),
   },
   dot: {
     height: scale(6),
     borderRadius: scale(3),
     marginHorizontal: scale(4),
+    transition: 'all 0.3s ease',
   },
   button: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: scale(32),
-    paddingVertical: verticalScale(14),
+    paddingHorizontal: isDesktop ? scale(40) : isTablet ? scale(36) : scale(32),
+    paddingVertical: isDesktop ? verticalScale(18) : isTablet ? verticalScale(16) : verticalScale(14),
     borderRadius: scale(20),
     backgroundColor: BRAND_COLOR,
     shadowColor: BRAND_COLOR,
@@ -668,15 +707,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 4,
-    minWidth: scale(140),
-    minHeight: verticalScale(48),
+    minWidth: isDesktop ? scale(160) : isTablet ? scale(150) : scale(140),
+    minHeight: isDesktop ? verticalScale(56) : isTablet ? verticalScale(52) : verticalScale(48),
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
     color: 'white',
-    fontSize: scale(16),
+    fontSize: isDesktop ? scale(18) : isTablet ? scale(17) : scale(16),
     fontWeight: 'bold',
     marginRight: scale(6),
   },
