@@ -37,10 +37,18 @@ interface RouteInstructionsProps {
   message?: string;
 }
 
+// Safe number formatting utility
+const safeToFixed = (value: number | undefined | null, decimals: number = 2): string => {
+  if (value === undefined || value === null || isNaN(value)) {
+    return decimals === 0 ? '0' : '0.' + '0'.repeat(decimals);
+  }
+  return value.toFixed(decimals);
+};
+
 export default function RouteInstructions({
   fromLocation,
   toLocation,
-  steps,
+  steps = [],
   totalDuration,
   totalDistance,
   totalCost,
@@ -51,11 +59,16 @@ export default function RouteInstructions({
 }: RouteInstructionsProps) {
   const router = useRouter();
 
-  const formatDistance = (km: number) => {
-    if (km < 1) {
-      return `${(km * 1000).toFixed(0)}m`;
+  const formatDistance = (km: number | undefined) => {
+    // Handle undefined, null, or NaN values
+    if (km === undefined || km === null || isNaN(km)) {
+      return 'N/A';
     }
-    return `${km.toFixed(1)}km`;
+    
+    if (km < 1) {
+      return `${safeToFixed(km * 1000, 0)}m`;
+    }
+    return `${safeToFixed(km, 1)}km`;
   };
 
   const getTransportIcon = (type: string) => {
@@ -146,8 +159,11 @@ export default function RouteInstructions({
     return '#1ea2b1';
   };
 
-  // Handle case when no valid route is found
-  if (!hasValidRoute) {
+  // Check if we have valid route data
+  const hasValidData = hasValidRoute && steps && steps.length > 0;
+
+  // Handle case when no valid route is found or data is undefined
+  if (!hasValidData) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -156,22 +172,22 @@ export default function RouteInstructions({
         </View>
 
         <View style={styles.noRouteContainer}>
-          <Text style={styles.noRouteIcon}>🚧</Text>
-          <Text style={styles.noRouteTitle}>Route Not Available</Text>
+          <Text style={styles.noRouteIcon}>❓</Text>
+          <Text style={styles.noRouteTitle}>Route Unknown</Text>
           <Text style={styles.noRouteMessage}>
-            {message || "We don't have route information for this journey in our system yet."}
+            {message || "We don't have information about this route in our system."}
           </Text>
           
           <View style={styles.routeOverview}>
             <View style={styles.routePath}>
               <View style={styles.locationContainer}>
                 <Text style={styles.locationLabel}>From</Text>
-                <Text style={styles.locationText}>{fromLocation}</Text>
+                <Text style={styles.locationText}>{fromLocation || 'Starting point'}</Text>
               </View>
               <ArrowRight size={20} color="#666666" style={styles.arrowIcon} />
               <View style={styles.locationContainer}>
                 <Text style={styles.locationLabel}>To</Text>
-                <Text style={styles.locationText}>{toLocation}</Text>
+                <Text style={styles.locationText}>{toLocation || 'Destination'}</Text>
               </View>
             </View>
             
@@ -179,18 +195,25 @@ export default function RouteInstructions({
               <View style={styles.statItem}>
                 <MapPin size={18} color="#666666" />
                 <Text style={[styles.statText, { color: '#666666' }]}>
-                  {formatDistance(totalDistance)}
+                  {totalDistance ? formatDistance(totalDistance) : 'Distance unknown'}
                 </Text>
               </View>
             </View>
           </View>
 
           <View style={styles.suggestionBox}>
-            <Text style={styles.suggestionTitle}>Suggestions:</Text>
-            <Text style={styles.suggestionText}>• Try a different destination or starting point</Text>
-            <Text style={styles.suggestionText}>• Check our available routes in the Routes tab</Text>
-            <Text style={styles.suggestionText}>• We're constantly adding new routes to our system</Text>
-            <Text style={styles.suggestionText}>• Consider alternative transportation options</Text>
+            <Text style={styles.suggestionTitle}>Why this might be:</Text>
+            <Text style={styles.suggestionText}>• This route isn't in our current database</Text>
+            <Text style={styles.suggestionText}>• We may not serve this area yet</Text>
+            <Text style={styles.suggestionText}>• The route might be very new</Text>
+            <Text style={styles.suggestionText}>• Try checking our available routes</Text>
+          </View>
+
+          <View style={styles.helpBox}>
+            <Text style={styles.helpTitle}>Help us improve:</Text>
+            <Text style={styles.helpText}>
+              Let us know about this route so we can consider adding it to our system.
+            </Text>
           </View>
         </View>
       </View>
@@ -234,7 +257,7 @@ export default function RouteInstructions({
             <Text style={styles.statText}>{formatDistance(totalDistance)}</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.costText}>R {totalCost.toFixed(0)}</Text>
+            <Text style={styles.costText}>R {safeToFixed(totalCost, 0)}</Text>
           </View>
         </View>
       </View>
@@ -278,7 +301,7 @@ export default function RouteInstructions({
                       <View style={styles.stepMetrics}>
                         <Clock size={12} color="#666666" />
                         <Text style={styles.stepDuration}>{step.duration}</Text>
-                        {step.distance && step.distance > 0 && (
+                        {step.distance !== undefined && step.distance > 0 && (
                           <>
                             <MapPin size={12} color="#666666" style={{ marginLeft: 8 }} />
                             <Text style={styles.stepDistance}>
@@ -286,8 +309,8 @@ export default function RouteInstructions({
                             </Text>
                           </>
                         )}
-                        {step.cost && step.cost > 0 && (
-                          <Text style={styles.stepCost}>• R {step.cost}</Text>
+                        {step.cost !== undefined && step.cost > 0 && (
+                          <Text style={styles.stepCost}>• R {safeToFixed(step.cost, 0)}</Text>
                         )}
                       </View>
                     </View>
@@ -298,7 +321,7 @@ export default function RouteInstructions({
 
                 {step.coordinates && (
                   <Text style={styles.coordinates}>
-                    📍 {step.coordinates.lat.toFixed(6)}, {step.coordinates.lon.toFixed(6)}
+                    📍 {safeToFixed(step.coordinates.lat, 6)}, {safeToFixed(step.coordinates.lon, 6)}
                   </Text>
                 )}
 
@@ -651,6 +674,7 @@ const styles = StyleSheet.create({
     borderColor: '#333333',
     width: '100%',
     marginTop: 16,
+    marginBottom: 12,
   },
   suggestionTitle: {
     fontSize: 16,
@@ -662,6 +686,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#cccccc',
     marginBottom: 4,
+    lineHeight: 20,
+  },
+  helpBox: {
+    backgroundColor: '#1ea2b115',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1ea2b130',
+    width: '100%',
+  },
+  helpTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1ea2b1',
+    marginBottom: 8,
+  },
+  helpText: {
+    fontSize: 14,
+    color: '#cccccc',
     lineHeight: 20,
   },
 });

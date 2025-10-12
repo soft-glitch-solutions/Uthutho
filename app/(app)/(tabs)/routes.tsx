@@ -7,7 +7,6 @@ import { supabase } from '@/lib/supabase';
 import LocationAutocomplete from '@/components/LocationAutocomplete';
 import RouteInstructions from '@/components/RouteInstructions';
 
-
 interface Route {
   id: string;
   name: string;
@@ -33,6 +32,19 @@ interface Location {
   lon: string;
   place_id: string;
 }
+
+// Distance calculation function
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+};
 
 export default function RoutesScreen() {
   const router = useRouter();
@@ -188,113 +200,136 @@ export default function RoutesScreen() {
     setFilteredHubs(filtered);
   };
 
-const findRoute = async () => {
-  if (!fromLocation || !toLocation) return;
+  const findRoute = async () => {
+    if (!fromLocation || !toLocation) return;
 
-  // Fade out the search fields
-  Animated.timing(searchFieldsOpacity, {
-    toValue: 0,
-    duration: 400,
-    useNativeDriver: true,
-  }).start(() => {
-    setShowSearchFields(false);
-    setSearchingRoute(true);
-  });
+    // Fade out the search fields
+    Animated.timing(searchFieldsOpacity, {
+      toValue: 0,
+      duration: 400,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowSearchFields(false);
+      setSearchingRoute(true);
+    });
 
-  // Wait for fade out before searching
-  setTimeout(async () => {
-    try {
-      const fromQuery = fromLocation.display_name.split(',')[0];
-      const toQuery = toLocation.display_name.split(',')[0];
+    // Wait for fade out before searching
+    setTimeout(async () => {
+      try {
+        const fromQuery = fromLocation.display_name.split(',')[0];
+        const toQuery = toLocation.display_name.split(',')[0];
 
-      console.log("🗂 Supabase query", { fromQuery, toQuery });
+        console.log("🗂 Supabase query", { fromQuery, toQuery });
 
-      const { data: matchingRoutes, error } = await supabase
-        .from('routes')
-        .select('*')
-        .ilike('start_point', `%${fromQuery}%`)
-        .ilike('end_point', `%${toQuery}%`);
+        const { data: matchingRoutes, error } = await supabase
+          .from('routes')
+          .select('*')
+          .ilike('start_point', `%${fromQuery}%`)
+          .ilike('end_point', `%${toQuery}%`);
 
-      if (error) {
-        console.error("❌ Supabase error:", error);
-        return;
+        if (error) {
+          console.error("❌ Supabase error:", error);
+          return;
+        }
+
+        console.log("✅ Matching routes:", matchingRoutes);
+
+        let instructions;
+        if (matchingRoutes && matchingRoutes.length > 0) {
+          instructions = generateRouteInstructions(fromLocation, toLocation, matchingRoutes);
+          console.log("✅ Using specific route instructions");
+        } else {
+          instructions = {
+            hasValidRoute: false,
+            fromLocation: fromLocation.display_name.split(',')[0],
+            toLocation: toLocation.display_name.split(',')[0],
+            totalDuration: 'Unknown',
+            totalDistance: calculateDistance(
+              parseFloat(fromLocation.lat),
+              parseFloat(fromLocation.lon),
+              parseFloat(toLocation.lat),
+              parseFloat(toLocation.lon)
+            ),
+            totalCost: 0,
+            steps: [],
+            isMultiModal: false,
+            routes: [],
+            message: "We don't have information about this specific route in our system. This route might not be in our database yet."
+          };
+          console.log("❌ No routes found, showing unknown route message");
+        }
+
+        console.log("📝 Generated instructions:", instructions);
+        setRouteInstructions(instructions);
+      } catch (err) {
+        console.error("❌ Error finding route:", err);
+        setRouteInstructions({
+          hasValidRoute: false,
+          fromLocation: fromLocation?.display_name.split(',')[0] || 'Starting point',
+          toLocation: toLocation?.display_name.split(',')[0] || 'Destination',
+          totalDuration: 'Unknown',
+          totalDistance: 0,
+          totalCost: 0,
+          steps: [],
+          isMultiModal: false,
+          routes: [],
+          message: "We encountered an error while searching for this route. Please try again."
+        });
+      } finally {
+        setSearchingRoute(false);
       }
-
-      console.log("✅ Matching routes:", matchingRoutes);
-
-      const instructions =
-        matchingRoutes && matchingRoutes.length > 0
-          ? generateRouteInstructions(fromLocation, toLocation, matchingRoutes)
-          : generateGeneralInstructions(fromLocation, toLocation);
-
-      console.log("📝 Generated instructions:", instructions);
-
-      setRouteInstructions(instructions);
-    } finally {
-      setSearchingRoute(false);
-    }
-  }, 400);
-};
-
+    }, 400);
+  };
 
   const generateRouteInstructions = (from: Location, to: Location, routes: Route[]) => {
     const bestRoute = routes[0];
+    const totalDistance = calculateDistance(
+      parseFloat(from.lat),
+      parseFloat(from.lon),
+      parseFloat(to.lat),
+      parseFloat(to.lon)
+    );
+
     return {
       fromLocation: from.display_name.split(',')[0],
       toLocation: to.display_name.split(',')[0],
       totalDuration: '45-60 min',
+      totalDistance: totalDistance,
       totalCost: bestRoute.cost,
       steps: [
         {
           instruction: `Walk to the nearest ${bestRoute.transport_type} stop`,
           transport_type: 'Walking',
           duration: '5-10 min',
+          distance: totalDistance * 0.1, // Estimate walking distance
         },
         {
           instruction: `Take ${bestRoute.name} from ${bestRoute.start_point} to ${bestRoute.end_point}`,
           transport_type: bestRoute.transport_type,
           duration: '30-45 min',
           cost: bestRoute.cost,
+          distance: totalDistance * 0.8, // Estimate transport distance
+          entityId: bestRoute.id,
+          entityType: 'route' as const,
+          navigationLink: `/route-details?routeId=${bestRoute.id}`,
         },
         {
           instruction: 'Walk to your destination',
           transport_type: 'Walking',
           duration: '5-10 min',
+          distance: totalDistance * 0.1, // Estimate walking distance
         },
       ],
+      isMultiModal: false,
+      routes: [{
+        routeId: bestRoute.id,
+        routeName: bestRoute.name,
+        transportType: bestRoute.transport_type,
+        navigationLink: `/route-details?routeId=${bestRoute.id}`
+      }],
+      hasValidRoute: true,
     };
   };
-
-  const generateGeneralInstructions = (from: Location, to: Location) => ({
-    fromLocation: from.display_name.split(',')[0],
-    toLocation: to.display_name.split(',')[0],
-    totalDuration: '60-90 min',
-    totalCost: 25,
-    steps: [
-      {
-        instruction: 'Walk to the nearest taxi rank or bus stop',
-        transport_type: 'Walking',
-        duration: '10-15 min',
-      },
-      {
-        instruction: 'Take a taxi or bus towards your destination area',
-        transport_type: 'Taxi/Bus',
-        duration: '40-60 min',
-        cost: 20,
-      },
-      {
-        instruction: 'Transfer to local transport if needed',
-        transport_type: 'Local Transport',
-        duration: '10-15 min',
-        cost: 5,
-      },
-      {
-        instruction: 'Walk to your final destination',
-        transport_type: 'Walking',
-        duration: '5-10 min',
-      },
-    ],
-  });
 
   const navigateToRoute = (routeId: string) => {
     router.push(`/route-details?routeId=${routeId}`);
