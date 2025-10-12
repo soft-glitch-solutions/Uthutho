@@ -502,13 +502,6 @@ export default function Auth() {
       contentContainerStyle={styles.contentContainer}
     >
       {/* Logo */}
-      <View style={styles.logoContainer}>
-        <Image
-          source={require('../../assets/images/icon.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-      </View>
 
       <View style={styles.header}>
         <Text style={styles.logoText}>Uthutho</Text>
@@ -516,7 +509,7 @@ export default function Auth() {
 
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>
-          {showForgotPassword ? 'Reset Password' : isLogin ? 'Transform Your Daily Commute' : 'Create Account'}
+          {showForgotPassword ? 'Reset Password' : isLogin ? 'Connect Community Community' : 'Join Uthutho Today'}
         </Text>
       </View>
 
