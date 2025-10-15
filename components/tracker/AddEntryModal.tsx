@@ -17,7 +17,7 @@ import { UserCard } from '@/types/tracker';
 
 const CARD_TYPES = {
   myciti: {
-    name: 'MyCiti Card',
+    name: 'MyCiTi Card',
     color: '#1ea2b1',
     pointsName: 'Points',
     logoImage: null
@@ -27,8 +27,27 @@ const CARD_TYPES = {
     color: '#f59e0b',
     pointsName: 'Rides',
     logoImage: 'https://www.gabs.co.za/Assets/Images/logo_main.png'
+  },
+  go_george: {
+    name: 'Go George',
+    color: '#2563eb',
+    pointsName: 'Trips',
+    logoImage: 'https://www.go-george.co.za/wp-content/uploads/2019/07/GoGeorge-Logo.png'
+  },
+  rea_vaya: {
+    name: 'Rea Vaya',
+    color: '#dc2626',
+    pointsName: 'Trips',
+    logoImage: 'https://www.reavaya.org.za/images/reavaya-logo.png'
+  },
+  gautrain: {
+    name: 'Gautrain',
+    color: '#0f172a',
+    pointsName: 'Trips',
+    logoImage: 'https://www.gautrain.co.za/media/jf1h0atx/gautrain-logo.png'
   }
 };
+
 
 interface AddEntryModalProps {
   visible: boolean;

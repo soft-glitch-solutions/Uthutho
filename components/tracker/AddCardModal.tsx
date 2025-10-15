@@ -16,19 +16,37 @@ import { useAuth } from '@/hook/useAuth';
 
 const CARD_TYPES = {
   myciti: {
-    name: 'MyCiti Card',
+    name: 'MyCiTi Card',
     color: '#1ea2b1',
     pointsName: 'Points',
-    backgroundColor: '#1a2b3c'
+    logoImage: null
   },
   golden_arrow: {
     name: 'Golden Arrow',
     color: '#f59e0b',
     pointsName: 'Rides',
-    logoImage: 'https://www.gabs.co.za/Assets/Images/logo_main.png',
-    backgroundColor: '#3c2a1a'
+    logoImage: 'https://www.gabs.co.za/Assets/Images/logo_main.png'
+  },
+  go_george: {
+    name: 'Go George',
+    color: '#2563eb',
+    pointsName: 'Trips',
+    logoImage: 'https://www.gogeorge.org.za/wp-content/uploads/2024/06/GO-GEORGE-logo-10-Years-icon.jpghttps://scontent-cpt1-1.xx.fbcdn.net/v/t39.30808-6/472786018_991934252967660_1152141784284113326_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=_kFUT2azoLIQ7kNvwHUqguO&_nc_oc=AdlHkuFF-ajOEGuCk_StYAwGeonzXax6xWU33omdJ7K5OoBLENe4Tsx_4aAWj2FeSiQ&_nc_zt=23&_nc_ht=scontent-cpt1-1.xx&_nc_gid=7iub8H3VRzKPjKigx4bgew&oh=00_AffP-6CwmhPjRso4fhJsuXoqicUZql_pyF3HNWjW2A8wHQ&oe=68F5319B'
+  },
+  rea_vaya: {
+    name: 'Rea Vaya',
+    color: '#dc2626',
+    pointsName: 'Trips',
+    logoImage: 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/Rea_Vaya_logo.svg/1200px-Rea_Vaya_logo.svg.png'
+  },
+  gautrain: {
+    name: 'Gautrain',
+    color: '#0f172a',
+    pointsName: 'Trips',
+    logoImage: 'https://icon2.cleanpng.com/20180804/ske/kisspng-logo-product-design-centurion-breakfast-brand-file-gautrain-logo-svg-wikipedia-5b65261ce4d854.0570432315333555489374.jpghttps://images.seeklogo.com/logo-png/22/2/gautrain-logo-png_seeklogo-224452.png'
   }
 };
+
 
 interface AddCardModalProps {
   visible: boolean;
@@ -123,43 +141,55 @@ const AddCardModal: React.FC<AddCardModalProps> = ({
           </View>
 
           <ScrollView style={styles.modalBody}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Card Type</Text>
-              <View style={styles.cardOptions}>
-                {Object.entries(CARD_TYPES).map(([key, config]) => {
-                  const isSelected = cardType === key;
-                  return (
-                    <TouchableOpacity
-                      key={key}
-                      style={[
-                        styles.cardOption,
-                        isSelected && { 
-                          borderColor: config.color, 
-                          backgroundColor: config.color + '20' 
-                        }
-                      ]}
-                      onPress={() => setCardType(key as any)}
-                    >
-                      {key === 'golden_arrow' ? (
-                        <Image 
-                          source={{ uri: config.logoImage }}
-                          style={styles.cardOptionLogo}
-                          resizeMode="contain"
-                        />
-                      ) : (
-                        <CreditCard size={20} color={isSelected ? config.color : '#666'} />
-                      )}
-                      <Text style={[
-                        styles.cardOptionText,
-                        isSelected && { color: config.color, fontWeight: '600' }
-                      ]}>
-                        {config.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
+<View style={styles.inputGroup}>
+  <Text style={styles.inputLabel}>Card Type</Text>
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    contentContainerStyle={styles.cardOptionsScroll}
+  >
+    {Object.entries(CARD_TYPES).map(([key, config]) => {
+      const isSelected = cardType === key;
+      return (
+        <TouchableOpacity
+          key={key}
+          style={[
+            styles.cardOption,
+            isSelected && {
+              borderColor: config.color,
+              backgroundColor: config.color + '20',
+              shadowColor: config.color,
+              shadowOpacity: 0.3,
+              shadowRadius: 6,
+              elevation: 3
+            }
+          ]}
+          onPress={() => setCardType(key as any)}
+          activeOpacity={0.8}
+        >
+          {config.logoImage ? (
+            <Image
+              source={{ uri: config.logoImage }}
+              style={styles.cardOptionLogo}
+              resizeMode="contain"
+            />
+          ) : (
+            <CreditCard size={22} color={isSelected ? config.color : '#888'} />
+          )}
+          <Text
+            style={[
+              styles.cardOptionText,
+              isSelected && { color: config.color, fontWeight: '600' }
+            ]}
+          >
+            {config.name}
+          </Text>
+        </TouchableOpacity>
+      );
+    })}
+  </ScrollView>
+</View>
+
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Card Number</Text>
@@ -277,30 +307,43 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#ffffff',
   },
-  cardOptions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  cardOption: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#333333',
-    backgroundColor: '#1a1a1a',
-  },
-  cardOptionLogo: {
-    width: 20,
-    height: 20,
-  },
-  cardOptionText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-  },
+cardOptionsScroll: {
+  flexDirection: 'row',
+  gap: 12,
+  paddingVertical: 4,
+  paddingHorizontal: 2
+},
+
+cardOption: {
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 100,
+  height: 100,
+  marginRight: 12,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#333333',
+  backgroundColor: '#1a1a1a',
+  padding: 10,
+  shadowColor: '#000',
+  shadowOpacity: 0.2,
+  shadowRadius: 4,
+  elevation: 2
+},
+
+cardOptionLogo: {
+  width: 40,
+  height: 40,
+  marginBottom: 8
+},
+
+cardOptionText: {
+  fontSize: 13,
+  color: '#aaa',
+  textAlign: 'center'
+},
+
   cancelButton: {
     flex: 1,
     backgroundColor: '#333333',

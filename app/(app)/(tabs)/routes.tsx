@@ -74,7 +74,7 @@ export default function RoutesScreen() {
   const [loading, setLoading] = useState(false);
   const [loadingHubs, setLoadingHubs] = useState(false);
 
-  const transportTypes = ['All', 'Taxi', 'Bus', 'Train'];
+  const transportTypes = ['All', 'Taxi', 'Bus', 'Train','Shuttle'];
   const hubTypes = ['All', 'Taxi', 'Bus', 'Train', 'Metro', 'Interchange'];
 
   const searchFieldsOpacity = useRef(new Animated.Value(1)).current;
