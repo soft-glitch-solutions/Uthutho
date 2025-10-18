@@ -5,7 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { MapPin, Clock, Users, Bookmark, BookmarkCheck, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
-import { useFavorites } from '@/hook/useFavorites'; // Add this import
+import { useFavorites } from '@/hook/useFavorites';
+import { formatTimeAgo } from '@/components/utils';
 
 interface Hub {
   id: string;
@@ -24,6 +25,7 @@ interface Route {
   cost: number;
   start_point: string;
   end_point: string;
+  created_at: string;
 }
 
 interface Post {
@@ -34,8 +36,11 @@ interface Post {
   profiles: {
     first_name: string;
     last_name: string;
+    avatar_url?: string;
   };
 }
+
+type TabType = 'routes' | 'activity';
 
 // Skeleton Loading Components
 const SkeletonLoader = () => {
@@ -66,19 +71,16 @@ const SkeletonLoader = () => {
         <View style={[styles.actionButton, styles.skeleton]} />
       </View>
 
-      {/* Routes Skeleton */}
-      <View style={styles.section}>
-        <View style={[styles.skeletonTextMedium, styles.skeleton, { width: '50%', marginBottom: 16 }]} />
-        {[1, 2].map((item) => (
-          <View key={item} style={[styles.routeItem, styles.skeleton, { height: 100 }]} />
-        ))}
+      {/* Tab Skeleton */}
+      <View style={styles.tabContainer}>
+        <View style={[styles.tab, styles.skeleton, { flex: 1, height: 44 }]} />
+        <View style={[styles.tab, styles.skeleton, { flex: 1, height: 44 }]} />
       </View>
 
-      {/* Posts Skeleton */}
+      {/* Content Skeleton */}
       <View style={styles.section}>
-        <View style={[styles.skeletonTextMedium, styles.skeleton, { width: '50%', marginBottom: 16 }]} />
-        {[1, 2].map((item) => (
-          <View key={item} style={[styles.postItem, styles.skeleton, { height: 80 }]} />
+        {[1, 2, 3].map((item) => (
+          <View key={item} style={[styles.routeItem, styles.skeleton, { height: 100 }]} />
         ))}
       </View>
 
@@ -91,7 +93,7 @@ export default function HubDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
-  const { favorites, addToFavorites, removeFromFavorites, isFavorite } = useFavorites(); // Add useFavorites hook
+  const { favorites, addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
   const [hub, setHub] = useState<Hub | null>(null);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -99,6 +101,17 @@ export default function HubDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [followerCount, setFollowerCount] = useState(0);
   const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
+  const [activeTab, setActiveTab] = useState<TabType>('routes');
+
+  // Filter posts to only show from this week
+  const getThisWeeksPosts = () => {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    return posts.filter(post => new Date(post.created_at) >= oneWeekAgo);
+  };
+
+  const thisWeeksPosts = getThisWeeksPosts();
+  const hasRecentActivity = thisWeeksPosts.length > 0;
 
   useEffect(() => {
     if (id) {
@@ -110,6 +123,16 @@ export default function HubDetailScreen() {
       populateFollowerCounts();
     }
   }, [id]);
+
+  // Set default tab based on available content
+  useEffect(() => {
+    if (!loading) {
+      // If no recent activity, default to routes tab
+      if (!hasRecentActivity && activeTab === 'activity') {
+        setActiveTab('routes');
+      }
+    }
+  }, [loading, hasRecentActivity]);
 
   const loadHubDetails = async () => {
     try {
@@ -136,7 +159,8 @@ export default function HubDetailScreen() {
       const { data, error } = await supabase
         .from('routes')
         .select('*')
-        .eq('hub_id', id);
+        .eq('hub_id', id)
+        .order('created_at', { ascending: false });
 
       if (!error) {
         setRoutes(data || []);
@@ -152,11 +176,11 @@ export default function HubDetailScreen() {
         .from('hub_posts')
         .select(`
           *,
-          profiles (first_name, last_name)
+          profiles (first_name, last_name, avatar_url)
         `)
         .eq('hub_id', id)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(20); // Get more posts to filter by week
 
       if (!error) {
         setPosts(data || []);
@@ -186,7 +210,6 @@ export default function HubDetailScreen() {
     try {
       const newMap: Record<string, number> = {};
       
-      // Get follower counts for this hub
       const { data } = await supabase
         .from('favorites')
         .select('entity_id')
@@ -207,11 +230,9 @@ export default function HubDetailScreen() {
     try {
       if (!user) return;
 
-      // Use the useFavorites hook to check if it's already in favorites
       const isFav = isFavorite(id as string);
       setIsFollowing(isFav);
 
-      // Also check the database directly as a fallback
       const { data, error } = await supabase
         .from('favorites')
         .select('id')
@@ -220,12 +241,11 @@ export default function HubDetailScreen() {
         .eq('user_id', user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+      if (error && error.code !== 'PGRST116') {
         console.error('Error checking follow status:', error);
         return;
       }
 
-      // If database check differs from hook, update both
       if (!!data !== isFav) {
         setIsFollowing(!!data);
       }
@@ -256,7 +276,6 @@ export default function HubDetailScreen() {
 
       try {
         if (isCurrentlyFollowing) {
-          // Remove from favorites/followers
           const { error: favErr } = await supabase.rpc('remove_favorite', {
             p_user_id: user.id,
             p_entity_type: entityType,
@@ -270,10 +289,8 @@ export default function HubDetailScreen() {
           });
           if (bumpErr) console.warn('bump_favorites_count failed:', bumpErr);
 
-          // Remove from local favorites state
           await removeFromFavorites(entityId);
         } else {
-          // Add to favorites/followers
           const { error: favErr } = await supabase.rpc('add_favorite', {
             p_user_id: user.id,
             p_entity_type: entityType,
@@ -287,7 +304,6 @@ export default function HubDetailScreen() {
           });
           if (bumpErr) console.warn('bump_favorites_count failed:', bumpErr);
 
-          // Add to local favorites state
           await addToFavorites({ 
             id: entityId, 
             type: entityType, 
@@ -321,56 +337,35 @@ export default function HubDetailScreen() {
     const lng = hub.longitude;
     const label = encodeURIComponent(hub.name);
 
-    // Native deep links
     const iosUrl = `comgooglemaps://?q=${lat},${lng}`;
     const androidUrl = `geo:${lat},${lng}?q=${lat},${lng}(${label})`;
-
-    // Web fallback
     const webUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-
-    console.log("openInMaps called with hub:", hub);
-    console.log("Generated URLs:", { iosUrl, androidUrl, webUrl });
 
     if (Platform.OS === "web") {
       const confirm = window.confirm(`Would you like to open ${hub.name} in Google Maps?`);
       if (confirm) {
-        console.log("Opening in browser:", webUrl);
         window.open(webUrl, "_blank");
-      } else {
-        console.log("User cancelled on web.");
       }
       return;
     }
 
-    // Native platforms
     Alert.alert(
       "Open in Maps",
       `Would you like to open ${hub.name} in Google Maps?`,
       [
-        { text: "Cancel", style: "cancel", onPress: () => console.log("User cancelled openInMaps") },
+        { text: "Cancel", style: "cancel" },
         {
           text: "Open",
           onPress: async () => {
             try {
-              let url =
-                Platform.OS === "ios"
-                  ? iosUrl
-                  : Platform.OS === "android"
-                  ? androidUrl
-                  : webUrl;
-
-              console.log("Trying URL:", url);
+              let url = Platform.OS === "ios" ? iosUrl : Platform.OS === "android" ? androidUrl : webUrl;
 
               const supported = await Linking.canOpenURL(url);
-              console.log("canOpenURL result:", supported);
-
               if (!supported) {
-                console.log("Deep link not supported, falling back to webUrl:", webUrl);
                 url = webUrl;
               }
 
               await Linking.openURL(url);
-              console.log("Successfully opened URL:", url);
             } catch (err) {
               console.error("Error opening maps:", err);
               Alert.alert("Error", "Unable to open Google Maps.");
@@ -384,6 +379,92 @@ export default function HubDetailScreen() {
   const navigateToRoute = (routeId: string) => {
     router.push(`/route-details?routeId=${routeId}`);
   };
+
+  const renderRoutesTab = () => (
+    <View style={styles.tabContent}>
+      <Text style={styles.sectionTitle}>Routes from this Hub ({routes.length})</Text>
+      {routes.length === 0 ? (
+        <View style={styles.emptyState}>
+          <RouteIcon size={24} color="#666666" />
+          <Text style={styles.emptyStateText}>No routes available from this hub</Text>
+          <Text style={styles.emptyStateSubtext}>
+            Check back later for new routes or explore other hubs
+          </Text>
+        </View>
+      ) : (
+        routes.map((route) => (
+          <TouchableOpacity
+            key={route.id}
+            style={styles.routeItem}
+            onPress={() => navigateToRoute(route.id)}
+          >
+            <View style={styles.routeInfo}>
+              <Text style={styles.routeName}>{route.name}</Text>
+              <Text style={styles.routeDestination}>
+                {route.start_point} → {route.end_point}
+              </Text>
+              <View style={styles.routeDetails}>
+                <Text style={styles.routeType}>{route.transport_type}</Text>
+                <Text style={styles.routeCost}>R {route.cost}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.routeArrow}>
+              <Text style={styles.routeArrowText}>›</Text>
+            </View>
+          </TouchableOpacity>
+        ))
+      )}
+    </View>
+  );
+
+  const renderActivityTab = () => (
+    <View style={styles.tabContent}>
+      <Text style={styles.sectionTitle}>This Week's Activity ({thisWeeksPosts.length})</Text>
+      {thisWeeksPosts.length === 0 ? (
+        <View style={styles.emptyState}>
+          <MessageSquare size={24} color="#666666" />
+          <Text style={styles.emptyStateText}>No activity this week</Text>
+          <Text style={styles.emptyStateSubtext}>
+            Be the first to share updates about this hub
+          </Text>
+        </View>
+      ) : (
+        thisWeeksPosts.map((post) => (
+          <View key={post.id} style={styles.postItem}>
+            <View style={styles.postHeader}>
+              <View style={styles.postAuthorInfo}>
+                {post.profiles.avatar_url ? (
+                  <Image 
+                    source={{ uri: post.profiles.avatar_url }} 
+                    style={styles.avatar}
+                  />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                    <Text style={styles.avatarText}>
+                      {post.profiles.first_name[0]}{post.profiles.last_name[0]}
+                    </Text>
+                  </View>
+                )}
+                <View>
+                  <Text style={styles.postAuthor}>
+                    {post.profiles.first_name} {post.profiles.last_name}
+                  </Text>
+                  <Text style={styles.postTime}>
+                    {formatTimeAgo(post.created_at)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+            <Text style={styles.postContent}>{post.content}</Text>
+          </View>
+        ))
+      )}
+    </View>
+  );
+
+  // Only show activity tab if there's recent activity
+  const shouldShowActivityTab = hasRecentActivity;
   
   if (loading) {
     return <SkeletonLoader />;
@@ -468,62 +549,51 @@ export default function HubDetailScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Routes from this Hub */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Routes from this Hub ({routes.length})</Text>
-        {routes.length === 0 ? (
-          <View style={styles.emptyState}>
-            <RouteIcon size={24} color="#666666" />
-            <Text style={styles.emptyStateText}>No routes available from this hub</Text>
-          </View>
-        ) : (
-          routes.map((route) => (
-            <TouchableOpacity
-              key={route.id}
-              style={styles.routeItem}
-              onPress={() => navigateToRoute(route.id)}
-            >
-              <View style={styles.routeInfo}>
-                <Text style={styles.routeName}>{route.name}</Text>
-                <Text style={styles.routeDestination}>
-                  {route.start_point} → {route.end_point}
-                </Text>
-                <View style={styles.routeDetails}>
-                  <Text style={styles.routeType}>{route.transport_type}</Text>
-                  <Text style={styles.routeCost}>R {route.cost}</Text>
-                </View>
-              </View>
-              
-              <View style={styles.routeArrow}>
-                <Text style={styles.routeArrowText}>›</Text>
-              </View>
-            </TouchableOpacity>
-          ))
-        )}
-      </View>
+      {/* Tab Selectors - Only show activity tab if there's recent activity */}
+      {shouldShowActivityTab && (
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              activeTab === 'routes' && [styles.activeTab, { backgroundColor: '#1ea2b1' }]
+            ]}
+            onPress={() => setActiveTab('routes')}
+          >
+            <RouteIcon size={16} color={activeTab === 'routes' ? '#ffffff' : '#666666'} />
+            <Text style={[
+              styles.tabText,
+              { color: activeTab === 'routes' ? '#ffffff' : '#666666' }
+            ]}>
+              Routes ({routes.length})
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              activeTab === 'activity' && [styles.activeTab, { backgroundColor: '#1ea2b1' }]
+            ]}
+            onPress={() => setActiveTab('activity')}
+          >
+            <MessageSquare size={16} color={activeTab === 'activity' ? '#ffffff' : '#666666'} />
+            <Text style={[
+              styles.tabText,
+              { color: activeTab === 'activity' ? '#ffffff' : '#666666' }
+            ]}>
+              This Week ({thisWeeksPosts.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
-      {/* Recent Posts */}
+      {/* Tab Content */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent Posts ({posts.length})</Text>
-        {posts.length === 0 ? (
-          <View style={styles.emptyState}>
-            <MessageSquare size={24} color="#666666" />
-            <Text style={styles.emptyStateText}>No posts yet from this hub</Text>
-          </View>
+        {!shouldShowActivityTab ? (
+          // If no activity tab, always show routes
+          renderRoutesTab()
         ) : (
-          posts.map((post) => (
-            <View key={post.id} style={styles.postItem}>
-              <View style={styles.postHeader}>
-                <Text style={styles.postAuthor}>
-                  {post.profiles.first_name} {post.profiles.last_name}
-                </Text>
-                <Text style={styles.postTime}>
-                  {new Date(post.created_at).toLocaleDateString()}
-                </Text>
-              </View>
-              <Text style={styles.postContent}>{post.content}</Text>
-            </View>
-          ))
+          // If activity tab exists, show based on active tab
+          activeTab === 'routes' ? renderRoutesTab() : renderActivityTab()
         )}
       </View>
 
@@ -556,7 +626,36 @@ const styles = StyleSheet.create({
   skeletonBadge: {
     height: 28,
   },
-  // New follower styles
+  // Tab styles
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#1a1a1a',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  activeTab: {
+    backgroundColor: '#1ea2b1',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  tabContent: {
+    minHeight: 200,
+  },
+  // Rest of the styles
   followerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -573,7 +672,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: 4,
   },
-  // Rest of the styles remain the same
   loadingContainer: {
     flex: 1,
     backgroundColor: '#000000',
@@ -676,7 +774,7 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    marginBottom: 30,
+    marginBottom: 20,
     gap: 12,
   },
   hubImage: {
@@ -718,6 +816,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 12,
     textAlign: 'center',
+  },
+  emptyStateSubtext: {
+    color: '#666666',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+    maxWidth: 300,
   },
   routeItem: {
     flexDirection: 'row',
@@ -777,10 +882,27 @@ const styles = StyleSheet.create({
     borderColor: '#333333',
   },
   postHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 8,
+  },
+  postAuthorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  avatarPlaceholder: {
+    backgroundColor: '#1ea2b1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
   },
   postAuthor: {
     fontSize: 14,
@@ -790,6 +912,7 @@ const styles = StyleSheet.create({
   postTime: {
     fontSize: 12,
     color: '#666666',
+    marginTop: 2,
   },
   postContent: {
     fontSize: 14,
