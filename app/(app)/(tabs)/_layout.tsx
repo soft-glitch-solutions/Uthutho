@@ -78,7 +78,7 @@ const FloatingBackground = ({ activeIndex, colors }) => {
 };
 
 // Animated Tab Icon with Floating Effect
-const FloatingTabIcon = ({ color, size, focused, children, notificationCount = 0, index }) => {
+const FloatingTabIcon = ({ color, size, focused, children, notificationCount = 0, index, colors }) => {
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0);
@@ -155,7 +155,7 @@ const FloatingTabIcon = ({ color, size, focused, children, notificationCount = 0
               backgroundColor: '#ef4444',
               borderRadius: 10,
               minWidth: 18,
-              height: 80,
+              height: 18,
               justifyContent: 'center',
               alignItems: 'center',
               borderWidth: 2,
@@ -266,6 +266,7 @@ const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount })
                 focused={isFocused}
                 notificationCount={notificationCount}
                 index={index}
+                colors={colors} // PASS COLORS HERE
               >
                 <IconComponent 
                   color={isFocused ? '#ffffff' : colors.text} 
