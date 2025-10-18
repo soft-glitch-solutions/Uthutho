@@ -170,6 +170,7 @@ options={{
           <Drawer.Screen name="hubs" options={{ drawerItemStyle: { height: 0 }, title: 'hubs' }} />
           <Drawer.Screen name="stops" options={{ drawerItemStyle: { height: 0 }, title: 'stops' }} />
           <Drawer.Screen name="OnboardDriver" options={{ drawerItemStyle: { height: 0 }, title: 'stops' }} />
+                      <Drawer.Screen name="leaderboard/[id]" options={{ drawerItemStyle: { height: 0 }, title: 'Managing Profile' }} />
           <Drawer.Screen name="driver/signup" options={{ drawerItemStyle: { height: 0 }, title: 'stops' }} />
       <Drawer.Screen
         name="post-details"
