@@ -29,8 +29,7 @@ import {
   Shield,
   MessageSquare,
   Route as RouteIcon,
-  Calendar,
-  Trophy // ADD THIS IMPORT
+  Calendar
 } from 'lucide-react-native';
 import * as Sharing from 'expo-sharing';
 import { formatTimeAgo } from '../../components/utils';
@@ -612,7 +611,7 @@ export default function StopDetailsScreen() {
           </View>
         </View>
 
-        {/* Action Buttons - FIXED SECTION */}
+        {/* Action Buttons */}
         <View style={styles.actionButtons}>
           <TouchableOpacity 
             style={[styles.actionButton, { backgroundColor: colors.primary }]} 
@@ -628,15 +627,6 @@ export default function StopDetailsScreen() {
           >
             <MessageSquare size={20} color="#ffffff" />
             <Text style={styles.actionButtonText}>Post Update</Text>
-          </TouchableOpacity>
-
-          {/* ADD LEADERBOARD BUTTON */}
-          <TouchableOpacity 
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.push(`/leaderboard?entityId=${stopId}&entityType=stop&name=${encodeURIComponent(stopDetails.name)}`)}
-          >
-            <Trophy size={20} color="#ffffff" />
-            <Text style={styles.actionButtonText}>Leaderboard</Text>
           </TouchableOpacity>
         </View>
 
