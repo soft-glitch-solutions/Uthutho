@@ -1,9 +1,36 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  RefreshControl,
+  Image 
+} from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, Bell, CircleCheck as CheckCircle, Clock, MapPin, Users, Flame } from 'lucide-react-native';
 import { useNotifications } from '@/hook/useNotifications';
+
+// Skeleton Loading Component
+const NotificationSkeleton = () => {
+  return (
+    <View style={styles.skeletonItem}>
+      {/* Skeleton Profile Picture */}
+      <View style={styles.skeletonProfile} />
+      
+      {/* Skeleton Notification Icon */}
+      <View style={styles.skeletonIcon} />
+      
+      <View style={styles.skeletonContent}>
+        <View style={[styles.skeletonLine, styles.skeletonTitle]} />
+        <View style={[styles.skeletonLine, styles.skeletonMessage]} />
+        <View style={[styles.skeletonLine, styles.skeletonTime]} />
+      </View>
+    </View>
+  );
+};
 
 export default function NotificationScreen() {
   const router = useRouter();
@@ -21,11 +48,21 @@ export default function NotificationScreen() {
       await markAsRead(notification.id);
     }
 
-    // Navigate based on notification type
+    // Enhanced navigation logic
     if (notification.data?.postId) {
       router.push(`/post/${notification.data.postId}`);
     } else if (notification.data?.userId) {
       router.push(`/user/${notification.data.userId}`);
+    } else if (notification.data?.senderId) {
+      router.push(`/user/${notification.data.senderId}`);
+    } else if (notification.data?.post_hub_id) {
+      router.push(`/post/${notification.data.post_hub_id}`);
+    } else if (notification.data?.post_stop_id) {
+      router.push(`/post/${notification.data.post_stop_id}`);
+    }
+    // For follow notifications, you might want to navigate to the follower's profile
+    else if (notification.type === 'new_follower' && notification.data?.followerId) {
+      router.push(`/user/${notification.data.followerId}`);
     }
   };
 
@@ -37,6 +74,8 @@ export default function NotificationScreen() {
         return <Users size={20} color="#1ea2b1" />;
       case 'journey_update':
         return <MapPin size={20} color="#1ea2b1" />;
+      case 'new_follower':
+        return <Users size={20} color="#10b981" />;
       default:
         return <Bell size={20} color="#1ea2b1" />;
     }
@@ -51,6 +90,52 @@ export default function NotificationScreen() {
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
     return `${Math.floor(diffInMinutes / 1440)}d ago`;
+  };
+
+  // Function to render profile picture with fallback
+  const renderProfilePicture = (notification: any) => {
+    const senderAvatar = notification.data?.senderAvatar;
+    const senderName = notification.data?.senderName || 'U';
+    const firstName = senderName.split(' ')[0];
+    const fallbackLetter = firstName ? firstName.charAt(0).toUpperCase() : 'U';
+
+    if (senderAvatar) {
+      return (
+        <Image 
+          source={{ uri: senderAvatar }} 
+          style={styles.profileImage}
+        />
+      );
+    } else {
+      return (
+        <View style={styles.profileFallback}>
+          <Text style={styles.profileFallbackText}>{fallbackLetter}</Text>
+        </View>
+      );
+    }
+  };
+
+  // Function to get sender name for display
+  const getSenderName = (notification: any) => {
+    return notification.data?.senderName || 'Someone';
+  };
+
+  // Enhanced notification message with sender context
+  const getEnhancedMessage = (notification: any) => {
+    const senderName = getSenderName(notification);
+    
+    switch (notification.type) {
+      case 'post_reaction':
+        return `${senderName} reacted to your post`;
+      case 'post_comment':
+        return `${senderName} commented on your post`;
+      case 'new_follower':
+        return `${senderName} started following you`;
+      case 'journey_update':
+        return `${senderName} updated their journey`;
+      default:
+        return notification.message;
+    }
   };
 
   return (
@@ -78,8 +163,11 @@ export default function NotificationScreen() {
       {/* Notifications List */}
       <View style={styles.content}>
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading notifications...</Text>
+          // Skeleton Loading State
+          <View style={styles.skeletonContainer}>
+            {Array.from({ length: 6 }).map((_, index) => (
+              <NotificationSkeleton key={index} />
+            ))}
           </View>
         ) : notifications.length === 0 ? (
           <View style={styles.emptyState}>
@@ -99,6 +187,12 @@ export default function NotificationScreen() {
               ]}
               onPress={() => handleNotificationPress(notification)}
             >
+              {/* Profile Picture */}
+              <View style={styles.profileContainer}>
+                {renderProfilePicture(notification)}
+              </View>
+              
+              {/* Notification Icon */}
               <View style={styles.notificationIcon}>
                 {getNotificationIcon(notification.type)}
               </View>
@@ -111,7 +205,7 @@ export default function NotificationScreen() {
                   {notification.title}
                 </Text>
                 <Text style={styles.notificationMessage}>
-                  {notification.message}
+                  {getEnhancedMessage(notification)}
                 </Text>
                 <Text style={styles.notificationTime}>
                   {formatTimeAgo(notification.created_at)}
@@ -202,22 +296,52 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#333333',
+    position: 'relative',
   },
   unreadNotification: {
     borderColor: '#1ea2b1',
     backgroundColor: '#1ea2b110',
   },
-  notificationIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  profileContainer: {
+    marginRight: 12,
+    position: 'relative',
+  },
+  profileImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#333333',
+  },
+  profileFallback: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1ea2b1',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+  },
+  profileFallbackText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  notificationIcon: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#000000',
+    borderWidth: 2,
+    borderColor: '#1a1a1a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
   },
   notificationContent: {
     flex: 1,
+    marginLeft: 8,
   },
   notificationTitle: {
     fontSize: 16,
@@ -247,5 +371,59 @@ const styles = StyleSheet.create({
   },
   bottomSpace: {
     height: 20,
+  },
+  // Skeleton Styles
+  skeletonContainer: {
+    paddingVertical: 8,
+  },
+  skeletonItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  skeletonProfile: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#333333',
+    marginRight: 12,
+  },
+  skeletonIcon: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#333333',
+    borderWidth: 2,
+    borderColor: '#1a1a1a',
+    zIndex: 2,
+  },
+  skeletonContent: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  skeletonLine: {
+    backgroundColor: '#333333',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonTitle: {
+    height: 16,
+    width: '70%',
+  },
+  skeletonMessage: {
+    height: 14,
+    width: '90%',
+  },
+  skeletonTime: {
+    height: 12,
+    width: '30%',
   },
 });
