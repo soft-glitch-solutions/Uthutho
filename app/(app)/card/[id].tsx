@@ -17,6 +17,35 @@ import TransactionList from '@/components/tracker/TransactionList';
 import AddEntryModal from '@/components/tracker/AddEntryModal';
 import { UserCard, CardEntry, ActivityData } from '@/types/tracker';
 
+// Card type configurations
+const CARD_TYPES = {
+  myciti: {
+    name: 'MyCiti Card',
+    color: '#1ea2b1',
+    pointsName: 'Points',
+  },
+  golden_arrow: {
+    name: 'Golden Arrow',
+    color: '#f59e0b',
+    pointsName: 'Rides',
+  },
+  go_george: {
+    name: 'Go George',
+    color: '#2563eb',
+    pointsName: 'Trips',
+  },
+  rea_vaya: {
+    name: 'Rea Vaya',
+    color: '#dc2626',
+    pointsName: 'Trips',
+  },
+  gautrain: {
+    name: 'Gautrain',
+    color: '#0f172a',
+    pointsName: 'Trips',
+  }
+};
+
 export default function CardDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -121,6 +150,11 @@ export default function CardDetailScreen() {
     }
   };
 
+  // Get card type configuration
+  const getCardTypeConfig = (cardType: string) => {
+    return CARD_TYPES[cardType as keyof typeof CARD_TYPES] || CARD_TYPES.myciti;
+  };
+
   if (loading || !selectedCard) {
     return (
       <View style={styles.container}>
@@ -136,6 +170,8 @@ export default function CardDetailScreen() {
     );
   }
 
+  const cardTypeConfig = getCardTypeConfig(selectedCard.card_type);
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -145,13 +181,13 @@ export default function CardDetailScreen() {
           <ArrowLeft size={24} color="#ffffff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {selectedCard.card_type === 'myciti' ? 'MyCiti Card' : 'Golden Arrow'}
+          {cardTypeConfig.name}
         </Text>
         <TouchableOpacity 
           style={styles.addButton}
           onPress={() => setShowAddEntryModal(true)}
         >
-          <Plus size={24} color="#1ea2b1" />
+          <Plus size={24} color={cardTypeConfig.color} />
         </TouchableOpacity>
       </View>
 
@@ -160,16 +196,19 @@ export default function CardDetailScreen() {
           data={activityData} 
           selectedYear={selectedYear}
           onYearChange={setSelectedYear}
+          color={cardTypeConfig.color}
         />
         
         <QuickStats 
           card={selectedCard}
           entries={entries}
+          cardTypeConfig={cardTypeConfig}
         />
 
         <TransactionList 
           entries={entries}
           cardType={selectedCard.card_type}
+          cardTypeConfig={cardTypeConfig}
           onAddEntry={() => setShowAddEntryModal(true)}
         />
       </ScrollView>

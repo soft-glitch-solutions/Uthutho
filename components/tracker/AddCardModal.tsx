@@ -14,7 +14,15 @@ import { X, CreditCard } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 
-const CARD_TYPES = {
+// Define the card type
+export type CardType = 'myciti' | 'golden_arrow' | 'go_george' | 'rea_vaya' | 'gautrain';
+
+const CARD_TYPES: Record<CardType, {
+  name: string;
+  color: string;
+  pointsName: string;
+  logoImage: string | null;
+}> = {
   myciti: {
     name: 'MyCiTi Card',
     color: '#1ea2b1',
@@ -31,7 +39,7 @@ const CARD_TYPES = {
     name: 'Go George',
     color: '#2563eb',
     pointsName: 'Trips',
-    logoImage: 'https://www.gogeorge.org.za/wp-content/uploads/2024/06/GO-GEORGE-logo-10-Years-icon.jpghttps://scontent-cpt1-1.xx.fbcdn.net/v/t39.30808-6/472786018_991934252967660_1152141784284113326_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=_kFUT2azoLIQ7kNvwHUqguO&_nc_oc=AdlHkuFF-ajOEGuCk_StYAwGeonzXax6xWU33omdJ7K5OoBLENe4Tsx_4aAWj2FeSiQ&_nc_zt=23&_nc_ht=scontent-cpt1-1.xx&_nc_gid=7iub8H3VRzKPjKigx4bgew&oh=00_AffP-6CwmhPjRso4fhJsuXoqicUZql_pyF3HNWjW2A8wHQ&oe=68F5319B'
+    logoImage: 'https://www.gogeorge.org.za/wp-content/uploads/2024/06/GO-GEORGE-logo-10-Years-icon.jpg'
   },
   rea_vaya: {
     name: 'Rea Vaya',
@@ -43,24 +51,25 @@ const CARD_TYPES = {
     name: 'Gautrain',
     color: '#0f172a',
     pointsName: 'Trips',
-    logoImage: 'https://icon2.cleanpng.com/20180804/ske/kisspng-logo-product-design-centurion-breakfast-brand-file-gautrain-logo-svg-wikipedia-5b65261ce4d854.0570432315333555489374.jpghttps://images.seeklogo.com/logo-png/22/2/gautrain-logo-png_seeklogo-224452.png'
+    logoImage: 'https://icon2.cleanpng.com/20180804/ske/kisspng-logo-product-design-centurion-breakfast-brand-file-gautrain-logo-svg-wikipedia-5b65261ce4d854.0570432315333555489374.jpg'
   }
 };
-
 
 interface AddCardModalProps {
   visible: boolean;
   onClose: () => void;
   onCardAdded: () => void;
+  userCardsCount?: number;
 }
 
 const AddCardModal: React.FC<AddCardModalProps> = ({
   visible,
   onClose,
-  onCardAdded
+  onCardAdded,
+  userCardsCount = 0
 }) => {
   const { user } = useAuth();
-  const [cardType, setCardType] = useState<'myciti' | 'golden_arrow'>('myciti');
+  const [cardType, setCardType] = useState<CardType>('myciti');
   const [cardNumber, setCardNumber] = useState('');
   const [cardHolder, setCardHolder] = useState('');
   const [initialBalance, setInitialBalance] = useState('');
@@ -89,31 +98,47 @@ const AddCardModal: React.FC<AddCardModalProps> = ({
       return;
     }
 
+    if (!user?.id) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
     setLoading(true);
 
     try {
-        const cardData = {
-        user_id: user?.id,
+      const cardData = {
+        user_id: user.id,
         card_type: cardType,
         card_number: cardNumber.trim(),
         card_holder: cardHolder.trim(),
         current_balance: parseFloat(initialBalance),
-        position: userCards.length, // New cards go to the end
+        position: userCardsCount,
         is_active: true
-        };
+      };
 
       const { error } = await supabase
         .from('user_cards')
         .insert([cardData]);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
 
       resetForm();
       onCardAdded();
       Alert.alert('Success', 'Card added successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding card:', error);
-      Alert.alert('Error', 'Failed to add card');
+      
+      // More specific error messages
+      if (error.code === '23514') {
+        Alert.alert('Error', 'Invalid card type. Please select a valid card type.');
+      } else if (error.code === '23505') {
+        Alert.alert('Error', 'A card with this number already exists.');
+      } else {
+        Alert.alert('Error', 'Failed to add card. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -141,55 +166,54 @@ const AddCardModal: React.FC<AddCardModalProps> = ({
           </View>
 
           <ScrollView style={styles.modalBody}>
-<View style={styles.inputGroup}>
-  <Text style={styles.inputLabel}>Card Type</Text>
-  <ScrollView
-    horizontal
-    showsHorizontalScrollIndicator={false}
-    contentContainerStyle={styles.cardOptionsScroll}
-  >
-    {Object.entries(CARD_TYPES).map(([key, config]) => {
-      const isSelected = cardType === key;
-      return (
-        <TouchableOpacity
-          key={key}
-          style={[
-            styles.cardOption,
-            isSelected && {
-              borderColor: config.color,
-              backgroundColor: config.color + '20',
-              shadowColor: config.color,
-              shadowOpacity: 0.3,
-              shadowRadius: 6,
-              elevation: 3
-            }
-          ]}
-          onPress={() => setCardType(key as any)}
-          activeOpacity={0.8}
-        >
-          {config.logoImage ? (
-            <Image
-              source={{ uri: config.logoImage }}
-              style={styles.cardOptionLogo}
-              resizeMode="contain"
-            />
-          ) : (
-            <CreditCard size={22} color={isSelected ? config.color : '#888'} />
-          )}
-          <Text
-            style={[
-              styles.cardOptionText,
-              isSelected && { color: config.color, fontWeight: '600' }
-            ]}
-          >
-            {config.name}
-          </Text>
-        </TouchableOpacity>
-      );
-    })}
-  </ScrollView>
-</View>
-
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Card Type</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.cardOptionsScroll}
+              >
+                {(Object.entries(CARD_TYPES) as [CardType, typeof CARD_TYPES[CardType]][]).map(([key, config]) => {
+                  const isSelected = cardType === key;
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      style={[
+                        styles.cardOption,
+                        isSelected && {
+                          borderColor: config.color,
+                          backgroundColor: config.color + '20',
+                          shadowColor: config.color,
+                          shadowOpacity: 0.3,
+                          shadowRadius: 6,
+                          elevation: 3
+                        }
+                      ]}
+                      onPress={() => setCardType(key)}
+                      activeOpacity={0.8}
+                    >
+                      {config.logoImage ? (
+                        <Image
+                          source={{ uri: config.logoImage }}
+                          style={styles.cardOptionLogo}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <CreditCard size={22} color={isSelected ? config.color : '#888'} />
+                      )}
+                      <Text
+                        style={[
+                          styles.cardOptionText,
+                          isSelected && { color: config.color, fontWeight: '600' }
+                        ]}
+                      >
+                        {config.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Card Number</Text>
@@ -252,6 +276,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({
   );
 };
 
+// ... styles remain the same ...
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
@@ -307,43 +332,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#ffffff',
   },
-cardOptionsScroll: {
-  flexDirection: 'row',
-  gap: 12,
-  paddingVertical: 4,
-  paddingHorizontal: 2
-},
-
-cardOption: {
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  width: 100,
-  height: 100,
-  marginRight: 12,
-  borderRadius: 12,
-  borderWidth: 1,
-  borderColor: '#333333',
-  backgroundColor: '#1a1a1a',
-  padding: 10,
-  shadowColor: '#000',
-  shadowOpacity: 0.2,
-  shadowRadius: 4,
-  elevation: 2
-},
-
-cardOptionLogo: {
-  width: 40,
-  height: 40,
-  marginBottom: 8
-},
-
-cardOptionText: {
-  fontSize: 13,
-  color: '#aaa',
-  textAlign: 'center'
-},
-
+  cardOptionsScroll: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 2
+  },
+  cardOption: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 100,
+    height: 100,
+    marginRight: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+    backgroundColor: '#1a1a1a',
+    padding: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2
+  },
+  cardOptionLogo: {
+    width: 40,
+    height: 40,
+    marginBottom: 8
+  },
+  cardOptionText: {
+    fontSize: 13,
+    color: '#aaa',
+    textAlign: 'center'
+  },
   cancelButton: {
     flex: 1,
     backgroundColor: '#333333',

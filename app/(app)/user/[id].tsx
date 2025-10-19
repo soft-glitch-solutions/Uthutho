@@ -125,12 +125,38 @@ export default function UserProfileScreen() {
   const [posts, setPosts] = useState<UserPost[]>([]);
   const [fireCount, setFireCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Get current user ID
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setCurrentUserId(user.id);
+        }
+      } catch (error) {
+        console.error('Error getting current user:', error);
+      }
+    };
+
+    getCurrentUser();
+  }, []);
+
+  // Check if viewing own profile and redirect
+  useEffect(() => {
+    if (currentUserId && id === currentUserId) {
+      // This is the current user's own profile, redirect to /profile
+      router.replace('/profile');
+      return;
+    }
+  }, [currentUserId, id, router]);
 
   useEffect(() => {
-    if (id) {
+    if (id && currentUserId && id !== currentUserId) {
       loadUserData();
     }
-  }, [id]);
+  }, [id, currentUserId]);
 
   const loadUserData = async () => {
     try {
@@ -232,7 +258,7 @@ export default function UserProfileScreen() {
 
       if (hubPostError) {
         console.error('Error fetching user hub post IDs:', hubPostError);
- return;
+        return;
       }
       const hubPostIds = (hubPosts || []).map(p => p.id);
 
@@ -241,7 +267,7 @@ export default function UserProfileScreen() {
         .select('id')
         .eq('user_id', id);
 
-      if (hubPostError || stopPostError) {
+      if (stopPostError) {
         console.error('Error fetching user stop post IDs:', stopPostError);
         return;
       }
@@ -249,9 +275,9 @@ export default function UserProfileScreen() {
 
       const { data: fireReactions, error: fireError } = await supabase
         .from('post_reactions')
-        .select('id') // Just need the count, so selecting 'id' is sufficient
+        .select('id')
         .eq('reaction_type', 'fire')
- .or(`post_hub_id.in.(${hubPostIds.join(',')}),post_stop_id.in.(${stopPostIds.join(',')})`);
+        .or(`post_hub_id.in.(${hubPostIds.join(',')}),post_stop_id.in.(${stopPostIds.join(',')})`);
 
       if (fireError) {
         console.error('Error loading fire reactions:', fireError);
@@ -264,14 +290,6 @@ export default function UserProfileScreen() {
       // Update profile with fire count
       if (profile && profile.fire_count !== totalFireCount) {
         setProfile(prev => prev ? { ...prev, fire_count: totalFireCount } : null);
-        // Optionally, you might want to update the database as well
-        // const { error: updateError } = await supabase
-        //   .from('profiles')
-        //   .update({ fire_count: totalFireCount })
-        //   .eq('id', id);
-        // if (updateError) {
-        //   console.error('Error updating profile fire count:', updateError);
-        // }
       }
     } catch (error) {
       console.error('Error loading fire count:', error);
@@ -280,13 +298,14 @@ export default function UserProfileScreen() {
 
   const navigateToPost = (postId: string, postType: 'hub' | 'stop') => {
     if (postType === 'hub') {
-      router.push(`/post/{postId}`);
+      router.push(`/post/${postId}`);
     } else {
-      router.push(`/post/{postId}`);
+      router.push(`/post/${postId}`);
     }
   };
 
-  if (loading) {
+  // Show loading while checking user or redirecting
+  if (loading || (currentUserId && id === currentUserId)) {
     return <SkeletonLoader />;
   }
 
@@ -302,97 +321,96 @@ export default function UserProfileScreen() {
   }
 
   return (
- <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" backgroundColor="#000000" />
       
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
- <ArrowLeft size={24} color="#ffffff" />
+          <ArrowLeft size={24} color="#ffffff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>User Profile</Text>
         <View style={styles.placeholder} />
       </View>
 
       {/* Profile Info */}
-
+      <ScrollView style={styles.scrollContent}>
         <View style={styles.profileCard}>
- <View style={styles.profileHeader}>
- <View style={styles.profileIcon}>
- <Image
- source={{ uri: profile.avatar_url || 'https://via.placeholder.com/50' }}
- style={styles.profileIcon}
- />
- </View>
- <Text style={styles.profileName}>
- {profile.first_name} {profile.last_name}
- </Text>
- <Text style={styles.profileTitle}>{profile.selected_title}</Text>
- </View>
-
- <View style={styles.statsContainer}>
- <View style={styles.statItem}>
- <Trophy size={20} color="#fbbf24" />
- <Text style={styles.statValue}>{profile.points}</Text>
- <Text style={styles.statLabel}>Points</Text>
- </View>
- <View style={styles.statItem}>
- <Flame size={20} color="#ff6b35" />
- <Text style={styles.statValue}>{fireCount}</Text>
- <Text style={styles.statLabel}>Fire Received</Text>
- </View>
- <View style={styles.statItem}>
- <Award size={20} color="#1ea2b1" />
- <Text style={styles.statValue}>Level {Math.floor(profile.points / 100) + 1}</Text>
- <Text style={styles.statLabel}>Explorer</Text>
- </View>
- </View>
-
- {profile.home && (
- <View style={styles.locationContainer}>
- <MapPin size={16} color="#1ea2b1" />
- <Text style={styles.locationText}>Lives in {profile.home}</Text>
+          <View style={styles.profileHeader}>
+            <View style={styles.profileIcon}>
+              <Image
+                source={{ uri: profile.avatar_url || 'https://via.placeholder.com/50' }}
+                style={styles.profileIcon}
+              />
+            </View>
+            <Text style={styles.profileName}>
+              {profile.first_name} {profile.last_name}
+            </Text>
+            <Text style={styles.profileTitle}>{profile.selected_title}</Text>
           </View>
- )}
 
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Trophy size={20} color="#fbbf24" />
+              <Text style={styles.statValue}>{profile.points}</Text>
+              <Text style={styles.statLabel}>Points</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Flame size={20} color="#ff6b35" />
+              <Text style={styles.statValue}>{fireCount}</Text>
+              <Text style={styles.statLabel}>Fire Received</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Award size={20} color="#1ea2b1" />
+              <Text style={styles.statValue}>Level {Math.floor(profile.points / 100) + 1}</Text>
+              <Text style={styles.statLabel}>Explorer</Text>
+            </View>
+          </View>
+
+          {profile.home && (
+            <View style={styles.locationContainer}>
+              <MapPin size={16} color="#1ea2b1" />
+              <Text style={styles.locationText}>Lives in {profile.home}</Text>
+            </View>
+          )}
         </View>
-        <ScrollView>
-      <View style={styles.postsSection}>
-        <Text style={styles.postsTitle}>Recent Posts ({posts.length})</Text>
-        {posts.length === 0 ? (
-          <Text style={styles.noPostsText}>No posts yet</Text>
-        ) : (
-          posts.map((post) => (
-            <TouchableOpacity
-              key={post.id}
-              style={styles.postItem}
-              onPress={() => navigateToPost(post.id, post.type)}
-            >
-              <Text style={styles.postContent} numberOfLines={3}>
-                {post.content}
-              </Text>
-              <View style={styles.postFooter}>
-                <View style={styles.postLocation}>
-                  <MapPin size={12} color="#666666" />
-                  <Text style={styles.postLocationText}>
-                    {post.location_name}
-                  </Text>
+
+        <View style={styles.postsSection}>
+          <Text style={styles.postsTitle}>Recent Posts ({posts.length})</Text>
+          {posts.length === 0 ? (
+            <Text style={styles.noPostsText}>No posts yet</Text>
+          ) : (
+            posts.map((post) => (
+              <TouchableOpacity
+                key={post.id}
+                style={styles.postItem}
+                onPress={() => navigateToPost(post.id, post.type)}
+              >
+                <Text style={styles.postContent} numberOfLines={3}>
+                  {post.content}
+                </Text>
+                <View style={styles.postFooter}>
+                  <View style={styles.postLocation}>
+                    <MapPin size={12} color="#666666" />
+                    <Text style={styles.postLocationText}>
+                      {post.location_name}
+                    </Text>
+                  </View>
+                  <View style={styles.postReactions}>
+                    <Flame size={14} color="#ff6b35" />
+                    <Text style={styles.postReactionCount}>
+                      {post.post_reactions.filter(r => r.reaction_type === 'fire').length}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.postReactions}>
-                  <Flame size={14} color="#ff6b35" />
-                  <Text style={styles.postReactionCount}>
-                    {post.post_reactions.filter(r => r.reaction_type === 'fire').length}
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))
-        )}
-      </View>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+        <View style={styles.bottomSpace} />
       </ScrollView>
-      <View style={styles.bottomSpace} />
- </SafeAreaView>
+    </SafeAreaView>
   );
 }
 
@@ -400,6 +418,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  scrollContent: {
+    flex: 1,
   },
   // Skeleton Styles
   skeletonItem: {
@@ -440,7 +461,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 20,
-    zIndex: 1, // Ensure header is above scrolling content
+    zIndex: 1,
   },
   backButton: {
     backgroundColor: '#1a1a1a',
@@ -471,7 +492,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    marginTop: 20, // Overlap with the bottom of the header for a smoother look
+    marginTop: 20,
     borderColor: '#333333',
   },
   profileHeader: {

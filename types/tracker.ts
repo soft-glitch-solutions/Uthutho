@@ -1,7 +1,7 @@
 export interface UserCard {
   id: string;
   user_id: string;
-  card_type: 'myciti' | 'golden_arrow';
+  card_type: 'myciti' | 'golden_arrow' | 'go_george' | 'rea_vaya' | 'gautrain';
   card_number: string;
   card_holder: string;
   current_balance: number;

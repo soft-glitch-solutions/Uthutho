@@ -22,6 +22,7 @@ const CARD_TYPES = {
     gradient: ['#1ea2b1', '#158194', '#0f6173'],
     cardImage: 'https://www.sapeople.com/wp-content/uploads/2023/10/MyCiTi-bus-2-1024x683.jpg',
     backgroundColor: '#1a2b3c',
+    type: 'CONTACTLESS CARD'
   },
   golden_arrow: {
     name: 'Golden Arrow',
@@ -31,6 +32,37 @@ const CARD_TYPES = {
     cardImage: null,
     logoImage: 'https://upload.wikimedia.org/wikipedia/en/0/0a/Golden_Arrow_Bus_Services_logo.png',
     backgroundColor: '#3c2a1a',
+    type: 'BUS CARD'
+  },
+  go_george: {
+    name: 'Go George',
+    color: '#2563eb',
+    pointsName: 'Trips',
+    gradient: ['#2563eb', '#1d4ed8', '#1e40af'],
+    cardImage: null,
+    logoImage: 'https://www.gogeorge.org.za/wp-content/uploads/2024/06/GO-GEORGE-logo-10-Years-icon.jpg',
+    backgroundColor: '#1a1f2b',
+    type: 'BUS CARD'
+  },
+  rea_vaya: {
+    name: 'Rea Vaya',
+    color: '#dc2626',
+    pointsName: 'Trips',
+    gradient: ['#dc2626', '#b91c1c', '#991b1b'],
+    cardImage: null,
+    logoImage: 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/Rea_Vaya_logo.svg/1200px-Rea_Vaya_logo.svg.png',
+    backgroundColor: '#2b1a1a',
+    type: 'BUS RAPID TRANSIT'
+  },
+  gautrain: {
+    name: 'Gautrain',
+    color: '#0f172a',
+    pointsName: 'Trips',
+    gradient: ['#0f172a', '#1e293b', '#334155'],
+    cardImage: null,
+    logoImage: 'https://icon2.cleanpng.com/20180804/ske/kisspng-logo-product-design-centurion-breakfast-brand-file-gautrain-logo-svg-wikipedia-5b65261ce4d854.0570432315333555489374.jpg',
+    backgroundColor: '#0a0a0a',
+    type: 'TRAIN CARD'
   }
 };
 
@@ -54,7 +86,7 @@ const CardComponent: React.FC<CardComponentProps> = ({
   isSelected = false,
 }) => {
   const { width: windowWidth } = useWindowDimensions();
-  const cardType = CARD_TYPES[card.card_type];
+  const cardType = CARD_TYPES[card.card_type as keyof typeof CARD_TYPES];
   
   // Animation values
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -236,6 +268,51 @@ const CardComponent: React.FC<CardComponentProps> = ({
     }
   };
 
+  // Render logo based on card type
+  const renderLogo = () => {
+    if (card.card_type === 'myciti') {
+      return (
+        <View style={[
+          styles.mycitiLogo,
+          isVerySmallScreen && styles.verySmallMycitiLogo
+        ]}>
+          <Text style={[
+            styles.mycitiLogoText,
+            isVerySmallScreen && { fontSize: 9 }
+          ]}>my</Text>
+          <Text style={[
+            styles.mycitiLogoText, 
+            styles.mycitiLogoHighlight,
+            isVerySmallScreen && { fontSize: 9 }
+          ]}>Citi</Text>
+        </View>
+      );
+    } else if (cardType.logoImage) {
+      return (
+        <Image 
+          source={{ uri: cardType.logoImage }}
+          style={[
+            styles.cardLogoImage,
+            isVerySmallScreen && styles.verySmallLogo
+          ]}
+          resizeMode="contain"
+        />
+      );
+    } else {
+      // Fallback for cards without logo images
+      return (
+        <View style={[
+          styles.fallbackLogo,
+          { backgroundColor: cardType.color }
+        ]}>
+          <Text style={styles.fallbackLogoText}>
+            {cardType.name.charAt(0)}
+          </Text>
+        </View>
+      );
+    }
+  };
+
   // Combined transform for smooth animations
   const cardTransform = [
     { scale: scaleAnim },
@@ -302,31 +379,7 @@ const CardComponent: React.FC<CardComponentProps> = ({
           {/* Compact Header */}
           <View style={styles.cardHeader}>
             <View style={styles.cardLogo}>
-              {card.card_type === 'golden_arrow' ? (
-                <Image 
-                  source={{ uri: cardType.logoImage }}
-                  style={[
-                    styles.goldenArrowLogo,
-                    isVerySmallScreen && styles.verySmallLogo
-                  ]}
-                  resizeMode="contain"
-                />
-              ) : (
-                <View style={[
-                  styles.mycitiLogo,
-                  isVerySmallScreen && styles.verySmallMycitiLogo
-                ]}>
-                  <Text style={[
-                    styles.mycitiLogoText,
-                    isVerySmallScreen && { fontSize: 9 }
-                  ]}>my</Text>
-                  <Text style={[
-                    styles.mycitiLogoText, 
-                    styles.mycitiLogoHighlight,
-                    isVerySmallScreen && { fontSize: 9 }
-                  ]}>Citi</Text>
-                </View>
-              )}
+              {renderLogo()}
               <Text style={[
                 styles.cardName,
                 { 
@@ -379,27 +432,26 @@ const CardComponent: React.FC<CardComponentProps> = ({
             </View>
           </View>
           
-            <View style={styles.balanceSection}>
-              <Text style={[
-                styles.balanceLabel,
-                { fontSize: getResponsiveFontSize(11) }
-              ]}>
-                Balance
-              </Text>
-              <Text style={[
-                styles.balanceAmount,
-                { fontSize: getResponsiveFontSize(22) }
-              ]}>
-                {card.current_balance}
-              </Text>
-              <Text style={[
-                styles.balanceUnit,
-                { fontSize: getResponsiveFontSize(10) }
-              ]}>
-                {cardType.pointsName.toLowerCase()}
-              </Text>
-            </View>
-
+          <View style={styles.balanceSection}>
+            <Text style={[
+              styles.balanceLabel,
+              { fontSize: getResponsiveFontSize(11) }
+            ]}>
+              Balance
+            </Text>
+            <Text style={[
+              styles.balanceAmount,
+              { fontSize: getResponsiveFontSize(22) }
+            ]}>
+              {card.current_balance}
+            </Text>
+            <Text style={[
+              styles.balanceUnit,
+              { fontSize: getResponsiveFontSize(10) }
+            ]}>
+              {cardType.pointsName.toLowerCase()}
+            </Text>
+          </View>
 
           {/* Compact Footer */}
           <View style={styles.cardFooter}>
@@ -407,7 +459,7 @@ const CardComponent: React.FC<CardComponentProps> = ({
               styles.cardTypeText,
               { fontSize: getResponsiveFontSize(9) }
             ]}>
-              {card.card_type === 'myciti' ? 'CONTACTLESS CARD' : 'BUS CARD'}
+              {cardType.type}
             </Text>
             <ArrowUpRight 
               size={isVerySmallScreen ? 12 : 14} 
@@ -415,8 +467,6 @@ const CardComponent: React.FC<CardComponentProps> = ({
             />
           </View>
         </View>
-
-        {/* Drag Instructions Overlay */}
 
         {/* Menu Overlay */}
         {showMenu && (
@@ -555,23 +605,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
   },
-  dragHint: {
-    position: 'absolute',
-    bottom: 8,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  dragHintText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 10,
-    fontWeight: '500',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  goldenArrowLogo: {
+  cardLogoImage: {
     width: 20,
     height: 20,
   },
@@ -597,6 +631,18 @@ const styles = StyleSheet.create({
   },
   mycitiLogoHighlight: {
     color: '#1ea2b1',
+  },
+  fallbackLogo: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fallbackLogoText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   cardName: {
     fontWeight: 'bold',
