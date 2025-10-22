@@ -10,7 +10,50 @@ import {
 } from 'react-native';
 import { Flame, MessageCircle, Download, Share } from 'lucide-react-native';
 import ViewShot from 'react-native-view-shot';
-import { PostCardProps } from '@/types';
+
+interface UserProfile {
+  first_name: string;
+  last_name: string;
+  selected_title: string;
+  avatar_url?: string;
+}
+
+interface PostReaction {
+  reaction_type: string;
+  user_id: string;
+}
+
+interface PostComment {
+  id: string;
+  content: string;
+  created_at: string;
+  user_id: string;
+  profiles: UserProfile;
+}
+
+interface Post {
+  id: string;
+  content: string;
+  created_at: string;
+  user_id: string;
+  hub_id?: string;
+  stop_id?: string;
+  profiles: UserProfile;
+  post_reactions: PostReaction[];
+  post_comments: PostComment[];
+}
+
+interface PostCardProps {
+  post: Post;
+  userId: string;
+  toggleReaction: (postId: string, reactionType: string) => void;
+  sharePost: (post: Post) => void;
+  downloadPost: (post: Post) => void;
+  sharingPost: boolean;
+  router: any;
+  viewShotRef: (ref: any) => void;
+  disabled?: boolean;
+}
 
 const PostCard: React.FC<PostCardProps> = ({
   post,
@@ -21,6 +64,7 @@ const PostCard: React.FC<PostCardProps> = ({
   sharingPost,
   router,
   viewShotRef,
+  disabled = false
 }) => {
   const fireCount = post.post_reactions.filter((r) => r.reaction_type === 'fire').length;
   const hasUserFired = post.post_reactions.some((r) => r.reaction_type === 'fire' && r.user_id === userId);
@@ -37,24 +81,51 @@ const PostCard: React.FC<PostCardProps> = ({
     return `${Math.floor(diffInMinutes / 1440)}d ago`;
   };
 
+  const handleReaction = (reactionType: string) => {
+    if (disabled) return;
+    toggleReaction(post.id, reactionType);
+  };
+
+  const handleShare = () => {
+    if (disabled) return;
+    sharePost(post);
+  };
+
+  const handleDownload = () => {
+    if (disabled) return;
+    downloadPost(post);
+  };
+
+  const handlePostPress = () => {
+    if (disabled) return;
+    router.push(`/post/${post.id}`);
+  };
+
+  const handleUserPress = () => {
+    if (disabled) return;
+    router.push(`/user/${post.user_id}`);
+  };
+
   return (
     <ViewShot 
       ref={viewShotRef}
       options={{ format: 'png', quality: 0.9 }}
-      style={styles.postCard}
+      style={[styles.postCard, disabled && styles.disabledCard]}
     >
       <Pressable
-        onPress={() => router.push(`/post/${post.id}`)}
+        onPress={handlePostPress}
         android_ripple={{ color: '#0f0f0f' }}
+        disabled={disabled}
       >
         <View style={styles.postHeader}>
           <Pressable 
-            onPress={() => router.push(`/user/${post.user_id}`)}
+            onPress={handleUserPress}
             style={styles.userInfoContainer}
+            disabled={disabled}
           >
             <View style={styles.profilePicture}>
               <Image
-                source={{ uri: post.profiles.avatar_url || 'https://example.com/default-avatar.png' }}
+                source={{ uri: post.profiles.avatar_url || 'https://via.placeholder.com/40x40/333333/ffffff?text=U' }}
                 style={styles.profileImage}
               />
             </View>
@@ -72,8 +143,9 @@ const PostCard: React.FC<PostCardProps> = ({
 
         <View style={styles.postActions}>
           <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => toggleReaction(post.id, 'fire')}
+            style={[styles.actionItem, disabled && styles.disabledAction]}
+            onPress={() => handleReaction('fire')}
+            disabled={disabled}
           >
             <Flame 
               size={18} 
@@ -82,32 +154,36 @@ const PostCard: React.FC<PostCardProps> = ({
             />
             <Text style={[
               styles.actionCount, 
-              hasUserFired && { color: '#ff7b25' }
+              hasUserFired && { color: '#ff7b25' },
+              disabled && styles.disabledText
             ]}>
               {fireCount}
             </Text>
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => router.push(`/post/${post.id}`)}
+            style={[styles.actionItem, disabled && styles.disabledAction]}
+            onPress={handlePostPress}
+            disabled={disabled}
           >
             <MessageCircle size={18} color="#666" />
-            <Text style={styles.actionCount}>{post.post_comments.length}</Text>
+            <Text style={[styles.actionCount, disabled && styles.disabledText]}>
+              {post.post_comments.length}
+            </Text>
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => downloadPost(post)}
-            disabled={sharingPost}
+            style={[styles.actionItem, disabled && styles.disabledAction]}
+            onPress={handleDownload}
+            disabled={disabled || sharingPost}
           >
             <Download size={18} color="#666" />
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => sharePost(post)}
-            disabled={sharingPost}
+            style={[styles.actionItem, disabled && styles.disabledAction]}
+            onPress={handleShare}
+            disabled={disabled || sharingPost}
           >
             <Share size={18} color="#666" />
           </TouchableOpacity>
@@ -118,9 +194,15 @@ const PostCard: React.FC<PostCardProps> = ({
             <Text style={styles.commentAuthor}>
               {latestComment.profiles.first_name}: 
             </Text>
-            <Text style={styles.commentText} numberOfLines={1}>
+            <Text style={[styles.commentText, disabled && styles.disabledText]} numberOfLines={1}>
               {latestComment.content}
             </Text>
+          </View>
+        )}
+
+        {disabled && (
+          <View style={styles.overlay}>
+            <Text style={styles.overlayText}>Follow community to interact</Text>
           </View>
         )}
       </Pressable>
@@ -137,6 +219,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#333333',
+    position: 'relative',
+  },
+  disabledCard: {
+    opacity: 0.7,
   },
   postHeader: {
     flexDirection: 'row',
@@ -199,11 +285,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 16,
   },
+  disabledAction: {
+    opacity: 0.5,
+  },
   actionCount: {
     marginLeft: 6,
     fontSize: 14,
     color: '#666666',
     fontWeight: '500',
+  },
+  disabledText: {
+    color: '#444444',
   },
   latestComment: {
     flexDirection: 'row',
@@ -222,6 +314,26 @@ const styles = StyleSheet.create({
     color: '#cccccc',
     flex: 1,
     marginLeft: 4,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  overlayText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
 });
 

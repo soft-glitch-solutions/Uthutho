@@ -558,10 +558,22 @@ export default function HubDetailScreen() {
           <Text style={styles.actionButtonText}>Directions</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(tabs)/feeds')}>
-          <MessageSquare size={20} color="#ffffff" />
-          <Text style={styles.actionButtonText}>View Posts</Text>
-        </TouchableOpacity>
+        // In the actionButtons section, replace the View Posts button:
+      <TouchableOpacity 
+        style={styles.actionButton} 
+        onPress={() => router.push({
+          pathname: '/(tabs)/feeds',
+          params: { 
+            previewHub: hub.id,
+            hubName: hub.name,
+            hubType: 'hub',
+            hubData: JSON.stringify(hub) // Pass the full hub data
+          }
+        })}
+      >
+        <MessageSquare size={20} color="#ffffff" />
+        <Text style={styles.actionButtonText}>View Posts</Text>
+      </TouchableOpacity>
       </View>
 
       {/* Leaderboard Button */}

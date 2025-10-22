@@ -10,11 +10,12 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Users, MessageSquare } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 
-// Import components directly to avoid import issues
+// Import components
 import Header from '@/components/feeds/Header';
 import CommunityTabs from '@/components/feeds/CommunityTabs';
 import PostCreation from '@/components/feeds/PostCreation';
@@ -106,10 +107,91 @@ const WeekRangeHeader: React.FC<{
   );
 };
 
+const PreviewHeader: React.FC<{
+  previewCommunity: Community;
+  isFollowingPreview: boolean;
+  onFollow: () => void;
+  onUnfollow: () => void;
+  onViewFull: () => void;
+  posts: Post[];
+}> = ({ previewCommunity, isFollowingPreview, onFollow, onUnfollow, onViewFull, posts }) => {
+  return (
+    <View style={styles.previewHeader}>
+      <View style={styles.previewHeaderContent}>
+        <Text style={styles.previewTitle}>Previewing Community</Text>
+        <Text style={styles.previewCommunityName}>{previewCommunity?.name}</Text>
+        <Text style={styles.previewDescription}>
+          {isFollowingPreview 
+            ? "You're following this community and can see all posts!" 
+            : "Follow this community to see all posts and join the conversation"
+          }
+        </Text>
+        
+        {!isFollowingPreview ? (
+          <TouchableOpacity 
+            style={styles.followButton}
+            onPress={onFollow}
+          >
+            <Users size={20} color="#ffffff" />
+            <Text style={styles.followButtonText}>Follow Community</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.followActions}>
+            <TouchableOpacity 
+              style={styles.viewFullButton}
+              onPress={onViewFull}
+            >
+              <Text style={styles.viewFullButtonText}>View Full Community</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.unfollowButton}
+              onPress={onUnfollow}
+            >
+              <Text style={styles.unfollowButtonText}>Unfollow</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+      
+      {/* Week stats preview - show what they're missing */}
+      <View style={styles.weekStats}>
+        <Text style={styles.weekStatsTitle}>
+          {isFollowingPreview ? 'This Week' : 'This Week in Preview'}
+        </Text>
+        <View style={styles.statsGrid}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{posts.length}</Text>
+            <Text style={styles.statLabel}>Posts</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>
+              {posts.reduce((acc, post) => acc + (post.post_comments?.length || 0), 0)}
+            </Text>
+            <Text style={styles.statLabel}>Comments</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>
+              {posts.reduce((acc, post) => acc + (post.post_reactions?.length || 0), 0)}
+            </Text>
+            <Text style={styles.statLabel}>Reactions</Text>
+          </View>
+        </View>
+        
+        {!isFollowingPreview && posts.length > 0 && (
+          <Text style={styles.previewHint}>
+            Follow to see {posts.length} post{posts.length > 1 ? 's' : ''} from this week
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+};
+
 export default function FeedsScreen() {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const router = useRouter();
+  const params = useLocalSearchParams();
   const viewShotRefs = useRef<Record<string, any>>({});
 
   // State
@@ -127,6 +209,11 @@ export default function FeedsScreen() {
   const [weekRange, setWeekRange] = useState('');
   const [postFilter, setPostFilter] = useState<PostFilter>('week');
   const [sharingPost, setSharingPost] = useState(false);
+
+  // Preview state
+  const [previewMode, setPreviewMode] = useState(false);
+  const [previewCommunity, setPreviewCommunity] = useState<Community | null>(null);
+  const [isFollowingPreview, setIsFollowingPreview] = useState(false);
 
   // UUID validation
   const isValidUUID = (str: string): boolean => {
@@ -148,6 +235,87 @@ export default function FeedsScreen() {
     sunday.setHours(23, 59, 59, 999);
 
     return { monday, sunday };
+  };
+
+  // Check for preview parameters
+  useEffect(() => {
+    if (params.previewHub && params.hubName) {
+      let hubData = null;
+      if (params.hubData) {
+        try {
+          hubData = JSON.parse(params.hubData as string);
+        } catch (error) {
+          console.error('Error parsing hub data:', error);
+        }
+      }
+
+      const previewComm: Community = {
+        id: params.previewHub as string,
+        name: params.hubName as string,
+        type: (params.hubType as 'hub' | 'stop') || 'hub',
+        latitude: hubData?.latitude || 0,
+        longitude: hubData?.longitude || 0,
+        address: hubData?.address,
+      };
+      
+      setPreviewCommunity(previewComm);
+      setPreviewMode(true);
+      setSelectedCommunity(previewComm);
+      
+      // Check if user is already following this community
+      checkIfFollowingPreview(previewComm.id);
+    } else {
+      setPreviewMode(false);
+      setPreviewCommunity(null);
+    }
+  }, [params]);
+
+  const checkIfFollowingPreview = (communityId: string) => {
+    // Use existing favorites check logic
+    const isFav = communities.some(community => community.id === communityId);
+    setIsFollowingPreview(isFav);
+  };
+
+  const followPreviewCommunity = async () => {
+    if (!previewCommunity) return;
+
+    try {
+      await toggleFavorite(previewCommunity.id);
+      setIsFollowingPreview(true);
+      
+      // Refresh communities to include the new one
+      if (user?.id) {
+        await loadFavoriteCommunities(user.id);
+      }
+      
+      Alert.alert('Success', `You're now following ${previewCommunity.name}!`, [
+        { text: 'OK', onPress: () => setPreviewMode(false) }
+      ]);
+      
+    } catch (error) {
+      console.error('Error following community:', error);
+      Alert.alert('Error', 'Failed to follow community. Please try again.');
+    }
+  };
+
+  const unfollowPreviewCommunity = async () => {
+    if (!previewCommunity) return;
+
+    try {
+      await toggleFavorite(previewCommunity.id);
+      setIsFollowingPreview(false);
+      
+      // Refresh communities
+      if (user?.id) {
+        await loadFavoriteCommunities(user.id);
+      }
+      
+      Alert.alert('Success', `You've unfollowed ${previewCommunity.name}`);
+      
+    } catch (error) {
+      console.error('Error unfollowing community:', error);
+      Alert.alert('Error', 'Failed to unfollow community. Please try again.');
+    }
   };
 
   // Data loading functions
@@ -455,7 +623,6 @@ export default function FeedsScreen() {
           Alert.alert('Link copied', 'Post link has been copied to your clipboard');
         }
       } else {
-        // Use basic alert for mobile for now to avoid import issues
         Alert.alert('Share Post', `Share this post: ${shareUrl}`);
       }
     } catch (error) {
@@ -468,7 +635,6 @@ export default function FeedsScreen() {
   const downloadPost = useCallback(async (post: Post) => {
     try {
       setSharingPost(true);
-      // For now, just share since download requires more setup
       await sharePost(post);
     } catch (error) {
       console.error('Error downloading post:', error);
@@ -499,7 +665,6 @@ export default function FeedsScreen() {
         }
       }
 
-      // Use setTimeout to ensure this runs after render
       setTimeout(() => {
         if (mounted) {
           setInitialLoadComplete(true);
@@ -521,6 +686,33 @@ export default function FeedsScreen() {
       loadCommunityPosts(selectedCommunity);
     }
   }, [selectedCommunity, postFilter]);
+
+  // Render post creation based on preview mode
+  const renderPostCreation = () => {
+    if (previewMode && !isFollowingPreview) {
+      return (
+        <View style={styles.previewPostCreation}>
+          <MessageSquare size={24} color="#666666" />
+          <Text style={styles.previewPostCreationText}>
+            Follow this community to post and comment
+          </Text>
+        </View>
+      );
+    }
+    
+    if (selectedCommunity && (!previewMode || isFollowingPreview)) {
+      return (
+        <PostCreation
+          newPost={newPost}
+          setNewPost={setNewPost}
+          createPost={createPost}
+          selectedCommunity={selectedCommunity}
+        />
+      );
+    }
+    
+    return null;
+  };
 
   // Show loading state
   if (!initialLoadComplete || loading) {
@@ -563,6 +755,18 @@ export default function FeedsScreen() {
         onAddCommunityPress={() => setShowAddCommunity(true)}
       />
 
+      {/* Show preview header when in preview mode */}
+      {previewMode && previewCommunity && (
+        <PreviewHeader
+          previewCommunity={previewCommunity}
+          isFollowingPreview={isFollowingPreview}
+          onFollow={followPreviewCommunity}
+          onUnfollow={unfollowPreviewCommunity}
+          onViewFull={() => setPreviewMode(false)}
+          posts={posts}
+        />
+      )}
+
       <CommunityTabs
         communities={communities}
         selectedCommunity={selectedCommunity}
@@ -593,25 +797,23 @@ export default function FeedsScreen() {
             viewShotRef={(ref: any) => {
               viewShotRefs.current[item.id] = ref;
             }}
+            disabled={previewMode && !isFollowingPreview}
           />
         )}
-        ListHeaderComponent={
-          selectedCommunity ? (
-            <PostCreation
-              newPost={newPost}
-              setNewPost={setNewPost}
-              createPost={createPost}
-              selectedCommunity={selectedCommunity}
-            />
-          ) : null
-        }
+        ListHeaderComponent={renderPostCreation()}
         ListEmptyComponent={
           <EmptyPosts
-            title={selectedCommunity ? "No Posts Yet" : "Select a Community"}
+            title={
+              previewMode && !isFollowingPreview 
+                ? "Follow to See Posts" 
+                : selectedCommunity ? "No Posts Yet" : "Select a Community"
+            }
             subtitle={
-              selectedCommunity 
-                ? "Be the first to post in this community" 
-                : "Choose a community to see posts"
+              previewMode && !isFollowingPreview
+                ? "Follow this community to see what people are posting"
+                : selectedCommunity 
+                  ? "Be the first to post in this community" 
+                  : "Choose a community to see posts"
             }
             showAnimation={!!selectedCommunity}
           />
@@ -624,7 +826,10 @@ export default function FeedsScreen() {
             colors={['#1ea2b1']}
           />
         }
-        contentContainerStyle={styles.postsListContent}
+        contentContainerStyle={[
+          styles.postsListContent,
+          previewMode && styles.previewContent,
+        ]}
         showsVerticalScrollIndicator={false}
       />
     </View>
@@ -667,5 +872,134 @@ const styles = StyleSheet.create({
   postsListContent: {
     paddingBottom: 24,
     flexGrow: 1,
+  },
+  // Preview styles
+  previewHeader: {
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+  },
+  previewHeaderContent: {
+    marginBottom: 16,
+  },
+  previewTitle: {
+    color: '#cccccc',
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  previewCommunityName: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  previewDescription: {
+    color: '#cccccc',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  followButton: {
+    backgroundColor: '#1ea2b1',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  followButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  followActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  viewFullButton: {
+    flex: 2,
+    backgroundColor: '#1ea2b1',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  viewFullButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  unfollowButton: {
+    flex: 1,
+    backgroundColor: '#333333',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  unfollowButtonText: {
+    color: '#cccccc',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  weekStats: {
+    backgroundColor: '#0a0a0a',
+    borderRadius: 12,
+    padding: 16,
+  },
+  weekStatsTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 8,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    color: '#1ea2b1',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  statLabel: {
+    color: '#cccccc',
+    fontSize: 12,
+  },
+  previewHint: {
+    color: '#666666',
+    fontSize: 12,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  previewPostCreation: {
+    backgroundColor: '#1a1a1a',
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  previewPostCreationText: {
+    color: '#666666',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  previewContent: {
+    paddingTop: 0,
   },
 });
