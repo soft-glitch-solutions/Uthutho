@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, TextInput, Animated, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, FlatList, Platform, TextInput, Animated, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { Search, Clock, MapPin, Filter, Route as RouteIcon } from 'lucide-react-native';
@@ -46,6 +46,8 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 };
 
+const ITEMS_PER_PAGE = 20;
+
 export default function RoutesScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'planner' | 'routes' | 'hubs'>('planner');
@@ -58,21 +60,31 @@ export default function RoutesScreen() {
   const [searchingRoute, setSearchingRoute] = useState(false);
   const [routeInstructions, setRouteInstructions] = useState<any>(null);
 
-  // Routes State
+  // Routes State with Pagination
   const [routes, setRoutes] = useState<Route[]>([]);
   const [filteredRoutes, setFilteredRoutes] = useState<Route[]>([]);
   const [routeSearchQuery, setRouteSearchQuery] = useState('');
   const [selectedTransportType, setSelectedTransportType] = useState<string>('All');
   const [routeFollowerCounts, setRouteFollowerCounts] = useState<Record<string, number>>({});
+  const [routesLoading, setRoutesLoading] = useState(false);
+  const [routesLoadingMore, setRoutesLoadingMore] = useState(false);
+  const [routesPage, setRoutesPage] = useState(0);
+  const [hasMoreRoutes, setHasMoreRoutes] = useState(true);
+  const [isSearchingRoutes, setIsSearchingRoutes] = useState(false);
+  const [routesRefreshing, setRoutesRefreshing] = useState(false);
 
-  // Hubs State
+  // Hubs State with Pagination
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [filteredHubs, setFilteredHubs] = useState<Hub[]>([]);
   const [hubSearchQuery, setHubSearchQuery] = useState('');
   const [selectedHubType, setSelectedHubType] = useState<string>('All');
   const [hubFollowerCounts, setHubFollowerCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(false);
-  const [loadingHubs, setLoadingHubs] = useState(false);
+  const [hubsLoading, setHubsLoading] = useState(false);
+  const [hubsLoadingMore, setHubsLoadingMore] = useState(false);
+  const [hubsPage, setHubsPage] = useState(0);
+  const [hasMoreHubs, setHasMoreHubs] = useState(true);
+  const [isSearchingHubs, setIsSearchingHubs] = useState(false);
+  const [hubsRefreshing, setHubsRefreshing] = useState(false);
 
   const transportTypes = ['All', 'Taxi', 'Bus', 'Train','Shuttle'];
   const hubTypes = ['All', 'Taxi', 'Bus', 'Train', 'Metro', 'Interchange'];
@@ -80,124 +92,297 @@ export default function RoutesScreen() {
   const searchFieldsOpacity = useRef(new Animated.Value(1)).current;
   const [showSearchFields, setShowSearchFields] = useState(true);
 
+  // Refs to track if we're in search mode
+  const isRouteSearchMode = useRef(false);
+  const isHubSearchMode = useRef(false);
+
   useEffect(() => {
-    loadRoutes();
-    loadHubs();
+    loadRoutes(true);
+    loadHubs(true);
   }, []);
 
   useEffect(() => {
-    filterRoutes();
-  }, [routes, routeSearchQuery, selectedTransportType]);
+    // Debounce search for routes
+    const timeoutId = setTimeout(() => {
+      if (routeSearchQuery.trim() || selectedTransportType !== 'All') {
+        handleRouteSearch();
+      } else {
+        // If no search query and "All" transport type, reset to normal infinite scroll
+        isRouteSearchMode.current = false;
+        setFilteredRoutes(routes);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [routeSearchQuery, selectedTransportType]);
 
   useEffect(() => {
-    filterHubs();
-  }, [hubs, hubSearchQuery, selectedHubType]);
+    // Debounce search for hubs
+    const timeoutId = setTimeout(() => {
+      if (hubSearchQuery.trim() || selectedHubType !== 'All') {
+        handleHubSearch();
+      } else {
+        // If no search query and "All" hub type, reset to normal infinite scroll
+        isHubSearchMode.current = false;
+        setFilteredHubs(hubs);
+      }
+    }, 500);
 
-  const loadRoutes = async () => {
-    setLoading(true);
+    return () => clearTimeout(timeoutId);
+  }, [hubSearchQuery, selectedHubType]);
+
+  const loadRoutes = async (initialLoad = false) => {
+    if (isRouteSearchMode.current) return; // Don't load more if in search mode
+
+    if (initialLoad) {
+      setRoutesLoading(true);
+    } else {
+      setRoutesLoadingMore(true);
+    }
+
     try {
-      const { data, error } = await supabase
+      const from = initialLoad ? 0 : routesPage * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
+      let query = supabase
         .from('routes')
-        .select('*')
-        .limit(50);
+        .select('*', { count: 'exact' })
+        .range(from, to);
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
-      setRoutes(data || []);
 
-      const ids = (data || []).map(r => r.id);
-      if (ids.length) {
-        const { data: favs } = await supabase
-          .from('favorites')
-          .select('entity_id')
-          .eq('entity_type', 'route')
-          .in('entity_id', ids);
-
-        const map: Record<string, number> = {};
-        (favs || []).forEach(f => { map[f.entity_id] = (map[f.entity_id] || 0) + 1; });
-        setRouteFollowerCounts(map);
+      if (initialLoad) {
+        setRoutes(data || []);
+        setRoutesPage(1);
+        setFilteredRoutes(data || []);
       } else {
-        setRouteFollowerCounts({});
+        const newRoutes = [...routes, ...(data || [])];
+        setRoutes(newRoutes);
+        setFilteredRoutes(newRoutes);
+        setRoutesPage(prev => prev + 1);
       }
+
+      // Check if there are more items to load
+      setHasMoreRoutes((data?.length || 0) === ITEMS_PER_PAGE);
+
+      // Load follower counts for the new routes
+      await loadRouteFollowerCounts(data || []);
     } catch (err) {
       console.error('Failed to load routes:', err);
     } finally {
-      setLoading(false);
+      setRoutesLoading(false);
+      setRoutesLoadingMore(false);
+      setRoutesRefreshing(false);
     }
   };
 
-  const loadHubs = async () => {
-    setLoadingHubs(true);
+  const loadHubs = async (initialLoad = false) => {
+    if (isHubSearchMode.current) return; // Don't load more if in search mode
+
+    if (initialLoad) {
+      setHubsLoading(true);
+    } else {
+      setHubsLoadingMore(true);
+    }
+
     try {
-      const { data, error } = await supabase
+      const from = initialLoad ? 0 : hubsPage * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
+      let query = supabase
         .from('hubs')
-        .select('*')
-        .limit(50);
+        .select('*', { count: 'exact' })
+        .range(from, to);
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
-      setHubs(data || []);
-      setFilteredHubs(data || []);
 
-      const ids = (data || []).map(h => h.id);
-      if (ids.length) {
-        const { data: favs } = await supabase
-          .from('favorites')
-          .select('entity_id')
-          .eq('entity_type', 'hub')
-          .in('entity_id', ids);
-
-        const map: Record<string, number> = {};
-        (favs || []).forEach(f => { map[f.entity_id] = (map[f.entity_id] || 0) + 1; });
-        setHubFollowerCounts(map);
+      if (initialLoad) {
+        setHubs(data || []);
+        setHubsPage(1);
+        setFilteredHubs(data || []);
       } else {
-        setHubFollowerCounts({});
+        const newHubs = [...hubs, ...(data || [])];
+        setHubs(newHubs);
+        setFilteredHubs(newHubs);
+        setHubsPage(prev => prev + 1);
       }
+
+      // Check if there are more items to load
+      setHasMoreHubs((data?.length || 0) === ITEMS_PER_PAGE);
+
+      // Load follower counts for the new hubs
+      await loadHubFollowerCounts(data || []);
     } catch (err) {
       console.error('Failed to load hubs:', err);
     } finally {
-      setLoadingHubs(false);
+      setHubsLoading(false);
+      setHubsLoadingMore(false);
+      setHubsRefreshing(false);
     }
   };
 
-  const filterRoutes = () => {
-    let filtered = routes;
+  const loadRouteFollowerCounts = async (routesData: Route[]) => {
+    const routeIds = routesData.map(r => r.id);
+    if (routeIds.length) {
+      const { data: favs } = await supabase
+        .from('favorites')
+        .select('entity_id')
+        .eq('entity_type', 'route')
+        .in('entity_id', routeIds);
 
-    if (routeSearchQuery.trim()) {
-      const query = routeSearchQuery.toLowerCase();
-      filtered = filtered.filter(route =>
-        route.name.toLowerCase().includes(query) ||
-        route.start_point.toLowerCase().includes(query) ||
-        route.end_point.toLowerCase().includes(query)
-      );
+      const map: Record<string, number> = {};
+      (favs || []).forEach(f => { 
+        map[f.entity_id] = (map[f.entity_id] || 0) + 1; 
+      });
+      setRouteFollowerCounts(prev => ({ ...prev, ...map }));
     }
-
-    if (selectedTransportType !== 'All') {
-      filtered = filtered.filter(route =>
-        route.transport_type === selectedTransportType
-      );
-    }
-
-    setFilteredRoutes(filtered);
   };
 
-  const filterHubs = () => {
-    let filtered = hubs;
+  const loadHubFollowerCounts = async (hubsData: Hub[]) => {
+    const hubIds = hubsData.map(h => h.id);
+    if (hubIds.length) {
+      const { data: favs } = await supabase
+        .from('favorites')
+        .select('entity_id')
+        .eq('entity_type', 'hub')
+        .in('entity_id', hubIds);
 
-    if (hubSearchQuery.trim()) {
-      const query = hubSearchQuery.toLowerCase();
-      filtered = filtered.filter(hub =>
-        hub.name.toLowerCase().includes(query) ||
-        (hub.address && hub.address.toLowerCase().includes(query)) ||
-        (hub.transport_type && hub.transport_type.toLowerCase().includes(query))
-      );
+      const map: Record<string, number> = {};
+      (favs || []).forEach(f => { 
+        map[f.entity_id] = (map[f.entity_id] || 0) + 1; 
+      });
+      setHubFollowerCounts(prev => ({ ...prev, ...map }));
+    }
+  };
+
+  const handleRouteSearch = async () => {
+    if (!routeSearchQuery.trim() && selectedTransportType === 'All') {
+      isRouteSearchMode.current = false;
+      setFilteredRoutes(routes);
+      return;
     }
 
-    if (selectedHubType !== 'All') {
-      filtered = filtered.filter(hub =>
-        hub.transport_type === selectedHubType
-      );
+    setIsSearchingRoutes(true);
+    isRouteSearchMode.current = true;
+
+    try {
+      let query = supabase
+        .from('routes')
+        .select('*');
+
+      // Add search conditions
+      if (routeSearchQuery.trim()) {
+        const searchQuery = routeSearchQuery.toLowerCase();
+        query = query.or(`name.ilike.%${searchQuery}%,start_point.ilike.%${searchQuery}%,end_point.ilike.%${searchQuery}%`);
+      }
+
+      // Add transport type filter
+      if (selectedTransportType !== 'All') {
+        query = query.eq('transport_type', selectedTransportType);
+      }
+
+      // Limit results for search
+      query = query.limit(100); // Increase limit for search results
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      setFilteredRoutes(data || []);
+      
+      // Load follower counts for search results
+      if (data && data.length > 0) {
+        await loadRouteFollowerCounts(data);
+      }
+    } catch (err) {
+      console.error('Failed to search routes:', err);
+    } finally {
+      setIsSearchingRoutes(false);
+    }
+  };
+
+  const handleHubSearch = async () => {
+    if (!hubSearchQuery.trim() && selectedHubType === 'All') {
+      isHubSearchMode.current = false;
+      setFilteredHubs(hubs);
+      return;
     }
 
-    setFilteredHubs(filtered);
+    setIsSearchingHubs(true);
+    isHubSearchMode.current = true;
+
+    try {
+      let query = supabase
+        .from('hubs')
+        .select('*');
+
+      // Add search conditions
+      if (hubSearchQuery.trim()) {
+        const searchQuery = hubSearchQuery.toLowerCase();
+        query = query.or(`name.ilike.%${searchQuery}%,address.ilike.%${searchQuery}%,transport_type.ilike.%${searchQuery}%`);
+      }
+
+      // Add hub type filter
+      if (selectedHubType !== 'All') {
+        query = query.eq('transport_type', selectedHubType);
+      }
+
+      // Limit results for search
+      query = query.limit(100); // Increase limit for search results
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      setFilteredHubs(data || []);
+      
+      // Load follower counts for search results
+      if (data && data.length > 0) {
+        await loadHubFollowerCounts(data);
+      }
+    } catch (err) {
+      console.error('Failed to search hubs:', err);
+    } finally {
+      setIsSearchingHubs(false);
+    }
+  };
+
+  const loadMoreRoutes = useCallback(() => {
+    if (!routesLoadingMore && hasMoreRoutes && !isRouteSearchMode.current) {
+      loadRoutes(false);
+    }
+  }, [routesLoadingMore, hasMoreRoutes, isRouteSearchMode.current]);
+
+  const loadMoreHubs = useCallback(() => {
+    if (!hubsLoadingMore && hasMoreHubs && !isHubSearchMode.current) {
+      loadHubs(false);
+    }
+  }, [hubsLoadingMore, hasMoreHubs, isHubSearchMode.current]);
+
+  const handleRefreshRoutes = () => {
+    setRoutesRefreshing(true);
+    setRoutes([]);
+    setRoutesPage(0);
+    setHasMoreRoutes(true);
+    isRouteSearchMode.current = false;
+    setRouteSearchQuery('');
+    setSelectedTransportType('All');
+    loadRoutes(true);
+  };
+
+  const handleRefreshHubs = () => {
+    setHubsRefreshing(true);
+    setHubs([]);
+    setHubsPage(0);
+    setHasMoreHubs(true);
+    isHubSearchMode.current = false;
+    setHubSearchQuery('');
+    setSelectedHubType('All');
+    loadHubs(true);
   };
 
   const findRoute = async () => {
@@ -367,94 +552,184 @@ export default function RoutesScreen() {
     </View>
   );
 
+  // Skeleton loading for refresh - shows multiple skeleton items
+  const RouteSkeletonList = () => (
+    <View style={styles.listContainer}>
+      {Array.from({ length: 8 }).map((_, index) => (
+        <RouteSkeleton key={`route-skeleton-${index}`} />
+      ))}
+    </View>
+  );
+
+  const HubSkeletonList = () => (
+    <View style={styles.listContainer}>
+      {Array.from({ length: 8 }).map((_, index) => (
+        <HubSkeleton key={`hub-skeleton-${index}`} />
+      ))}
+    </View>
+  );
+
+  const RouteItem = ({ route }: { route: Route }) => (
+    <TouchableOpacity
+      style={styles.routeCard}
+      onPress={() => navigateToRoute(route.id)}
+    >
+      <View style={styles.routeHeader}>
+        <View style={styles.routeInfo}>
+          <Text style={styles.routeTitle}>{route.name}</Text>
+          <Text style={[styles.coordinatesText, { marginTop: 4, color: '#1ea2b1' }]}>
+            Followers: {routeFollowerCounts[route.id] || 0}
+          </Text>
+        </View>
+        <View style={styles.routeType}>
+          <Text style={styles.routeTypeText}>{route.transport_type}</Text>
+        </View>
+      </View>
+
+      <View style={styles.routeFooter}>
+        <View style={styles.routeDetail}>
+          <Clock size={16} color="#1ea2b1" />
+          <Text style={styles.routeDetailText}>Est. 45-60 min</Text>
+        </View>
+        <Text style={styles.routeCost}>R {route.cost}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const HubItem = ({ hub }: { hub: Hub }) => (
+    <TouchableOpacity
+      style={styles.hubCard}
+      onPress={() => navigateToHub(hub.id)}
+    >
+      <View style={styles.hubHeader}>
+        <MapPin size={24} color="#1ea2b1" />
+        <View style={styles.hubInfo}>
+          <Text style={styles.hubName}>{hub.name}</Text>
+          {hub.address && (
+            <Text style={styles.hubAddress}>{hub.address}</Text>
+          )}
+          {hub.transport_type && (
+            <Text style={styles.hubType}>{hub.transport_type}</Text>
+          )}
+        </View>
+      </View>
+      <View style={styles.hubCoordinates}>
+        <Text style={[styles.coordinatesText, { marginTop: 4, color: '#1ea2b1' }]}>
+          Followers: {hubFollowerCounts[hub.id] || 0}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const ListFooterComponent = ({ loadingMore, isSearchMode }: { loadingMore: boolean; isSearchMode: boolean }) => {
+    if (isSearchMode) return null; // Don't show load more in search mode
+    
+    if (!loadingMore) return null;
+    
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color="#1ea2b1" />
+        <Text style={styles.footerText}>Loading more...</Text>
+      </View>
+    );
+  };
+
+  const ListEmptyComponent = ({ loading, isSearching, type }: { loading: boolean; isSearching: boolean; type: string }) => {
+    if (loading || isSearching) {
+      return null; // We'll handle skeleton loading in the main render
+    }
+    
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyStateText}>
+          {isSearching ? `No ${type}s match your search` : `No ${type}s found`}
+        </Text>
+      </View>
+    );
+  };
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'planner':
         return (
           <ScrollView style={styles.tabContent} keyboardShouldPersistTaps="handled">
-            {activeTab === 'planner' && (
-              <ScrollView style={styles.tabContent} keyboardShouldPersistTaps="handled">
-                <View style={styles.searchCard}>
-                  {showSearchFields && (
-                    <Animated.View style={{ opacity: searchFieldsOpacity }}>
-                      {/* From/To fields and Find Route button */}
-                      <View style={{
-                        zIndex: 2000
-                      }}>
-                        <Text style={styles.inputLabel}>From</Text>
-                        <LocationAutocomplete
-                          placeholder="Your current location"
-                          value={fromText}
-                          onChangeText={setFromText}
-                          onLocationSelect={setFromLocation}
-                        />
-                      </View>
-
-                      <View style={{ zIndex: 1000 }}>
-                        <Text style={styles.inputLabel}>To</Text>
-                        <LocationAutocomplete
-                          placeholder="Your destination"
-                          value={toText}
-                          onChangeText={setToText}
-                          onLocationSelect={setToLocation}
-                        />
-                        <Text style={{ color: '#666666', fontSize: 12, marginTop: 8 }}>
-                          Note: Searches are limited to South Africa addresses.
-                        </Text>
-                      </View>
-
-                      <TouchableOpacity
-                        style={[styles.searchButton, (!fromLocation || !toLocation) && styles.searchButtonDisabled]}
-                        onPress={findRoute}
-                        disabled={!fromLocation || !toLocation || searchingRoute}
-                      >
-                        <Search size={20} color="#ffffff" style={styles.searchIcon} />
-                        <Text style={styles.searchButtonText}>
-                          {searchingRoute ? 'Finding Route...' : 'Find Route'}
-                        </Text>
-                      </TouchableOpacity>
-                    </Animated.View>
-                  )}
-                  {!showSearchFields && searchingRoute && (
-                    <View style={{ alignItems: 'center', padding: 32 }}>
-                      <ActivityIndicator size="large" color="#1ea2b1" />
-                      <Text style={{ color: '#1ea2b1', marginTop: 16, fontSize: 16 }}>
-                        Finding the best route...
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Route Instructions */}
-                {routeInstructions && (
-                  <View>
-                    <View style={styles.instructionsContainer}>
-                      <RouteInstructions {...routeInstructions} />
-                    </View>
-                    <TouchableOpacity
-                      style={styles.searchButton}
-                      onPress={() => {
-                        setShowSearchFields(true);
-                        searchFieldsOpacity.setValue(1);
-                        setRouteInstructions(null);
-                        setFromLocation(null);
-                        setToLocation(null);
-                        setFromText('');
-                        setToText('');
-                      }}
-                    >
-                      <Text style={styles.searchButtonText}>Plan Another Route</Text>
-                    </TouchableOpacity>
+            <View style={styles.searchCard}>
+              {showSearchFields && (
+                <Animated.View style={{ opacity: searchFieldsOpacity }}>
+                  {/* From/To fields and Find Route button */}
+                  <View style={{ zIndex: 2000 }}>
+                    <Text style={styles.inputLabel}>From</Text>
+                    <LocationAutocomplete
+                      placeholder="Your current location"
+                      value={fromText}
+                      onChangeText={setFromText}
+                      onLocationSelect={setFromLocation}
+                    />
                   </View>
-                )}
-              </ScrollView>
+
+                  <View style={{ zIndex: 1000 }}>
+                    <Text style={styles.inputLabel}>To</Text>
+                    <LocationAutocomplete
+                      placeholder="Your destination"
+                      value={toText}
+                      onChangeText={setToText}
+                      onLocationSelect={setToLocation}
+                    />
+                    <Text style={{ color: '#666666', fontSize: 12, marginTop: 8 }}>
+                      Note: Searches are limited to South Africa addresses.
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.searchButton, (!fromLocation || !toLocation) && styles.searchButtonDisabled]}
+                    onPress={findRoute}
+                    disabled={!fromLocation || !toLocation || searchingRoute}
+                  >
+                    <Search size={20} color="#ffffff" style={styles.searchIcon} />
+                    <Text style={styles.searchButtonText}>
+                      {searchingRoute ? 'Finding Route...' : 'Find Route'}
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              )}
+              {!showSearchFields && searchingRoute && (
+                <View style={{ alignItems: 'center', padding: 32 }}>
+                  <ActivityIndicator size="large" color="#1ea2b1" />
+                  <Text style={{ color: '#1ea2b1', marginTop: 16, fontSize: 16 }}>
+                    Finding the best route...
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Route Instructions */}
+            {routeInstructions && (
+              <View>
+                <View style={styles.instructionsContainer}>
+                  <RouteInstructions {...routeInstructions} />
+                </View>
+                <TouchableOpacity
+                  style={styles.searchButton}
+                  onPress={() => {
+                    setShowSearchFields(true);
+                    searchFieldsOpacity.setValue(1);
+                    setRouteInstructions(null);
+                    setFromLocation(null);
+                    setToLocation(null);
+                    setFromText('');
+                    setToText('');
+                  }}
+                >
+                  <Text style={styles.searchButtonText}>Plan Another Route</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </ScrollView>
         );
 
       case 'routes':
         return (
-          <ScrollView style={styles.tabContent}>
+          <View style={styles.tabContent}>
             {/* Search and Filter */}
             <View style={styles.filterSection}>
               <View style={styles.searchContainer}>
@@ -489,59 +764,31 @@ export default function RoutesScreen() {
               </ScrollView>
             </View>
 
-            {/* Routes List */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                {filteredRoutes.length} Routes Found
-              </Text>
-
-              {loading ? (
-                // Skeleton Loader for Routes
-                Array.from({ length: 5 }).map((_, index) => (
-                  <RouteSkeleton key={index} />
-                ))
-              ) : filteredRoutes.length === 0 ? (
-                <Text style={styles.noDataText}>No routes found</Text>
-              ) : (
-                filteredRoutes.map((route) => (
-                  <TouchableOpacity
-                    key={route.id}
-                    style={styles.routeCard}
-                    onPress={() => navigateToRoute(route.id)}
-                  >
-                    <View style={styles.routeHeader}>
-                      <View style={styles.routeInfo}>
-                        <Text style={styles.routeTitle}>{route.name}</Text>
-                        <Text style={[styles.coordinatesText, { marginTop: 4, color: '#1ea2b1' }]}>
-                          Followers: {routeFollowerCounts[route.id] || 0}
-                        </Text>
-                      </View>
-                      <View style={styles.routeType}>
-                        <Text style={styles.routeTypeText}>{route.transport_type}</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.routeFooter}>
-                      <View style={styles.routeDetail}>
-                        <Clock size={16} color="#1ea2b1" />
-                        <Text style={styles.routeDetailText}>Est. 45-60 min</Text>
-                      </View>
-
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-
-                        <Text style={styles.routeCost}>R {route.cost}</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))
-              )}
-            </View>
-          </ScrollView>
+            {/* Show skeleton loading during refresh */}
+            {(routesRefreshing || routesLoading) && filteredRoutes.length === 0 ? (
+              <RouteSkeletonList />
+            ) : (
+              /* Routes List with Infinite Scroll */
+              <FlatList
+                data={filteredRoutes}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => <RouteItem route={item} />}
+                onEndReached={loadMoreRoutes}
+                onEndReachedThreshold={0.5}
+                onRefresh={handleRefreshRoutes}
+                refreshing={routesRefreshing}
+                ListFooterComponent={<ListFooterComponent loadingMore={routesLoadingMore} isSearchMode={isRouteSearchMode.current} />}
+                ListEmptyComponent={<ListEmptyComponent loading={routesLoading} isSearching={isSearchingRoutes} type="route" />}
+                contentContainerStyle={styles.listContainer}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
+          </View>
         );
 
       case 'hubs':
         return (
-          <ScrollView style={styles.tabContent}>
+          <View style={styles.tabContent}>
             {/* Search and Filter for Hubs */}
             <View style={styles.filterSection}>
               <View style={styles.searchContainer}>
@@ -576,47 +823,26 @@ export default function RoutesScreen() {
               </ScrollView>
             </View>
 
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                Transport Hubs ({filteredHubs.length})
-              </Text>
-
-              {loadingHubs ? (
-                // Skeleton Loader for Hubs
-                Array.from({ length: 5 }).map((_, index) => (
-                  <HubSkeleton key={index} />
-                ))
-              ) : filteredHubs.length === 0 ? (
-                <Text style={styles.noDataText}>No hubs found</Text>
-              ) : (
-                filteredHubs.map((hub) => (
-                  <TouchableOpacity
-                    key={hub.id}
-                    style={styles.hubCard}
-                    onPress={() => navigateToHub(hub.id)}
-                  >
-                    <View style={styles.hubHeader}>
-                      <MapPin size={24} color="#1ea2b1" />
-                      <View style={styles.hubInfo}>
-                        <Text style={styles.hubName}>{hub.name}</Text>
-                        {hub.address && (
-                          <Text style={styles.hubAddress}>{hub.address}</Text>
-                        )}
-                        {hub.transport_type && (
-                          <Text style={styles.hubType}>{hub.transport_type}</Text>
-                        )}
-                      </View>
-                    </View>
-                    <View style={styles.hubCoordinates}>
-                      <Text style={[styles.coordinatesText, { marginTop: 4, color: '#1ea2b1' }]}>
-                        Followers: {hubFollowerCounts[hub.id] || 0}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))
-              )}
-            </View>
-          </ScrollView>
+            {/* Show skeleton loading during refresh */}
+            {(hubsRefreshing || hubsLoading) && filteredHubs.length === 0 ? (
+              <HubSkeletonList />
+            ) : (
+              /* Hubs List with Infinite Scroll */
+              <FlatList
+                data={filteredHubs}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => <HubItem hub={item} />}
+                onEndReached={loadMoreHubs}
+                onEndReachedThreshold={0.5}
+                onRefresh={handleRefreshHubs}
+                refreshing={hubsRefreshing}
+                ListFooterComponent={<ListFooterComponent loadingMore={hubsLoadingMore} isSearchMode={isHubSearchMode.current} />}
+                ListEmptyComponent={<ListEmptyComponent loading={hubsLoading} isSearching={isSearchingHubs} type="hub" />}
+                contentContainerStyle={styles.listContainer}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
+          </View>
         );
 
       default:
@@ -626,6 +852,7 @@ export default function RoutesScreen() {
 
   return (
     <View style={styles.container}>
+      <StatusBar style="light" />
 
       <View style={styles.header}>
         <Text style={styles.title}>Transport</Text>
@@ -721,44 +948,9 @@ const styles = StyleSheet.create({
   tabContent: {
     flex: 1,
   },
-  searchCard: {
-    backgroundColor: '#1a1a1a',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  inputLabel: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  searchButton: {
-    backgroundColor: '#1ea2b1',
-    borderRadius: 12,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 24,
-  },
-  searchButtonDisabled: {
-    backgroundColor: '#333333',
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  instructionsContainer: {
+  listContainer: {
     paddingHorizontal: 20,
-    marginBottom: 24,
+    paddingBottom: 20,
   },
   filterSection: {
     paddingHorizontal: 20,
@@ -802,15 +994,6 @@ const styles = StyleSheet.create({
   filterButtonTextActive: {
     color: '#ffffff',
   },
-  section: {
-    paddingHorizontal: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 16,
-  },
   routeCard: {
     backgroundColor: '#1a1a1a',
     borderRadius: 12,
@@ -833,10 +1016,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
     marginBottom: 4,
-  },
-  routeDestination: {
-    fontSize: 14,
-    color: '#cccccc',
   },
   routeType: {
     backgroundColor: '#1ea2b120',
@@ -915,17 +1094,64 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontFamily: 'monospace',
   },
-  loadingText: {
-    color: '#666666',
-    fontSize: 16,
-    textAlign: 'center',
-    paddingVertical: 20,
+  footerLoader: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
-  noDataText: {
+  footerText: {
+    color: '#1ea2b1',
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  emptyState: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyStateText: {
     color: '#666666',
     fontSize: 16,
     textAlign: 'center',
-    paddingVertical: 20,
+  },
+  searchCard: {
+    backgroundColor: '#1a1a1a',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  inputLabel: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  searchButton: {
+    backgroundColor: '#1ea2b1',
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+  },
+  searchButtonDisabled: {
+    backgroundColor: '#333333',
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  instructionsContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
   },
   // Skeleton Loader Styles
   skeletonCard: {
