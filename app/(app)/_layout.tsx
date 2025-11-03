@@ -394,6 +394,13 @@ export default function AppLayout() {
           title: 'Managing Profile' 
         }} 
       />
+            <Drawer.Screen 
+        name="community-preview" 
+        options={{ 
+          drawerItemStyle: { height: 0 }, 
+          title: 'Community Preview' 
+        }} 
+      />
       <Drawer.Screen 
         name="post/[id]" 
         options={{ 
