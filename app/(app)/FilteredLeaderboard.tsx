@@ -24,6 +24,43 @@ interface LeaderboardUser {
   isCurrentUser?: boolean;
 }
 
+// Skeleton Loading Component
+const SkeletonLoader = () => {
+  return (
+    <View style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Header Skeleton */}
+      <View style={styles.header}>
+        <View style={[styles.backButton, styles.skeleton]} />
+        <View style={styles.headerTitle}>
+          <View style={[styles.skeleton, { width: 120, height: 24 }]} />
+        </View>
+        <View style={[styles.clearButton, styles.skeleton]} />
+      </View>
+
+      {/* Entity Info Skeleton */}
+      <View style={[styles.entityInfo, { justifyContent: 'center' }]}>
+        <View style={[styles.skeleton, { width: 200, height: 16 }]} />
+      </View>
+
+      {/* Current User Section Skeleton */}
+      <View style={styles.currentUserSection}>
+        <View style={[styles.skeleton, { width: 120, height: 20, marginBottom: 16 }]} />
+        <View style={[styles.leaderboardItem, styles.skeleton, { height: 80 }]} />
+      </View>
+
+      {/* Leaderboard Section Skeleton */}
+      <View style={styles.leaderboardSection}>
+        <View style={[styles.skeleton, { width: 100, height: 20, marginBottom: 16 }]} />
+        {[1, 2, 3, 4, 5].map((item) => (
+          <View key={item} style={[styles.leaderboardItem, styles.skeleton, { height: 70, marginBottom: 8 }]} />
+        ))}
+      </View>
+    </View>
+  );
+};
+
 export default function FilteredLeaderboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -131,25 +168,12 @@ export default function FilteredLeaderboardScreen() {
     router.push('/leaderboard');
   };
 
+  const navigateToUserProfile = (userId: string) => {
+    router.push(`/user/${userId}`);
+  };
+
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft size={24} color="#ffffff" />
-          </TouchableOpacity>
-          <View style={styles.headerTitle}>
-            <Trophy size={24} color="#FFD700" />
-            <Text style={styles.headerTitleText}>Loading...</Text>
-          </View>
-          <View style={styles.backButton} />
-        </View>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading leaderboard...</Text>
-        </View>
-      </View>
-    );
+    return <SkeletonLoader />;
   }
 
   return (
@@ -185,13 +209,20 @@ export default function FilteredLeaderboardScreen() {
       <View style={styles.entityInfo}>
         <MapPin size={16} color="#1ea2b1" />
         <Text style={styles.entityName}>{entityName}</Text>
+        <View style={styles.followerCount}>
+          <Users size={12} color="#666" />
+          <Text style={styles.followerCountText}>{followerCount} fans</Text>
+        </View>
       </View>
 
       {/* Current User Card */}
       {currentUserRank && (
         <View style={styles.currentUserSection}>
           <Text style={styles.sectionTitle}>Your Position</Text>
-          <View style={[styles.leaderboardItem, styles.currentUserHighlight]}>
+          <TouchableOpacity 
+            style={[styles.leaderboardItem, styles.currentUserHighlight]}
+            onPress={() => navigateToUserProfile(user?.id || '')}
+          >
             <View style={styles.rankContainer}>
               <View style={[
                 styles.rankBadge,
@@ -234,7 +265,7 @@ export default function FilteredLeaderboardScreen() {
               <Text style={styles.pointsNumber}>{users.find(u => u.isCurrentUser)?.points || 0}</Text>
               <Text style={styles.pointsLabel}>points</Text>
             </View>
-          </View>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -254,12 +285,13 @@ export default function FilteredLeaderboardScreen() {
           </View>
         ) : (
           users.map((user) => (
-            <View 
+            <TouchableOpacity 
               key={user.id} 
               style={[
                 styles.leaderboardItem,
                 user.isCurrentUser && styles.currentUserInList
               ]}
+              onPress={() => navigateToUserProfile(user.id)}
             >
               <View style={styles.rankContainer}>
                 <View style={[
@@ -303,7 +335,7 @@ export default function FilteredLeaderboardScreen() {
                 <Text style={styles.pointsNumber}>{user.points}</Text>
                 <Text style={styles.pointsLabel}>points</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           ))
         )}
       </View>
@@ -517,5 +549,12 @@ const styles = StyleSheet.create({
   },
   bottomSpace: {
     height: 20,
+  },
+  // Skeleton styles
+  skeleton: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
   },
 });
