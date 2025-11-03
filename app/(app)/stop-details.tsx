@@ -696,14 +696,14 @@ export default function StopDetailsScreen() {
           </View>
         </View>
 
-        <View>
+        <View style={styles.section}>
             <TouchableOpacity 
-    style={[styles.actionButton, { backgroundColor: colors.primary }]}
-    onPress={() => router.push(`/FilteredLeaderboard?entityId=${stopId}&entityType=stop&name=${encodeURIComponent(stopDetails.name)}`)}
-  >
-    <Trophy size={20} color="#ffffff" />
-    <Text style={styles.actionButtonText}>Leaderboard</Text>
-  </TouchableOpacity>
+              style={[styles.actionButton, { backgroundColor: colors.primary }]}
+              onPress={() => router.push(`/FilteredLeaderboard?entityId=${stopId}&entityType=stop&name=${encodeURIComponent(stopDetails.name)}`)}
+            >
+              <Trophy size={20} color="#ffffff" />
+              <Text style={styles.actionButtonText}>Leaderboard</Text>
+            </TouchableOpacity>
           </View>
 
 

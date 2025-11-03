@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform, Alert, Image } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { MapPin, Clock, Users, Bookmark, BookmarkCheck, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon } from 'lucide-react-native';
+import { MapPin, Clock, Users, Bookmark, BookmarkCheck, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon, Trophy } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import { useFavorites } from '@/hook/useFavorites';
@@ -390,6 +390,11 @@ export default function HubDetailScreen() {
     router.push(`/route-details?routeId=${routeId}`);
   };
 
+  const navigateToLeaderboard = () => {
+    if (!hub) return;
+    router.push(`/FilteredLeaderboard?entityId=${hub.id}&entityType=hub&name=${encodeURIComponent(hub.name)}`);
+  };
+
   const renderRoutesTab = () => (
     <View style={styles.tabContent}>
       <Text style={styles.sectionTitle}>Routes from this Hub ({routes.length})</Text>
@@ -559,6 +564,17 @@ export default function HubDetailScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Leaderboard Button */}
+      <View style={styles.section}>
+        <TouchableOpacity 
+          style={[styles.leaderboardButton, { backgroundColor: '#1ea2b1' }]}
+          onPress={navigateToLeaderboard}
+        >
+          <Trophy size={20} color="#ffffff" />
+          <Text style={styles.leaderboardButtonText}>Leaderboard</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Tab Selectors - Only show activity tab if there's recent activity */}
       {shouldShowActivityTab && (
         <View style={styles.tabContainer}>
@@ -664,6 +680,21 @@ const styles = StyleSheet.create({
   },
   tabContent: {
     minHeight: 200,
+  },
+  // Leaderboard button styles
+  leaderboardButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  leaderboardButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   // Rest of the styles
   followerContainer: {
