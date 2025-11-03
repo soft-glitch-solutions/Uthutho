@@ -558,22 +558,23 @@ export default function HubDetailScreen() {
           <Text style={styles.actionButtonText}>Directions</Text>
         </TouchableOpacity>
         
-        // In the actionButtons section, replace the View Posts button:
-      <TouchableOpacity 
-        style={styles.actionButton} 
-        onPress={() => router.push({
-          pathname: '/(tabs)/feeds',
-          params: { 
-            previewHub: hub.id,
-            hubName: hub.name,
-            hubType: 'hub',
-            hubData: JSON.stringify(hub) // Pass the full hub data
-          }
-        })}
-      >
-        <MessageSquare size={20} color="#ffffff" />
-        <Text style={styles.actionButtonText}>View Posts</Text>
-      </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={() => {
+            if (isFollowing) {
+              // If it's a favorite, go to feeds
+              router.push('/(tabs)/feeds');
+            } else {
+              // If it's NOT a favorite, go to preview
+              router.push(`/community-preview?communityId=${hub.id}&communityType=hub&communityName=${encodeURIComponent(hub.name)}`);
+            }
+          }}
+        >
+          <MessageSquare size={20} color="#ffffff" />
+          <Text style={styles.actionButtonText}>
+            {isFollowing ? 'View Posts' : 'Preview Posts'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Leaderboard Button */}
