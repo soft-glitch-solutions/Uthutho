@@ -14,6 +14,8 @@ import { ArrowLeft, Bookmark, BookmarkCheck, Users } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import { useFavorites } from '@/hook/useFavorites';
+import PostCard from '@/components/feeds/PostCard';
+import SkeletonLoader from '@/components/feeds/SkeletonLoader';
 
 interface Community {
   id: string;
@@ -68,6 +70,8 @@ export default function CommunityPreviewScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
+  const [sharingPost, setSharingPost] = useState(false);
+  const viewShotRefs = React.useRef<Record<string, any>>({});
 
   useEffect(() => {
     if (communityId && communityType) {
@@ -286,6 +290,8 @@ export default function CommunityPreviewScreen() {
 
   const sharePost = async (post: Post) => {
     try {
+      setSharingPost(true);
+      
       const communityName = community?.name || "Uthutho Community";
       const userName = `${post.profiles.first_name} ${post.profiles.last_name}`;
       const shareUrl = `https://mobile.uthutho.co.za/post/${post.id}`;
@@ -308,90 +314,26 @@ export default function CommunityPreviewScreen() {
       }
     } catch (error) {
       console.error('Error sharing post:', error);
+    } finally {
+      setSharingPost(false);
     }
   };
 
-  const renderPost = ({ item }: { item: Post }) => (
-    <View style={styles.postCard}>
-      <View style={styles.postHeader}>
-        <View style={styles.userInfo}>
-          {item.profiles.avatar_url ? (
-            <Image 
-              source={{ uri: item.profiles.avatar_url }}
-              style={styles.avatar}
-            />
-          ) : (
-            <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <Text style={styles.avatarText}>
-                {item.profiles.first_name[0]}{item.profiles.last_name[0]}
-              </Text>
-            </View>
-          )}
-          <View>
-            <Text style={styles.userName}>
-              {item.profiles.first_name} {item.profiles.last_name}
-            </Text>
-            <Text style={styles.userTitle}>
-              {item.profiles.selected_title || 'Explorer'}
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.postTime}>
-          {new Date(item.created_at).toLocaleDateString()}
-        </Text>
-      </View>
-
-      <Text style={styles.postContent}>{item.content}</Text>
-
-      <View style={styles.postActions}>
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => toggleReaction(item.id, 'like')}
-        >
-          <Text style={styles.actionText}>
-            👍 {item.post_reactions.filter(r => r.reaction_type === 'like').length}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => {
-            Alert.alert(
-              'Join Community',
-              'To comment on posts, please join this community by tapping the follow button.'
-            );
-          }}
-        >
-          <Text style={styles.actionText}>
-            💬 {item.post_comments.length}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => sharePost(item)}
-        >
-          <Text style={styles.actionText}>Share</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  const downloadPost = async (post: Post) => {
+    try {
+      setSharingPost(true);
+      // For now, just share since download requires more setup
+      await sharePost(post);
+    } catch (error) {
+      console.error('Error downloading post:', error);
+      Alert.alert('Error', 'Failed to download post');
+    } finally {
+      setSharingPost(false);
+    }
+  };
 
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft size={24} color="#ffffff" />
-          </TouchableOpacity>
-          <Text style={styles.loadingText}>Loading...</Text>
-          <View style={styles.backButton} />
-        </View>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading community...</Text>
-        </View>
-      </View>
-    );
+    return <SkeletonLoader />;
   }
 
   return (
@@ -443,7 +385,21 @@ export default function CommunityPreviewScreen() {
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
-        renderItem={renderPost}
+        renderItem={({ item }) => (
+          <PostCard
+            post={item}
+            userId={user?.id || ''}
+            toggleReaction={toggleReaction}
+            sharePost={sharePost}
+            downloadPost={downloadPost}
+            sharingPost={sharingPost}
+            router={router}
+            viewShotRef={(ref: any) => {
+              viewShotRefs.current[item.id] = ref;
+            }}
+            disabled={!isFollowing} // Disable interactions if not following
+          />
+        )}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -575,84 +531,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   postsList: {
-    padding: 16,
     paddingBottom: 100,
-  },
-  postCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  postHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  avatarPlaceholder: {
-    backgroundColor: '#1ea2b1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  userName: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  userTitle: {
-    color: '#1ea2b1',
-    fontSize: 12,
-  },
-  postTime: {
-    color: '#666666',
-    fontSize: 12,
-  },
-  postContent: {
-    color: '#ffffff',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  postActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    borderTopWidth: 1,
-    borderTopColor: '#333333',
-    paddingTop: 12,
-  },
-  actionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  actionText: {
-    color: '#cccccc',
-    fontSize: 14,
-    fontWeight: '500',
   },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
+    paddingHorizontal: 16,
   },
   emptyStateText: {
     color: '#666666',

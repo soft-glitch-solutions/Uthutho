@@ -202,7 +202,6 @@ const PostCard: React.FC<PostCardProps> = ({
 
         {disabled && (
           <View style={styles.overlay}>
-            <Text style={styles.overlayText}>Follow community to interact</Text>
           </View>
         )}
       </Pressable>
@@ -330,7 +329,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
