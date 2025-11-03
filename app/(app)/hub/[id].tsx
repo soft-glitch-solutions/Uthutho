@@ -118,11 +118,17 @@ export default function HubDetailScreen() {
       loadHubDetails();
       loadHubRoutes();
       loadHubPosts();
-      checkIfFollowing();
       loadFollowerCount();
       populateFollowerCounts();
     }
   }, [id]);
+
+  // Check favorite status whenever hub data or favorites change
+  useEffect(() => {
+    if (hub && id) {
+      checkIfFollowing();
+    }
+  }, [hub, id, favorites]);
 
   // Set default tab based on available content
   useEffect(() => {
@@ -228,11 +234,13 @@ export default function HubDetailScreen() {
 
   const checkIfFollowing = async () => {
     try {
-      if (!user) return;
+      if (!user || !id) return;
 
-      const isFav = isFavorite(id as string);
-      setIsFollowing(isFav);
+      // Use the isFavorite function from useFavorites hook
+      const isHubFavorite = isFavorite(id as string);
+      setIsFollowing(isHubFavorite);
 
+      // Also check in the database to ensure consistency
       const { data, error } = await supabase
         .from('favorites')
         .select('id')
@@ -246,8 +254,10 @@ export default function HubDetailScreen() {
         return;
       }
 
-      if (!!data !== isFav) {
-        setIsFollowing(!!data);
+      // If there's a discrepancy between local state and database, sync them
+      const isInDatabase = !!data;
+      if (isInDatabase !== isHubFavorite) {
+        setIsFollowing(isInDatabase);
       }
     } catch (error) {
       console.error('Error checking follow status:', error);

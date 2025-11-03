@@ -145,6 +145,7 @@ export default function StopDetailsScreen() {
       loadStopRoutes();
       loadStopPosts();
       loadFollowerCount();
+      checkIfFavorite(); // Add this line to check favorite status on load
       
       const subscription = supabase
         .channel('stop_waiting_changes')
@@ -167,6 +168,29 @@ export default function StopDetailsScreen() {
       };
     }
   }, [stopId]);
+
+  // Add this function to check if the stop is already a favorite
+  const checkIfFavorite = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('favorites')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.favorites) {
+        const isStopFavorite = profile.favorites.some(
+          (fav: any) => fav.id === stopId && fav.type === 'stop'
+        );
+        setIsFavorite(isStopFavorite);
+      }
+    } catch (error) {
+      console.error('Error checking favorite status:', error);
+    }
+  };
 
   const loadStopInfo = async () => {
     try {

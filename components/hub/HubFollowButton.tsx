@@ -18,7 +18,7 @@ const HubFollowButton = ({ hubId, hubName, colors }: HubFollowButtonProps) => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const { user } = useAuth();
-  const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
+  const { addToFavorites, removeFromFavorites, isFavorite, favorites } = useFavorites();
 
   useEffect(() => {
     if (hubId) {
@@ -26,6 +26,13 @@ const HubFollowButton = ({ hubId, hubName, colors }: HubFollowButtonProps) => {
       loadFollowerCount();
     }
   }, [hubId]);
+
+  // Add this useEffect to watch for changes in favorites
+  useEffect(() => {
+    if (hubId) {
+      checkIfFollowing();
+    }
+  }, [favorites, hubId]);
 
   const loadFollowerCount = async () => {
     try {
@@ -45,9 +52,34 @@ const HubFollowButton = ({ hubId, hubName, colors }: HubFollowButtonProps) => {
 
   const checkIfFollowing = async () => {
     try {
-      if (!user) return;
-      const isFav = isFavorite(hubId);
-      setIsFollowing(isFav);
+      if (!user) {
+        setIsFollowing(false);
+        return;
+      }
+      
+      // Use the isFavorite function from useFavorites hook
+      const isHubFavorite = isFavorite(hubId);
+      setIsFollowing(isHubFavorite);
+
+      // Also check in the database to ensure consistency
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('id')
+        .eq('entity_type', 'hub')
+        .eq('entity_id', hubId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking follow status:', error);
+        return;
+      }
+
+      // If there's a discrepancy between local state and database, sync them
+      const isInDatabase = !!data;
+      if (isInDatabase !== isHubFavorite) {
+        setIsFollowing(isInDatabase);
+      }
     } catch (error) {
       console.error('Error checking follow status:', error);
     }
@@ -108,32 +140,32 @@ const HubFollowButton = ({ hubId, hubName, colors }: HubFollowButtonProps) => {
 
   return (
     <View style={styles.container}>
-    <TouchableOpacity
-      style={[
-        styles.button, 
-        isFollowing 
-          ? { backgroundColor: '#1ea2b1' } 
-          : { backgroundColor: '#10b981' }
-      ]}
-      onPress={toggleFollow}
-    >
-      {isFollowing ? (
-        <BookmarkCheck size={18} color="white" />
-      ) : (
-        <Bookmark size={18} color="white" />
-      )}
-      
-      <Text style={styles.buttonText}>
-        {isFollowing ? 'Following' : 'Follow'}
-      </Text>
-      
-      <View style={styles.followerBadge}>
-        <Users size={12} color="white" />
-        <Text style={styles.followerText}>
-          {followerCount}
+      <TouchableOpacity
+        style={[
+          styles.button, 
+          isFollowing 
+            ? { backgroundColor: '#1ea2b1' } 
+            : { backgroundColor: '#10b981' }
+        ]}
+        onPress={toggleFollow}
+      >
+        {isFollowing ? (
+          <BookmarkCheck size={18} color="white" />
+        ) : (
+          <Bookmark size={18} color="white" />
+        )}
+        
+        <Text style={styles.buttonText}>
+          {isFollowing ? 'Following' : 'Follow'}
         </Text>
-      </View>
-    </TouchableOpacity>
+        
+        <View style={styles.followerBadge}>
+          <Users size={12} color="white" />
+          <Text style={styles.followerText}>
+            {followerCount}
+          </Text>
+        </View>
+      </TouchableOpacity>
     </View>
   );
 };
