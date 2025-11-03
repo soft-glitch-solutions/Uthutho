@@ -16,7 +16,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { Route as RouteIcon, MapPin, Clock, DollarSign, Bookmark, BookmarkCheck, ArrowLeft, Users, TrendingUp, Shield } from 'lucide-react-native';
 import { useAuth } from '@/hook/useAuth';
-import { useFavorites } from '@/hook/useFavorites'; // Add this import
+import { useFavorites } from '@/hook/useFavorites';
 
 interface RouteStats {
   avg_journey_time: string;
@@ -113,7 +113,7 @@ export default function RouteDetailsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { user } = useAuth();
-  const { favorites, addToFavorites, removeFromFavorites, isFavorite } = useFavorites(); // Add useFavorites hook
+  const { favorites, addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
   const [route, setRoute] = useState(null);
   const [stops, setStops] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -130,10 +130,16 @@ export default function RouteDetailsScreen() {
     fetchRouteDetails();
     loadRouteStats();
     fetchPriceChangeRequests();
-    checkIfFollowing();
     loadFollowerCount();
     populateFollowerCounts();
   }, [routeId]);
+
+  // Add this useEffect to check favorite status when route data or favorites change
+  useEffect(() => {
+    if (route && routeId) {
+      checkIfFollowing();
+    }
+  }, [route, routeId, favorites]);
 
   const loadRouteStats = async () => {
     try {
@@ -188,11 +194,11 @@ export default function RouteDetailsScreen() {
 
   const checkIfFollowing = async () => {
     try {
-      if (!user) return;
+      if (!user || !routeId) return;
 
       // Use the useFavorites hook to check if it's already in favorites
-      const isFav = isFavorite(routeId as string);
-      setIsFollowing(isFav);
+      const isRouteFavorite = isFavorite(routeId as string);
+      setIsFollowing(isRouteFavorite);
 
       // Also check the database directly as a fallback
       const { data, error } = await supabase
@@ -209,8 +215,9 @@ export default function RouteDetailsScreen() {
       }
 
       // If database check differs from hook, update both
-      if (!!data !== isFav) {
-        setIsFollowing(!!data);
+      const isInDatabase = !!data;
+      if (isInDatabase !== isRouteFavorite) {
+        setIsFollowing(isInDatabase);
       }
     } catch (error) {
       console.error('Error checking follow status:', error);
@@ -618,7 +625,7 @@ export default function RouteDetailsScreen() {
               <Text style={[styles.requestText, { color: colors.text }]}>
                 Status: {request.status}
               </Text>
-              <Pressable onPress={() => router.push(`/social-profile?id=${request.profiles.id}`)}>
+              <Pressable onPress={() => router.push(`/user/${request.profiles.id}`)}>
                 <Text style={[styles.requestText, { color: colors.text }]}>
                   Requested by: {request.profiles.first_name} {request.profiles.last_name}
                 </Text>

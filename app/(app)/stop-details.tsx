@@ -145,7 +145,7 @@ export default function StopDetailsScreen() {
       loadStopRoutes();
       loadStopPosts();
       loadFollowerCount();
-      checkIfFavorite(); // Add this line to check favorite status on load
+      checkIfFavorite();
       
       const subscription = supabase
         .channel('stop_waiting_changes')
@@ -169,7 +169,6 @@ export default function StopDetailsScreen() {
     }
   }, [stopId]);
 
-  // Add this function to check if the stop is already a favorite
   const checkIfFavorite = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -648,10 +647,20 @@ export default function StopDetailsScreen() {
           
           <TouchableOpacity 
             style={[styles.actionButton, { backgroundColor: colors.primary }]}
-            onPress={() => setShowAddPost(!showAddPost)}
+            onPress={() => {
+              if (isFavorite) {
+                // If it's a favorite, go to feeds
+                router.push('/(tabs)/feeds');
+              } else {
+                // If it's NOT a favorite, go to preview
+                router.push(`/community-preview?communityId=${stopDetails.id}&communityType=stop&communityName=${encodeURIComponent(stopDetails.name)}`);
+              }
+            }}
           >
             <MessageSquare size={20} color="#ffffff" />
-            <Text style={styles.actionButtonText}>Post Update</Text>
+            <Text style={styles.actionButtonText}>
+              {isFavorite ? 'View Posts' : 'Preview Posts'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -705,7 +714,6 @@ export default function StopDetailsScreen() {
               <Text style={styles.actionButtonText}>Leaderboard</Text>
             </TouchableOpacity>
           </View>
-
 
         {/* Tab Selectors */}
         <View style={styles.tabContainer}>
