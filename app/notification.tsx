@@ -6,7 +6,7 @@ import {
   ScrollView, 
   TouchableOpacity, 
   RefreshControl,
-  Image 
+  Image
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -55,6 +55,7 @@ export default function NotificationScreen() {
         if (data.senderId) userIds.add(data.senderId);
         if (data.followerId) userIds.add(data.followerId);
         if (data.userId) userIds.add(data.userId);
+        if (data.commenter_id) userIds.add(data.commenter_id);
       });
 
       if (userIds.size === 0) return;
@@ -89,62 +90,105 @@ export default function NotificationScreen() {
   };
 
   const handleNotificationPress = async (notification: any) => {
+    console.log('Notification pressed:', notification);
+    console.log('Notification data:', notification.data);
+    console.log('Notification type:', notification.type);
+
     if (!notification.is_read) {
       await markAsRead(notification.id);
     }
 
-    // Enhanced navigation logic with better context
     const data = notification.data || {};
     const type = notification.type;
 
+    // Try multiple possible post ID fields - now including hub and stop posts
+    const postId = data.postId || data.post_id || data.postID || data.post_hub_id || data.post_stop_id;
+    const commentId = data.comment_id;
+
+    console.log('Extracted postId:', postId);
+    console.log('Extracted commentId:', commentId);
+
     // Post-related notifications - navigate to post details
     if (type === 'post_reaction' || type === 'post_comment' || type === 'comment_reaction' || type === 'mention') {
-      if (data.postId) {
-        // Navigate to the post details page
-        router.push(`/post/${data.postId}`);
+      if (postId) {
+        console.log('Navigating to post:', postId);
+        // Navigate to the post details page with the post ID
+        router.push(`/post/${postId}`);
         return;
+      } else {
+        console.log('No postId found for post notification, checking for hub/stop posts');
+        
+        // If we have a comment ID but no post ID, we might need to fetch the post ID from the comment
+        if (commentId) {
+          console.log('Found comment ID, attempting to fetch post ID from comment');
+          try {
+            // Try to get the post ID from the comment
+            const { data: commentData, error } = await supabase
+              .from('post_comments')
+              .select('post_id, post_type')
+              .eq('id', commentId)
+              .single();
+
+            if (!error && commentData) {
+              console.log('Found post from comment:', commentData);
+              // Navigate to the post with the found post ID
+              router.push(`/post/${commentData.post_id}`);
+              return;
+            }
+          } catch (error) {
+            console.error('Error fetching post from comment:', error);
+          }
+        }
+        
+        console.log('No post navigation possible');
       }
     }
+
     // User profile navigation
-    else if (data.senderId) {
-      router.push(`/user/${data.senderId}`);
+    else if (data.senderId || data.commenter_id) {
+      const userId = data.senderId || data.commenter_id;
+      console.log('Navigating to user profile:', userId);
+      router.push(`/user/${userId}`);
     }
     // Follow notifications
     else if (type === 'new_follower' && data.followerId) {
+      console.log('Navigating to follower profile:', data.followerId);
       router.push(`/user/${data.followerId}`);
     }
     // Journey notifications
     else if (data.journeyId) {
+      console.log('Navigating to journey:', data.journeyId);
       router.push(`/journey/${data.journeyId}`);
     }
     // Hub notifications
     else if (data.hubId) {
+      console.log('Navigating to hub:', data.hubId);
       router.push(`/hub/${data.hubId}`);
     }
     // Stop notifications
     else if (data.stopId) {
+      console.log('Navigating to stop:', data.stopId);
       router.push(`/stop-details?stopId=${data.stopId}`);
     }
     // Route notifications
     else if (data.routeId) {
+      console.log('Navigating to route:', data.routeId);
       router.push(`/route-details?routeId=${data.routeId}`);
     }
     // Achievement notifications
     else if (type === 'achievement_unlocked') {
-      // Navigate to achievements or profile page
+      console.log('Navigating to profile for achievement');
       router.push('/profile');
     }
     // Points earned notifications
     else if (type === 'points_earned') {
-      // Navigate to profile or leaderboard
+      console.log('Navigating to profile for points');
       router.push('/profile');
     }
-    // Default fallback - try to navigate to post if postId exists
-    else if (data.postId) {
-      router.push(`/post/${data.postId}`);
-    } else {
-      console.log('No specific navigation for notification:', notification);
-      // Fallback to home or stay on notifications
+    // Default fallback
+    else {
+      console.log('No specific navigation for notification');
+      // Fallback to home
       router.push('/(tabs)');
     }
   };
@@ -194,7 +238,7 @@ export default function NotificationScreen() {
     const data = notification.data || {};
     
     // Try different possible sender ID fields
-    const senderId = data.senderId || data.followerId || data.userId;
+    const senderId = data.senderId || data.followerId || data.userId || data.commenter_id;
     
     if (senderId && userProfiles[senderId]) {
       return userProfiles[senderId];
@@ -256,6 +300,12 @@ export default function NotificationScreen() {
   const isPostNotification = (notification: any) => {
     const type = notification.type;
     return type === 'post_reaction' || type === 'post_comment' || type === 'comment_reaction' || type === 'mention';
+  };
+
+  // Get the actual post ID for display in debug
+  const getPostIdForDebug = (notification: any) => {
+    const data = notification.data || {};
+    return data.postId || data.post_id || data.postID || data.post_hub_id || data.post_stop_id || 'none';
   };
 
   // Group notifications by date
@@ -381,6 +431,9 @@ export default function NotificationScreen() {
                     <Text style={styles.notificationTime}>
                       {formatTimeAgo(notification.created_at)}
                     </Text>
+                    
+
+                    )}
                   </View>
 
                   {!notification.is_read && (
@@ -562,6 +615,12 @@ const styles = StyleSheet.create({
   notificationTime: {
     fontSize: 12,
     color: '#666666',
+  },
+  debugText: {
+    fontSize: 10,
+    color: '#666666',
+    marginTop: 4,
+    fontFamily: 'monospace',
   },
   unreadDot: {
     width: 8,
