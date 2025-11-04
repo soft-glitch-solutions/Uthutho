@@ -14,7 +14,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import { Route as RouteIcon, MapPin, Clock, DollarSign, Bookmark, BookmarkCheck, ArrowLeft, Users, TrendingUp, Shield } from 'lucide-react-native';
+import { Route as RouteIcon, MapPin, Clock, DollarSign, Bookmark, BookmarkCheck, ArrowLeft, Users, TrendingUp, Shield, Trophy } from 'lucide-react-native';
 import { useAuth } from '@/hook/useAuth';
 import { useFavorites } from '@/hook/useFavorites';
 
@@ -312,15 +312,28 @@ export default function RouteDetailsScreen() {
       if (routeError) throw routeError;
       setRoute(routeData);
 
-      const { data: stopsData, error: stopsError } = await supabase
-        .from('stops')
-        .select('*')
-        .eq('route_id', routeId);
+      // Get stops through route_stops table instead of directly from stops
+      const { data: routeStopsData, error: routeStopsError } = await supabase
+        .from('route_stops')
+        .select(`
+          order_number,
+          stops (
+            id,
+            name,
+            latitude,
+            longitude,
+            route_id
+          )
+        `)
+        .eq('route_id', routeId)
+        .order('order_number', { ascending: true });
 
-      if (stopsError) throw stopsError;
+      if (routeStopsError) throw routeStopsError;
 
+      // Process stops with waiting counts
       const stopsWithWaitingCount = await Promise.all(
-        stopsData.map(async (stop) => {
+        (routeStopsData || []).map(async (routeStop) => {
+          const stop = routeStop.stops;
           const { data: waitingData, error: waitingError } = await supabase
             .from('stop_waiting')
             .select('id')
@@ -328,7 +341,11 @@ export default function RouteDetailsScreen() {
             .gt('expires_at', new Date().toISOString());
 
           if (waitingError) throw waitingError;
-          return { ...stop, waitingCount: waitingData.length };
+          return { 
+            ...stop, 
+            waitingCount: waitingData.length,
+            order_number: routeStop.order_number 
+          };
         })
       );
 
@@ -409,6 +426,11 @@ export default function RouteDetailsScreen() {
     setModalVisible(true);
   };
 
+  const navigateToLeaderboard = () => {
+    if (!route) return;
+    router.push(`/FilteredLeaderboard?entityId=${route.id}&entityType=route&name=${encodeURIComponent(route.name)}`);
+  };
+
   if (loading) {
     return <RouteDetailsSkeleton colors={colors} />;
   }
@@ -476,6 +498,17 @@ export default function RouteDetailsScreen() {
             <Text style={styles.infoValue}>{stops.length}</Text>
           </View>
         </View>
+
+        {/* Leaderboard Button */}
+        <View style={styles.section}>
+          <TouchableOpacity 
+            style={[styles.leaderboardButton, { backgroundColor: '#1ea2b1' }]}
+            onPress={navigateToLeaderboard}
+          >
+            <Trophy size={20} color="#ffffff" />
+            <Text style={styles.leaderboardButtonText}>Leaderboard</Text>
+          </TouchableOpacity>
+        </View>
         
         {/* Route Statistics */}
         <View style={styles.section}>
@@ -540,7 +573,12 @@ export default function RouteDetailsScreen() {
               key={stop.id}
               style={[styles.stopItem, { backgroundColor: colors.card }]}
               onPress={() => router.push(`/stop-details?stopId=${stop.id}`)}>
-              <Text style={[styles.stopName, { color: colors.text }]}>{stop.name}</Text>
+              <View style={styles.stopHeader}>
+                <Text style={[styles.stopName, { color: colors.text }]}>{stop.name}</Text>
+                <Text style={[styles.stopOrder, { color: '#1ea2b1' }]}>
+                  Stop #{stop.order_number}
+                </Text>
+              </View>
               <Text style={[styles.stopDetails, { color: colors.text }]}>
                 People Waiting: {stop.waitingCount}
               </Text>
@@ -775,9 +813,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
   },
+  stopHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   stopName: {
     fontSize: 16,
     fontWeight: 'bold',
+    flex: 1,
+  },
+  stopOrder: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   stopDetails: {
     fontSize: 14,
@@ -869,6 +918,21 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#ffffff',
     fontWeight: '600',
+  },
+  // Leaderboard button styles
+  leaderboardButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  leaderboardButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 
   // Skeleton Styles
