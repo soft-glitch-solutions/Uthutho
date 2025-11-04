@@ -9,7 +9,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Crown, Trophy, Medal, Star, MapPin, Users, X } from 'lucide-react-native';
+import { ArrowLeft, Crown, Trophy, Medal, Star, MapPin, Users, X, Flame, Car, Heart } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 
@@ -22,6 +22,10 @@ interface LeaderboardUser {
   selected_title: string | null;
   rank: number;
   isCurrentUser?: boolean;
+  reaction_count?: number;
+  favorite_count?: number;
+  driver_rating?: number;
+  total_trips?: number;
 }
 
 // Skeleton Loading Component
@@ -42,6 +46,13 @@ const SkeletonLoader = () => {
       {/* Entity Info Skeleton */}
       <View style={[styles.entityInfo, { justifyContent: 'center' }]}>
         <View style={[styles.skeleton, { width: 200, height: 16 }]} />
+      </View>
+
+      {/* Tab Skeleton */}
+      <View style={styles.tabContainer}>
+        {[1, 2, 3, 4].map((item) => (
+          <View key={item} style={[styles.tab, styles.skeleton, { height: 40 }]} />
+        ))}
       </View>
 
       {/* Current User Section Skeleton */}
@@ -69,7 +80,12 @@ export default function FilteredLeaderboardScreen() {
   const entityType = params.entityType as 'hub' | 'stop';
   const entityName = params.name as string;
 
+  const [activeTab, setActiveTab] = useState<'popular' | 'points' | 'drivers' | 'movers'>('points');
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
+  const [popularUsers, setPopularUsers] = useState<LeaderboardUser[]>([]);
+  const [pointsUsers, setPointsUsers] = useState<LeaderboardUser[]>([]);
+  const [driverUsers, setDriverUsers] = useState<LeaderboardUser[]>([]);
+  const [moverUsers, setMoverUsers] = useState<LeaderboardUser[]>([]);
   const [currentUserRank, setCurrentUserRank] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -107,42 +123,175 @@ export default function FilteredLeaderboardScreen() {
 
       if (fanIds.length === 0) {
         setUsers([]);
+        setPointsUsers([]);
+        setPopularUsers([]);
+        setDriverUsers([]);
+        setMoverUsers([]);
         setCurrentUserRank(null);
         return;
       }
 
-      // Get the complete profiles of these fans with their points, ordered by points
+      // Get the complete profiles of these fans
       const { data: fanProfiles, error: fansError } = await supabase
         .from('profiles')
         .select('*')
-        .in('id', fanIds)
-        .not('points', 'is', null)
-        .order('points', { ascending: false });
+        .in('id', fanIds);
 
       if (fansError) {
         console.error('Error loading fan profiles:', fansError);
         return;
       }
 
-      const rankedUsers: LeaderboardUser[] = (fanProfiles || []).map((profile, index) => ({
-        ...profile,
-        rank: index + 1,
-        points: profile.points || 0,
-        isCurrentUser: profile.id === user?.id,
-      }));
+      // Load additional data for different leaderboard types
+      const { data: hubReactions, error: hubReactionsError } = await supabase
+        .from('hub_posts')
+        .select('user_id, post_reactions(count)')
+        .in('user_id', fanIds);
 
-      setUsers(rankedUsers);
+      const { data: stopReactions, error: stopReactionsError } = await supabase
+        .from('stop_posts')
+        .select('user_id, post_reactions(count)')
+        .in('user_id', fanIds);
 
-      // Find current user's rank
-      if (user) {
-        const currentUserIndex = rankedUsers.findIndex(u => u.id === user.id);
-        setCurrentUserRank(currentUserIndex >= 0 ? currentUserIndex + 1 : null);
-      }
+      // Load drivers data
+      const { data: driversData, error: driversError } = await supabase
+        .from('drivers')
+        .select('user_id, rating, total_trips')
+        .eq('is_verified', true)
+        .eq('is_active', true)
+        .in('user_id', fanIds);
+
+      // Process reaction counts
+      const reactionCounts: { [key: string]: number } = {};
+      
+      hubReactions?.forEach(post => {
+        const userId = post.user_id;
+        const count = (post as any).post_reactions?.[0]?.count || 0;
+        reactionCounts[userId] = (reactionCounts[userId] || 0) + count;
+      });
+
+      stopReactions?.forEach(post => {
+        const userId = post.user_id;
+        const count = (post as any).post_reactions?.[0]?.count || 0;
+        reactionCounts[userId] = (reactionCounts[userId] || 0) + count;
+      });
+
+      // Process drivers data
+      const driverRatings: { [key: string]: { rating: number; total_trips: number } } = {};
+      driversData?.forEach(driver => {
+        driverRatings[driver.user_id] = {
+          rating: driver.rating || 0,
+          total_trips: driver.total_trips || 0
+        };
+      });
+
+      // Process points users
+      const processedPointsUsers: LeaderboardUser[] = (fanProfiles || [])
+        .filter(profile => (profile.points || 0) > 0)
+        .sort((a, b) => (b.points || 0) - (a.points || 0))
+        .map((profile, index) => ({
+          ...profile,
+          rank: index + 1,
+          points: profile.points || 0,
+          isCurrentUser: profile.id === user?.id,
+        }));
+
+      // Process popular users (reaction-based)
+      const processedPopularUsers: LeaderboardUser[] = (fanProfiles || [])
+        .map(profile => ({
+          ...profile,
+          reaction_count: reactionCounts[profile.id] || 0,
+          points: profile.points || 0,
+        }))
+        .sort((a, b) => (b.reaction_count || 0) - (a.reaction_count || 0))
+        .map((profile, index) => ({
+          ...profile,
+          rank: index + 1,
+          isCurrentUser: profile.id === user?.id,
+        }));
+
+      // Process driver users
+      const processedDriverUsers: LeaderboardUser[] = (fanProfiles || [])
+        .filter(profile => driverRatings[profile.id])
+        .map(profile => ({
+          ...profile,
+          driver_rating: driverRatings[profile.id]?.rating || 0,
+          total_trips: driverRatings[profile.id]?.total_trips || 0,
+          points: profile.points || 0,
+        }))
+        .sort((a, b) => (b.driver_rating || 0) - (a.driver_rating || 0))
+        .map((profile, index) => ({
+          ...profile,
+          rank: index + 1,
+          isCurrentUser: profile.id === user?.id,
+        }));
+
+      // Process mover users (using favorites_count from profiles)
+      const processedMoverUsers: LeaderboardUser[] = (fanProfiles || [])
+        .map(profile => ({
+          ...profile,
+          favorite_count: profile.favorites_count || 0,
+          points: profile.points || 0,
+        }))
+        .sort((a, b) => (b.favorite_count || 0) - (a.favorite_count || 0))
+        .map((profile, index) => ({
+          ...profile,
+          rank: index + 1,
+          isCurrentUser: profile.id === user?.id,
+        }));
+
+      setPointsUsers(processedPointsUsers);
+      setPopularUsers(processedPopularUsers);
+      setDriverUsers(processedDriverUsers);
+      setMoverUsers(processedMoverUsers);
+
+      // Set initial active tab data
+      handleTabChange(activeTab, {
+        popular: processedPopularUsers,
+        points: processedPointsUsers,
+        drivers: processedDriverUsers,
+        movers: processedMoverUsers
+      });
+
     } catch (error) {
       console.error('Error loading filtered leaderboard:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const handleTabChange = (
+    tab: 'popular' | 'points' | 'drivers' | 'movers', 
+    usersData?: any
+  ) => {
+    setActiveTab(tab);
+    const data = usersData || {
+      popular: popularUsers,
+      points: pointsUsers,
+      drivers: driverUsers,
+      movers: moverUsers
+    };
+    
+    switch (tab) {
+      case 'popular':
+        setUsers(data.popular);
+        break;
+      case 'points':
+        setUsers(data.points);
+        break;
+      case 'drivers':
+        setUsers(data.drivers);
+        break;
+      case 'movers':
+        setUsers(data.movers);
+        break;
+    }
+
+    // Update current user rank
+    if (user) {
+      const currentUserIndex = data[tab].findIndex((u: LeaderboardUser) => u.id === user.id);
+      setCurrentUserRank(currentUserIndex >= 0 ? currentUserIndex + 1 : null);
     }
   };
 
@@ -164,6 +313,64 @@ export default function FilteredLeaderboardScreen() {
     }
   };
 
+  const getTabConfig = () => {
+    const config = {
+      popular: { 
+        icon: <Flame size={20} color="#FF6B35" />, 
+        title: 'Most Popular', 
+        metric: 'reactions',
+        color: '#FF6B35'
+      },
+      points: { 
+        icon: <Trophy size={20} color="#FFD700" />, 
+        title: 'Top Points', 
+        metric: 'points',
+        color: '#FFD700'
+      },
+      drivers: { 
+        icon: <Car size={20} color="#1EA2B1" />, 
+        title: 'Best Drivers', 
+        metric: 'rating',
+        color: '#1EA2B1'
+      },
+      movers: { 
+        icon: <Heart size={20} color="#10B981" />, 
+        title: 'Big Movers', 
+        metric: 'favorites',
+        color: '#10B981'
+      },
+    };
+    return config[activeTab];
+  };
+
+  const getDisplayMetric = (user: LeaderboardUser) => {
+    switch (activeTab) {
+      case 'popular':
+        return user.reaction_count || 0;
+      case 'points':
+        return user.points || 0;
+      case 'drivers':
+        return user.driver_rating ? Number(user.driver_rating).toFixed(1) : '0.0';
+      case 'movers':
+        return user.favorite_count || 0;
+      default:
+        return user.points || 0;
+    }
+  };
+
+  const getDisplayUsers = () => {
+    if (!users.length) return [];
+    
+    const currentUser = users.find(u => u.isCurrentUser);
+    const topUsers = users.slice(0, 10);
+    
+    if (currentUser && !topUsers.find(u => u.isCurrentUser)) {
+      return [...topUsers, currentUser];
+    }
+    
+    return topUsers;
+  };
+
   const clearFilter = () => {
     router.push('/leaderboard');
   };
@@ -175,6 +382,10 @@ export default function FilteredLeaderboardScreen() {
   if (loading) {
     return <SkeletonLoader />;
   }
+
+  const displayUsers = getDisplayUsers();
+  const currentUser = users.find(u => u.isCurrentUser);
+  const tabConfig = getTabConfig();
 
   return (
     <ScrollView 
@@ -198,6 +409,7 @@ export default function FilteredLeaderboardScreen() {
         <View style={styles.headerTitle}>
           <View style={styles.headerTextContainer}>
             <Text style={styles.headerTitleText}>Leaderboard</Text>
+            <Text style={styles.headerSubtitle}>{entityName}</Text>
           </View>
         </View>
         <TouchableOpacity style={styles.clearButton} onPress={clearFilter}>
@@ -215,67 +427,120 @@ export default function FilteredLeaderboardScreen() {
         </View>
       </View>
 
+      {/* Tabs */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabScrollContainer}
+        contentContainerStyle={styles.tabContentContainer}
+      >
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'popular' && styles.activeTab]}
+          onPress={() => handleTabChange('popular')}
+        >
+          <Flame size={16} color={activeTab === 'popular' ? '#FF6B35' : '#666'} />
+          <Text style={[styles.tabText, activeTab === 'popular' && styles.activeTabText]}>
+            Popular
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'points' && styles.activeTab]}
+          onPress={() => handleTabChange('points')}
+        >
+          <Trophy size={16} color={activeTab === 'points' ? '#FFD700' : '#666'} />
+          <Text style={[styles.tabText, activeTab === 'points' && styles.activeTabText]}>
+            Points
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'drivers' && styles.activeTab]}
+          onPress={() => handleTabChange('drivers')}
+        >
+          <Car size={16} color={activeTab === 'drivers' ? '#1EA2B1' : '#666'} />
+          <Text style={[styles.tabText, activeTab === 'drivers' && styles.activeTabText]}>
+            Drivers
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'movers' && styles.activeTab]}
+          onPress={() => handleTabChange('movers')}
+        >
+          <Heart size={16} color={activeTab === 'movers' ? '#10B981' : '#666'} />
+          <Text style={[styles.tabText, activeTab === 'movers' && styles.activeTabText]}>
+            Movers
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+
       {/* Current User Card */}
-      {currentUserRank && (
+      {currentUser && (
         <View style={styles.currentUserSection}>
           <Text style={styles.sectionTitle}>Your Position</Text>
           <TouchableOpacity 
-            style={[styles.leaderboardItem, styles.currentUserHighlight]}
+            style={[
+              styles.leaderboardItem, 
+              styles.currentUserHighlight,
+              { borderColor: tabConfig.color }
+            ]}
             onPress={() => navigateToUserProfile(user?.id || '')}
           >
             <View style={styles.rankContainer}>
               <View style={[
                 styles.rankBadge,
-                { backgroundColor: getRankBadge(currentUserRank).color + '20' }
+                { backgroundColor: getRankBadge(currentUser.rank).color + '20' }
               ]}>
-                {getRankBadge(currentUserRank).icon}
+                {getRankBadge(currentUser.rank).icon}
                 <Text style={[
                   styles.rankText,
-                  { color: getRankBadge(currentUserRank).color }
+                  { color: getRankBadge(currentUser.rank).color }
                 ]}>
-                  {getRankBadge(currentUserRank).label}
+                  {getRankBadge(currentUser.rank).label}
                 </Text>
               </View>
             </View>
 
             <View style={styles.userInfo}>
-              {users.find(u => u.isCurrentUser)?.avatar_url ? (
+              {currentUser.avatar_url ? (
                 <Image 
-                  source={{ uri: users.find(u => u.isCurrentUser)?.avatar_url || '' }}
+                  source={{ uri: currentUser.avatar_url }}
                   style={styles.userAvatar}
                 />
               ) : (
                 <View style={[styles.userAvatar, styles.avatarPlaceholder]}>
                   <Text style={styles.avatarText}>
-                    {users.find(u => u.isCurrentUser)?.first_name?.[0]}{users.find(u => u.isCurrentUser)?.last_name?.[0]}
+                    {currentUser.first_name?.[0]}{currentUser.last_name?.[0]}
                   </Text>
                 </View>
               )}
               <View style={styles.userDetails}>
                 <Text style={styles.userName}>
-                  {users.find(u => u.isCurrentUser)?.first_name} {users.find(u => u.isCurrentUser)?.last_name}
+                  {currentUser.first_name} {currentUser.last_name}
                 </Text>
                 <Text style={styles.userTitle}>
-                  {users.find(u => u.isCurrentUser)?.selected_title || 'Newbie Explorer'}
+                  {currentUser.selected_title || 'Newbie Explorer'}
                 </Text>
               </View>
             </View>
 
             <View style={styles.pointsContainer}>
-              <Text style={styles.pointsNumber}>{users.find(u => u.isCurrentUser)?.points || 0}</Text>
-              <Text style={styles.pointsLabel}>points</Text>
+              <Text style={styles.pointsNumber}>{getDisplayMetric(currentUser)}</Text>
+              <Text style={styles.pointsLabel}>{tabConfig.metric}</Text>
             </View>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Top Fans Leaderboard */}
+      {/* Leaderboard Section */}
       <View style={styles.leaderboardSection}>
-        <Text style={styles.sectionTitle}>
-          {users.length > 0 ? 'Top Fans' : 'No Fans Yet'}
-        </Text>
+        <View style={styles.sectionHeader}>
+          {tabConfig.icon}
+          <Text style={styles.sectionTitle}>{tabConfig.title}</Text>
+        </View>
         
-        {users.length === 0 ? (
+        {displayUsers.length === 0 ? (
           <View style={styles.emptyState}>
             <Users size={48} color="#666" />
             <Text style={styles.emptyStateText}>No fans yet</Text>
@@ -284,7 +549,7 @@ export default function FilteredLeaderboardScreen() {
             </Text>
           </View>
         ) : (
-          users.map((user) => (
+          displayUsers.map((user) => (
             <TouchableOpacity 
               key={user.id} 
               style={[
@@ -327,13 +592,14 @@ export default function FilteredLeaderboardScreen() {
                   </Text>
                   <Text style={styles.userTitle}>
                     {user.selected_title || 'Newbie Explorer'}
+                    {activeTab === 'drivers' && user.total_trips && ` • ${user.total_trips} trips`}
                   </Text>
                 </View>
               </View>
 
               <View style={styles.pointsContainer}>
-                <Text style={styles.pointsNumber}>{user.points}</Text>
-                <Text style={styles.pointsLabel}>points</Text>
+                <Text style={styles.pointsNumber}>{getDisplayMetric(user)}</Text>
+                <Text style={styles.pointsLabel}>{tabConfig.metric}</Text>
               </View>
             </TouchableOpacity>
           ))
@@ -349,6 +615,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  skeleton: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
   },
   header: {
     flexDirection: 'row',
@@ -421,15 +691,43 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 12,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 100,
+  tabScrollContainer: {
+    marginBottom: 20,
   },
-  loadingText: {
+  tabContentContainer: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    gap: 8,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a1a1a',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#333333',
+    minWidth: 100,
+  },
+  activeTab: {
+    backgroundColor: '#1ea2b120',
+    borderColor: '#1ea2b1',
+  },
+  tabText: {
     color: '#666',
-    fontSize: 16,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  activeTabText: {
+    color: '#ffffff',
   },
   currentUserSection: {
     paddingHorizontal: 20,
@@ -437,7 +735,6 @@ const styles = StyleSheet.create({
   },
   currentUserHighlight: {
     backgroundColor: '#1ea2b120',
-    borderColor: '#1ea2b1',
     borderWidth: 2,
   },
   currentUserInList: {
@@ -445,11 +742,16 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#1ea2b1',
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
   sectionTitle: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 16,
   },
   leaderboardSection: {
     paddingHorizontal: 20,
@@ -549,12 +851,5 @@ const styles = StyleSheet.create({
   },
   bottomSpace: {
     height: 20,
-  },
-  // Skeleton styles
-  skeleton: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 8,
-    overflow: 'hidden',
-    position: 'relative',
   },
 });
