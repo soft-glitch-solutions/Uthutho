@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Dimensions, Linking } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import { Users, MessageCircle } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 const HORIZONTAL_PADDING = 24;
@@ -58,6 +59,13 @@ export default function JourneyCompleteScreen() {
     });
   };
 
+  const handleJoinWhatsAppChannel = () => {
+    const whatsappUrl = 'https://whatsapp.com/channel/0029VbBvCFSFMqrRi2c83q0Z';
+    Linking.openURL(whatsappUrl).catch(err => 
+      console.error('Error opening WhatsApp:', err)
+    );
+  };
+
   return (
     <View style={styles.container}>
       <ViewShot
@@ -90,6 +98,30 @@ export default function JourneyCompleteScreen() {
             <Text style={styles.infoValue}>{tripsCount}</Text>
           </View>
         )}
+
+        {/* WhatsApp Channel Section */}
+        <View style={styles.whatsappSection}>
+          <View style={styles.whatsappHeader}>
+            <MessageCircle size={24} color="#25D366" />
+            <Text style={styles.whatsappTitle}>Join Our Community</Text>
+          </View>
+          
+          <Text style={styles.whatsappDescription}>
+            Get real-time updates, transport alerts, and connect with other commuters on our official WhatsApp channel
+          </Text>
+
+          <Pressable 
+            style={styles.whatsappButton}
+            onPress={handleJoinWhatsAppChannel}
+          >
+            <Users size={20} color="#ffffff" />
+            <Text style={styles.whatsappButtonText}>Join WhatsApp Channel</Text>
+          </Pressable>
+
+          <Text style={styles.whatsappNote}>
+            Stay informed about route changes and community events
+          </Text>
+        </View>
       </ViewShot>
 
       <View style={styles.actionsRow}>
@@ -164,6 +196,56 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     marginTop: 4,
+  },
+  // WhatsApp Section Styles
+  whatsappSection: {
+    marginTop: 24,
+    padding: 16,
+    backgroundColor: '#0a0a0a',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#25D36620',
+    alignItems: 'center',
+    width: '100%',
+  },
+  whatsappHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  whatsappTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginLeft: 8,
+  },
+  whatsappDescription: {
+    fontSize: 14,
+    color: '#cccccc',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  whatsappButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#25D366',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  whatsappButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  whatsappNote: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   actionsRow: {
     flexDirection: 'row',

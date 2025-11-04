@@ -33,6 +33,8 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
   const [isClose, setIsClose] = useState(false);
   const [userLocation, setUserLocation] = useState<Location.LocationObjectCoords | null>(null);
   const [showDrawer, setShowDrawer] = useState(false);
+  const [hasActiveJourney, setHasActiveJourney] = useState(false);
+  const [isCheckingJourney, setIsCheckingJourney] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -46,6 +48,53 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
       setUserLocation(location.coords);
     })();
   }, []);
+
+  // Check for active journey participation
+  useEffect(() => {
+    checkActiveJourneyParticipation();
+  }, []);
+
+  const checkActiveJourneyParticipation = async () => {
+    try {
+      setIsCheckingJourney(true);
+      const session = await supabase.auth.getSession();
+      const userId = session.data.session?.user.id;
+      
+      if (!userId) {
+        setHasActiveJourney(false);
+        return;
+      }
+
+      // Check if user is an active participant in any in-progress journey
+      const { data, error } = await supabase
+        .from('journey_participants')
+        .select(`
+          id,
+          journeys!inner(
+            id,
+            status,
+            last_ping_time
+          )
+        `)
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .eq('journeys.status', 'in_progress')
+        .gte('journeys.last_ping_time', new Date(Date.now() - 30 * 60 * 1000).toISOString()) // Last 30 minutes
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking active journey participation:', error);
+        setHasActiveJourney(false);
+      } else {
+        setHasActiveJourney(!!data);
+      }
+    } catch (error) {
+      console.error('Error checking journey participation:', error);
+      setHasActiveJourney(false);
+    } finally {
+      setIsCheckingJourney(false);
+    }
+  };
 
   useEffect(() => {
     if (userLocation && stopLocation) {
@@ -74,10 +123,29 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
   };
 
   const handleMarkAsWaiting = () => {
+    // Don't allow marking as waiting if user is participating in an active journey
+    if (hasActiveJourney) {
+      Alert.alert(
+        "Active Journey",
+        "You are currently participating in an active journey. Complete your current journey before starting a new one.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
     setShowDrawer(true);
   };
 
   const handleWaitingSet = async (routeId: string, transportType: string) => {
+    // Double check before setting waiting status
+    if (hasActiveJourney) {
+      Alert.alert(
+        "Active Journey",
+        "You are currently participating in an active journey. Complete your current journey before starting a new one.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
     const userId = (await supabase.auth.getSession()).data.session?.user.id;
     if (!userId) return;
 
@@ -172,6 +240,17 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
 
   const isWaiting = waitingStatus?.stopId === stopId;
 
+  // Show loading state while checking for active journey
+  if (isCheckingJourney) {
+    return (
+      <View style={styles.container}>
+        <Text style={[styles.countdownText, { color: colors.text }]}>
+          Checking journey status...
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {isWaiting && (
@@ -190,21 +269,26 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
         </TouchableOpacity>
       ) : (
         <>
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: '#10b981' }]}
-            onPress={handleMarkAsWaiting}
-          >
-            <Hand size={20} color="white" />
-            <Text style={styles.buttonText}>Waiting</Text>
-          </TouchableOpacity>
-          
-          <WaitingDrawer
-            visible={showDrawer}
-            onClose={() => setShowDrawer(false)}
-            stopId={stopId}
-            stopName={stopName}
-            onWaitingSet={handleWaitingSet}
-          />
+          {/* Only show waiting button if user is not participating in an active journey */}
+          {!hasActiveJourney && (
+            <>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: '#10b981' }]}
+                onPress={handleMarkAsWaiting}
+              >
+                <Hand size={20} color="white" />
+                <Text style={styles.buttonText}>Waiting</Text>
+              </TouchableOpacity>
+              
+              <WaitingDrawer
+                visible={showDrawer}
+                onClose={() => setShowDrawer(false)}
+                stopId={stopId}
+                stopName={stopName}
+                onWaitingSet={handleWaitingSet}
+              />
+            </>
+          )}
         </>
       )}
     </View>
