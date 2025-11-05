@@ -24,7 +24,7 @@ export default function SettingsScreen() {
       privacy: 'Privacy',
       privacyPolicy: 'Privacy Policy',
       about: 'About',
-      appVersion: 'App Version 1.0.1',
+      appVersion: 'App Version 1.5.1',
       notifications: 'Notifications',
     },
     es: {
@@ -38,7 +38,7 @@ export default function SettingsScreen() {
       privacy: 'Privacidad',
       privacyPolicy: 'Política de Privacidad',
       about: 'Acerca de',
-      appVersion: 'Versión de la App 1.0.1',
+      appVersion: 'Versión de la App 1.5.1',
       notifications: 'Notificaciones',
     },
     // Add more languages as needed

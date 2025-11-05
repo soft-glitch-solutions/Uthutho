@@ -171,7 +171,7 @@ export default function AppLayout() {
         {/* Drawer Footer */}
         <View style={styles.drawerFooter}>
           <Text style={[styles.footerText, { color: `${colors.text}40` }]}>
-            Version 1.0.1
+            Version 1.5.1
           </Text>
         </View>
       </View>
