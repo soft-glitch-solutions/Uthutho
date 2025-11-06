@@ -1,5 +1,5 @@
 // components/feeds/PostCard.tsx
-import React from 'react';
+import React, { forwardRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Image,
   Pressable,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import { Flame, MessageCircle, Download, Share } from 'lucide-react-native';
 import ViewShot from 'react-native-view-shot';
@@ -19,8 +20,11 @@ interface UserProfile {
 }
 
 interface PostReaction {
+  id: string;
   reaction_type: string;
   user_id: string;
+  post_hub_id?: string;
+  post_stop_id?: string;
 }
 
 interface PostComment {
@@ -55,17 +59,19 @@ interface PostCardProps {
   disabled?: boolean;
 }
 
-const PostCard: React.FC<PostCardProps> = ({
-  post,
-  userId,
-  toggleReaction,
-  sharePost,
-  downloadPost,
-  sharingPost,
-  router,
-  viewShotRef,
-  disabled = false
-}) => {
+const PostCard = forwardRef<View, PostCardProps>((props, ref) => {
+  const {
+    post,
+    userId,
+    toggleReaction,
+    sharePost,
+    downloadPost,
+    sharingPost,
+    router,
+    viewShotRef,
+    disabled = false
+  } = props;
+
   const fireCount = post.post_reactions.filter((r) => r.reaction_type === 'fire').length;
   const hasUserFired = post.post_reactions.some((r) => r.reaction_type === 'fire' && r.user_id === userId);
   const latestComment = post.post_comments[post.post_comments.length - 1];
@@ -106,114 +112,127 @@ const PostCard: React.FC<PostCardProps> = ({
     router.push(`/user/${post.user_id}`);
   };
 
+  // Only show download option on native platforms (not web)
+  const showDownloadOption = Platform.OS !== 'web';
+
   return (
     <ViewShot 
       ref={viewShotRef}
       options={{ format: 'png', quality: 0.9 }}
-      style={[styles.postCard, disabled && styles.disabledCard]}
+      style={[styles.container, disabled && styles.disabledCard]}
     >
       <Pressable
         onPress={handlePostPress}
         android_ripple={{ color: '#0f0f0f' }}
         disabled={disabled}
       >
-        <View style={styles.postHeader}>
-          <Pressable 
-            onPress={handleUserPress}
-            style={styles.userInfoContainer}
-            disabled={disabled}
-          >
-            <View style={styles.profilePicture}>
-              <Image
-                source={{ uri: post.profiles.avatar_url || 'https://via.placeholder.com/40x40/333333/ffffff?text=U' }}
-                style={styles.profileImage}
+        <View style={styles.postCard}>
+          <View style={styles.postHeader}>
+            <Pressable 
+              onPress={handleUserPress}
+              style={styles.userInfoContainer}
+              disabled={disabled}
+            >
+              <View style={styles.profilePicture}>
+                <Image
+                  source={{ uri: post.profiles.avatar_url || 'https://via.placeholder.com/40x40/333333/ffffff?text=U' }}
+                  style={styles.profileImage}
+                />
+              </View>
+              <View>
+                <Text style={styles.userName}>
+                  {post.profiles.first_name} {post.profiles.last_name}
+                </Text>
+                <Text style={styles.userTitle}>{post.profiles.selected_title}</Text>
+              </View>
+            </Pressable>
+            <Text style={styles.postTime}>{formatTimeAgo(post.created_at)}</Text>
+          </View>
+
+          <Text style={styles.postContent}>{post.content}</Text>
+
+          <View style={styles.postActions}>
+            <TouchableOpacity
+              style={[styles.actionItem, disabled && styles.disabledAction]}
+              onPress={() => handleReaction('fire')}
+              disabled={disabled}
+            >
+              <Flame 
+                size={18} 
+                color={hasUserFired ? '#ff7b25' : '#666'} 
+                fill={hasUserFired ? '#ff7b25' : 'none'} 
               />
-            </View>
-            <View>
-              <Text style={styles.userName}>
-                {post.profiles.first_name} {post.profiles.last_name}
+              <Text style={[
+                styles.actionCount, 
+                hasUserFired && { color: '#ff7b25' },
+                disabled && styles.disabledText
+              ]}>
+                {fireCount}
               </Text>
-              <Text style={styles.userTitle}>{post.profiles.selected_title}</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.actionItem, disabled && styles.disabledAction]}
+              onPress={handlePostPress}
+              disabled={disabled}
+            >
+              <MessageCircle size={18} color="#666" />
+              <Text style={[styles.actionCount, disabled && styles.disabledText]}>
+                {post.post_comments.length}
+              </Text>
+            </TouchableOpacity>
+            
+            {/* Only show download button on native platforms */}
+            {showDownloadOption && (
+              <TouchableOpacity
+                style={[styles.actionItem, disabled && styles.disabledAction]}
+                onPress={handleDownload}
+                disabled={disabled || sharingPost}
+              >
+                <Download size={18} color="#666" />
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity
+              style={[styles.actionItem, disabled && styles.disabledAction]}
+              onPress={handleShare}
+              disabled={disabled || sharingPost}
+            >
+              <Share size={18} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          {latestComment && (
+            <View style={styles.latestComment}>
+              <Text style={styles.commentAuthor}>
+                {latestComment.profiles.first_name}: 
+              </Text>
+              <Text style={[styles.commentText, disabled && styles.disabledText]} numberOfLines={1}>
+                {latestComment.content}
+              </Text>
             </View>
-          </Pressable>
-          <Text style={styles.postTime}>{formatTimeAgo(post.created_at)}</Text>
+          )}
+
+          {disabled && (
+            <View style={styles.overlay}>
+              <Text style={styles.overlayText}>Follow to interact</Text>
+            </View>
+          )}
         </View>
-
-        <Text style={styles.postContent}>{post.content}</Text>
-
-        <View style={styles.postActions}>
-          <TouchableOpacity
-            style={[styles.actionItem, disabled && styles.disabledAction]}
-            onPress={() => handleReaction('fire')}
-            disabled={disabled}
-          >
-            <Flame 
-              size={18} 
-              color={hasUserFired ? '#ff7b25' : '#666'} 
-              fill={hasUserFired ? '#ff7b25' : 'none'} 
-            />
-            <Text style={[
-              styles.actionCount, 
-              hasUserFired && { color: '#ff7b25' },
-              disabled && styles.disabledText
-            ]}>
-              {fireCount}
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.actionItem, disabled && styles.disabledAction]}
-            onPress={handlePostPress}
-            disabled={disabled}
-          >
-            <MessageCircle size={18} color="#666" />
-            <Text style={[styles.actionCount, disabled && styles.disabledText]}>
-              {post.post_comments.length}
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.actionItem, disabled && styles.disabledAction]}
-            onPress={handleDownload}
-            disabled={disabled || sharingPost}
-          >
-            <Download size={18} color="#666" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.actionItem, disabled && styles.disabledAction]}
-            onPress={handleShare}
-            disabled={disabled || sharingPost}
-          >
-            <Share size={18} color="#666" />
-          </TouchableOpacity>
-        </View>
-
-        {latestComment && (
-          <View style={styles.latestComment}>
-            <Text style={styles.commentAuthor}>
-              {latestComment.profiles.first_name}: 
-            </Text>
-            <Text style={[styles.commentText, disabled && styles.disabledText]} numberOfLines={1}>
-              {latestComment.content}
-            </Text>
-          </View>
-        )}
-
-        {disabled && (
-          <View style={styles.overlay}>
-          </View>
-        )}
       </Pressable>
     </ViewShot>
   );
-};
+});
 
 const styles = StyleSheet.create({
-  postCard: {
-    backgroundColor: '#1a1a1a',
+  container: {
     marginHorizontal: 16,
     marginVertical: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  postCard: {
+    backgroundColor: '#1a1a1a',
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
@@ -335,5 +354,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
 });
+
+PostCard.displayName = 'PostCard';
 
 export default PostCard;

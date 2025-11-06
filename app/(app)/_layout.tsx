@@ -1,16 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { useTheme } from '../../context/ThemeContext';
 import { 
-  Route, 
   House, 
   Trophy, 
   Settings, 
   CircleHelp as HelpCircle, 
   User, 
-  MapPin, 
   Bot,
-  Sparkles,
   ChevronRight
 } from 'lucide-react-native';
 import { 
@@ -31,12 +28,23 @@ const FallbackIcon = ({ color, size }) => (
   <View style={{ width: size, height: size, backgroundColor: color, opacity: 0.3, borderRadius: 4 }} />
 );
 
-export default function AppLayout() {
+// List of screens that should appear in the drawer
+const VISIBLE_DRAWER_SCREENS = [
+  '(tabs)',
+  'Leaderboard', 
+  'ai',
+  'profile',
+  'settings',
+  'help'
+];
+
+// Custom drawer content component
+const CustomDrawerContent = (props) => {
   const { colors } = useTheme();
   
-  // Animation values
-  const scaleAnim = new Animated.Value(1);
-  const slideAnim = new Animated.Value(0);
+  // Animation values using useRef to persist across renders
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Start slide-in animation when component mounts
@@ -64,119 +72,122 @@ export default function AppLayout() {
     }).start();
   };
 
-  const CustomDrawerContent = (props) => {
-    return (
-      <View style={[styles.drawerContainer, { backgroundColor: colors.background }]}>
-        {/* Drawer Header */}
-        <View style={styles.drawerHeader}>
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('../../assets/uthutho-logo.png')}
-              style={styles.logoContainer}
-            />
-          </View>
-          <Text style={[styles.appTitle, { color: colors.text }]}>Uthutho</Text>
-          <Text style={[styles.appSubtitle, { color: `${colors.text}70` }]}>
-            Your Journey Companion
-          </Text>
+  // Filter routes to only show visible screens
+  const visibleRoutes = props.state.routes.filter(route => 
+    VISIBLE_DRAWER_SCREENS.includes(route.name)
+  );
+
+  return (
+    <View style={[styles.drawerContainer, { backgroundColor: colors.background }]}>
+      {/* Drawer Header */}
+      <View style={styles.drawerHeader}>
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('../../assets/uthutho-logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
         </View>
-
-        {/* Drawer Items */}
-        <View style={styles.drawerItems}>
-          {props.state.routes.map((route, index) => {
-            const { options } = props.descriptors[route.key];
-            const isFocused = props.state.index === index;
-            
-            // Skip hidden drawer items
-            if (options.drawerItemStyle?.height === 0) {
-              return null;
-            }
-
-            const onPress = () => {
-              const event = props.navigation.emit({
-                type: 'drawerItemPress',
-                target: route.key,
-                canPreventDefault: true,
-              });
-
-              if (!isFocused && !event.defaultPrevented) {
-                props.navigation.navigate(route.name);
-              }
-            };
-
-            // Get the icon component or use fallback
-            const IconComponent = options.drawerIcon || FallbackIcon;
-
-            const translateX = slideAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [-50, 0],
-            });
-
-            const opacity = slideAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, 1],
-            });
-
-            return (
-              <AnimatedPressable
-                key={route.key}
-                onPress={onPress}
-                onPressIn={handlePressIn}
-                onPressOut={handlePressOut}
-                style={[
-                  styles.drawerItem,
-                  {
-                    transform: [
-                      { scale: scaleAnim },
-                      { translateX }
-                    ],
-                    opacity,
-                    backgroundColor: isFocused ? `${colors.primary}15` : 'transparent',
-                    borderLeftWidth: isFocused ? 4 : 0,
-                    borderLeftColor: colors.primary,
-                  }
-                ]}
-              >
-                <View style={styles.drawerItemContent}>
-                  <View style={[
-                    styles.iconContainer,
-                    { backgroundColor: isFocused ? colors.primary : `${colors.text}20` }
-                  ]}>
-                    <IconComponent 
-                      color={isFocused ? colors.background : colors.text} 
-                      size={22} 
-                      fill={isFocused ? colors.primary : 'transparent'}
-                    />
-                  </View>
-                  <Text style={[
-                    styles.drawerLabel,
-                    { 
-                      color: isFocused ? colors.primary : colors.text,
-                      fontWeight: isFocused ? '600' : '400'
-                    }
-                  ]}>
-                    {options.title || route.name}
-                  </Text>
-                </View>
-                <ChevronRight 
-                  size={16} 
-                  color={isFocused ? colors.primary : `${colors.text}50`}
-                  style={{ opacity: isFocused ? 1 : 0.5 }}
-                />
-              </AnimatedPressable>
-            );
-          })}
-        </View>
-
-        {/* Drawer Footer */}
-        <View style={styles.drawerFooter}>
-          <Text style={[styles.footerText, { color: `${colors.text}40` }]}>
-            Version 1.5.1
-          </Text>
-        </View>
+        <Text style={[styles.appTitle, { color: colors.text }]}>Uthutho</Text>
+        <Text style={[styles.appSubtitle, { color: `${colors.text}70` }]}>
+          Your Journey Companion
+        </Text>
       </View>
-    );
-  };
+
+      {/* Drawer Items */}
+      <View style={styles.drawerItems}>
+        {visibleRoutes.map((route, index) => {
+          const { options } = props.descriptors[route.key];
+          const isFocused = props.state.index === index;
+
+          const onPress = () => {
+            const event = props.navigation.emit({
+              type: 'drawerItemPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              props.navigation.navigate(route.name);
+            }
+          };
+
+          // Get the icon component or use fallback
+          const IconComponent = options.drawerIcon || FallbackIcon;
+
+          const translateX = slideAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [-50, 0],
+          });
+
+          const opacity = slideAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, 1],
+          });
+
+          return (
+            <AnimatedPressable
+              key={route.key}
+              onPress={onPress}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              style={[
+                styles.drawerItem,
+                {
+                  transform: [
+                    { scale: scaleAnim },
+                    { translateX }
+                  ],
+                  opacity,
+                  backgroundColor: isFocused ? `${colors.primary}15` : 'transparent',
+                  borderLeftWidth: isFocused ? 4 : 0,
+                  borderLeftColor: colors.primary,
+                }
+              ]}
+            >
+              <View style={styles.drawerItemContent}>
+                <View style={[
+                  styles.iconContainer,
+                  { backgroundColor: isFocused ? colors.primary : `${colors.text}20` }
+                ]}>
+                  <IconComponent 
+                    color={isFocused ? colors.background : colors.text} 
+                    size={22} 
+                    fill={isFocused ? colors.primary : 'transparent'}
+                  />
+                </View>
+                <Text style={[
+                  styles.drawerLabel,
+                  { 
+                    color: isFocused ? colors.primary : colors.text,
+                    fontWeight: isFocused ? '600' : '400'
+                  }
+                ]}>
+                  {options.title || route.name}
+                </Text>
+              </View>
+              <ChevronRight 
+                size={16} 
+                color={isFocused ? colors.primary : `${colors.text}50`}
+                style={{ opacity: isFocused ? 1 : 0.5 }}
+              />
+            </AnimatedPressable>
+          );
+        })}
+      </View>
+
+      {/* Drawer Footer */}
+      <View style={styles.drawerFooter}>
+        <Text style={[styles.footerText, { color: `${colors.text}40` }]}>
+          Version 1.5.1
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+export default function AppLayout() {
+  const { colors } = useTheme();
 
   return (
     <Drawer
@@ -207,6 +218,7 @@ export default function AppLayout() {
       }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
+      {/* Visible Drawer Screens */}
       <Drawer.Screen
         name="(tabs)"
         options={{
@@ -268,6 +280,7 @@ export default function AppLayout() {
       />
 
       {/* Hidden screens - they will still be accessible but won't appear in drawer */}
+      {/* All your hidden screens remain exactly as they were */}
       <Drawer.Screen
         name="hub-details"
         options={{
@@ -394,7 +407,7 @@ export default function AppLayout() {
           title: 'Managing Profile' 
         }} 
       />
-            <Drawer.Screen 
+      <Drawer.Screen 
         name="community-preview" 
         options={{ 
           drawerItemStyle: { height: 0 }, 
@@ -584,6 +597,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
+    overflow: 'hidden',
+  },
+  logo: {
+    width: '100%',
+    height: '100%',
   },
   appTitle: {
     fontSize: 24,

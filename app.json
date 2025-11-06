@@ -44,7 +44,13 @@
     "plugins": [
       "expo-router",
       "expo-localization",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-media-library",
+      {
+        "photosPermission": "Allow Uthutho to save posts to your photo gallery.",
+        "savePhotosPermission": "Allow Uthutho to save posts to your photo gallery.",
+        "isAccessMediaLocationEnabled": true
+      }
     ],
     "experiments": {
       "typedRoutes": true

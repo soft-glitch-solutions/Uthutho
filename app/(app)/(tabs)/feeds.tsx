@@ -9,11 +9,15 @@ import {
   RefreshControl,
   Alert,
   Platform,
+  Share,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Users, MessageSquare } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
+import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
+import { captureRef } from 'react-native-view-shot';
 
 // Import components
 import Header from '@/components/feeds/Header';
@@ -43,8 +47,11 @@ interface UserProfile {
 }
 
 interface PostReaction {
+  id: string;
   reaction_type: string;
   user_id: string;
+  post_hub_id?: string;
+  post_stop_id?: string;
 }
 
 interface PostComment {
@@ -466,6 +473,13 @@ export default function FeedsScreen() {
           selected_title: '',
           avatar_url: 'https://via.placeholder.com/40x40/333333/ffffff?text=U',
         },
+        post_reactions: (post.post_reactions || []).map((reaction: any) => ({
+          id: reaction.id,
+          reaction_type: reaction.reaction_type,
+          user_id: reaction.user_id,
+          post_hub_id: reaction.post_hub_id,
+          post_stop_id: reaction.post_stop_id,
+        })),
         post_comments: (post.post_comments || []).map((comment: any) => ({
           ...comment,
           profiles: comment.profiles || {
@@ -561,66 +575,66 @@ export default function FeedsScreen() {
     }
   }, [userId, allCommunities, loadFavoriteCommunities]);
 
-const toggleReaction = useCallback(async (postId: string, reactionType: string) => {
-  if (!isValidUUID(userId)) return;
-  
-  try {
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
+  const toggleReaction = useCallback(async (postId: string, reactionType: string) => {
+    if (!isValidUUID(userId)) return;
+    
+    try {
+      const post = posts.find(p => p.id === postId);
+      if (!post) return;
 
-    const existingReaction = post.post_reactions
-      .find(r => r.user_id === userId && r.reaction_type === reactionType);
+      const existingReaction = post.post_reactions
+        .find(r => r.user_id === userId && r.reaction_type === reactionType);
 
-    if (existingReaction) {
-      // Delete reaction - use the reaction ID for precise deletion
-      const { error: deleteError } = await supabase
-        .from('post_reactions')
-        .delete()
-        .eq('id', existingReaction.id);
+      if (existingReaction) {
+        // Delete reaction - use the reaction ID for precise deletion
+        const { error: deleteError } = await supabase
+          .from('post_reactions')
+          .delete()
+          .eq('id', existingReaction.id);
 
-      if (deleteError) throw deleteError;
-    } else {
-      // Insert new reaction
-      const reactionData: any = {
-        user_id: userId,
-        reaction_type: reactionType,
-      };
-
-      // Use the correct column names from your schema
-      if (post.hub_id) {
-        reactionData.post_hub_id = postId;
-      } else if (post.stop_id) {
-        reactionData.post_stop_id = postId;
+        if (deleteError) throw deleteError;
       } else {
-        console.error('Post has neither hub_id nor stop_id');
-        return;
-      }
+        // Insert new reaction
+        const reactionData: any = {
+          user_id: userId,
+          reaction_type: reactionType,
+        };
 
-      const { error: insertError } = await supabase
-        .from('post_reactions')
-        .insert([reactionData]);
-
-      // Handle the specific trigger error gracefully
-      if (insertError) {
-        if (insertError.code === '42703' && insertError.message?.includes('username')) {
-          // Trigger error, but the reaction was likely created successfully
-          console.warn('Trigger error (username column), but reaction was created');
-          // Continue to refresh posts anyway - the reaction worked
+        // Use the correct column names from your schema
+        if (post.hub_id) {
+          reactionData.post_hub_id = postId;
+        } else if (post.stop_id) {
+          reactionData.post_stop_id = postId;
         } else {
-          throw insertError;
+          console.error('Post has neither hub_id nor stop_id');
+          return;
+        }
+
+        const { error: insertError } = await supabase
+          .from('post_reactions')
+          .insert([reactionData]);
+
+        // Handle the specific trigger error gracefully
+        if (insertError) {
+          if (insertError.code === '42703' && insertError.message?.includes('username')) {
+            // Trigger error, but the reaction was likely created successfully
+            console.warn('Trigger error (username column), but reaction was created');
+            // Continue to refresh posts anyway - the reaction worked
+          } else {
+            throw insertError;
+          }
         }
       }
-    }
 
-    await loadCommunityPosts(selectedCommunity);
-  } catch (error) {
-    console.error('Error toggling reaction:', error);
-    // Don't show alert for the specific trigger error
-    if (!(error as any)?.message?.includes('username')) {
-      Alert.alert('Error', 'Failed to toggle reaction');
+      await loadCommunityPosts(selectedCommunity);
+    } catch (error) {
+      console.error('Error toggling reaction:', error);
+      // Don't show alert for the specific trigger error
+      if (!(error as any)?.message?.includes('username')) {
+        Alert.alert('Error', 'Failed to toggle reaction');
+      }
     }
-  }
-}, [userId, posts, selectedCommunity, loadCommunityPosts]);
+  }, [userId, posts, selectedCommunity, loadCommunityPosts]);
 
   const sharePost = useCallback(async (post: Post) => {
     try {
@@ -630,7 +644,7 @@ const toggleReaction = useCallback(async (postId: string, reactionType: string) 
       const userName = `${post.profiles.first_name} ${post.profiles.last_name}`;
       const shareUrl = `https://mobile.uthutho.co.za/post/${post.id}`;
 
-      const message = `Check out ${userName}'s post in ${communityName} on Uthutho`;
+      const message = `Check out ${userName}'s post in ${communityName} on Uthutho:\n\n"${post.content}"\n\n${shareUrl}`;
 
       if (Platform.OS === 'web') {
         if (navigator.share) {
@@ -644,10 +658,31 @@ const toggleReaction = useCallback(async (postId: string, reactionType: string) 
           Alert.alert('Link copied', 'Post link has been copied to your clipboard');
         }
       } else {
-        Alert.alert('Share Post', `Share this post: ${shareUrl}`);
+        // Use React Native's Share API for mobile
+        try {
+          const result = await Share.share({
+            message: message,
+            title: `Post from ${communityName}`,
+          });
+          
+          if (result.action === Share.sharedAction) {
+            console.log('Post shared successfully');
+          } else if (result.action === Share.dismissedAction) {
+            console.log('Share dismissed');
+          }
+        } catch (shareError) {
+          console.error('Error sharing:', shareError);
+          // Fallback to alert if sharing fails
+          Alert.alert(
+            'Share Post', 
+            `${message}`,
+            [{ text: 'OK' }]
+          );
+        }
       }
     } catch (error) {
       console.error('Error sharing post:', error);
+      Alert.alert('Error', 'Failed to share post');
     } finally {
       setSharingPost(false);
     }
@@ -656,14 +691,73 @@ const toggleReaction = useCallback(async (postId: string, reactionType: string) 
   const downloadPost = useCallback(async (post: Post) => {
     try {
       setSharingPost(true);
-      await sharePost(post);
+      
+      // Get the viewShot ref for this post
+      const viewShotRef = viewShotRefs.current[post.id];
+      
+      if (!viewShotRef) {
+        throw new Error('Could not capture post for download');
+      }
+
+      // Capture the post as an image
+      const uri = await captureRef(viewShotRef, {
+        format: 'png',
+        quality: 1.0,
+        result: 'tmpfile',
+      });
+
+      // Request permissions for media library (iOS/Android)
+      if (Platform.OS !== 'web') {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        
+        if (status !== 'granted') {
+          throw new Error('Media library permissions required to save image');
+        }
+
+        // Save to photo library
+        const asset = await MediaLibrary.createAssetAsync(uri);
+        
+        // Create album if needed (optional)
+        const album = await MediaLibrary.getAlbumAsync('Uthutho');
+        if (album) {
+          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+        } else {
+          await MediaLibrary.createAlbumAsync('Uthutho', asset, false);
+        }
+
+        Alert.alert('Success', 'Post saved to your photo gallery!');
+      } else {
+        // Web fallback - create download link
+        const link = document.createElement('a');
+        link.href = uri;
+        link.download = `uthutho-post-${post.id}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        Alert.alert('Success', 'Post image downloaded!');
+      }
+
     } catch (error) {
       console.error('Error downloading post:', error);
-      Alert.alert('Error', 'Failed to download post');
+      
+      if (error.message.includes('permissions')) {
+        Alert.alert(
+          'Permission Required', 
+          'Please grant photo library access to save posts.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Download Failed', 
+          'Could not save post image. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
     } finally {
       setSharingPost(false);
     }
-  }, [sharePost]);
+  }, []);
 
   // Load initial data
   useEffect(() => {
