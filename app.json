@@ -34,7 +34,12 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#000000"
-      }
+      },
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_MEDIA_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/images/logo.png",
@@ -45,12 +50,14 @@
       "expo-router",
       "expo-localization",
       "expo-secure-store",
-      "expo-media-library",
-      {
-        "photosPermission": "Allow Uthutho to save posts to your photo gallery.",
-        "savePhotosPermission": "Allow Uthutho to save posts to your photo gallery.",
-        "isAccessMediaLocationEnabled": true
-      }
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Uthutho to save posts to your photo gallery.",
+          "savePhotosPermission": "Allow Uthutho to save posts to your photo gallery.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
