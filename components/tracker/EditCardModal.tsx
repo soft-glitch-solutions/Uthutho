@@ -8,24 +8,49 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Modal,
+  ScrollView,
 } from 'react-native';
-import { CreditCard } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { UserCard } from '@/types/tracker';
 
+// Define CARD_TYPES inside the file
 const CARD_TYPES = {
   myciti: {
     name: 'MyCiti Card',
     color: '#1ea2b1',
     pointsName: 'Points',
-    backgroundColor: '#1a2b3c'
+    backgroundColor: '#1a2b3c',
+    logoImage: null,
   },
   golden_arrow: {
     name: 'Golden Arrow',
     color: '#f59e0b',
     pointsName: 'Rides',
-    logoImage: 'https://www.gabs.co.za/Assets/Images/logo_main.png',
-    backgroundColor: '#3c2a1a'
+    backgroundColor: '#3c2a1a',
+    logoImage: 'https://upload.wikimedia.org/wikipedia/en/0/0a/Golden_Arrow_Bus_Services_logo.png',
+  },
+  go_george: {
+    name: 'Go George',
+    color: '#2563eb',
+    pointsName: 'Trips',
+    backgroundColor: '#1a1f2b',
+    logoImage: 'https://www.gogeorge.org.za/wp-content/uploads/2024/06/GO-GEORGE-logo-10-Years-icon.jpg',
+  },
+  rea_vaya: {
+    name: 'Rea Vaya',
+    color: '#dc2626',
+    pointsName: 'Trips',
+    backgroundColor: '#2b1a1a',
+    logoImage: 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/Rea_Vaya_logo.svg/1200px-Rea_Vaya_logo.svg.png',
+  },
+  gautrain: {
+    name: 'Gautrain',
+    color: '#0f172a',
+    pointsName: 'Trips',
+    backgroundColor: '#0a0a0a',
+    logoImage: 'https://icon2.cleanpng.com/20180804/ske/kisspng-logo-product-design-centurion-breakfast-brand-file-gautrain-logo-svg-wikipedia-5b65261ce4d854.0570432315333555489374.jpg',
   }
 };
 
@@ -51,7 +76,7 @@ const EditCardModal: React.FC<EditCardModalProps> = ({
     if (card) {
       setCardHolder(card.card_holder);
       setCardNumber(card.card_number);
-      setErrors({}); // Clear errors when card changes
+      setErrors({});
     }
   }, [card]);
 
@@ -82,7 +107,6 @@ const EditCardModal: React.FC<EditCardModalProps> = ({
   const handleUpdateCard = async () => {
     if (!card) return;
 
-    // Validate form
     if (!validateForm()) {
       return;
     }
@@ -104,10 +128,9 @@ const EditCardModal: React.FC<EditCardModalProps> = ({
         throw new Error(error.message || 'Failed to update card');
       }
 
-      // Success - update parent and close
       onCardUpdated();
       resetForm();
-      onClose(); // Close modal after successful update
+      onClose();
       
     } catch (error) {
       console.error('Error updating card:', error);
@@ -126,122 +149,186 @@ const EditCardModal: React.FC<EditCardModalProps> = ({
     onClose();
   };
 
-  // Don't render if not visible or no card
-  if (!visible || !card) return null;
+  // Get card type info
+  const cardType = card ? CARD_TYPES[card.card_type as keyof typeof CARD_TYPES] : null;
 
-  const cardType = CARD_TYPES[card.card_type];
+  // Render logo based on card type
+  const renderLogo = () => {
+    if (!cardType) return null;
+
+    if (card.card_type === 'myciti') {
+      return (
+        <View style={styles.previewMycitiLogo}>
+          <Text style={styles.previewMycitiText}>my</Text>
+          <Text style={[styles.previewMycitiText, styles.previewMycitiHighlight]}>Citi</Text>
+        </View>
+      );
+    } else if (cardType.logoImage) {
+      return (
+        <Image 
+          source={{ uri: cardType.logoImage }}
+          style={styles.previewLogoImage}
+          resizeMode="contain"
+        />
+      );
+    } else {
+      return (
+        <View style={[styles.fallbackLogo, { backgroundColor: cardType.color }]}>
+          <Text style={styles.fallbackLogoText}>
+            {cardType.name.charAt(0)}
+          </Text>
+        </View>
+      );
+    }
+  };
 
   return (
-    <View style={styles.container}>
-      {/* Card Holder Input */}
-      <Text style={styles.inputLabel}>Card Holder Name</Text>
-      <TextInput
-        style={[
-          styles.textInput,
-          errors.cardHolder && styles.inputError
-        ]}
-        placeholder="Enter card holder name"
-        value={cardHolder}
-        onChangeText={(text) => {
-          setCardHolder(text);
-          // Clear error when user starts typing
-          if (errors.cardHolder) {
-            setErrors(prev => ({ ...prev, cardHolder: undefined }));
-          }
-        }}
-        placeholderTextColor="#666"
-        editable={!loading}
-      />
-      {errors.cardHolder && (
-        <Text style={styles.errorText}>{errors.cardHolder}</Text>
-      )}
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
+    >
+      <View style={styles.modalContainer}>
+        {/* Modal Header */}
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Edit Card</Text>
+          <TouchableOpacity 
+            style={styles.closeButton}
+            onPress={handleClose}
+            disabled={loading}
+          >
+            <X size={24} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
 
-      {/* Card Number Input */}
-      <Text style={[styles.inputLabel, { marginTop: 16 }]}>Card Number</Text>
-      <TextInput
-        style={[
-          styles.textInput,
-          errors.cardNumber && styles.inputError
-        ]}
-        placeholder="Enter card number"
-        value={cardNumber}
-        onChangeText={(text) => {
-          setCardNumber(text);
-          // Clear error when user starts typing
-          if (errors.cardNumber) {
-            setErrors(prev => ({ ...prev, cardNumber: undefined }));
-          }
-        }}
-        placeholderTextColor="#666"
-        editable={!loading}
-        keyboardType="numeric"
-      />
-      {errors.cardNumber && (
-        <Text style={styles.errorText}>{errors.cardNumber}</Text>
-      )}
+        <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+          {/* Card Holder Input */}
+          <Text style={styles.inputLabel}>Card Holder Name</Text>
+          <TextInput
+            style={[
+              styles.textInput,
+              errors.cardHolder && styles.inputError
+            ]}
+            placeholder="Enter card holder name"
+            value={cardHolder}
+            onChangeText={(text) => {
+              setCardHolder(text);
+              if (errors.cardHolder) {
+                setErrors(prev => ({ ...prev, cardHolder: undefined }));
+              }
+            }}
+            placeholderTextColor="#666"
+            editable={!loading}
+          />
+          {errors.cardHolder && (
+            <Text style={styles.errorText}>{errors.cardHolder}</Text>
+          )}
 
-      {/* Card Preview */}
-      <View style={styles.cardPreview}>
-        <Text style={styles.previewLabel}>Preview:</Text>
-        <View style={[styles.previewCard, { backgroundColor: cardType.backgroundColor }]}>
-          <View style={styles.previewHeader}>
-            <View style={styles.previewLogo}>
-              {card.card_type === 'golden_arrow' ? (
-                <Image 
-                  source={{ uri: cardType.logoImage }}
-                  style={styles.previewLogoImage}
-                  resizeMode="contain"
-                />
-              ) : (
-                <View style={styles.previewMycitiLogo}>
-                  <Text style={styles.previewMycitiText}>my</Text>
-                  <Text style={[styles.previewMycitiText, styles.previewMycitiHighlight]}>Citi</Text>
+          {/* Card Number Input */}
+          <Text style={[styles.inputLabel, { marginTop: 16 }]}>Card Number</Text>
+          <TextInput
+            style={[
+              styles.textInput,
+              errors.cardNumber && styles.inputError
+            ]}
+            placeholder="Enter card number"
+            value={cardNumber}
+            onChangeText={(text) => {
+              setCardNumber(text);
+              if (errors.cardNumber) {
+                setErrors(prev => ({ ...prev, cardNumber: undefined }));
+              }
+            }}
+            placeholderTextColor="#666"
+            editable={!loading}
+            keyboardType="numeric"
+          />
+          {errors.cardNumber && (
+            <Text style={styles.errorText}>{errors.cardNumber}</Text>
+          )}
+
+          {/* Card Preview */}
+          {card && cardType && (
+            <View style={styles.cardPreview}>
+              <Text style={styles.previewLabel}>Preview:</Text>
+              <View style={[styles.previewCard, { backgroundColor: cardType.backgroundColor }]}>
+                <View style={styles.previewHeader}>
+                  <View style={styles.previewLogo}>
+                    {renderLogo()}
+                    <Text style={styles.previewCardName}>
+                      {cardType.name}
+                    </Text>
+                  </View>
                 </View>
-              )}
+                <View style={styles.previewDetails}>
+                  <Text style={styles.previewNumber}>
+                    •••• {cardNumber.slice(-4) || '••••'}
+                  </Text>
+                  <Text style={styles.previewHolder}>
+                    {cardHolder || 'Card Holder'}
+                  </Text>
+                </View>
+              </View>
             </View>
-          </View>
-          <View style={styles.previewDetails}>
-            <Text style={styles.previewNumber}>
-              •••• {cardNumber.slice(-4) || '••••'}
-            </Text>
-            <Text style={styles.previewHolder}>
-              {cardHolder || 'Card Holder'}
-            </Text>
-          </View>
+          )}
+        </ScrollView>
+
+        {/* Action Buttons */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={[styles.cancelButton, loading && styles.buttonDisabled]}
+            onPress={handleClose}
+            disabled={loading}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[
+              styles.saveButton,
+              (!cardHolder.trim() || !cardNumber.trim() || loading) && styles.saveButtonDisabled
+            ]}
+            onPress={handleUpdateCard}
+            disabled={!cardHolder.trim() || !cardNumber.trim() || loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Update Card</Text>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
-
-      {/* Action Buttons */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          style={[styles.cancelButton, loading && styles.buttonDisabled]}
-          onPress={handleClose}
-          disabled={loading}
-        >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[
-            styles.saveButton,
-            (!cardHolder.trim() || !cardNumber.trim() || loading) && styles.saveButtonDisabled
-          ]}
-          onPress={handleUpdateCard}
-          disabled={!cardHolder.trim() || !cardNumber.trim() || loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <Text style={styles.saveButtonText}>Update Card</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  modalContent: {
+    flex: 1,
     padding: 20,
   },
   inputLabel: {
@@ -311,6 +398,12 @@ const styles = StyleSheet.create({
   previewMycitiHighlight: {
     color: '#1ea2b1',
   },
+  previewCardName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginLeft: 6,
+  },
   previewDetails: {
     alignItems: 'flex-start',
   },
@@ -324,10 +417,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.8)',
   },
+  fallbackLogo: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fallbackLogoText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
   buttonContainer: {
     flexDirection: 'row',
-    marginTop: 24,
+    padding: 20,
     gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
   },
   cancelButton: {
     flex: 1,

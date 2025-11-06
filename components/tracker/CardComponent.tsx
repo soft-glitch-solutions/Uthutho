@@ -10,8 +10,10 @@ import {
   useWindowDimensions,
   PanResponder,
   Vibration,
+  Modal, // Add Modal import
+  Alert, // Add Alert import for web fallback
 } from 'react-native';
-import { MoreVertical, ArrowUpRight, Trash2, Edit3, Move } from 'lucide-react-native';
+import { MoreVertical, ArrowUpRight, Trash2, Edit3, Move, AlertTriangle } from 'lucide-react-native';
 import { UserCard } from '@/types/tracker';
 
 const CARD_TYPES = {
@@ -94,6 +96,7 @@ const CardComponent: React.FC<CardComponentProps> = ({
   const pan = useRef(new Animated.ValueXY()).current;
   
   const [showMenu, setShowMenu] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false); // Add delete modal state
   const [isDragging, setIsDragging] = useState(false);
   const [dragDirection, setDragDirection] = useState<'up' | 'down' | 'none'>('none');
 
@@ -244,9 +247,18 @@ const CardComponent: React.FC<CardComponentProps> = ({
     onEditCard(card);
   };
 
-  const handleRemoveCard = () => {
+  const handleRemoveCardPress = () => {
     setShowMenu(false);
+    setShowDeleteModal(true); // Show confirmation modal instead of directly removing
+  };
+
+  const handleConfirmRemove = () => {
+    setShowDeleteModal(false);
     onRemoveCard(card.id);
+  };
+
+  const handleCancelRemove = () => {
+    setShowDeleteModal(false);
   };
 
   // Responsive font sizes
@@ -320,198 +332,241 @@ const CardComponent: React.FC<CardComponentProps> = ({
   ];
 
   return (
-    <Animated.View 
-      style={[
-        styles.cardWrapper,
-        {
-          transform: cardTransform,
-          zIndex: isDragging ? 1000 : 1,
-          shadowOpacity: isDragging ? 0.5 : 0.3,
-          elevation: isDragging ? 20 : 8,
-        }
-      ]}
-      {...panResponder.panHandlers}
-    >
-      <Pressable
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onPress={onPress}
+    <>
+      <Animated.View 
         style={[
-          styles.cardContainer,
-          isSelected && styles.selectedCard,
-          isDragging && styles.draggingCard,
-          { 
-            backgroundColor: cardType.backgroundColor,
-            width: cardWidth,
-            height: cardHeight,
+          styles.cardWrapper,
+          {
+            transform: cardTransform,
+            zIndex: isDragging ? 1000 : 1,
+            shadowOpacity: isDragging ? 0.5 : 0.3,
+            elevation: isDragging ? 20 : 8,
           }
         ]}
+        {...panResponder.panHandlers}
       >
-        {/* Card Background */}
-        <View style={styles.cardBackground}>
-          {cardType.cardImage ? (
-            <Image 
-              source={{ uri: cardType.cardImage }}
-              style={styles.cardImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={[styles.cardGradient, { 
-              backgroundColor: cardType.gradient[0] 
-            }]}>
-              <View style={[styles.gradientCircle, { 
-                backgroundColor: cardType.gradient[1],
-                top: -20,
-                right: -20,
-              }]} />
-              <View style={[styles.gradientCircle, { 
-                backgroundColor: cardType.gradient[2],
-                bottom: -15,
-                left: -15,
-              }]} />
-            </View>
-          )}
-          <View style={styles.cardOverlay} />
-        </View>
+        <Pressable
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          onPress={onPress}
+          style={[
+            styles.cardContainer,
+            isSelected && styles.selectedCard,
+            isDragging && styles.draggingCard,
+            { 
+              backgroundColor: cardType.backgroundColor,
+              width: cardWidth,
+              height: cardHeight,
+            }
+          ]}
+        >
+          {/* Card Background */}
+          <View style={styles.cardBackground}>
+            {cardType.cardImage ? (
+              <Image 
+                source={{ uri: cardType.cardImage }}
+                style={styles.cardImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[styles.cardGradient, { 
+                backgroundColor: cardType.gradient[0] 
+              }]}>
+                <View style={[styles.gradientCircle, { 
+                  backgroundColor: cardType.gradient[1],
+                  top: -20,
+                  right: -20,
+                }]} />
+                <View style={[styles.gradientCircle, { 
+                  backgroundColor: cardType.gradient[2],
+                  bottom: -15,
+                  left: -15,
+                }]} />
+              </View>
+            )}
+            <View style={styles.cardOverlay} />
+          </View>
 
-        {/* Card Content */}
-        <View style={styles.cardContent}>
-          {/* Compact Header */}
-          <View style={styles.cardHeader}>
-            <View style={styles.cardLogo}>
-              {renderLogo()}
-              <Text style={[
-                styles.cardName,
-                { 
-                  fontSize: getResponsiveFontSize(14),
-                  marginLeft: isVerySmallScreen ? 4 : 6
-                }
-              ]}>
-                {cardType.name}
-              </Text>
+          {/* Card Content */}
+          <View style={styles.cardContent}>
+            {/* Compact Header */}
+            <View style={styles.cardHeader}>
+              <View style={styles.cardLogo}>
+                {renderLogo()}
+                <Text style={[
+                  styles.cardName,
+                  { 
+                    fontSize: getResponsiveFontSize(14),
+                    marginLeft: isVerySmallScreen ? 4 : 6
+                  }
+                ]}>
+                  {cardType.name}
+                </Text>
+              </View>
+              
+              <View style={styles.headerRight}>
+                {isDragging && (
+                  <View style={styles.dragIndicator}>
+                    <Move size={14} color="rgba(255,255,255,0.9)" />
+                    <Text style={styles.dragText}>
+                      {getDragText()}
+                    </Text>
+                  </View>
+                )}
+                
+                <TouchableOpacity 
+                  style={styles.menuButton}
+                  onPress={handleMenuPress}
+                  disabled={isDragging}
+                >
+                  <MoreVertical 
+                    size={isVerySmallScreen ? 16 : 18} 
+                    color={isDragging ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.7)"} 
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Card Details - More Compact */}
+            <View style={styles.cardDetails}>
+              <View style={styles.cardNumberSection}>
+                <Text style={[
+                  styles.cardNumber,
+                  { fontSize: getResponsiveFontSize(16) }
+                ]}>
+                  {formatCardNumber(card.card_number)}
+                </Text>
+                <Text style={[
+                  styles.cardHolder,
+                  { fontSize: getResponsiveFontSize(11) }
+                ]}>
+                  {card.card_holder}
+                </Text>
+              </View>
             </View>
             
-            <View style={styles.headerRight}>
-              {isDragging && (
-                <View style={styles.dragIndicator}>
-                  <Move size={14} color="rgba(255,255,255,0.9)" />
-                  <Text style={styles.dragText}>
-                    {getDragText()}
-                  </Text>
-                </View>
-              )}
-              
-              <TouchableOpacity 
-                style={styles.menuButton}
-                onPress={handleMenuPress}
-                disabled={isDragging}
-              >
-                <MoreVertical 
-                  size={isVerySmallScreen ? 16 : 18} 
-                  color={isDragging ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.7)"} 
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Card Details - More Compact */}
-          <View style={styles.cardDetails}>
-            <View style={styles.cardNumberSection}>
+            <View style={styles.balanceSection}>
               <Text style={[
-                styles.cardNumber,
-                { fontSize: getResponsiveFontSize(16) }
-              ]}>
-                {formatCardNumber(card.card_number)}
-              </Text>
-              <Text style={[
-                styles.cardHolder,
+                styles.balanceLabel,
                 { fontSize: getResponsiveFontSize(11) }
               ]}>
-                {card.card_holder}
+                Balance
+              </Text>
+              <Text style={[
+                styles.balanceAmount,
+                { fontSize: getResponsiveFontSize(22) }
+              ]}>
+                {card.current_balance}
+              </Text>
+              <Text style={[
+                styles.balanceUnit,
+                { fontSize: getResponsiveFontSize(10) }
+              ]}>
+                {cardType.pointsName.toLowerCase()}
               </Text>
             </View>
-          </View>
-          
-          <View style={styles.balanceSection}>
-            <Text style={[
-              styles.balanceLabel,
-              { fontSize: getResponsiveFontSize(11) }
-            ]}>
-              Balance
-            </Text>
-            <Text style={[
-              styles.balanceAmount,
-              { fontSize: getResponsiveFontSize(22) }
-            ]}>
-              {card.current_balance}
-            </Text>
-            <Text style={[
-              styles.balanceUnit,
-              { fontSize: getResponsiveFontSize(10) }
-            ]}>
-              {cardType.pointsName.toLowerCase()}
-            </Text>
+
+            {/* Compact Footer */}
+            <View style={styles.cardFooter}>
+              <Text style={[
+                styles.cardTypeText,
+                { fontSize: getResponsiveFontSize(9) }
+              ]}>
+                {cardType.type}
+              </Text>
+              <ArrowUpRight 
+                size={isVerySmallScreen ? 12 : 14} 
+                color="rgba(255,255,255,0.7)" 
+              />
+            </View>
           </View>
 
-          {/* Compact Footer */}
-          <View style={styles.cardFooter}>
-            <Text style={[
-              styles.cardTypeText,
-              { fontSize: getResponsiveFontSize(9) }
-            ]}>
-              {cardType.type}
-            </Text>
-            <ArrowUpRight 
-              size={isVerySmallScreen ? 12 : 14} 
-              color="rgba(255,255,255,0.7)" 
-            />
-          </View>
-        </View>
-
-        {/* Menu Overlay */}
-        {showMenu && (
-          <View style={styles.menuOverlay}>
-            <TouchableOpacity 
-              style={styles.menuBackdrop}
-              onPress={() => setShowMenu(false)}
-            />
-            <View style={[
-              styles.menuContent,
-              isVerySmallScreen && styles.verySmallMenuContent
-            ]}>
+          {/* Menu Overlay */}
+          {showMenu && (
+            <View style={styles.menuOverlay}>
               <TouchableOpacity 
-                style={styles.menuItem}
-                onPress={handleEditCard}
+                style={styles.menuBackdrop}
+                onPress={() => setShowMenu(false)}
+              />
+              <View style={[
+                styles.menuContent,
+                isVerySmallScreen && styles.verySmallMenuContent
+              ]}>
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={handleEditCard}
+                >
+                  <Edit3 size={isVerySmallScreen ? 14 : 16} color="#1ea2b1" />
+                  <Text style={[
+                    styles.menuItemText,
+                    isVerySmallScreen && { fontSize: 12 }
+                  ]}>
+                    Edit
+                  </Text>
+                </TouchableOpacity>
+                
+                <View style={styles.menuDivider} />
+                
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={handleRemoveCardPress}
+                >
+                  <Trash2 size={isVerySmallScreen ? 14 : 16} color="#ef4444" />
+                  <Text style={[
+                    styles.menuItemText, 
+                    styles.removeText,
+                    isVerySmallScreen && { fontSize: 12 }
+                  ]}>
+                    Remove
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </Pressable>
+      </Animated.View>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCancelRemove}
+      >
+        <View style={styles.deleteModalOverlay}>
+          <View style={styles.deleteModalContent}>
+            <View style={styles.deleteModalHeader}>
+              <AlertTriangle size={24} color="#ef4444" />
+              <Text style={styles.deleteModalTitle}>Remove Card</Text>
+            </View>
+            
+            <Text style={styles.deleteModalMessage}>
+              Are you sure you want to delete your {cardType.name} card?{'\n\n'}
+              <Text style={styles.warningText}>
+                This action cannot be undone. All card history and data will be permanently lost.
+              </Text>
+            </Text>
+
+            <View style={styles.deleteModalActions}>
+              <TouchableOpacity 
+                style={styles.deleteCancelButton}
+                onPress={handleCancelRemove}
               >
-                <Edit3 size={isVerySmallScreen ? 14 : 16} color="#1ea2b1" />
-                <Text style={[
-                  styles.menuItemText,
-                  isVerySmallScreen && { fontSize: 12 }
-                ]}>
-                  Edit
-                </Text>
+                <Text style={styles.deleteCancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               
-              <View style={styles.menuDivider} />
-              
               <TouchableOpacity 
-                style={styles.menuItem}
-                onPress={handleRemoveCard}
+                style={styles.deleteConfirmButton}
+                onPress={handleConfirmRemove}
               >
-                <Trash2 size={isVerySmallScreen ? 14 : 16} color="#ef4444" />
-                <Text style={[
-                  styles.menuItemText, 
-                  styles.removeText,
-                  isVerySmallScreen && { fontSize: 12 }
-                ]}>
-                  Remove
-                </Text>
+                <Trash2 size={16} color="#ffffff" />
+                <Text style={styles.deleteConfirmButtonText}>Delete Card</Text>
               </TouchableOpacity>
             </View>
           </View>
-        )}
-      </Pressable>
-    </Animated.View>
+        </View>
+      </Modal>
+    </>
   );
 };
 
@@ -771,6 +826,75 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#333333',
     marginVertical: 2,
+  },
+    deleteModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  deleteModalContent: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  deleteModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  deleteModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  deleteModalMessage: {
+    fontSize: 16,
+    color: '#cccccc',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  warningText: {
+    color: '#ef4444',
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  deleteModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deleteCancelButton: {
+    flex: 1,
+    backgroundColor: '#333333',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  deleteCancelButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  deleteConfirmButton: {
+    flex: 1,
+    backgroundColor: '#ef4444',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  deleteConfirmButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });
 

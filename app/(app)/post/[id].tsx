@@ -9,11 +9,12 @@ import {
   Alert, 
   Image,
   Platform,
-  Share 
+  Share,
+  Linking 
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ArrowLeft, Flame, MessageCircle, Send, MapPin, Download, Share as ShareIcon } from 'lucide-react-native';
+import { ArrowLeft, Flame, MessageCircle, Send, MapPin, Download, Share as ShareIcon, User, Smartphone } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
@@ -72,6 +73,8 @@ export default function PostDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [sharing, setSharing] = useState(false);
   const viewShotRef = useRef<View>(null);
+
+  const isLoggedIn = !!user;
 
   useEffect(() => {
     if (id) {
@@ -147,7 +150,10 @@ export default function PostDetailScreen() {
   );
 
   const toggleReaction = async (reactionType: string) => {
-    if (!post || !currentUserId) return;
+    if (!post || !isLoggedIn) {
+      showLoginPrompt();
+      return;
+    }
 
     try {
       const existingReaction = post.post_reactions
@@ -191,7 +197,12 @@ export default function PostDetailScreen() {
   };
 
   const addComment = async () => {
-    if (!newComment.trim() || !post || !currentUserId) return;
+    if (!newComment.trim() || !post) {
+      if (!isLoggedIn) {
+        showLoginPrompt();
+      }
+      return;
+    }
 
     try {
       const commentData: any = {
@@ -353,6 +364,10 @@ export default function PostDetailScreen() {
   };
 
   const navigateToUserProfile = (userId: string) => {
+    if (!isLoggedIn) {
+      showLoginPrompt();
+      return;
+    }
     router.push(`/user/${userId}`);
   };
 
@@ -375,6 +390,32 @@ export default function PostDetailScreen() {
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
     return `${Math.floor(diffInMinutes / 1440)}d ago`;
+  };
+
+  const showLoginPrompt = () => {
+    Alert.alert(
+      'Login Required',
+      'Please log in to interact with posts and comments.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Login', onPress: () => router.push('/login') }
+      ]
+    );
+  };
+
+  const handleDownloadApp = () => {
+    // You can update this URL to your actual app store links
+    const appStoreUrl = Platform.OS === 'ios' 
+      ? 'https://apps.apple.com/app/uthutho' 
+      : 'https://play.google.com/store/apps/details?id=com.uthutho.app';
+    
+    Linking.openURL(appStoreUrl).catch(err => {
+      Alert.alert('Error', 'Could not open app store');
+    });
+  };
+
+  const handleLogin = () => {
+    router.push('/login');
   };
 
   // Only show download option on native platforms (not web)
@@ -459,30 +500,43 @@ export default function PostDetailScreen() {
           {/* Post Content */}
           <Text style={styles.postContent}>{post.content}</Text>
 
-          {/* Post Actions - Same as feed */}
+          {/* Post Actions - Disabled for non-logged-in users */}
           <View style={styles.postActions}>
             <TouchableOpacity
-              style={[styles.actionItem, hasUserReacted('fire') && styles.actionActive]}
+              style={[
+                styles.actionItem, 
+                hasUserReacted('fire') && styles.actionActive,
+                !isLoggedIn && styles.disabledAction
+              ]}
               onPress={() => toggleReaction('fire')}
+              disabled={!isLoggedIn}
             >
               <Flame 
                 size={18} 
-                color={hasUserReacted('fire') ? '#ff7b25' : '#666'} 
-                fill={hasUserReacted('fire') ? '#ff7b25' : 'none'} 
+                color={
+                  !isLoggedIn ? '#444' : 
+                  hasUserReacted('fire') ? '#ff7b25' : '#666'
+                } 
+                fill={
+                  !isLoggedIn ? 'none' :
+                  hasUserReacted('fire') ? '#ff7b25' : 'none'
+                } 
               />
               <Text style={[
                 styles.actionCount, 
-                hasUserReacted('fire') && { color: '#ff7b25' }
+                hasUserReacted('fire') && { color: '#ff7b25' },
+                !isLoggedIn && styles.disabledText
               ]}>
                 {fireCount}
               </Text>
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={styles.actionItem}
+              style={[styles.actionItem, !isLoggedIn && styles.disabledAction]}
+              disabled={!isLoggedIn}
             >
-              <MessageCircle size={18} color="#666" />
-              <Text style={styles.actionCount}>
+              <MessageCircle size={18} color={!isLoggedIn ? '#444' : '#666'} />
+              <Text style={[styles.actionCount, !isLoggedIn && styles.disabledText]}>
                 {commentCount}
               </Text>
             </TouchableOpacity>
@@ -490,11 +544,11 @@ export default function PostDetailScreen() {
             {/* Only show download button on native platforms */}
             {showDownloadOption && (
               <TouchableOpacity
-                style={styles.actionItem}
+                style={[styles.actionItem, !isLoggedIn && styles.disabledAction]}
                 onPress={downloadPost}
-                disabled={sharing}
+                disabled={!isLoggedIn || sharing}
               >
-                <Download size={18} color="#666" />
+                <Download size={18} color={!isLoggedIn ? '#444' : '#666'} />
               </TouchableOpacity>
             )}
             
@@ -538,25 +592,59 @@ export default function PostDetailScreen() {
           </View>
         ))}
 
-        {/* Add Comment */}
-        <View style={styles.addCommentContainer}>
+        {/* Add Comment - Disabled for non-logged-in users */}
+        <View style={[
+          styles.addCommentContainer,
+          !isLoggedIn && styles.disabledCommentContainer
+        ]}>
           <TextInput
-            style={styles.commentInput}
-            placeholder="Add a comment..."
-            placeholderTextColor="#666666"
+            style={[
+              styles.commentInput,
+              !isLoggedIn && styles.disabledCommentInput
+            ]}
+            placeholder={!isLoggedIn ? "Login to comment..." : "Add a comment..."}
+            placeholderTextColor={!isLoggedIn ? "#444" : "#666666"}
             value={newComment}
             onChangeText={setNewComment}
             multiline
+            editable={isLoggedIn}
           />
           <TouchableOpacity
-            style={[styles.commentButton, !newComment.trim() && styles.commentButtonDisabled]}
+            style={[
+              styles.commentButton, 
+              (!newComment.trim() || !isLoggedIn) && styles.commentButtonDisabled
+            ]}
             onPress={addComment}
-            disabled={!newComment.trim()}
+            disabled={!newComment.trim() || !isLoggedIn}
           >
             <Send size={20} color="#ffffff" />
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Call to Action for Non-Logged-In Users */}
+      {!isLoggedIn && (
+        <View style={styles.ctaContainer}>
+          <View style={styles.ctaContent}>
+            <User size={24} color="#1ea2b1" />
+            <Text style={styles.ctaTitle}>Join the Conversation</Text>
+            <Text style={styles.ctaDescription}>
+              Login to react, comment, and connect with your community
+            </Text>
+            <View style={styles.ctaButtons}>
+              <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+                <Text style={styles.loginButtonText}>Login to Comment</Text>
+              </TouchableOpacity>
+              {Platform.OS === 'web' && (
+                <TouchableOpacity style={styles.downloadButton} onPress={handleDownloadApp}>
+                  <Smartphone size={16} color="#ffffff" />
+                  <Text style={styles.downloadButtonText}>Download App</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      )}
 
       <View style={styles.bottomSpace} />
     </ScrollView>
@@ -694,11 +782,17 @@ const styles = StyleSheet.create({
   actionActive: {
     // Active state styling if needed
   },
+  disabledAction: {
+    opacity: 0.5,
+  },
   actionCount: {
     marginLeft: 6,
     fontSize: 14,
     color: '#666666',
     fontWeight: '500',
+  },
+  disabledText: {
+    color: '#444444',
   },
   commentsSection: {
     paddingHorizontal: 16,
@@ -762,12 +856,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
   },
+  disabledCommentContainer: {
+    opacity: 0.6,
+  },
   commentInput: {
     flex: 1,
     color: '#ffffff',
     fontSize: 14,
     maxHeight: 80,
     paddingVertical: 4,
+  },
+  disabledCommentInput: {
+    color: '#666666',
   },
   commentButton: {
     backgroundColor: '#1ea2b1',
@@ -780,6 +880,65 @@ const styles = StyleSheet.create({
   },
   commentButtonDisabled: {
     backgroundColor: '#333333',
+  },
+  // Call to Action Styles
+  ctaContainer: {
+    margin: 16,
+    marginTop: 24,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  ctaContent: {
+    alignItems: 'center',
+  },
+  ctaTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  ctaDescription: {
+    fontSize: 14,
+    color: '#cccccc',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  ctaButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  loginButton: {
+    flex: 2,
+    backgroundColor: '#1ea2b1',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  loginButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  downloadButton: {
+    flex: 1,
+    backgroundColor: '#333333',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  downloadButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
   },
   bottomSpace: {
     height: 20,
