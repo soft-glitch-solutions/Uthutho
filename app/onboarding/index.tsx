@@ -209,6 +209,48 @@ export default function Onboarding() {
   // Calculate max content width for desktop
   const maxContentWidth = isDesktop ? 600 : isTablet ? 500 : '100%';
 
+  // Calculate dynamic heights based on screen size
+  const getDynamicHeights = () => {
+    if (isTinyScreen) {
+      return {
+        headerHeight: verticalScale(35),
+        animationHeight: verticalScale(120),
+        textMarginBottom: verticalScale(10),
+        footerMarginTop: verticalScale(5)
+      };
+    } else if (isVerySmallScreen) {
+      return {
+        headerHeight: verticalScale(40),
+        animationHeight: verticalScale(140),
+        textMarginBottom: verticalScale(15),
+        footerMarginTop: verticalScale(10)
+      };
+    } else if (isSmallScreen) {
+      return {
+        headerHeight: verticalScale(45),
+        animationHeight: verticalScale(160),
+        textMarginBottom: verticalScale(20),
+        footerMarginTop: verticalScale(15)
+      };
+    } else if (isTablet) {
+      return {
+        headerHeight: verticalScale(50),
+        animationHeight: verticalScale(220),
+        textMarginBottom: verticalScale(25),
+        footerMarginTop: verticalScale(20)
+      };
+    } else {
+      return {
+        headerHeight: verticalScale(55),
+        animationHeight: verticalScale(250),
+        textMarginBottom: verticalScale(30),
+        footerMarginTop: verticalScale(25)
+      };
+    }
+  };
+
+  const dynamicHeights = getDynamicHeights();
+
   // Prevent double tap zoom
   const handleDoubleTapProtection = () => {
     const now = Date.now();
@@ -442,7 +484,7 @@ export default function Onboarding() {
           onResponderTerminationRequest={() => false}
         >
           {/* Header with Back Button */}
-          <View style={styles.header}>
+          <View style={[styles.header, { height: dynamicHeights.headerHeight }]}>
             {currentSlide > 0 ? (
               <TouchableOpacity 
                 style={styles.backButton} 
@@ -477,7 +519,7 @@ export default function Onboarding() {
             onStartShouldSetResponder={() => true}
           >
             {/* Animation */}
-            <View style={styles.animationContainer}>
+            <View style={[styles.animationContainer, { height: dynamicHeights.animationHeight }]}>
               <SafeAnimation
                 slide={currentItem}
                 style={styles.animation}
@@ -488,7 +530,7 @@ export default function Onboarding() {
             </View>
 
             {/* Text Content */}
-            <View style={styles.textContainer}>
+            <View style={[styles.textContainer, { marginBottom: dynamicHeights.textMarginBottom }]}>
               <Text style={styles.title}>{currentItem.title}</Text>
               <Text style={styles.subtitle}>{currentItem.subtitle}</Text>
               <Text style={styles.description}>{currentItem.description}</Text>
@@ -496,7 +538,7 @@ export default function Onboarding() {
           </Animated.View>
 
           {/* Footer with Navigation */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { marginTop: dynamicHeights.footerMarginTop }]}>
             {/* Pagination Dots */}
             <View style={styles.pagination}>
               {slides.map((_, index) => (
@@ -540,8 +582,6 @@ export default function Onboarding() {
               </Text>
             </View>
           )}
-
-          
         </View>
       </View>
     </View>
@@ -552,13 +592,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BACKGROUND_COLOR,
-    alignItems: 'center', // Center content on desktop
+    alignItems: 'center',
   },
   contentContainer: {
     flex: 1,
     overflow: 'hidden',
     width: '100%',
-    maxWidth: 1200, // Maximum width for very large screens
+    maxWidth: 1200,
   },
   splashContainer: {
     flex: 1,
@@ -596,18 +636,18 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: isDesktop ? scale(40) : isTablet ? scale(32) : scale(16),
-    paddingTop: verticalScale(40),
-    paddingBottom: verticalScale(20),
-    alignSelf: 'center', // Center the content
+    paddingTop: verticalScale(20), // Reduced top padding
+    paddingBottom: verticalScale(10), // Reduced bottom padding
+    alignSelf: 'center',
     width: '100%',
+    justifyContent: 'space-between', // Better distribution of space
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: verticalScale(10),
-    height: verticalScale(40),
-    minHeight: verticalScale(40),
+    marginBottom: verticalScale(5), // Reduced margin
+    minHeight: verticalScale(30),
   },
   backButton: {
     padding: scale(8),
@@ -630,15 +670,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: isTinyScreen ? verticalScale(-40) : isVerySmallScreen ? verticalScale(-20) : 0,
+    // Removed negative margins that were causing issues
   },
   animationContainer: {
     width: isDesktop ? '50%' : isTablet ? '60%' : isTinyScreen ? '60%' : isVerySmallScreen ? '70%' : '80%',
     maxWidth: isDesktop ? scale(400) : isTablet ? scale(320) : scale(280),
-    height: isDesktop ? verticalScale(300) : isTablet ? verticalScale(250) : isTinyScreen ? verticalScale(120) : isVerySmallScreen ? verticalScale(150) : verticalScale(200),
-    marginBottom: isDesktop ? verticalScale(40) : isTablet ? verticalScale(30) : isTinyScreen ? verticalScale(15) : isVerySmallScreen ? verticalScale(20) : verticalScale(30),
     justifyContent: 'center',
     alignItems: 'center',
+    // Height is now dynamic via props
   },
   animation: {
     width: '100%',
@@ -648,7 +687,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: isDesktop ? scale(40) : isTablet ? scale(24) : scale(12),
     width: '100%',
-    marginTop: isTinyScreen ? verticalScale(-10) : 0,
+    // Margin bottom is now dynamic via props
   },
   title: {
     fontSize: isDesktop ? scale(36) : isTablet ? scale(32) : isTinyScreen ? scale(22) : isVerySmallScreen ? scale(26) : scale(30),
@@ -678,15 +717,15 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: 'center',
-    marginTop: isDesktop ? verticalScale(30) : isTablet ? verticalScale(25) : isTinyScreen ? verticalScale(10) : isVerySmallScreen ? verticalScale(15) : verticalScale(20),
-    paddingBottom: verticalScale(10),
+    // Margin top is now dynamic via props
+    paddingBottom: verticalScale(5), // Reduced padding
   },
   pagination: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: isDesktop ? verticalScale(25) : isTablet ? verticalScale(20) : isTinyScreen ? verticalScale(15) : verticalScale(20),
-    height: verticalScale(16),
+    marginBottom: isDesktop ? verticalScale(20) : isTablet ? verticalScale(15) : isTinyScreen ? verticalScale(10) : verticalScale(15),
+    height: verticalScale(12), // Reduced height
   },
   dot: {
     height: scale(6),
@@ -699,7 +738,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: isDesktop ? scale(40) : isTablet ? scale(36) : scale(32),
-    paddingVertical: isDesktop ? verticalScale(18) : isTablet ? verticalScale(16) : verticalScale(14),
+    paddingVertical: isDesktop ? verticalScale(16) : isTablet ? verticalScale(14) : verticalScale(12), // Reduced padding
     borderRadius: scale(20),
     backgroundColor: BRAND_COLOR,
     shadowColor: BRAND_COLOR,
@@ -708,7 +747,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
     minWidth: isDesktop ? scale(160) : isTablet ? scale(150) : scale(140),
-    minHeight: isDesktop ? verticalScale(56) : isTablet ? verticalScale(52) : verticalScale(48),
+    minHeight: isDesktop ? verticalScale(52) : isTablet ? verticalScale(48) : verticalScale(44), // Reduced height
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -720,11 +759,8 @@ const styles = StyleSheet.create({
     marginRight: scale(6),
   },
   credit: {
-    position: 'absolute',
-    bottom: verticalScale(15),
-    left: 0,
-    right: 0,
     alignItems: 'center',
+    marginTop: verticalScale(5), // Reduced margin
   },
   creditText: {
     fontSize: scale(10),
@@ -737,16 +773,4 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(30, 162, 177, 0.1)',
     borderRadius: scale(80),
   },
-  swipeHint: {
-    position: 'absolute',
-    bottom: verticalScale(50),
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  swipeHintText: {
-    fontSize: scale(12),
-    color: BRAND_COLOR,
-    opacity: 0.5,
-  }, 
 });

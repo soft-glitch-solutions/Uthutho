@@ -408,13 +408,15 @@ export default function Auth() {
     checked, 
     onPress, 
     linkUrl,
-    onLinkPress 
+    onLinkPress,
+    linkText 
   }: {
     label: string;
     checked: boolean;
     onPress: () => void;
     linkUrl?: string;
     onLinkPress?: (url: string) => void;
+    linkText?: string;
   }) => {
     return (
       <TouchableOpacity 
@@ -431,12 +433,12 @@ export default function Auth() {
         </View>
         <Text style={[styles.checkboxLabel, { color: colors.text }]}>
           {label}
-          {linkUrl && (
+          {linkUrl && linkText && (
             <Text 
               style={styles.linkText}
               onPress={() => onLinkPress?.(linkUrl)}
             >
-              {' '}Terms and Conditions
+              {' '}{linkText}
             </Text>
           )}
         </Text>
@@ -617,14 +619,16 @@ export default function Auth() {
                 onPress={() => setAcceptedTerms(!acceptedTerms)}
                 linkUrl={termsUrl}
                 onLinkPress={handleOpenLink}
+                linkText="Terms and Conditions"
               />
               
               <Checkbox
-                label="I accept the Privacy Policy"
+                label="I accept the"
                 checked={acceptedPrivacy}
                 onPress={() => setAcceptedPrivacy(!acceptedPrivacy)}
                 linkUrl={privacyUrl}
                 onLinkPress={handleOpenLink}
+                linkText="Privacy Policy"
               />
             </View>
           </>
