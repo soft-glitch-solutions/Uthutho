@@ -821,17 +821,8 @@ Current route: ${activeJourney?.routes?.start_point} to ${activeJourney?.routes?
               null
             }
           />
-          {/* Show driver promotion if no driver */}
-          {!hasDriverInJourney && (
-            <NoDriverPromotion 
-              onShare={handleShareWithDriver}
-              onDriverSignup={handleDriverSignup}
-              routeName={activeJourney.routes.name}
-              transportType={activeJourney.routes.transport_type}
-            />
-          )}
 
-          {/* Journey Status Buttons */}
+                    {/* Journey Status Buttons */}
           <View style={styles.statusContainer}>
             {participantStatus === 'waiting' && (
               <TouchableOpacity
@@ -860,6 +851,17 @@ Current route: ${activeJourney?.routes?.start_point} to ${activeJourney?.routes?
               </TouchableOpacity>
             )}
           </View>
+          {/* Show driver promotion if no driver */}
+          {!hasDriverInJourney && (
+            <NoDriverPromotion 
+              onShare={handleShareWithDriver}
+              onDriverSignup={handleDriverSignup}
+              routeName={activeJourney.routes.name}
+              transportType={activeJourney.routes.transport_type}
+            />
+          )}
+
+
           
           <UserStopHighlight stopName={userStopName} />
           

@@ -616,12 +616,15 @@ export default function WaitingDrawer({
                     {waitingCount} {waitingCount === 1 ? 'person' : 'people'} waiting
                   </Text>
                 </View>
+                 {/* NOTE: dont show this we will work on this feature later
+                  
                 <View style={styles.estimatedTime}>
                   <Clock size={16} color="#666666" />
                   <Text style={styles.timeText}>
                     Est. {10 + Math.floor(Math.random() * 15)} min
                   </Text>
                 </View>
+                */}
               </View>
 
               {isDriver && (
