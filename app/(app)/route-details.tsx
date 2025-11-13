@@ -546,8 +546,7 @@ export default function RouteDetailsScreen() {
           {/* Start and End Points in Two Columns */}
           <View style={styles.pointsContainer}>
             <Pressable
-              style={styles.pointColumn}
-              onPress={() => router.push(`/hub-details?hubId=${route.start_hub_id}`)}>
+              style={styles.pointColumn}>
               <Text style={[styles.detailLabel, { color: colors.text }]}>Start Point</Text>
               <Text style={[styles.detailValue, { color: colors.text }]}>
                 {route.start_point}
@@ -555,8 +554,7 @@ export default function RouteDetailsScreen() {
             </Pressable>
 
             <Pressable
-              style={styles.pointColumn}
-              onPress={() => router.push(`/hub-details?hubId=${route.end_hub_id}`)}>
+              style={styles.pointColumn}>
               <Text style={[styles.detailLabel, { color: colors.text }]}>End Point</Text>
               <Text style={[styles.detailValue, { color: colors.text }]}>
                 {route.end_point}
