@@ -17,7 +17,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme } from '@/context/ThemeContext';
 import { useNotifications } from '../../../hook/useNotifications';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import StreakOverlay from '@/components/StreakOverlay'; // Adjust path as needed
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TAB_COUNT = 5;
@@ -266,7 +269,7 @@ const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount })
                 focused={isFocused}
                 notificationCount={notificationCount}
                 index={index}
-                colors={colors} // PASS COLORS HERE
+                colors={colors}
               >
                 <IconComponent 
                   color={isFocused ? '#ffffff' : colors.text} 
@@ -297,70 +300,117 @@ const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount })
 export default function EnhancedTabLayout() {
   const { unreadCount } = useNotifications();
   const { colors } = useTheme();
+  const [userId, setUserId] = useState<string | null>(null);
+  const [showStreakOverlay, setShowStreakOverlay] = useState(false);
+
+  // Check for streak overlay when component mounts
+  useEffect(() => {
+    checkAndShowStreakOverlay();
+  }, []);
+
+  const checkAndShowStreakOverlay = async () => {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.log('No user found for streak overlay');
+        return;
+      }
+
+      setUserId(user.id);
+
+      // Check if we've shown the overlay today
+      const today = new Date().toISOString().split('T')[0];
+      const shownKey = `streakOverlayShown_${user.id}_${today}`;
+      const hasShownToday = await AsyncStorage.getItem(shownKey);
+      
+      console.log('Streak overlay check:', { userId: user.id, today, hasShownToday });
+
+      if (!hasShownToday) {
+        // Small delay to let the app load first
+        setTimeout(() => {
+          setShowStreakOverlay(true);
+          AsyncStorage.setItem(shownKey, 'true');
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('Error checking streak overlay:', error);
+    }
+  };
 
   return (
-    <Tabs
-      tabBar={(props) => <FloatingTabBar {...props} colors={colors} unreadCount={unreadCount} />}
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.background,
-        },
-        headerTintColor: colors.text,
-        tabBarStyle: {
-          display: 'none', // Hide default tab bar
-        },
-        headerShown: false,
-      }}
-    >
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color, size, focused }) => (
-            <House color={color} size={size} />
-          ),
+    <>
+      <Tabs
+        tabBar={(props) => <FloatingTabBar {...props} colors={colors} unreadCount={unreadCount} />}
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: colors.background,
+          },
+          headerTintColor: colors.text,
+          tabBarStyle: {
+            display: 'none', // Hide default tab bar
+          },
+          headerShown: false,
         }}
-      />
+      >
+        <Tabs.Screen
+          name="home"
+          options={{
+            title: 'Home',
+            tabBarIcon: ({ color, size, focused }) => (
+              <House color={color} size={size} />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="feeds"
-        options={{
-          title: 'Feeds',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Rss color={color} size={size} />
-          ),
-        }}
-      />
+        <Tabs.Screen
+          name="feeds"
+          options={{
+            title: 'Feeds',
+            tabBarIcon: ({ color, size, focused }) => (
+              <Rss color={color} size={size} />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="tracker"
-        options={{
-          title: 'Cards',
-          tabBarIcon: ({ color, size, focused }) => (
-            <WalletCards color={color} size={size} />
-          ),
-        }}
-      />
+        <Tabs.Screen
+          name="tracker"
+          options={{
+            title: 'Cards',
+            tabBarIcon: ({ color, size, focused }) => (
+              <WalletCards color={color} size={size} />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="routes"
-        options={{
-          title: 'Journey',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Route color={color} size={size} />
-          ),
-        }}
-      />
+        <Tabs.Screen
+          name="routes"
+          options={{
+            title: 'Journey',
+            tabBarIcon: ({ color, size, focused }) => (
+              <Route color={color} size={size} />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size, focused }) => (
-            <User color={color} size={size} />
-          ),
-        }}
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Profile',
+            tabBarIcon: ({ color, size, focused }) => (
+              <User color={color} size={size} />
+            ),
+          }}
+        />
+      </Tabs>
+
+      {/* Streak Overlay - Shows across all tabs */}
+      <StreakOverlay
+        visible={showStreakOverlay}
+        userId={userId}
+        onClose={() => setShowStreakOverlay(false)}
       />
-    </Tabs>
+    </>
   );
 }

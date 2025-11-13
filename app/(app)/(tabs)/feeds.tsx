@@ -19,11 +19,10 @@ import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { captureRef } from 'react-native-view-shot';
 
-// Import components
+// Import components (Remove AddCommunityScreen import)
 import Header from '@/components/feeds/Header';
 import CommunityTabs from '@/components/feeds/CommunityTabs';
 import PostCreation from '@/components/feeds/PostCreation';
-import AddCommunityScreen from '@/components/feeds/AddCommunityScreen';
 import EmptyState from '@/components/feeds/EmptyState';
 import SkeletonLoader from '@/components/feeds/SkeletonLoader';
 import PostCard from '@/components/feeds/PostCard';
@@ -201,16 +200,16 @@ export default function FeedsScreen() {
   const params = useLocalSearchParams();
   const viewShotRefs = useRef<Record<string, any>>({});
 
-  // State
+  // State (Remove showAddCommunity state)
   const [communities, setCommunities] = useState<Community[]>([]);
   const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPost, setNewPost] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showAddCommunity, setShowAddCommunity] = useState(false);
+  // Remove: const [showAddCommunity, setShowAddCommunity] = useState(false);
   const [allCommunities, setAllCommunities] = useState<Community[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  // Remove: const [searchQuery, setSearchQuery] = useState('');
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [weekRange, setWeekRange] = useState('');
@@ -834,30 +833,13 @@ export default function FeedsScreen() {
     return <SkeletonLoader />;
   }
 
-  // Show add community screen
-  if (showAddCommunity) {
-    return (
-      <AddCommunityScreen
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        setShowAddCommunity={setShowAddCommunity}
-        allCommunities={allCommunities}
-        communities={communities}
-        toggleFavorite={toggleFavorite}
-        followerCounts={{}}
-        refreshing={refreshing}
-        onRefresh={onRefresh}
-      />
-    );
-  }
-
   // Show empty state if no communities
   if (communities.length === 0) {
     return (
       <EmptyState
         unreadNotifications={unreadNotifications}
         router={router}
-        onButtonPress={() => setShowAddCommunity(true)}
+        // Remove the onButtonPress prop since we're not using AddCommunityScreen anymore
       />
     );
   }
@@ -867,7 +849,7 @@ export default function FeedsScreen() {
       <Header
         unreadNotifications={unreadNotifications}
         router={router}
-        onAddCommunityPress={() => setShowAddCommunity(true)}
+        // Remove the onAddCommunityPress prop
       />
 
       {/* Show preview header when in preview mode */}

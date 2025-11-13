@@ -22,7 +22,6 @@ import HeaderSection from '@/components/home/HeaderSection';
 import NearbySection from '@/components/home/NearbySection';
 import FavoritesSection from '@/components/home/FavoritesSection';
 import GamificationSection from '@/components/home/GamificationSection';
-import StreakOverlay from '@/components/StreakOverlay';
 import ScreenTransition from '@/components/ScreenTransition';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import LottieView from 'lottie-react-native';
@@ -138,7 +137,6 @@ export default function HomeScreen() {
   const [isFavoritesLoading, setIsFavoritesLoading] = useState(false);
   const navigation = useNavigation();
   const { activeJourney, loading: journeyLoading, refreshActiveJourney } = useJourney();
-  const [showStreakOverlay, setShowStreakOverlay] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
 
@@ -332,7 +330,6 @@ export default function HomeScreen() {
           );
           setFavoriteDetails(details.filter(Boolean));
         }
-        checkAndShowStreakOverlay(userId);
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -374,19 +371,6 @@ export default function HomeScreen() {
     fetchNearestLocations();
   }, [userLocation, fetchNearestLocations]);
 
-  const checkAndShowStreakOverlay = async (userId: string) => {
-    try {
-      const shownKey = `streakOverlayShown_${userId}`;
-      const hasShown = await AsyncStorage.getItem(shownKey);
-      
-      if (!hasShown) {
-        setShowStreakOverlay(true);
-        await AsyncStorage.setItem(shownKey, 'true');
-      }
-    } catch (error) {
-      console.error('Error checking streak overlay status:', error);
-    }
-  };
 
   const loadUserStats = async () => {
     setIsStatsLoading(true);
@@ -822,11 +806,6 @@ useEffect(() => {
           colors={colors}
         />
 
-        <StreakOverlay
-          visible={showStreakOverlay}
-          userId={userId}
-          onClose={() => setShowStreakOverlay(false)}
-        />
       </ScrollView>
     </ScreenTransition>
   );

@@ -13,10 +13,13 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
   const [streakData, setStreakData] = useState({
     currentStreak: 0,
     maxStreak: 0,
-    pointsEarned: 10,
+    pointsEarned: 0,
     dayOfWeek: '',
     isNewRecord: false,
+    message: '',
   });
+
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (visible && userId) {
@@ -25,10 +28,15 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
   }, [visible, userId]);
 
   const updateLoginStreak = async () => {
+    if (!userId) return;
+    
+    setIsLoading(true);
     try {
       const today = new Date();
       const todayDate = today.toISOString().split('T')[0];
       const dayOfWeek = today.toLocaleDateString('en-US', { weekday: 'long' });
+
+      console.log('Updating streak for user:', userId, 'Date:', todayDate);
 
       // Get or create login streak record
       let { data: streakRecord, error } = await supabase
@@ -37,80 +45,130 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
         .eq('user_id', userId)
         .single();
 
+      console.log('Existing streak record:', streakRecord);
+
       let currentStreak = 1;
       let maxStreak = 1;
       let pointsEarned = 10; // Base points for logging in
       let isNewRecord = false;
+      let message = 'Welcome back!';
 
       if (error && error.code === 'PGRST116') {
         // No existing record, create new one
-        const { error: insertError } = await supabase
+        console.log('Creating new streak record');
+        const { data: newRecord, error: insertError } = await supabase
           .from('login_streaks')
           .insert([{
             user_id: userId,
             last_login: todayDate,
             current_streak: 1,
             max_streak: 1,
-          }]);
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }])
+          .select()
+          .single();
 
         if (insertError) {
           console.error('Error creating streak record:', insertError);
+          throw insertError;
         }
+
+        streakRecord = newRecord;
+        message = 'Welcome! Start your journey!';
+        
       } else if (streakRecord) {
         const lastLogin = new Date(streakRecord.last_login);
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
+        const lastLoginDate = lastLogin.toISOString().split('T')[0];
+        
+        console.log('Last login date:', lastLoginDate, 'Today:', todayDate);
 
-        if (streakRecord.last_login === todayDate) {
+        if (lastLoginDate === todayDate) {
           // Already logged in today
+          console.log('Already logged in today');
           currentStreak = streakRecord.current_streak;
           maxStreak = streakRecord.max_streak;
           pointsEarned = 0; // No additional points for same day
-        } else if (lastLogin.toISOString().split('T')[0] === yesterday.toISOString().split('T')[0]) {
-          // Consecutive day login
-          currentStreak = streakRecord.current_streak + 1;
-          maxStreak = Math.max(currentStreak, streakRecord.max_streak);
-          pointsEarned = 10 + (currentStreak * 2); // Bonus points for streak
-          isNewRecord = currentStreak > streakRecord.max_streak;
-
-          // Update streak record
-          await supabase
-            .from('login_streaks')
-            .update({
-              last_login: todayDate,
-              current_streak: currentStreak,
-              max_streak: maxStreak,
-            })
-            .eq('user_id', userId);
+          message = 'Welcome back! You already logged in today.';
         } else {
-          // Streak broken, reset to 1
-          currentStreak = 1;
-          maxStreak = streakRecord.max_streak;
-          pointsEarned = 10;
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayDate = yesterday.toISOString().split('T')[0];
 
-          await supabase
-            .from('login_streaks')
-            .update({
-              last_login: todayDate,
-              current_streak: 1,
-            })
-            .eq('user_id', userId);
+          console.log('Yesterday date:', yesterdayDate);
+
+          if (lastLoginDate === yesterdayDate) {
+            // Consecutive day login - streak continues
+            console.log('Consecutive day login - continuing streak');
+            currentStreak = streakRecord.current_streak + 1;
+            maxStreak = Math.max(currentStreak, streakRecord.max_streak);
+            pointsEarned = 10 + (currentStreak * 2); // Bonus points for streak
+            isNewRecord = currentStreak > streakRecord.max_streak;
+            message = `Amazing! ${currentStreak} day streak!`;
+
+            // Update streak record
+            const { error: updateError } = await supabase
+              .from('login_streaks')
+              .update({
+                last_login: todayDate,
+                current_streak: currentStreak,
+                max_streak: maxStreak,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('user_id', userId);
+
+            if (updateError) {
+              console.error('Error updating streak:', updateError);
+              throw updateError;
+            }
+          } else {
+            // Streak broken (not consecutive), reset to 1
+            console.log('Streak broken - resetting to 1');
+            currentStreak = 1;
+            maxStreak = streakRecord.max_streak;
+            pointsEarned = 10;
+            message = 'Welcome back! New streak started.';
+
+            const { error: updateError } = await supabase
+              .from('login_streaks')
+              .update({
+                last_login: todayDate,
+                current_streak: 1,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('user_id', userId);
+
+            if (updateError) {
+              console.error('Error resetting streak:', updateError);
+              throw updateError;
+            }
+          }
         }
       }
 
-      // Award points to user profile
+      // Award points to user profile if points were earned
       if (pointsEarned > 0) {
-        const { data: profile } = await supabase
+        console.log('Awarding points:', pointsEarned);
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('points')
           .eq('id', userId)
           .single();
 
-        if (profile) {
-          await supabase
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+        } else if (profile) {
+          const newPoints = (profile.points || 0) + pointsEarned;
+          const { error: updateError } = await supabase
             .from('profiles')
-            .update({ points: (profile.points || 0) + pointsEarned })
+            .update({ points: newPoints })
             .eq('id', userId);
+
+          if (updateError) {
+            console.error('Error updating points:', updateError);
+          } else {
+            console.log('Points updated successfully');
+          }
         }
       }
 
@@ -120,11 +178,45 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
         pointsEarned,
         dayOfWeek,
         isNewRecord,
+        message,
       });
+
+      console.log('Streak update completed:', {
+        currentStreak,
+        maxStreak,
+        pointsEarned,
+        isNewRecord,
+        message
+      });
+
     } catch (error) {
       console.error('Error updating login streak:', error);
+      // Set fallback data
+      setStreakData({
+        currentStreak: 1,
+        maxStreak: 1,
+        pointsEarned: 10,
+        dayOfWeek: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
+        isNewRecord: false,
+        message: 'Welcome! Daily login bonus awarded.',
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <Modal visible={visible} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.container}>
+            <Text style={styles.title}>Updating your streak...</Text>
+            <Text style={styles.dayText}>Please wait</Text>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
@@ -145,7 +237,7 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
             </View>
 
             <Text style={styles.title}>
-              {streakData.isNewRecord ? 'New Record!' : 'Welcome Back!'}
+              {streakData.isNewRecord ? 'New Record! 🔥' : streakData.message}
             </Text>
 
             <Text style={styles.dayText}>Happy {streakData.dayOfWeek}!</Text>
@@ -158,16 +250,18 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
             {streakData.isNewRecord && (
               <View style={styles.recordBadge}>
                 <Trophy size={20} color="#fbbf24" />
-                <Text style={styles.recordText}>Personal Best!</Text>
+                <Text style={styles.recordText}>Personal Best! 🏆</Text>
               </View>
             )}
 
             <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
-                <Star size={20} color="#1ea2b1" />
-                <Text style={styles.statValue}>+{streakData.pointsEarned}</Text>
-                <Text style={styles.statLabel}>Points Earned</Text>
-              </View>
+              {streakData.pointsEarned > 0 && (
+                <View style={styles.statItem}>
+                  <Star size={20} color="#1ea2b1" />
+                  <Text style={styles.statValue}>+{streakData.pointsEarned}</Text>
+                  <Text style={styles.statLabel}>Points Earned</Text>
+                </View>
+              )}
 
               <View style={styles.statItem}>
                 <Trophy size={20} color="#fbbf24" />
