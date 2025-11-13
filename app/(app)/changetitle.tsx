@@ -18,6 +18,8 @@ import {
 import { useProfile } from '@/hook/useProfile';
 
 const { width: screenWidth } = Dimensions.get('window');
+const CARD_MARGIN = 8;
+const CARD_WIDTH = (screenWidth - 40 - CARD_MARGIN) / 2;
 
 const TitleChangeScreen = () => {
   const { colors } = useTheme();
@@ -82,29 +84,86 @@ const TitleChangeScreen = () => {
     });
   };
 
-  const SkeletonLoader = () => (
-    <View style={styles.skeletonContainer}>
-      <View style={[styles.skeletonHeader, { backgroundColor: colors.border }]} />
-      <View style={[styles.skeletonSubheader, { backgroundColor: colors.border }]} />
-      
-      <View style={styles.grid}>
-        {[1, 2, 3, 4, 5, 6].map((item) => (
-          <View key={item} style={[styles.skeletonCard, { backgroundColor: colors.card }]}>
-            <View style={[styles.skeletonIcon, { backgroundColor: colors.border }]} />
-            <View style={[styles.skeletonText, { backgroundColor: colors.border }]} />
-            <View style={[styles.skeletonSubtext, { backgroundColor: colors.border }]} />
+  const SkeletonLoader = () => {
+    const { colors } = useTheme();
+    
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Header Skeleton */}
+        <View style={styles.header}>
+          <View style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
+          <View style={[styles.skeletonSubtitle, { backgroundColor: colors.border }]} />
+          
+          {/* Stats Bar Skeleton */}
+          <View style={[styles.statsBar, { backgroundColor: colors.card }]}>
+            {[1, 2, 3].map((item) => (
+              <View key={item} style={styles.stat}>
+                <View style={[styles.skeletonStatValue, { backgroundColor: colors.border }]} />
+                <View style={[styles.skeletonStatLabel, { backgroundColor: colors.border }]} />
+              </View>
+            ))}
           </View>
-        ))}
+
+          {/* Current Title Skeleton */}
+          <View style={[styles.currentContainer, { backgroundColor: colors.primary }]}>
+            <View style={[styles.skeletonCurrentLabel, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
+            <View style={styles.currentTitle}>
+              <View style={[styles.skeletonIconSmall, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
+              <View style={[styles.skeletonCurrentTitle, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
+            </View>
+          </View>
+        </View>
+
+        {/* Tabs Skeleton */}
+        <View style={[styles.tabsContainer, { backgroundColor: colors.card }]}>
+          {[1, 2, 3].map((item) => (
+            <View key={item} style={[styles.skeletonTab, { backgroundColor: colors.border }]} />
+          ))}
+        </View>
+
+        {/* Grid Skeleton */}
+        <View style={styles.grid}>
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((item) => (
+            <View 
+              key={item} 
+              style={[
+                styles.skeletonTitleCard, 
+                { 
+                  backgroundColor: colors.card,
+                  borderColor: colors.border
+                }
+              ]}
+            >
+              {/* Rarity Badge Skeleton */}
+              <View style={[styles.skeletonRarityBadge, { backgroundColor: colors.border }]} />
+              
+              {/* Status Badge Skeleton */}
+              <View style={[styles.skeletonStatusBadge, { backgroundColor: colors.border }]} />
+              
+              {/* Icon Skeleton */}
+              <View style={[styles.skeletonIcon, { backgroundColor: colors.border }]} />
+              
+              {/* Title Info Skeleton */}
+              <View style={styles.skeletonTitleInfo}>
+                <View style={[styles.skeletonTitleName, { backgroundColor: colors.border }]} />
+                <View style={[styles.skeletonRarity, { backgroundColor: colors.border }]} />
+                <View style={[styles.skeletonPoints, { backgroundColor: colors.border }]} />
+              </View>
+              
+              {/* Progress Bar Skeleton */}
+              <View style={styles.skeletonProgressContainer}>
+                <View style={[styles.skeletonProgressBar, { backgroundColor: colors.border }]} />
+                <View style={[styles.skeletonProgressText, { backgroundColor: colors.border }]} />
+              </View>
+            </View>
+          ))}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   if (loading) {
-    return (
-      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-        <SkeletonLoader />
-      </ScrollView>
-    );
+    return <SkeletonLoader />;
   }
 
   const unlockedTitles = titles.filter((title) => profile?.titles?.includes(title.title));
@@ -466,53 +525,9 @@ const TitleChangeScreen = () => {
   );
 };
 
-const CARD_MARGIN = 8;
-const CARD_WIDTH = (screenWidth - 40 - CARD_MARGIN) / 2;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  skeletonContainer: {
-    padding: 20,
-  },
-  skeletonHeader: {
-    height: 32,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  skeletonSubheader: {
-    height: 16,
-    borderRadius: 8,
-    marginBottom: 24,
-    width: '60%',
-  },
-  grid: {
-    padding: 12,
-  },
-  skeletonCard: {
-    width: CARD_WIDTH,
-    margin: CARD_MARGIN,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  skeletonIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginBottom: 12,
-  },
-  skeletonText: {
-    height: 16,
-    borderRadius: 4,
-    marginBottom: 8,
-    width: '80%',
-  },
-  skeletonSubtext: {
-    height: 12,
-    borderRadius: 4,
-    width: '60%',
   },
   header: {
     padding: 20,
@@ -593,6 +608,9 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  grid: {
+    padding: 12,
   },
   titleCard: {
     width: CARD_WIDTH,
@@ -854,6 +872,123 @@ const styles = StyleSheet.create({
   lockedButtonText: {
     fontWeight: '600',
     fontSize: 14,
+  },
+  // Skeleton Loader Styles
+  skeletonTitle: {
+    height: 32,
+    borderRadius: 8,
+    marginBottom: 8,
+    width: '40%',
+    alignSelf: 'center',
+  },
+  skeletonSubtitle: {
+    height: 16,
+    borderRadius: 6,
+    marginBottom: 16,
+    width: '60%',
+    alignSelf: 'center',
+  },
+  skeletonStatValue: {
+    height: 24,
+    borderRadius: 6,
+    width: 30,
+    marginBottom: 6,
+  },
+  skeletonStatLabel: {
+    height: 12,
+    borderRadius: 4,
+    width: 40,
+  },
+  skeletonCurrentLabel: {
+    height: 12,
+    borderRadius: 4,
+    width: 80,
+    marginBottom: 8,
+  },
+  skeletonCurrentTitle: {
+    height: 18,
+    borderRadius: 6,
+    width: 120,
+    marginLeft: 8,
+    flex: 1,
+  },
+  skeletonIconSmall: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  skeletonTab: {
+    flex: 1,
+    height: 32,
+    borderRadius: 8,
+    marginHorizontal: 2,
+  },
+  skeletonTitleCard: {
+    width: CARD_WIDTH,
+    margin: CARD_MARGIN,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 2,
+    alignItems: 'center',
+  },
+  skeletonRarityBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  skeletonStatusBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  skeletonIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: 12,
+    borderWidth: 2,
+  },
+  skeletonTitleInfo: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  skeletonTitleName: {
+    height: 16,
+    borderRadius: 4,
+    width: '80%',
+    marginBottom: 8,
+  },
+  skeletonRarity: {
+    height: 14,
+    borderRadius: 6,
+    width: 60,
+    marginBottom: 6,
+  },
+  skeletonPoints: {
+    height: 12,
+    borderRadius: 4,
+    width: 50,
+  },
+  skeletonProgressContainer: {
+    width: '100%',
+    marginTop: 12,
+  },
+  skeletonProgressBar: {
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 4,
+  },
+  skeletonProgressText: {
+    height: 10,
+    borderRadius: 3,
+    width: 30,
+    alignSelf: 'center',
   },
 });
 
