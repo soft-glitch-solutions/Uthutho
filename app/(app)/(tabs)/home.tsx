@@ -90,6 +90,30 @@ const getTypeLabel = (type: string) => {
   }
 };
 
+// Skeleton Loader Component for Community Items
+const CommunitySkeletonLoader = ({ colors }) => {
+  return (
+    <View style={styles.communityList}>
+      {[1, 2, 3].map((item) => (
+        <View 
+          key={item} 
+          style={[styles.communityItemSkeleton, { backgroundColor: colors.card, borderColor: colors.border }]}
+        >
+          <View style={styles.communityItemContent}>
+            <View style={[styles.communityIconSkeleton, { backgroundColor: colors.border }]} />
+            <View style={styles.communityInfoSkeleton}>
+              <View style={[styles.skeletonTextLarge, { backgroundColor: colors.border }]} />
+              <View style={[styles.skeletonTextSmall, { backgroundColor: colors.border }]} />
+              <View style={[styles.skeletonTextMedium, { backgroundColor: colors.border }]} />
+            </View>
+          </View>
+          <View style={[styles.removeButtonSkeleton, { backgroundColor: colors.border }]} />
+        </View>
+      ))}
+    </View>
+  );
+};
+
 export default function HomeScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -113,7 +137,6 @@ export default function HomeScreen() {
   const [isStatsLoading, setIsStatsLoading] = useState(true);
   const [isFavoritesLoading, setIsFavoritesLoading] = useState(false);
   const navigation = useNavigation();
-// Update the useJourney import to include refresh function if available
   const { activeJourney, loading: journeyLoading, refreshActiveJourney } = useJourney();
   const [showStreakOverlay, setShowStreakOverlay] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -413,7 +436,6 @@ useEffect(() => {
   }
 }, [userProfile]);
 
-// Keep the refresh functionality for manual refreshes
 useEffect(() => {
   if (params.refresh) {
     loadUserStats();
@@ -560,31 +582,27 @@ useEffect(() => {
     }
   };
 
-  // Pull-to-refresh handler
-// Pull-to-refresh handler
-const onRefresh = useCallback(async () => {
-  setRefreshing(true);
-  try {
-    const refreshPromises = [
-      fetchUserProfile(),
-      fetchNearestLocations(),
-      loadUserStats(),
-    ];
-    
-    // Add journey refresh if available
-    if (refreshActiveJourney) {
-      refreshPromises.push(refreshActiveJourney());
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const refreshPromises = [
+        fetchUserProfile(),
+        fetchNearestLocations(),
+        loadUserStats(),
+      ];
+      
+      if (refreshActiveJourney) {
+        refreshPromises.push(refreshActiveJourney());
+      }
+      
+      await Promise.all(refreshPromises);
+    } catch (error) {
+      console.error('Error during refresh:', error);
+    } finally {
+      setRefreshing(false);
     }
-    
-    await Promise.all(refreshPromises);
-  } catch (error) {
-    console.error('Error during refresh:', error);
-  } finally {
-    setRefreshing(false);
-  }
-}, [fetchUserProfile, fetchNearestLocations, loadUserStats, refreshActiveJourney]);
+  }, [fetchUserProfile, fetchNearestLocations, loadUserStats, refreshActiveJourney]);
 
-  // helper: fetch counts from favorites table for all resolved favorites
   const loadFavoriteFollowerCounts = async (items: Array<{ id: string; type: 'route'|'hub'|'stop' }>) => {
     try {
       const byType: Record<'route'|'hub'|'stop', string[]> = { route: [], hub: [], stop: [] };
@@ -611,7 +629,6 @@ const onRefresh = useCallback(async () => {
     }
   };
 
-  // reload counts whenever resolved favorite IDs/types change
   useEffect(() => {
     const resolved = favoriteDetails
       .filter(Boolean)
@@ -713,11 +730,7 @@ const onRefresh = useCallback(async () => {
           </Text>
           
           {isProfileLoading || isFavoritesLoading ? (
-            <View style={styles.loadingContainer}>
-              <Text style={[styles.loadingText, { color: colors.text }]}>
-                Loading your community...
-              </Text>
-            </View>
+            <CommunitySkeletonLoader colors={colors} />
           ) : favorites.length === 0 ? (
             <View style={styles.emptyContainer}>
               <FlyboxAnimation style={styles.lottieAnimation} />
@@ -921,7 +934,7 @@ const styles = StyleSheet.create({
   communityType: {
     fontSize: 14,
   },
-   addButton: {
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1ea2b1',
@@ -1013,5 +1026,44 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#ffffff',
     opacity: 0.7,
+  },
+  // Skeleton Styles
+  communityItemSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  communityIconSkeleton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: 12,
+  },
+  communityInfoSkeleton: {
+    flex: 1,
+    gap: 6,
+  },
+  skeletonTextLarge: {
+    height: 16,
+    borderRadius: 4,
+    width: '70%',
+  },
+  skeletonTextMedium: {
+    height: 12,
+    borderRadius: 4,
+    width: '40%',
+  },
+  skeletonTextSmall: {
+    height: 10,
+    borderRadius: 4,
+    width: '30%',
+  },
+  removeButtonSkeleton: {
+    width: 60,
+    height: 24,
+    borderRadius: 6,
   },
 });
