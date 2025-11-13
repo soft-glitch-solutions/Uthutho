@@ -127,38 +127,53 @@ export default function TrackerScreen() {
     }
   };
 
-  const removeCard = async (cardId: string) => {
-    Alert.alert(
-      'Remove Card',
-      'Are you sure you want to remove this card? All associated entries will be kept for historical records.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('user_cards')
-                .update({ is_active: false })
-                .eq('id', cardId);
+const removeCard = async (cardId: string) => {
+  try {
+    console.log('Attempting to remove card from Supabase:', cardId);
+    
+    // Option 1: Soft delete (set is_active to false) - RECOMMENDED
+    const { error } = await supabase
+      .from('user_cards')
+      .update({ 
+        is_active: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', cardId)
+      .eq('user_id', user?.id);
 
-              if (error) throw error;
+    // Option 2: Hard delete (completely remove from database)
+    // const { error } = await supabase
+    //   .from('user_cards')
+    //   .delete()
+    //   .eq('id', cardId)
+    //   .eq('user_id', user?.id);
 
-              await loadUserCards();
-              if (selectedCard?.id === cardId) {
-                setSelectedCard(userCards.find(card => card.id !== cardId) || null);
-              }
-              Alert.alert('Success', 'Card removed successfully');
-            } catch (error) {
-              console.error('Error removing card:', error);
-              Alert.alert('Error', 'Failed to remove card');
-            }
-          }
-        }
-      ]
-    );
-  };
+    if (error) {
+      console.error('Supabase delete error:', error);
+      throw error;
+    }
+
+    console.log('Card successfully removed from Supabase');
+    
+    // Update local state immediately for better UX
+    setUserCards(prevCards => prevCards.filter(card => card.id !== cardId));
+    
+    // Update selected card if needed
+    if (selectedCard?.id === cardId) {
+      setSelectedCard(userCards.find(card => card.id !== cardId) || null);
+    }
+
+    // Show success message
+    Alert.alert('Success', 'Card removed successfully');
+    
+  } catch (error) {
+    console.error('Error removing card:', error);
+    Alert.alert('Error', 'Failed to remove card. Please try again.');
+    
+    // Reload cards to sync with server state
+    loadUserCards();
+  }
+};
 
   const handleEditCard = (card: UserCard) => {
     setEditingCard(card);
