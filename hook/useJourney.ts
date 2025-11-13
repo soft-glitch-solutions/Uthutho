@@ -17,10 +17,13 @@ export interface Journey {
     start_point: string;
     end_point: string;
   };
-  stops?: Array<{
+  stops: Array<{
     id: string;
     name: string;
-    order_number: number;
+    order_number: number; // This now comes from route_stops
+    latitude?: number;
+    longitude?: number;
+    // ... any other stop fields
   }>;
   driver_journeys?: {
     driver_id: string;
@@ -311,78 +314,91 @@ export function useJourney() {
     }
   };
 
-  const loadActiveJourney = async () => {
-    if (!user) {
+const loadActiveJourney = async () => {
+  if (!user) {
+    setLoading(false);
+    return;
+  }
+
+  try {
+    // Check if user has active waiting status with journey
+    const { data: waitingData, error: waitingError } = await supabase
+      .from('stop_waiting')
+      .select(`
+        *,
+        journeys (
+          *,
+          routes (
+            name,
+            transport_type,
+            start_point,
+            end_point
+          ),
+          driver_journeys (
+            driver_id,
+            status,
+            drivers (
+              user_id,
+              profiles (
+                first_name,
+                last_name
+              )
+            )
+          )
+        )
+      `)
+      .eq('user_id', user.id)
+      .not('journey_id', 'is', null)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+
+    if (waitingError) {
+      console.error('Error loading active journey:', waitingError);
+      setActiveJourney(null);
       setLoading(false);
       return;
     }
 
-    try {
-      // Check if user has active waiting status with journey
-      const { data: waitingData, error: waitingError } = await supabase
-        .from('stop_waiting')
+    if (waitingData?.journeys) {
+      // FIX: Load route stops through route_stops junction table (like in StopDetailsScreen)
+      const { data: routeStops, error: stopsError } = await supabase
+        .from('route_stops')
         .select(`
-          *,
-          journeys (
-            *,
-            routes (
-              name,
-              transport_type,
-              start_point,
-              end_point
-            ),
-            driver_journeys (
-              driver_id,
-              status,
-              drivers (
-                user_id,
-                profiles (
-                  first_name,
-                  last_name
-                )
-              )
-            )
-          )
+          stops (*),
+          order_number
         `)
-        .eq('user_id', user.id)
-        .not('journey_id', 'is', null)
-        .gt('expires_at', new Date().toISOString())
-        .maybeSingle();
+        .eq('route_id', waitingData.journeys.route_id)
+        .order('order_number', { ascending: true });
 
-      if (waitingError) {
-        console.error('Error loading active journey:', waitingError);
-        setActiveJourney(null);
-        setLoading(false);
-        return;
+      if (stopsError) {
+        console.error('Error loading route stops:', stopsError);
       }
 
-      if (waitingData?.journeys) {
-        // Load route stops for progress tracking
-        const { data: stopsData } = await supabase
-          .from('stops')
-          .select('id, name, order_number')
-          .eq('route_id', waitingData.journeys.route_id)
-          .order('order_number', { ascending: true });
+      // Process the stops with their order numbers from route_stops
+      const processedStops = (routeStops || []).map(routeStop => ({
+        ...routeStop.stops,
+        order_number: routeStop.order_number // Use order_number from route_stops
+      }));
 
-        const journeyWithStops = {
-          ...waitingData.journeys,
-          stops: stopsData || [],
-        };
+      const journeyWithStops = {
+        ...waitingData.journeys,
+        stops: processedStops,
+      };
 
-        setActiveJourney(journeyWithStops);
+      setActiveJourney(journeyWithStops);
 
-        // Check and assign driver for this journey
-        await checkAndAssignJourneyDriver(waitingData.journeys.id);
-      } else {
-        setActiveJourney(null);
-      }
-    } catch (error) {
-      console.error('Error loading active journey:', error);
+      // Check and assign driver for this journey
+      await checkAndAssignJourneyDriver(waitingData.journeys.id);
+    } else {
       setActiveJourney(null);
     }
-    
-    setLoading(false);
-  };
+  } catch (error) {
+    console.error('Error loading active journey:', error);
+    setActiveJourney(null);
+  }
+  
+  setLoading(false);
+};
 
   const createOrJoinJourney = async (stopId: string, routeId: string, transportType: string) => {
     if (!user) return { success: false, error: 'User not authenticated' };

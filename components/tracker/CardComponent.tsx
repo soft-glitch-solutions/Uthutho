@@ -248,11 +248,15 @@ const CardComponent: React.FC<CardComponentProps> = ({
   };
 
   const handleRemoveCardPress = () => {
+    console.log('Remove button pressed for card:', card.id, card.card_number);
     setShowMenu(false);
     setShowDeleteModal(true); // Show confirmation modal instead of directly removing
   };
 
+  
+
   const handleConfirmRemove = () => {
+     console.log('Confirming removal for card ID:', card.id);
     setShowDeleteModal(false);
     onRemoveCard(card.id);
   };

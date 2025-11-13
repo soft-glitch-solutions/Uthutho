@@ -332,7 +332,7 @@ export default function JourneyScreen() {
     setConnectionError(false);
     try {
       await Promise.all([
-        loadJourneyStops(),
+
         loadOtherPassengers(),
         loadCurrentUserStop(),
         loadChatMessages(),
@@ -453,45 +453,6 @@ export default function JourneyScreen() {
     }
   };
 
-  const loadJourneyStops = async () => {
-    if (!activeJourney) return;
-
-    try {
-      const currentStopSequence = activeJourney.current_stop_sequence || 0;
-      
-      const { data: stops, error } = await supabase
-        .from('stops')
-        .select('*')
-        .eq('route_id', activeJourney.route_id)
-        .order('order_number', { ascending: true });
-
-      if (error) {
-        console.error('Error loading journey stops:', error);
-        return;
-      }
-
-      // Get user's stop for highlighting
-      const { data: userStop } = await supabase
-        .from('stop_waiting')
-        .select('stop_id')
-        .eq('user_id', currentUserId)
-        .eq('journey_id', activeJourney.id)
-        .maybeSingle();
-
-      const processedStops = stops.map(stop => ({
-        ...stop,
-        passed: stop.order_number < currentStopSequence,
-        current: stop.order_number === currentStopSequence,
-        upcoming: stop.order_number > currentStopSequence,
-        isUserStop: userStop?.stop_id === stop.id,
-      }));
-
-      setJourneyStops(processedStops);
-    } catch (error) {
-      console.error('Error loading journey stops:', error);
-      throw error;
-    }
-  };
 
   const loadOtherPassengers = async () => {
     if (!activeJourney) return;
@@ -605,35 +566,53 @@ export default function JourneyScreen() {
     }
   };
 
-  const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
-    if (!activeJourney) return;
+const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
+  if (!activeJourney || !user?.id) return;
 
-    try {
-      const { error } = await supabase
-        .from('journey_participants')
-        .update({ status: newStatus })
-        .eq('journey_id', activeJourney.id)
-        .eq('user_id', currentUserId);
+  try {
+    const { error } = await supabase
+      .from('journey_participants')
+      .update({ status: newStatus })
+      .eq('journey_id', activeJourney.id)
+      .eq('user_id', user.id)
+      .eq('is_active', true);
 
-      if (error) {
-        console.error('Error updating participant status:', error);
-        Alert.alert('Error', 'Failed to update status');
-        return;
-      }
-
-      setParticipantStatus(newStatus);
-      
-      // Award points for status changes
-      if (newStatus === 'picked_up') {
-        await awardPoints(2);
-      } else if (newStatus === 'arrived') {
-        await awardPoints(5);
-      }
-    } catch (error) {
+    if (error) {
       console.error('Error updating participant status:', error);
       Alert.alert('Error', 'Failed to update status');
+      return;
     }
-  };
+
+    setParticipantStatus(newStatus);
+    
+    // If user is marked as picked up, advance the journey progress
+    if (newStatus === 'picked_up') {
+      // Find user's current stop
+      const { data: userWaiting } = await supabase
+        .from('stop_waiting')
+        .select('stop_id, stops!inner(order_number)')
+        .eq('user_id', user.id)
+        .eq('journey_id', activeJourney.id)
+        .single();
+
+      if (userWaiting && userWaiting.stops) {
+        const userStopOrder = userWaiting.stops.order_number;
+        
+        // Only advance if this is the furthest stop reached
+        if (userStopOrder > activeJourney.current_stop_sequence) {
+          await updateJourneyProgress(userStopOrder);
+        }
+      }
+
+      await awardPoints(2);
+    } else if (newStatus === 'arrived') {
+      await awardPoints(5);
+    }
+  } catch (error) {
+    console.error('Error updating participant status:', error);
+    Alert.alert('Error', 'Failed to update status');
+  }
+};
 
   const awardPoints = async (points: number) => {
     try {
@@ -804,23 +783,23 @@ Current route: ${activeJourney?.routes?.start_point} to ${activeJourney?.routes?
     if (activeTab === 'info') {
       return (
         <>
-          <JourneyOverview
-            routeName={activeJourney.routes.name}
-            transportType={activeJourney.routes.transport_type}
-            startPoint={activeJourney.routes.start_point}
-            endPoint={activeJourney.routes.end_point}
-            progressPercentage={getProgressPercentage()}
-            waitingTime={formatWaitingTime(waitingTime)}
-            estimatedArrival={getEstimatedArrival()}
-            passengerCount={otherPassengers.length + 1}
-            currentStop={activeJourney.current_stop_sequence || 0}
-            totalStops={journeyStops.length}
-            hasDriver={hasDriverInJourney}
-            driverName={journeyDriver?.profiles ? 
-              `${journeyDriver.profiles.first_name} ${journeyDriver.profiles.last_name}` : 
-              null
-            }
-          />
+        <JourneyOverview
+          routeName={activeJourney.routes.name}
+          transportType={activeJourney.routes.transport_type}
+          startPoint={activeJourney.routes.start_point}
+          endPoint={activeJourney.routes.end_point}
+          progressPercentage={getProgressPercentage()}
+          waitingTime={formatWaitingTime(waitingTime)}
+          estimatedArrival={getEstimatedArrival()}
+          passengerCount={otherPassengers.length + 1}
+          currentStop={activeJourney.current_stop_sequence || 0}
+          totalStops={journeyStops.length} // This should now have the correct count
+          hasDriver={hasDriverInJourney}
+          driverName={journeyDriver?.profiles ? 
+            `${journeyDriver.profiles.first_name} ${journeyDriver.profiles.last_name}` : 
+            null
+          }
+        />
 
                     {/* Journey Status Buttons */}
           <View style={styles.statusContainer}>

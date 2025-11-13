@@ -412,9 +412,6 @@ export default function FilteredLeaderboardScreen() {
             <Text style={styles.headerSubtitle}>{entityName}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.clearButton} onPress={clearFilter}>
-          <X size={20} color="#666" />
-        </TouchableOpacity>
       </View>
 
       {/* Entity Info */}
