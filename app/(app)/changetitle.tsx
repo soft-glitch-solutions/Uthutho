@@ -121,8 +121,8 @@ const TitleChangeScreen = () => {
           ))}
         </View>
 
-        {/* Grid Skeleton */}
-        <View style={styles.grid}>
+        {/* Grid Skeleton - Fixed for 2 columns */}
+        <View style={styles.gridContainer}>
           {[1, 2, 3, 4, 5, 6, 7, 8].map((item) => (
             <View 
               key={item} 
@@ -612,6 +612,12 @@ const styles = StyleSheet.create({
   grid: {
     padding: 12,
   },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 12,
+    justifyContent: 'space-between',
+  },
   titleCard: {
     width: CARD_WIDTH,
     margin: CARD_MARGIN,
@@ -925,7 +931,7 @@ const styles = StyleSheet.create({
   },
   skeletonTitleCard: {
     width: CARD_WIDTH,
-    margin: CARD_MARGIN,
+    marginBottom: 16,
     padding: 16,
     borderRadius: 16,
     borderWidth: 2,
