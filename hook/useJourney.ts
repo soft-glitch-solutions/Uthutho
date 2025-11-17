@@ -20,10 +20,9 @@ export interface Journey {
   stops: Array<{
     id: string;
     name: string;
-    order_number: number; // This now comes from route_stops
+    order_number: number;
     latitude?: number;
     longitude?: number;
-    // ... any other stop fields
   }>;
   driver_journeys?: {
     driver_id: string;
@@ -48,7 +47,6 @@ export function useJourney() {
       loadActiveJourney();
       cleanupStaleJourneyParticipants();
       
-      // Subscribe to journey updates
       const subscription = supabase
         .channel('user_journey')
         .on(
@@ -74,7 +72,6 @@ export function useJourney() {
   // Driver assignment function using driver_journeys table
   const checkAndAssignJourneyDriver = async (journeyId: string) => {
     try {
-      // First check if journey already has an active driver in driver_journeys
       const { data: existingDriverJourney, error: existingError } = await supabase
         .from('driver_journeys')
         .select(`
@@ -98,12 +95,10 @@ export function useJourney() {
       }
   
       if (existingDriverJourney) {
-        // Journey already has an active driver
         await updateJourneyWithDriver(journeyId, existingDriverJourney.driver_id);
         return;
       }
   
-      // Look for verified drivers in journey participants using proper join through profiles
       const { data: participants, error } = await supabase
         .from('journey_participants')
         .select(`
@@ -125,10 +120,8 @@ export function useJourney() {
         return;
       }
   
-      // Get user IDs from participants
       const participantUserIds = participants.map(p => p.user_id);
   
-      // Check which of these users are verified drivers
       const { data: drivers, error: driversError } = await supabase
         .from('drivers')
         .select(`
@@ -150,7 +143,6 @@ export function useJourney() {
       }
   
       if (drivers && drivers.length > 0) {
-        // Found verified driver - create driver_journey entry
         const driver = drivers[0];
         await createDriverJourney(journeyId, driver);
       }
@@ -161,7 +153,6 @@ export function useJourney() {
 
   const createDriverJourney = async (journeyId: string, driverParticipant: any) => {
     try {
-      // Get journey details to get route_id
       const { data: journey, error: journeyError } = await supabase
         .from('journeys')
         .select('route_id')
@@ -173,7 +164,6 @@ export function useJourney() {
         return;
       }
 
-      // Get the first stop for this route
       const { data: firstStop, error: stopError } = await supabase
         .from('stops')
         .select('id')
@@ -186,7 +176,6 @@ export function useJourney() {
         console.error('Error getting first stop:', stopError);
       }
 
-      // Create driver_journey entry
       const { error: createError } = await supabase
         .from('driver_journeys')
         .insert({
@@ -202,10 +191,7 @@ export function useJourney() {
         return;
       }
 
-      // Update the main journey table
       await updateJourneyWithDriver(journeyId, driverParticipant.drivers.id);
-
-      // Send notification to passengers
       await notifyPassengersDriverJoined(journeyId, driverParticipant.profiles);
 
       console.log('Driver journey created for:', driverParticipant.user_id);
@@ -264,13 +250,11 @@ export function useJourney() {
     }
   };
 
-  // Clean up stale journey participants
   const cleanupStaleJourneyParticipants = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Find completed or expired journeys where user is still marked as active
       const { data: staleParticipants, error } = await supabase
         .from('journey_participants')
         .select(`
@@ -314,100 +298,94 @@ export function useJourney() {
     }
   };
 
-const loadActiveJourney = async () => {
-  if (!user) {
-    setLoading(false);
-    return;
-  }
-
-  try {
-    // Check if user has active waiting status with journey
-    const { data: waitingData, error: waitingError } = await supabase
-      .from('stop_waiting')
-      .select(`
-        *,
-        journeys (
-          *,
-          routes (
-            name,
-            transport_type,
-            start_point,
-            end_point
-          ),
-          driver_journeys (
-            driver_id,
-            status,
-            drivers (
-              user_id,
-              profiles (
-                first_name,
-                last_name
-              )
-            )
-          )
-        )
-      `)
-      .eq('user_id', user.id)
-      .not('journey_id', 'is', null)
-      .gt('expires_at', new Date().toISOString())
-      .maybeSingle();
-
-    if (waitingError) {
-      console.error('Error loading active journey:', waitingError);
-      setActiveJourney(null);
+  const loadActiveJourney = async () => {
+    if (!user) {
       setLoading(false);
       return;
     }
 
-    if (waitingData?.journeys) {
-      // FIX: Load route stops through route_stops junction table (like in StopDetailsScreen)
-      const { data: routeStops, error: stopsError } = await supabase
-        .from('route_stops')
+    try {
+      const { data: waitingData, error: waitingError } = await supabase
+        .from('stop_waiting')
         .select(`
-          stops (*),
-          order_number
+          *,
+          journeys (
+            *,
+            routes (
+              name,
+              transport_type,
+              start_point,
+              end_point
+            ),
+            driver_journeys (
+              driver_id,
+              status,
+              drivers (
+                user_id,
+                profiles (
+                  first_name,
+                  last_name
+                )
+              )
+            )
+          )
         `)
-        .eq('route_id', waitingData.journeys.route_id)
-        .order('order_number', { ascending: true });
+        .eq('user_id', user.id)
+        .not('journey_id', 'is', null)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
 
-      if (stopsError) {
-        console.error('Error loading route stops:', stopsError);
+      if (waitingError) {
+        console.error('Error loading active journey:', waitingError);
+        setActiveJourney(null);
+        setLoading(false);
+        return;
       }
 
-      // Process the stops with their order numbers from route_stops
-      const processedStops = (routeStops || []).map(routeStop => ({
-        ...routeStop.stops,
-        order_number: routeStop.order_number // Use order_number from route_stops
-      }));
+      if (waitingData?.journeys) {
+        const { data: routeStops, error: stopsError } = await supabase
+          .from('route_stops')
+          .select(`
+            stops (*),
+            order_number
+          `)
+          .eq('route_id', waitingData.journeys.route_id)
+          .order('order_number', { ascending: true });
 
-      const journeyWithStops = {
-        ...waitingData.journeys,
-        stops: processedStops,
-      };
+        if (stopsError) {
+          console.error('Error loading route stops:', stopsError);
+        }
 
-      setActiveJourney(journeyWithStops);
+        const processedStops = (routeStops || []).map(routeStop => ({
+          ...routeStop.stops,
+          order_number: routeStop.order_number
+        }));
 
-      // Check and assign driver for this journey
-      await checkAndAssignJourneyDriver(waitingData.journeys.id);
-    } else {
+        const journeyWithStops = {
+          ...waitingData.journeys,
+          stops: processedStops,
+        };
+
+        setActiveJourney(journeyWithStops);
+        await checkAndAssignJourneyDriver(waitingData.journeys.id);
+      } else {
+        setActiveJourney(null);
+      }
+    } catch (error) {
+      console.error('Error loading active journey:', error);
       setActiveJourney(null);
     }
-  } catch (error) {
-    console.error('Error loading active journey:', error);
-    setActiveJourney(null);
-  }
-  
-  setLoading(false);
-};
+    
+    setLoading(false);
+  };
 
-  const createOrJoinJourney = async (stopId: string, routeId: string, transportType: string) => {
+  // UPDATED: Modified to accept specific journey ID
+  const createOrJoinJourney = async (stopId: string, routeId: string, transportType: string, specificJourneyId?: string) => {
     if (!user) return { success: false, error: 'User not authenticated' };
 
     try {
-      // Clean up any stale participants before creating/joining
       await cleanupStaleJourneyParticipants();
 
-      // First check if user is already in a journey by looking at stop_waiting
       const { data: existingWaiting, error: waitingError } = await supabase
         .from('stop_waiting')
         .select('journey_id')
@@ -423,23 +401,13 @@ const loadActiveJourney = async () => {
         return { success: true, journeyId: existingWaiting.journey_id };
       }
 
-      // Check for existing journeys for this route
-      const { data: existingJourneys, error: fetchError } = await supabase
-        .from('journeys')
-        .select('*')
-        .eq('route_id', routeId)
-        .eq('status', 'in_progress')
-        .order('created_at', { ascending: false });
-
-      if (fetchError) throw fetchError;
-
       let journeyId;
 
-      // If there are existing journeys, join the first one
-      if (existingJourneys && existingJourneys.length > 0) {
-        journeyId = existingJourneys[0].id;
+      // NEW: If specific journey ID is provided, join that journey
+      if (specificJourneyId) {
+        journeyId = specificJourneyId;
         
-        // Add user to journey participants
+        // Add user to the specific journey participants
         const { error: participantError } = await supabase
           .from('journey_participants')
           .upsert({
@@ -455,32 +423,61 @@ const loadActiveJourney = async () => {
           console.error('Error adding participant:', participantError);
         }
       } else {
-        // Create new journey
-        const { data: newJourney, error: insertError } = await supabase
+        // Check for existing journeys for this route (original logic)
+        const { data: existingJourneys, error: fetchError } = await supabase
           .from('journeys')
-          .insert({
-            route_id: routeId,
-            current_stop_sequence: 0,
-            status: 'in_progress'
-          })
-          .select()
-          .single();
+          .select('*')
+          .eq('route_id', routeId)
+          .eq('status', 'in_progress')
+          .order('created_at', { ascending: false });
 
-        if (insertError) throw insertError;
-        journeyId = newJourney.id;
+        if (fetchError) throw fetchError;
 
-        // Add creator as participant
-        const { error: participantError } = await supabase
-          .from('journey_participants')
-          .insert({
-            journey_id: journeyId,
-            user_id: user.id,
-            is_active: true,
-            status: 'waiting'
-          });
+        // If there are existing journeys, join the first one
+        if (existingJourneys && existingJourneys.length > 0) {
+          journeyId = existingJourneys[0].id;
+          
+          const { error: participantError } = await supabase
+            .from('journey_participants')
+            .upsert({
+              journey_id: journeyId,
+              user_id: user.id,
+              is_active: true,
+              status: 'waiting'
+            }, {
+              onConflict: 'journey_id,user_id'
+            });
 
-        if (participantError) {
-          console.error('Error adding participant:', participantError);
+          if (participantError) {
+            console.error('Error adding participant:', participantError);
+          }
+        } else {
+          // Create new journey
+          const { data: newJourney, error: insertError } = await supabase
+            .from('journeys')
+            .insert({
+              route_id: routeId,
+              current_stop_sequence: 0,
+              status: 'in_progress'
+            })
+            .select()
+            .single();
+
+          if (insertError) throw insertError;
+          journeyId = newJourney.id;
+
+          const { error: participantError } = await supabase
+            .from('journey_participants')
+            .insert({
+              journey_id: journeyId,
+              user_id: user.id,
+              is_active: true,
+              status: 'waiting'
+            });
+
+          if (participantError) {
+            console.error('Error adding participant:', participantError);
+          }
         }
       }
 
@@ -500,23 +497,18 @@ const loadActiveJourney = async () => {
 
       if (waitingUpsertError) throw waitingUpsertError;
 
-      // Check for drivers after creating/joining journey
       await checkAndAssignJourneyDriver(journeyId);
-
-      // Reload active journey
       await loadActiveJourney();
 
       return { success: true, journeyId };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in createOrJoinJourney:', error);
       return { success: false, error: error.message };
     }
   };
 
-  // Add function to update driver's current stop
   const updateDriverCurrentStop = async (driverId: string, journeyId: string, stopId: string) => {
     try {
-      // Get next stop
       const { data: currentStop } = await supabase
         .from('stops')
         .select('order_number')
@@ -550,7 +542,6 @@ const loadActiveJourney = async () => {
     }
   };
 
-  // Add function to complete driver journey
   const completeDriverJourney = async (driverId: string, journeyId: string) => {
     try {
       const { error } = await supabase
@@ -579,7 +570,6 @@ const loadActiveJourney = async () => {
     }
 
     try {
-      // Check if user is a driver and complete driver journey if so
       const { data: driverData } = await supabase
         .from('drivers')
         .select('id')
@@ -592,7 +582,6 @@ const loadActiveJourney = async () => {
         await completeDriverJourney(driverData.id, activeJourney.id);
       }
 
-      // 1) Get the stop_waiting record to compute ride duration
       const { data: waitingRow, error: waitingError } = await supabase
         .from('stop_waiting')
         .select('created_at')
@@ -604,14 +593,13 @@ const loadActiveJourney = async () => {
         console.warn('Warning fetching stop_waiting:', waitingError);
       }
 
-      let rideDuration = 0; // seconds
+      let rideDuration = 0;
       if (waitingRow?.created_at) {
         const started = new Date(waitingRow.created_at).getTime();
         const now = Date.now();
         rideDuration = Math.max(0, Math.floor((now - started) / 1000));
       }
 
-      // 2) Remove user from stop_waiting
       const { error: deleteError } = await supabase
         .from('stop_waiting')
         .delete()
@@ -620,7 +608,6 @@ const loadActiveJourney = async () => {
       if (deleteError) throw deleteError;
       console.log('Removed user from stop_waiting');
 
-      // 3) Deactivate user from journey participants
       const { error: deactivateError } = await supabase
         .from('journey_participants')
         .update({ 
@@ -638,7 +625,6 @@ const loadActiveJourney = async () => {
         console.log('Deactivated user from journey participants');
       }
 
-      // 4) Increment trips, total ride time, and add points
       let newTrips: number | null = null;
       try {
         const { data: rpcData, error: rpcErr } = await supabase
@@ -646,14 +632,12 @@ const loadActiveJourney = async () => {
 
         if (rpcErr) throw rpcErr;
 
-        // Extract trips
         if (Array.isArray(rpcData) && rpcData.length > 0) {
           newTrips = rpcData[0].new_trips ?? rpcData[0].cur_trips ?? null;
         } else if (rpcData && typeof rpcData === 'object') {
           newTrips = (rpcData as any).new_trips ?? null;
         }
 
-        // Add points for completing journey
         await supabase
           .from('profiles')
           .update({ points: supabase.raw('points + 10') })
@@ -683,20 +667,19 @@ const loadActiveJourney = async () => {
         console.log('Updated trips, total_ride_time, and points inline');
       }
 
-      // 5) Check remaining users for this journey
       const { data: remainingUsers, error: remainingError } = await supabase
         .from('stop_waiting')
         .select('id')
         .eq('journey_id', activeJourney.id);
       if (remainingError) throw remainingError;
 
-      // Also check if there are any active participants left
+      // FIXED: Removed the extra single quote from 'true'
       const { data: activeParticipants, error: participantsError } = await supabase
         .from('journey_participants')
         .select('id')
         .eq('journey_id', activeJourney.id)
         .eq('is_active', true);
-      
+
       if (participantsError) {
         console.error('Error checking active participants:', participantsError);
       }
@@ -705,7 +688,6 @@ const loadActiveJourney = async () => {
                             (activeParticipants && activeParticipants.length > 0);
 
       if (!hasActiveUsers) {
-        // 6) Delete journey completely if no active users
         const { error: deleteJourneyError } = await supabase
           .from('journeys')
           .delete()
@@ -717,7 +699,6 @@ const loadActiveJourney = async () => {
         console.log('Journey still has waiting users; not deleting');
       }
 
-      // Clear local state
       setActiveJourney(null);
 
       return { success: true, rideDuration, newTrips };
