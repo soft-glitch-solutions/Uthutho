@@ -479,12 +479,6 @@ export default function ProfileScreen() {
       subtitle: 'Change your profile title',
       route: '/changetitle'
     },
-    {
-      icon: <Edit size={24} color={colors.primary} />,
-      title: 'Title To Earn',
-      subtitle: 'Look at what title to earn',
-      route: '/titleearn'
-    },
   ];
 
   // ... (keep all your existing loading skeleton and main component JSX)
