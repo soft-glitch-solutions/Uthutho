@@ -85,19 +85,22 @@ export default function JourneyScreen() {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [participantStatus, setParticipantStatus] = useState<'waiting' | 'picked_up' | 'arrived'>('waiting');
   const [isDriver, setIsDriver] = useState(false);
-  const hasDriverInJourney = activeJourney?.has_driver || false;
-  const journeyDriver = activeJourney?.driver_journeys?.[0]?.drivers;
+  const [hasDriverInJourney, setHasDriverInJourney] = useState(false);
+  const [journeyDriver, setJourneyDriver] = useState<any>(null);
 
-  useEffect(() => {
-    getCurrentUser();
-    checkIfDriver();
-    
-    if (activeJourney) {
-      loadJourneyData();
-      checkJourneyDriver();
-      subscribeToDriverChanges();
-    }
-  }, [activeJourney]);
+useEffect(() => {
+  getCurrentUser();
+  checkIfDriver();
+  
+  if (activeJourney) {
+    loadJourneyData();
+    checkJourneyDriver();
+    subscribeToDriverChanges();
+  } else {
+    // Reset stops when no active journey
+    setJourneyStops([]);
+  }
+}, [activeJourney]);
 
   useEffect(() => {
     if (activeTab === 'chat') {
@@ -328,25 +331,25 @@ export default function JourneyScreen() {
     }
   };
 
-  const loadJourneyData = async () => {
-    setConnectionError(false);
-    try {
-      await Promise.all([
-
-        loadOtherPassengers(),
-        loadCurrentUserStop(),
-        loadChatMessages(),
-        loadParticipantStatus(),
-        checkJourneyDriver()
-      ]);
-      startWaitingTimer();
-      subscribeToChat();
-      subscribeToDriverChanges();
-    } catch (error) {
-      console.error('Error loading journey data:', error);
-      setConnectionError(true);
-    }
-  };
+const loadJourneyData = async () => {
+  setConnectionError(false);
+  try {
+    await Promise.all([
+      loadJourneyStops(), // ADD THIS LINE
+      loadOtherPassengers(),
+      loadCurrentUserStop(),
+      loadChatMessages(),
+      loadParticipantStatus(),
+      checkJourneyDriver()
+    ]);
+    startWaitingTimer();
+    subscribeToChat();
+    subscribeToDriverChanges();
+  } catch (error) {
+    console.error('Error loading journey data:', error);
+    setConnectionError(true);
+  }
+};
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -452,7 +455,6 @@ export default function JourneyScreen() {
       console.error('Error starting waiting timer:', error);
     }
   };
-
 
   const loadOtherPassengers = async () => {
     if (!activeJourney) return;
@@ -566,51 +568,81 @@ export default function JourneyScreen() {
     }
   };
 
-const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
-  if (!activeJourney || !currentUserId) return;
+  // ADDED: updateJourneyProgress function
+  const updateJourneyProgress = async (stopOrder: number) => {
+    if (!activeJourney) return;
 
-  try {
-    const { error } = await supabase
-      .from('journey_participants')
-      .update({ status: newStatus })
-      .eq('journey_id', activeJourney.id)
-      .eq('user_id', currentUserId)
-      .eq('is_active', true);
+    try {
+      const { error } = await supabase
+        .from('journeys')
+        .update({ 
+          current_stop_sequence: stopOrder,
+          last_ping_time: new Date().toISOString()
+        })
+        .eq('id', activeJourney.id);
 
-    if (error) {
-      console.error('Error updating participant status:', error);
-      Alert.alert('Error', 'Failed to update status');
-      return;
+      if (error) {
+        console.error('Error updating journey progress:', error);
+        Alert.alert('Error', 'Failed to update journey progress');
+      } else {
+        console.log(`Journey progress updated to stop ${stopOrder}`);
+        // Refresh the active journey to get updated data
+        await refreshActiveJourney();
+      }
+    } catch (error) {
+      console.error('Error in updateJourneyProgress:', error);
+      Alert.alert('Error', 'Failed to update journey progress');
     }
+  };
 
-    setParticipantStatus(newStatus);
-    
-    // If user is marked as picked up, find user's current stop
-    if (newStatus === 'picked_up') {
-      const { data: userWaiting } = await supabase
-        .from('stop_waiting')
-        .select('stop_id, stops!inner(order_number)')
-        .eq('user_id', currentUserId)
+  // UPDATED: Fixed user reference to use currentUserId
+  const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
+    if (!activeJourney || !currentUserId) return;
+
+    try {
+      const { error } = await supabase
+        .from('journey_participants')
+        .update({ status: newStatus })
         .eq('journey_id', activeJourney.id)
-        .single();
+        .eq('user_id', currentUserId)
+        .eq('is_active', true);
 
-      if (userWaiting && userWaiting.stops) {
-        const userStopOrder = userWaiting.stops.order_number;
-        
-        // TODO: If you want to advance journey progress, implement updateJourneyProgress function
-        // For now, we'll just award points
-        console.log(`User picked up at stop ${userStopOrder}`);
+      if (error) {
+        console.error('Error updating participant status:', error);
+        Alert.alert('Error', 'Failed to update status');
+        return;
       }
 
-      await awardPoints(2);
-    } else if (newStatus === 'arrived') {
-      await awardPoints(5);
+      setParticipantStatus(newStatus);
+      
+      // If user is marked as picked up, advance the journey progress
+      if (newStatus === 'picked_up') {
+        // Find user's current stop
+        const { data: userWaiting } = await supabase
+          .from('stop_waiting')
+          .select('stop_id, stops!inner(order_number)')
+          .eq('user_id', currentUserId)
+          .eq('journey_id', activeJourney.id)
+          .single();
+
+        if (userWaiting && userWaiting.stops) {
+          const userStopOrder = userWaiting.stops.order_number;
+          
+          // Only advance if this is the furthest stop reached
+          if (userStopOrder > activeJourney.current_stop_sequence) {
+            await updateJourneyProgress(userStopOrder);
+          }
+        }
+
+        await awardPoints(2);
+      } else if (newStatus === 'arrived') {
+        await awardPoints(5);
+      }
+    } catch (error) {
+      console.error('Error updating participant status:', error);
+      Alert.alert('Error', 'Failed to update status');
     }
-  } catch (error) {
-    console.error('Error updating participant status:', error);
-    Alert.alert('Error', 'Failed to update status');
-  }
-};
+  };
 
   const awardPoints = async (points: number) => {
     try {
@@ -682,6 +714,99 @@ Current route: ${activeJourney?.routes?.start_point} to ${activeJourney?.routes?
       Alert.alert('Error', 'Something went wrong. Please try again.');
     }
   };
+
+const getCurrentStopName = () => {
+  if (!activeJourney || !journeyStops.length) return 'Current Stop';
+  
+  // Find the current stop based on current_stop_sequence
+  const currentStop = journeyStops.find(stop => 
+    stop.order_number === activeJourney.current_stop_sequence
+  );
+  
+  // If no exact match, find the first upcoming stop or last stop
+  if (!currentStop) {
+    const upcomingStop = journeyStops.find(stop => stop.upcoming);
+    if (upcomingStop) return upcomingStop.name;
+    
+    const lastStop = journeyStops[journeyStops.length - 1];
+    return lastStop?.name || 'Current Stop';
+  }
+  
+  return currentStop.name;
+};
+
+const getNextStopName = () => {
+  if (!activeJourney || !journeyStops.length) return 'Next Stop';
+  
+  // Find the next stop (first upcoming stop)
+  const nextStop = journeyStops.find(stop => stop.upcoming);
+  
+  // If no upcoming stops, we're at the end
+  if (!nextStop) {
+    const currentStop = journeyStops.find(stop => stop.current);
+    return currentStop ? 'Final Stop' : 'Next Stop';
+  }
+  
+  return nextStop.name;
+};
+
+
+const loadJourneyStops = async () => {
+  if (!activeJourney) return;
+
+  try {
+    // Get stops through route_stops table with proper joins
+    const { data: routeStopsData, error: routeStopsError } = await supabase
+      .from('route_stops')
+      .select(`
+        order_number,
+        stops (
+          id,
+          name,
+          latitude,
+          longitude
+        )
+      `)
+      .eq('route_id', activeJourney.route_id)
+      .order('order_number', { ascending: true });
+
+    if (routeStopsError) throw routeStopsError;
+
+    console.log('Journey Route Stops Data:', routeStopsData); // Debug log
+
+    // Process stops with status (passed, current, upcoming)
+    const processedStops = (routeStopsData || []).map((routeStop, index) => {
+      const stop = routeStop.stops;
+      if (!stop) {
+        console.warn('Missing stop data for route stop:', routeStop);
+        return null;
+      }
+
+      const currentStopSequence = activeJourney.current_stop_sequence || 0;
+      const stopOrder = routeStop.order_number;
+      
+      return {
+        id: stop.id,
+        name: stop.name,
+        order_number: stopOrder,
+        passed: stopOrder < currentStopSequence,
+        current: stopOrder === currentStopSequence,
+        upcoming: stopOrder > currentStopSequence,
+        latitude: stop.latitude,
+        longitude: stop.longitude
+      };
+    });
+
+    // Filter out any null stops and set the state
+    const validStops = processedStops.filter(stop => stop !== null) as JourneyStop[];
+    setJourneyStops(validStops);
+    
+    console.log('Processed Journey Stops:', validStops); // Debug log
+
+  } catch (error) {
+    console.error('Error loading journey stops:', error);
+  }
+};
 
   const getProgressPercentage = () => {
     if (!activeJourney || journeyStops.length === 0) return 0;
@@ -781,76 +906,78 @@ Current route: ${activeJourney?.routes?.start_point} to ${activeJourney?.routes?
     if (activeTab === 'info') {
       return (
         <>
-        <JourneyOverview
-          routeName={activeJourney.routes.name}
-          transportType={activeJourney.routes.transport_type}
-          startPoint={activeJourney.routes.start_point}
-          endPoint={activeJourney.routes.end_point}
-          progressPercentage={getProgressPercentage()}
-          waitingTime={formatWaitingTime(waitingTime)}
-          estimatedArrival={getEstimatedArrival()}
-          passengerCount={otherPassengers.length + 1}
-          currentStop={activeJourney.current_stop_sequence || 0}
-          totalStops={journeyStops.length} // This should now have the correct count
-          hasDriver={hasDriverInJourney}
-          driverName={journeyDriver?.profiles ? 
-            `${journeyDriver.profiles.first_name} ${journeyDriver.profiles.last_name}` : 
-            null
-          }
-        />
+          <JourneyOverview
+            routeName={activeJourney.routes.name}
+            transportType={activeJourney.routes.transport_type}
+            startPoint={activeJourney.routes.start_point}
+            endPoint={activeJourney.routes.end_point}
+            progressPercentage={getProgressPercentage()}
+            waitingTime={formatWaitingTime(waitingTime)}
+            estimatedArrival={getEstimatedArrival()}
+            passengerCount={otherPassengers.length + 1}
+            currentStop={activeJourney.current_stop_sequence || 0}
+            totalStops={journeyStops.length}
+            hasDriver={hasDriverInJourney}
+            driverName={journeyDriver?.profiles ? 
+              `${journeyDriver.profiles.first_name} ${journeyDriver.profiles.last_name}` : 
+              null
+            }
+            currentStopName={getCurrentStopName()} // You'll need to implement this
+            nextStopName={getNextStopName()} // You'll need to implement this
+            journeyStops={journeyStops} // Pass the journeyStops array
+          />
 
-                    {/* Journey Status Buttons */}
-          <View style={styles.statusContainer}>
-            {participantStatus === 'waiting' && (
-              <TouchableOpacity
-                style={styles.statusButton}
-                onPress={() => updateParticipantStatus('picked_up')}
-              >
-                <Text style={styles.statusButtonText}>Mark as Picked Up</Text>
-              </TouchableOpacity>
-            )}
-            
-            {participantStatus === 'picked_up' && (
-              <TouchableOpacity
-                style={[styles.statusButton, styles.arrivedButton]}
-                onPress={() => updateParticipantStatus('arrived')}
-              >
-                <Text style={styles.statusButtonText}>I've Arrived</Text>
-              </TouchableOpacity>
-            )}
-            
-            {participantStatus === 'arrived' && (
-              <TouchableOpacity
-                style={[styles.statusButton, styles.completeButton]}
-                onPress={handleCompleteJourney}
-              >
-                <Text style={styles.statusButtonText}>Complete Journey</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          {/* Show driver promotion if no driver */}
-          {!hasDriverInJourney && (
-            <NoDriverPromotion 
-              onShare={handleShareWithDriver}
-              onDriverSignup={handleDriverSignup}
-              routeName={activeJourney.routes.name}
-              transportType={activeJourney.routes.transport_type}
-            />
+        {/* Journey Status Buttons */}
+        <View style={styles.statusContainer}>
+          {participantStatus === 'waiting' && (
+            <TouchableOpacity
+              style={styles.statusButton}
+              onPress={() => updateParticipantStatus('picked_up')}
+            >
+              <Text style={styles.statusButtonText}>Mark as Picked Up</Text>
+            </TouchableOpacity>
           )}
-
-
           
-          <UserStopHighlight stopName={userStopName} />
+          {participantStatus === 'picked_up' && (
+            <TouchableOpacity
+              style={[styles.statusButton, styles.arrivedButton]}
+              onPress={() => updateParticipantStatus('arrived')}
+            >
+              <Text style={styles.statusButtonText}>I've Arrived</Text>
+            </TouchableOpacity>
+          )}
           
-          <RouteProgress
-            stops={journeyStops}
-            onPingPassengers={pingPassengersAhead}
+          {participantStatus === 'arrived' && (
+            <TouchableOpacity
+              style={[styles.statusButton, styles.completeButton]}
+              onPress={handleCompleteJourney}
+            >
+              <Text style={styles.statusButtonText}>Complete Journey</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        
+        {/* Show driver promotion if no driver */}
+        {!hasDriverInJourney && (
+          <NoDriverPromotion 
+            onShare={handleShareWithDriver}
+            onDriverSignup={handleDriverSignup}
+            routeName={activeJourney.routes.name}
+            transportType={activeJourney.routes.transport_type}
           />
-          
-          <PassengersList
-            passengers={otherPassengers}
-            getPassengerWaitingTime={getPassengerWaitingTime}
-          />
+        )}
+
+        <UserStopHighlight stopName={userStopName} />
+        
+        <RouteProgress
+          stops={journeyStops}
+          onPingPassengers={pingPassengersAhead}
+        />
+        
+        <PassengersList
+          passengers={otherPassengers}
+          getPassengerWaitingTime={getPassengerWaitingTime}
+        />
         </>
       );
     } else {
