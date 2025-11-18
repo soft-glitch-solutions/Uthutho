@@ -1,13 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Navigation, Timer, Clock, Users, MapPin, UserCheck, UserX, ChevronRight } from 'lucide-react-native';
+import { TransportProgressBar } from './TransportProgressBar'; // Adjust import path
 
 interface JourneyOverviewProps {
   routeName: string;
   transportType: string;
   startPoint: string;
   endPoint: string;
-  progressPercentage: number;
+  getProgressPercentage: () => number; // ADD THIS
   waitingTime: string;
   estimatedArrival: string;
   passengerCount: number;
@@ -32,7 +33,7 @@ export const JourneyOverview = ({
   transportType,
   startPoint,
   endPoint,
-  progressPercentage,
+  getProgressPercentage, // ADD THIS
   waitingTime,
   estimatedArrival,
   passengerCount,
@@ -44,6 +45,9 @@ export const JourneyOverview = ({
   nextStopName = 'Next Stop',
   journeyStops = []
 }: JourneyOverviewProps) => {
+  // Calculate progress percentage
+  const progressPercentage = getProgressPercentage(); // USE THE FUNCTION
+
   // Find current and next stops from journeyStops
   const currentStopInfo = journeyStops.find(stop => stop.current) || journeyStops[currentStop - 1];
   const nextStopInfo = journeyStops.find(stop => stop.upcoming && !stop.passed);
@@ -125,7 +129,7 @@ export const JourneyOverview = ({
         )}
       </View>
       
-      {/* Progress Bar */}
+      {/* Progress Bar with Moving Vehicle */}
       <View style={styles.progressContainer}>
         <View style={styles.progressHeader}>
           <Text style={styles.progressLabel}>Route Progress</Text>
@@ -134,16 +138,13 @@ export const JourneyOverview = ({
           </Text>
         </View>
         
-        <View style={styles.progressBar}>
-          <View 
-            style={[styles.progressFill, { width: `${progressPercentage}%` }]} 
-          />
-        </View>
-        
-        <View style={styles.progressStops}>
-          <Text style={styles.stopLabel}>Start</Text>
-          <Text style={styles.stopLabel}>End</Text>
-        </View>
+        <TransportProgressBar 
+          progressPercentage={progressPercentage}
+          transportType={transportType}
+          currentStop={currentStop}
+          totalStops={totalStops}
+          stops={journeyStops}
+        />
       </View>
       
       {/* Journey Stats */}
@@ -199,7 +200,9 @@ export const JourneyOverview = ({
   );
 };
 
+// ... keep your existing styles the same
 const styles = StyleSheet.create({
+  // ... your existing styles
   journeyCard: {
     backgroundColor: '#1a1a1a',
     marginHorizontal: 20,
@@ -330,25 +333,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1ea2b1',
     fontWeight: '500',
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#333333',
-    borderRadius: 4,
-    marginBottom: 4,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#1ea2b1',
-    borderRadius: 4,
-  },
-  progressStops: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  stopLabel: {
-    fontSize: 10,
-    color: '#666666',
   },
   statsContainer: {
     flexDirection: 'row',
