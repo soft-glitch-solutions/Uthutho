@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { View, Text, StyleSheet, ActivityIndicator, Linking, TouchableOpacity, RefreshControl, ScrollView } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { RefreshCw, MapPin, Navigation, Users, Clock } from 'lucide-react-native';
+import { RefreshCw, MapPin, Navigation, Users, Clock, User, Navigation2 } from 'lucide-react-native';
 
 interface SharedJourneyData {
   id: string;
@@ -53,7 +53,6 @@ export default function JourneyShareScreen() {
   useEffect(() => {
     if (journeyId && isValidUUID(journeyId)) {
       loadJourneyData();
-      // Set up real-time updates
       const subscription = setupRealtimeUpdates();
       return () => {
         subscription?.unsubscribe();
@@ -84,7 +83,6 @@ export default function JourneyShareScreen() {
         },
         (payload) => {
           console.log('📍 Real-time location update:', payload);
-          // Refresh data when location updates
           loadJourneyData();
         }
       )
@@ -95,7 +93,6 @@ export default function JourneyShareScreen() {
     try {
       console.log('🚀 Loading journey data for ID:', journeyId);
 
-      // STEP 1: Get journey with route info
       const { data: journey, error: journeyError } = await supabase
         .from('journeys')
         .select(`
@@ -115,7 +112,6 @@ export default function JourneyShareScreen() {
       if (journeyError) throw journeyError;
       if (!journey) throw new Error('Journey not found');
 
-      // STEP 2: Get ALL active participants with their real-time locations
       const { data: participants, error: participantsError } = await supabase
         .from('journey_participants')
         .select(`
@@ -136,9 +132,6 @@ export default function JourneyShareScreen() {
 
       if (participantsError) throw participantsError;
 
-      console.log('📍 Participants with locations:', participants);
-
-      // STEP 3: Get user's current stop from stop_waiting (fallback)
       const { data: userWaiting, error: waitingError } = await supabase
         .from('stop_waiting')
         .select(`
@@ -154,7 +147,6 @@ export default function JourneyShareScreen() {
         .limit(1)
         .single();
 
-      // STEP 4: Get next stop in sequence
       let nextStop = null;
       if (userWaiting && !waitingError) {
         try {
@@ -186,7 +178,6 @@ export default function JourneyShareScreen() {
         }
       }
 
-      // STEP 5: Find the user with the most recent location
       const userWithLocation = participants?.find(p => p.latitude && p.longitude);
       const userStop = userWaiting?.stops;
 
@@ -271,6 +262,7 @@ export default function JourneyShareScreen() {
   }
 
   const userWithGPS = journeyData.participants.find(p => p.latitude && p.longitude);
+  const usersWithLocations = journeyData.participants.filter(p => p.latitude && p.longitude);
 
   return (
     <View style={styles.container}>
@@ -289,7 +281,32 @@ export default function JourneyShareScreen() {
         </View>
       </View>
 
-      {/* OpenStreetMap with Custom Markers */}
+      {/* Map Legend */}
+      <View style={styles.legendContainer}>
+        <Text style={styles.legendTitle}>Map Markers:</Text>
+        <View style={styles.legendItems}>
+          {usersWithLocations.length > 0 && (
+            <View style={styles.legendItem}>
+              <View style={[styles.legendMarker, styles.userMarker]} />
+              <Text style={styles.legendText}>User Locations</Text>
+            </View>
+          )}
+          {journeyData.next_stop && (
+            <View style={styles.legendItem}>
+              <View style={[styles.legendMarker, styles.nextStopMarker]} />
+              <Text style={styles.legendText}>Next Stop</Text>
+            </View>
+          )}
+          {!userWithGPS && (
+            <View style={styles.legendItem}>
+              <View style={[styles.legendMarker, styles.currentStopMarker]} />
+              <Text style={styles.legendText}>Current Stop</Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* OpenStreetMap */}
       <View style={styles.mapContainer}>
         <iframe
           src={generateOpenStreetMapUrl(journeyData)}
@@ -300,34 +317,35 @@ export default function JourneyShareScreen() {
         />
       </View>
 
-      {/* Profile Pictures Display Below Map */}
-      <View style={styles.profileMarkersContainer}>
-        <Text style={styles.profileMarkersTitle}>Live Locations:</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.profileMarkersScroll}>
-          {journeyData.participants
-            .filter(p => p.latitude && p.longitude)
-            .map((participant) => (
-              <View key={participant.id} style={styles.profileMarker}>
+      {/* Profile Pictures Display */}
+      {usersWithLocations.length > 0 && (
+        <View style={styles.profilesContainer}>
+          <Text style={styles.profilesTitle}>Live Locations:</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.profilesScroll}>
+            {usersWithLocations.map((participant) => (
+              <View key={participant.id} style={styles.profileCard}>
                 {participant.profiles.avatar_url ? (
                   <img 
                     src={participant.profiles.avatar_url} 
-                    style={styles.profileMarkerImage}
+                    style={styles.profileImage}
                     alt={`${participant.profiles.first_name}'s location`}
                   />
                 ) : (
-                  <View style={[styles.profileMarkerImage, styles.profileMarkerPlaceholder]}>
-                    <Text style={styles.profileMarkerText}>
-                      {participant.profiles.first_name?.[0]}{participant.profiles.last_name?.[0]}
-                    </Text>
+                  <View style={[styles.profileImage, styles.profilePlaceholder]}>
+                    <User size={20} color="#ffffff" />
                   </View>
                 )}
-                <Text style={styles.profileMarkerName}>
+                <Text style={styles.profileName}>
                   {participant.profiles.first_name}
+                </Text>
+                <Text style={styles.profileLocation}>
+                  Live Location
                 </Text>
               </View>
             ))}
-        </ScrollView>
-      </View>
+          </ScrollView>
+        </View>
+      )}
 
       {/* Journey Info */}
       <ScrollView 
@@ -476,12 +494,10 @@ const generateOpenStreetMapUrl = (journey: SharedJourneyData) => {
   const baseUrl = 'https://www.openstreetmap.org/export/embed.html';
   
   const userWithGPS = journey.participants.find(p => p.latitude && p.longitude);
-  const userLat = journey.user_stop.latitude;
-  const userLon = journey.user_stop.longitude;
   
-  // Calculate bounds to include all markers
+  // Get all coordinates for bounds calculation
   const allCoordinates = [
-    { lat: userLat, lon: userLon },
+    { lat: journey.user_stop.latitude, lon: journey.user_stop.longitude },
     ...journey.participants
       .filter(p => p.latitude && p.longitude)
       .map(p => ({ lat: p.latitude!, lon: p.longitude! })),
@@ -499,24 +515,24 @@ const generateOpenStreetMapUrl = (journey: SharedJourneyData) => {
   const padding = 0.01;
   const bbox = `${minLon - padding},${minLat - padding},${maxLon + padding},${maxLat + padding}`;
   
-  // Build markers - using different colors to distinguish
+  // Build markers string
   let markers = '';
   
-  // Add user location markers (blue)
+  // Add user location markers
   journey.participants
     .filter(p => p.latitude && p.longitude)
-    .forEach((participant, index) => {
+    .forEach((participant) => {
       if (markers) markers += '&';
       markers += `marker=${participant.latitude},${participant.longitude}`;
     });
   
-  // Add next stop marker (yellow) if available
+  // Add next stop marker
   if (journey.next_stop) {
     if (markers) markers += '&';
     markers += `marker=${journey.next_stop.latitude},${journey.next_stop.longitude}`;
   }
   
-  // Add current stop marker (green) as fallback when no GPS
+  // Add current stop marker as fallback
   if (!userWithGPS) {
     if (markers) markers += '&';
     markers += `marker=${journey.user_stop.latitude},${journey.user_stop.longitude}`;
@@ -558,6 +574,46 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#2a2a2a',
   },
+  // Map Legend
+  legendContainer: {
+    backgroundColor: '#1a1a1a',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  legendTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  legendItems: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendMarker: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  userMarker: {
+    backgroundColor: '#1ea2b1',
+  },
+  nextStopMarker: {
+    backgroundColor: '#fbbf24',
+  },
+  currentStopMarker: {
+    backgroundColor: '#10b981',
+  },
+  legendText: {
+    fontSize: 12,
+    color: '#cccccc',
+  },
   mapContainer: {
     height: 300,
     width: '100%',
@@ -567,48 +623,50 @@ const styles = StyleSheet.create({
     height: '100%',
     border: 'none',
   },
-  // Profile markers below map
-  profileMarkersContainer: {
+  // Profile Pictures
+  profilesContainer: {
     backgroundColor: '#1a1a1a',
     padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
   },
-  profileMarkersTitle: {
+  profilesTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
     marginBottom: 8,
   },
-  profileMarkersScroll: {
+  profilesScroll: {
     flexDirection: 'row',
   },
-  profileMarker: {
+  profileCard: {
     alignItems: 'center',
     marginRight: 16,
+    backgroundColor: '#2a2a2a',
+    padding: 8,
+    borderRadius: 8,
+    minWidth: 80,
   },
-  profileMarkerImage: {
+  profileImage: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    borderWidth: 3,
-    borderColor: '#1ea2b1',
+    marginBottom: 4,
   },
-  profileMarkerPlaceholder: {
+  profilePlaceholder: {
     backgroundColor: '#1ea2b1',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  profileMarkerText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  profileMarkerName: {
+  profileName: {
     fontSize: 12,
-    color: '#cccccc',
-    marginTop: 4,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 2,
+  },
+  profileLocation: {
+    fontSize: 10,
+    color: '#1ea2b1',
   },
   infoContainer: {
     flex: 1,
