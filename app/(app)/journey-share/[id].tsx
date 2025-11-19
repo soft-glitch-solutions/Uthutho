@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { View, Text, StyleSheet, ActivityIndicator, Linking, TouchableOpacity, RefreshControl, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { RefreshCw, MapPin, Navigation, Users, Clock, User } from 'lucide-react-native';
 
 interface SharedJourneyData {
   id: string;
@@ -13,19 +12,6 @@ interface SharedJourneyData {
     start_point: string;
     end_point: string;
   };
-  participants: Array<{
-    id: string;
-    user_id: string;
-    status: 'waiting' | 'picked_up' | 'arrived';
-    latitude: number | null;
-    longitude: number | null;
-    last_location_update: string | null;
-    profiles: {
-      first_name: string;
-      last_name: string;
-      avatar_url: string | null;
-    };
-  }>;
   user_stop: {
     name: string;
     latitude: number;
@@ -44,55 +30,39 @@ export default function JourneyShareScreen() {
   const params = useLocalSearchParams();
   const [journeyData, setJourneyData] = useState<SharedJourneyData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdate, setLastUpdate] = useState<string>('');
 
-  const journeyId = Array.isArray(params.id) ? params.id[0] : params.id;
+  // Use 'id' instead of 'journeyId' since that's what Expo Router is providing
+  const journeyId = Array.isArray(params.id) 
+    ? params.id[0] 
+    : params.id;
+
+  console.log('🔍 [DEBUG] Route params received:', params);
+  console.log('🔍 [DEBUG] Extracted journeyId:', journeyId);
 
   useEffect(() => {
     if (journeyId && isValidUUID(journeyId)) {
+      console.log('✅ [DEBUG] journeyId is valid UUID, loading data...');
       loadJourneyData();
-      const subscription = setupRealtimeUpdates();
-      return () => {
-        subscription?.unsubscribe();
-      };
     } else {
+      console.log('❌ [DEBUG] Invalid journeyId:', journeyId);
       setError('Invalid journey link');
       setLoading(false);
     }
   }, [journeyId]);
 
+  // Helper function to validate UUID
   const isValidUUID = (uuid: string) => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     return uuidRegex.test(uuid);
   };
 
-  const setupRealtimeUpdates = () => {
-    if (!journeyId) return;
-
-    return supabase
-      .channel(`journey-location-${journeyId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'journey_participants',
-          filter: `journey_id=eq.${journeyId}`
-        },
-        (payload) => {
-          console.log('📍 Real-time location update:', payload);
-          loadJourneyData();
-        }
-      )
-      .subscribe();
-  };
-
   const loadJourneyData = async () => {
     try {
-      console.log('🚀 Loading journey data for ID:', journeyId);
+      console.log('🚀 [DEBUG] Starting to load journey data for ID:', journeyId);
 
+      // STEP 1: Get journey with route info
+      console.log('📋 [DEBUG] STEP 1: Fetching journey data...');
       const { data: journey, error: journeyError } = await supabase
         .from('journeys')
         .select(`
@@ -109,29 +79,22 @@ export default function JourneyShareScreen() {
         .eq('id', journeyId)
         .single();
 
-      if (journeyError) throw journeyError;
-      if (!journey) throw new Error('Journey not found');
+      console.log('📋 [DEBUG] Journey query result:', { journey, journeyError });
 
-      const { data: participants, error: participantsError } = await supabase
-        .from('journey_participants')
-        .select(`
-          id,
-          user_id,
-          status,
-          latitude,
-          longitude,
-          last_location_update,
-          profiles (
-            first_name,
-            last_name,
-            avatar_url
-          )
-        `)
-        .eq('journey_id', journeyId)
-        .eq('is_active', true);
+      if (journeyError) {
+        console.error('❌ [DEBUG] Journey fetch error:', journeyError);
+        throw journeyError;
+      }
 
-      if (participantsError) throw participantsError;
+      if (!journey) {
+        console.log('❌ [DEBUG] No journey found with ID:', journeyId);
+        throw new Error('Journey not found');
+      }
 
+      console.log('✅ [DEBUG] Journey found:', journey);
+
+      // STEP 2: Get user's current stop from stop_waiting
+      console.log('📍 [DEBUG] STEP 2: Fetching stop_waiting data...');
       const { data: userWaiting, error: waitingError } = await supabase
         .from('stop_waiting')
         .select(`
@@ -147,139 +110,104 @@ export default function JourneyShareScreen() {
         .limit(1)
         .single();
 
-      let nextStop = null;
-      if (userWaiting && !waitingError) {
-        try {
-          const { data: nextStopData } = await supabase
-            .from('route_stops')
-            .select(`
-              order_number,
-              stops (
-                id,
-                name,
-                latitude,
-                longitude
-              )
-            `)
-            .eq('route_id', journey.route_id)
-            .eq('order_number', (userWaiting.stops.order_number || 0) + 1)
-            .single();
+      console.log('📍 [DEBUG] Stop waiting query result:', { userWaiting, waitingError });
 
-          if (nextStopData) {
-            nextStop = {
-              name: nextStopData.stops.name,
-              latitude: nextStopData.stops.latitude,
-              longitude: nextStopData.stops.longitude,
-              order_number: nextStopData.order_number,
-            };
-          }
-        } catch (nextStopErr) {
-          console.log('No next stop found');
-        }
+      if (waitingError) {
+        console.error('❌ [DEBUG] Stop waiting fetch error:', waitingError);
+        throw waitingError;
       }
 
-      const userWithLocation = participants?.find(p => p.latitude && p.longitude);
-      const userStop = userWaiting?.stops;
+      if (!userWaiting || !userWaiting.stops) {
+        console.log('❌ [DEBUG] No active users found for this journey');
+        throw new Error('No active users found for this journey');
+      }
 
+      console.log('✅ [DEBUG] User waiting data:', userWaiting);
+
+      // STEP 3: Get next stop in sequence
+      console.log('➡️ [DEBUG] STEP 3: Fetching next stop data...');
+      let nextStop = null;
+      const currentStopOrder = userWaiting.stops.order_number || 0;
+
+      try {
+        const { data: nextStopData, error: nextStopError } = await supabase
+          .from('route_stops')
+          .select(`
+            order_number,
+            stops (
+              id,
+              name,
+              latitude,
+              longitude
+            )
+          `)
+          .eq('route_id', journey.route_id)
+          .eq('order_number', currentStopOrder + 1)
+          .single();
+
+        console.log('➡️ [DEBUG] Next stop query result:', { nextStopData, nextStopError });
+
+        if (!nextStopError && nextStopData) {
+          nextStop = {
+            name: nextStopData.stops.name,
+            latitude: nextStopData.stops.latitude,
+            longitude: nextStopData.stops.longitude,
+            order_number: nextStopData.order_number,
+          };
+          console.log('✅ [DEBUG] Next stop found:', nextStop);
+        } else {
+          console.log('ℹ️ [DEBUG] No next stop found - probably final destination');
+        }
+      } catch (nextStopErr) {
+        console.log('ℹ️ [DEBUG] Next stop query error (this is okay):', nextStopErr);
+      }
+
+      // STEP 4: Combine all data
       const journeyData = {
         ...journey,
-        participants: participants || [],
         user_stop: {
-          name: userWithLocation ? 'Current GPS Location' : (userStop?.name || 'Unknown Location'),
-          latitude: userWithLocation?.latitude || userStop?.latitude || -33.9249,
-          longitude: userWithLocation?.longitude || userStop?.longitude || 18.4241,
-          order_number: userStop?.order_number || 0,
+          name: userWaiting.stops.name,
+          latitude: userWaiting.stops.latitude,
+          longitude: userWaiting.stops.longitude,
+          order_number: userWaiting.stops.order_number,
         },
         next_stop: nextStop,
       };
 
+      console.log('🎯 [DEBUG] Final journey data:', journeyData);
       setJourneyData(journeyData);
-      setLastUpdate(new Date().toLocaleTimeString());
-      console.log('✅ Journey data loaded with real-time locations');
+      console.log('✅ [DEBUG] Journey data loaded successfully!');
 
     } catch (err: any) {
-      console.error('💥 Error loading journey data:', err);
-      setError('Failed to load journey data');
+      console.error('💥 [DEBUG] Error loading journey data:', err);
+      
+      if (err.code === '22P02') {
+        setError('Invalid journey ID format');
+      } else if (err.message?.includes('not found')) {
+        setError('Journey not found or no longer active');
+      } else if (err.message?.includes('No active users')) {
+        setError('No one is currently active on this journey');
+      } else {
+        setError('Failed to load journey data');
+      }
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadJourneyData();
   };
 
   const openInMaps = () => {
     if (!journeyData) return;
     
-    const url = `https://www.openstreetmap.org/?mlat=${journeyData.user_stop.latitude}&mlon=${journeyData.user_stop.longitude}#map=17/${journeyData.user_stop.latitude}/${journeyData.user_stop.longitude}`;
+    // Open in OpenStreetMap
+    const url = `https://www.openstreetmap.org/?mlat=${journeyData.user_stop.latitude}&mlon=${journeyData.user_stop.longitude}#map=15/${journeyData.user_stop.latitude}/${journeyData.user_stop.longitude}`;
     Linking.openURL(url);
-  };
-
-  const openDirections = () => {
-    if (!journeyData) return;
-    
-    const url = `https://www.openstreetmap.org/directions?from=&to=${journeyData.user_stop.latitude},${journeyData.user_stop.longitude}`;
-    Linking.openURL(url);
-  };
-
-  const getLocationAge = (updateTime: string | null) => {
-    if (!updateTime) return 'Unknown';
-    
-    const updateDate = new Date(updateTime);
-    const now = new Date();
-    const diffMinutes = Math.floor((now.getTime() - updateDate.getTime()) / (1000 * 60));
-    
-    if (diffMinutes < 1) return 'Just now';
-    if (diffMinutes === 1) return '1 minute ago';
-    if (diffMinutes < 60) return `${diffMinutes} minutes ago`;
-    
-    const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours === 1) return '1 hour ago';
-    return `${diffHours} hours ago`;
-  };
-
-  const generateStaticMapUrl = (journey: SharedJourneyData) => {
-    const usersWithGPS = journey.participants.filter(p => p.latitude && p.longitude);
-    const primaryLocation = usersWithGPS[0] || journey.user_stop;
-    
-    const baseUrl = 'https://staticmap.openstreetmap.de/staticmap.php';
-    
-    const markers = [];
-    
-    // User GPS locations (blue)
-    usersWithGPS.forEach(user => {
-      markers.push(`${user.latitude},${user.longitude},lightblue7`);
-    });
-    
-    // Next stop (yellow)
-    if (journey.next_stop) {
-      markers.push(`${journey.next_stop.latitude},${journey.next_stop.longitude},yellow7`);
-    }
-    
-    // Current stop (green) - only show if no GPS users
-    if (usersWithGPS.length === 0) {
-      markers.push(`${journey.user_stop.latitude},${journey.user_stop.longitude},green7`);
-    }
-    
-    const params = new URLSearchParams({
-      center: `${primaryLocation.latitude},${primaryLocation.longitude}`,
-      zoom: '15',
-      size: '600x300',
-      markers: markers.join('|'),
-      attribution: 'false'
-    });
-    
-    return `${baseUrl}?${params.toString()}`;
   };
 
   if (loading) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#1ea2b1" />
-        <Text style={styles.loadingText}>Loading real-time location...</Text>
+        <Text style={styles.loadingText}>Loading journey...</Text>
       </View>
     );
   }
@@ -287,7 +215,9 @@ export default function JourneyShareScreen() {
   if (error || !journeyData) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>{error || 'Journey not found'}</Text>
+        <Text style={styles.errorText}>
+          {error || 'Journey not found'}
+        </Text>
         <Text style={styles.subText}>
           The share link may have expired or the journey is no longer active.
         </Text>
@@ -295,217 +225,27 @@ export default function JourneyShareScreen() {
     );
   }
 
-  const userWithGPS = journeyData.participants.find(p => p.latitude && p.longitude);
-  const usersWithLocations = journeyData.participants.filter(p => p.latitude && p.longitude);
-
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.title}>Uthutho Live Location</Text>
-            <Text style={styles.subtitle}>
-              {userWithGPS ? 'Real-time GPS Tracking' : 'Route-based Location'}
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
-            <RefreshCw size={20} color="#1ea2b1" />
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.title}>Uthutho Location</Text>
+        <Text style={styles.subtitle}>Real-time Location Sharing</Text>
       </View>
 
-      {/* Map Legend */}
-      <View style={styles.legendContainer}>
-        <Text style={styles.legendTitle}>Map Markers:</Text>
-        <View style={styles.legendItems}>
-          {usersWithLocations.length > 0 && (
-            <View style={styles.legendItem}>
-              <View style={[styles.legendMarker, styles.userMarker]} />
-              <Text style={styles.legendText}>User Locations ({usersWithLocations.length})</Text>
-            </View>
-          )}
-          {journeyData.next_stop && (
-            <View style={styles.legendItem}>
-              <View style={[styles.legendMarker, styles.nextStopMarker]} />
-              <Text style={styles.legendText}>Next Stop</Text>
-            </View>
-          )}
-          {!userWithGPS && (
-            <View style={styles.legendItem}>
-              <View style={[styles.legendMarker, styles.currentStopMarker]} />
-              <Text style={styles.legendText}>Current Stop</Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      {/* StaticMap.org Static Map */}
+      {/* OpenStreetMap */}
       <View style={styles.mapContainer}>
-        <Image
-          source={{ uri: generateStaticMapUrl(journeyData) }}
-          style={styles.staticMap}
-          resizeMode="cover"
+        <iframe
+          src={generateOpenStreetMapUrl(journeyData)}
+          style={styles.mapIframe}
+          frameBorder="0"
+          scrolling="no"
+          title="Journey Location Map"
         />
-        <TouchableOpacity style={styles.mapOverlay} onPress={openInMaps}>
-          <Text style={styles.mapOverlayText}>Tap to open interactive map</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Location Coordinates Display */}
-      <View style={styles.coordinatesContainer}>
-        <Text style={styles.coordinatesTitle}>All Locations:</Text>
-        
-        {/* User Locations */}
-        {usersWithLocations.map((participant, index) => (
-          <View key={participant.id} style={styles.coordinateItem}>
-            <View style={styles.coordinateHeader}>
-              <View style={[styles.coordinateMarker, styles.userCoordinateMarker]}>
-                <Text style={styles.coordinateMarkerText}>📍</Text>
-              </View>
-              {participant.profiles.avatar_url ? (
-                <img 
-                  src={participant.profiles.avatar_url} 
-                  style={styles.coordinateAvatar}
-                  alt={`${participant.profiles.first_name}'s location`}
-                />
-              ) : (
-                <View style={[styles.coordinateAvatar, styles.coordinateAvatarPlaceholder]}>
-                  <Text style={styles.coordinateAvatarText}>
-                    {participant.profiles.first_name?.[0]}{participant.profiles.last_name?.[0]}
-                  </Text>
-                </View>
-              )}
-              <View style={styles.coordinateInfo}>
-                <Text style={styles.coordinateName}>
-                  {participant.profiles.first_name} {participant.profiles.last_name}
-                </Text>
-                <Text style={styles.coordinateStatus}>
-                  Live Location • {getLocationAge(participant.last_location_update)}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.coordinateText}>
-              {participant.latitude?.toFixed(6)}, {participant.longitude?.toFixed(6)}
-            </Text>
-          </View>
-        ))}
-
-        {/* Next Stop */}
-        {journeyData.next_stop && (
-          <View style={styles.coordinateItem}>
-            <View style={styles.coordinateHeader}>
-              <View style={[styles.coordinateMarker, styles.nextStopCoordinateMarker]}>
-                <Text style={styles.coordinateMarkerText}>🟡</Text>
-              </View>
-              <View style={styles.coordinateInfo}>
-                <Text style={styles.coordinateName}>Next Stop</Text>
-                <Text style={styles.coordinateStatus}>Scheduled Stop</Text>
-              </View>
-            </View>
-            <Text style={styles.coordinateText}>
-              {journeyData.next_stop.latitude.toFixed(6)}, {journeyData.next_stop.longitude.toFixed(6)}
-            </Text>
-            <Text style={styles.locationName}>{journeyData.next_stop.name}</Text>
-          </View>
-        )}
-
-        {/* Current Stop (fallback) */}
-        {!userWithGPS && (
-          <View style={styles.coordinateItem}>
-            <View style={styles.coordinateHeader}>
-              <View style={[styles.coordinateMarker, styles.currentStopCoordinateMarker]}>
-                <Text style={styles.coordinateMarkerText}>🟢</Text>
-              </View>
-              <View style={styles.coordinateInfo}>
-                <Text style={styles.coordinateName}>Current Stop</Text>
-                <Text style={styles.coordinateStatus}>Scheduled Location</Text>
-              </View>
-            </View>
-            <Text style={styles.coordinateText}>
-              {journeyData.user_stop.latitude.toFixed(6)}, {journeyData.user_stop.longitude.toFixed(6)}
-            </Text>
-            <Text style={styles.locationName}>{journeyData.user_stop.name}</Text>
-          </View>
-        )}
       </View>
 
       {/* Journey Info */}
-      <ScrollView 
-        style={styles.infoContainer}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#1ea2b1"
-            colors={["#1ea2b1"]}
-          />
-        }
-      >
-        {/* Location Status */}
-        <View style={styles.statusCard}>
-          <View style={styles.statusHeader}>
-            <View style={[styles.statusDot, userWithGPS ? styles.liveDot : styles.estimatedDot]} />
-            <Text style={styles.statusTitle}>
-              {userWithGPS ? 'Live GPS Location' : 'Estimated Location'}
-            </Text>
-          </View>
-          <Text style={styles.statusText}>
-            {userWithGPS 
-              ? `Tracking ${usersWithLocations.length} user${usersWithLocations.length > 1 ? 's' : ''} via GPS` 
-              : 'Showing scheduled stop location'
-            }
-          </Text>
-          {userWithGPS?.last_location_update && (
-            <View style={styles.updateTime}>
-              <Clock size={12} color="#666" />
-              <Text style={styles.updateTimeText}>
-                Updated {getLocationAge(userWithGPS.last_location_update)}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Participants List */}
-        {journeyData.participants.length > 0 && (
-          <View style={styles.participantsCard}>
-            <View style={styles.participantsHeader}>
-              <Users size={16} color="#1ea2b1" />
-              <Text style={styles.participantsTitle}>
-                Traveling Together ({journeyData.participants.length})
-              </Text>
-            </View>
-            {journeyData.participants.map((participant) => (
-              <View key={participant.id} style={styles.participantItem}>
-                {participant.profiles.avatar_url ? (
-                  <img 
-                    src={participant.profiles.avatar_url} 
-                    style={styles.avatar}
-                    alt="Profile"
-                  />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Text style={styles.avatarText}>
-                      {participant.profiles.first_name?.[0]}{participant.profiles.last_name?.[0]}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.participantInfo}>
-                  <Text style={styles.participantName}>
-                    {participant.profiles.first_name} {participant.profiles.last_name}
-                  </Text>
-                  <Text style={styles.participantStatus}>
-                    {participant.status === 'waiting' ? 'Waiting' : 
-                     participant.status === 'picked_up' ? 'On the way' : 'Arrived'}
-                    {participant.latitude && ' • Live Location'}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Route Information */}
+      <View style={styles.infoContainer}>
         <View style={styles.routeCard}>
           <Text style={styles.routeName}>{journeyData.routes.name}</Text>
           <Text style={styles.routeType}>{journeyData.routes.transport_type}</Text>
@@ -515,39 +255,70 @@ export default function JourneyShareScreen() {
           </View>
         </View>
 
-        {/* Actions */}
-        <View style={styles.actionsCard}>
-          <Text style={styles.actionsTitle}>Map Actions</Text>
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.actionButton} onPress={openInMaps}>
-              <MapPin size={16} color="#1ea2b1" />
-              <Text style={styles.actionButtonText}>View on Map</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={openDirections}>
-              <Navigation size={16} color="#1ea2b1" />
-              <Text style={styles.actionButtonText}>Get Directions</Text>
-            </TouchableOpacity>
+        <View style={styles.locationCard}>
+          <View style={styles.locationItem}>
+            <View style={[styles.statusDot, styles.currentDot]} />
+            <View style={styles.locationText}>
+              <Text style={styles.locationLabel}>Current Location</Text>
+              <Text style={styles.locationName}>{journeyData.user_stop.name}</Text>
+            </View>
           </View>
+
+          {journeyData.next_stop ? (
+            <View style={styles.locationItem}>
+              <View style={[styles.statusDot, styles.nextDot]} />
+              <View style={styles.locationText}>
+                <Text style={styles.locationLabel}>Heading To</Text>
+                <Text style={styles.locationName}>{journeyData.next_stop.name}</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.locationItem}>
+              <View style={[styles.statusDot, styles.finalDot]} />
+              <View style={styles.locationText}>
+                <Text style={styles.locationLabel}>Status</Text>
+                <Text style={styles.locationName}>Final Destination Reached</Text>
+              </View>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.actionsCard}>
+          <Text style={styles.actionsTitle}>Need Directions?</Text>
+          <Text style={styles.actionsText} onPress={openInMaps}>
+            Open in OpenStreetMap →
+          </Text>
         </View>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Last updated: {lastUpdate}
-          </Text>
-          <Text style={styles.footerText}>
-            {userWithGPS 
-              ? 'Live GPS tracking active • Pull down to refresh' 
-              : 'Route-based tracking • Enable GPS for live location'
-            }
-          </Text>
-          <Text style={styles.footerNote}>
-            Powered by OpenStreetMap • Map updates every refresh
+            Shared via Uthutho • Location updates automatically
           </Text>
         </View>
-      </ScrollView>
+      </View>
     </View>
   );
 }
+
+// Generate OpenStreetMap URL with markers
+const generateOpenStreetMapUrl = (journey: SharedJourneyData) => {
+  const baseUrl = 'https://www.openstreetmap.org/export/embed.html';
+  
+  if (journey.next_stop) {
+    // Calculate bounds to fit both markers
+    const minLon = Math.min(journey.user_stop.longitude, journey.next_stop.longitude) - 0.01;
+    const minLat = Math.min(journey.user_stop.latitude, journey.next_stop.latitude) - 0.01;
+    const maxLon = Math.max(journey.user_stop.longitude, journey.next_stop.longitude) + 0.01;
+    const maxLat = Math.max(journey.user_stop.latitude, journey.next_stop.latitude) + 0.01;
+    
+    return `${baseUrl}?bbox=${minLon},${minLat},${maxLon},${maxLat}&layer=mapnik&marker=${journey.user_stop.latitude},${journey.user_stop.longitude}&marker=${journey.next_stop.latitude},${journey.next_stop.longitude}`;
+  } else {
+    // Just show current location with zoom
+    const lon = journey.user_stop.longitude;
+    const lat = journey.user_stop.latitude;
+    return `${baseUrl}?bbox=${lon-0.01},${lat-0.01},${lon+0.01},${lat+0.01}&layer=mapnik&marker=${lat},${lon}`;
+  }
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -562,280 +333,38 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
   },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#ffffff',
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
     color: '#cccccc',
+    textAlign: 'center',
     marginTop: 4,
   },
-  refreshButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#2a2a2a',
-  },
-  // Map Legend
-  legendContainer: {
-    backgroundColor: '#1a1a1a',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333333',
-  },
-  legendTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  legendItems: {
-    flexDirection: 'row',
-    gap: 16,
-    flexWrap: 'wrap',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendMarker: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  userMarker: {
-    backgroundColor: '#1ea2b1',
-  },
-  nextStopMarker: {
-    backgroundColor: '#fbbf24',
-  },
-  currentStopMarker: {
-    backgroundColor: '#10b981',
-  },
-  legendText: {
-    fontSize: 12,
-    color: '#cccccc',
-  },
-  // Static Map
   mapContainer: {
     height: 300,
     width: '100%',
-    position: 'relative',
   },
-  staticMap: {
+  mapIframe: {
     width: '100%',
     height: '100%',
-  },
-  mapOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 8,
-    alignItems: 'center',
-  },
-  mapOverlayText: {
-    color: '#1ea2b1',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  // Coordinates Display
-  coordinatesContainer: {
-    backgroundColor: '#1a1a1a',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333333',
-  },
-  coordinatesTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 12,
-  },
-  coordinateItem: {
-    backgroundColor: '#2a2a2a',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  coordinateHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  coordinateMarker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  userCoordinateMarker: {
-    backgroundColor: 'rgba(30, 162, 177, 0.2)',
-  },
-  nextStopCoordinateMarker: {
-    backgroundColor: 'rgba(251, 191, 36, 0.2)',
-  },
-  currentStopCoordinateMarker: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-  },
-  coordinateMarkerText: {
-    fontSize: 16,
-  },
-  coordinateAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  coordinateAvatarPlaceholder: {
-    backgroundColor: '#1ea2b1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  coordinateAvatarText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  coordinateInfo: {
-    flex: 1,
-  },
-  coordinateName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-  coordinateStatus: {
-    fontSize: 12,
-    color: '#cccccc',
-  },
-  coordinateText: {
-    fontSize: 12,
-    color: '#1ea2b1',
-    fontFamily: 'monospace',
-    marginBottom: 4,
-  },
-  locationName: {
-    fontSize: 14,
-    color: '#ffffff',
-    fontWeight: '500',
+    border: 'none',
   },
   infoContainer: {
     flex: 1,
-  },
-  statusCard: {
-    backgroundColor: '#1a1a1a',
     padding: 16,
-    margin: 16,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#1ea2b1',
-  },
-  statusHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  liveDot: {
-    backgroundColor: '#10b981',
-  },
-  estimatedDot: {
-    backgroundColor: '#f59e0b',
-  },
-  statusTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  statusText: {
-    fontSize: 14,
-    color: '#cccccc',
-    marginBottom: 8,
-  },
-  updateTime: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  updateTimeText: {
-    fontSize: 12,
-    color: '#666666',
-  },
-  participantsCard: {
-    backgroundColor: '#1a1a1a',
-    padding: 16,
-    marginHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  participantsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-  participantsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  participantItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  avatarPlaceholder: {
-    backgroundColor: '#1ea2b1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  participantInfo: {
-    flex: 1,
-  },
-  participantName: {
-    fontSize: 16,
-    color: '#ffffff',
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  participantStatus: {
-    fontSize: 12,
-    color: '#cccccc',
   },
   routeCard: {
     backgroundColor: '#1a1a1a',
     padding: 16,
-    marginHorizontal: 16,
     borderRadius: 12,
     marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#1ea2b1',
   },
   routeName: {
     fontSize: 18,
@@ -856,10 +385,48 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#cccccc',
   },
+  locationCard: {
+    backgroundColor: '#1a1a1a',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  locationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  currentDot: {
+    backgroundColor: '#1ea2b1',
+  },
+  nextDot: {
+    backgroundColor: '#fbbf24',
+  },
+  finalDot: {
+    backgroundColor: '#10b981',
+  },
+  locationText: {
+    flex: 1,
+  },
+  locationLabel: {
+    fontSize: 14,
+    color: '#cccccc',
+    marginBottom: 2,
+  },
+  locationName: {
+    fontSize: 16,
+    color: '#ffffff',
+    fontWeight: '600',
+  },
   actionsCard: {
     backgroundColor: '#1a1a1a',
     padding: 16,
-    marginHorizontal: 16,
     borderRadius: 12,
     marginBottom: 12,
   },
@@ -867,43 +434,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2a2a2a',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    gap: 8,
-  },
-  actionButtonText: {
-    color: '#1ea2b1',
+  actionsText: {
     fontSize: 14,
-    fontWeight: '600',
+    color: '#1ea2b1',
   },
   footer: {
-    padding: 16,
-    paddingBottom: 32,
+    paddingVertical: 16,
   },
   footerText: {
     fontSize: 12,
     color: '#666666',
     textAlign: 'center',
-    marginBottom: 4,
-  },
-  footerNote: {
-    fontSize: 10,
-    color: '#444444',
-    textAlign: 'center',
-    marginTop: 8,
   },
   loadingText: {
     color: '#ffffff',
