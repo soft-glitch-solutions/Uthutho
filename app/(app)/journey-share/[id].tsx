@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { View, Text, StyleSheet, ActivityIndicator, Linking, TouchableOpacity, RefreshControl, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Linking, TouchableOpacity, RefreshControl, ScrollView, Image } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { RefreshCw, MapPin, Navigation, Users, Clock, User } from 'lucide-react-native';
 
@@ -214,14 +214,14 @@ export default function JourneyShareScreen() {
   const openInMaps = () => {
     if (!journeyData) return;
     
-    const url = `https://www.openstreetmap.org/?mlat=${journeyData.user_stop.latitude}&mlon=${journeyData.user_stop.longitude}#map=17/${journeyData.user_stop.latitude}/${journeyData.user_stop.longitude}`;
+    const url = `https://www.google.com/maps/search/?api=1&query=${journeyData.user_stop.latitude},${journeyData.user_stop.longitude}`;
     Linking.openURL(url);
   };
 
   const openDirections = () => {
     if (!journeyData) return;
     
-    const url = `https://www.openstreetmap.org/directions?from=&to=${journeyData.user_stop.latitude},${journeyData.user_stop.longitude}#map=17/${journeyData.user_stop.latitude}/${journeyData.user_stop.longitude}`;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${journeyData.user_stop.latitude},${journeyData.user_stop.longitude}`;
     Linking.openURL(url);
   };
 
@@ -239,6 +239,54 @@ export default function JourneyShareScreen() {
     const diffHours = Math.floor(diffMinutes / 60);
     if (diffHours === 1) return '1 hour ago';
     return `${diffHours} hours ago`;
+  };
+
+  const generateStaticMapUrl = (journey: SharedJourneyData) => {
+    const usersWithGPS = journey.participants.filter(p => p.latitude && p.longitude);
+    const primaryLocation = usersWithGPS[0] || journey.user_stop;
+    
+    // Base URL for Google Static Maps
+    const baseUrl = 'https://maps.googleapis.com/maps/api/staticmap';
+    
+    // Map parameters
+    const size = '600x300';
+    const zoom = '15';
+    const mapType = 'roadmap';
+    const scale = '2'; // For better quality on mobile
+    
+    // Center map on primary location
+    const center = `${primaryLocation.latitude},${primaryLocation.longitude}`;
+    
+    // Create markers for different locations
+    const markers = [];
+    
+    // User GPS locations (blue markers)
+    usersWithGPS.forEach((user, index) => {
+      const label = String.fromCharCode(65 + index); // A, B, C, etc.
+      markers.push(`color:blue|label:${label}|${user.latitude},${user.longitude}`);
+    });
+    
+    // Next stop (yellow marker)
+    if (journey.next_stop) {
+      markers.push(`color:yellow|label:N|${journey.next_stop.latitude},${journey.next_stop.longitude}`);
+    }
+    
+    // Current stop (green marker) - only show if no GPS users
+    if (usersWithGPS.length === 0) {
+      markers.push(`color:green|label:S|${journey.user_stop.latitude},${journey.user_stop.longitude}`);
+    }
+    
+    // Combine all parameters
+    const params = new URLSearchParams({
+      center: center,
+      zoom: zoom,
+      size: size,
+      maptype: mapType,
+      scale: scale,
+      markers: markers.join('&markers='),
+    });
+    
+    return `${baseUrl}?${params.toString()}`;
   };
 
   if (loading) {
@@ -294,37 +342,43 @@ export default function JourneyShareScreen() {
           {journeyData.next_stop && (
             <View style={styles.legendItem}>
               <View style={[styles.legendMarker, styles.nextStopMarker]} />
-              <Text style={styles.legendText}>Next Stop</Text>
+              <Text style={styles.legendText}>Next Stop (N)</Text>
             </View>
           )}
           {!userWithGPS && (
             <View style={styles.legendItem}>
               <View style={[styles.legendMarker, styles.currentStopMarker]} />
-              <Text style={styles.legendText}>Current Stop</Text>
+              <Text style={styles.legendText}>Current Stop (S)</Text>
             </View>
           )}
         </View>
       </View>
 
-      {/* OpenStreetMap - Focus on primary location */}
+      {/* Static Google Map */}
       <View style={styles.mapContainer}>
-        <iframe
-          src={generateOpenStreetMapUrl(journeyData)}
-          style={styles.mapIframe}
-          frameBorder="0"
-          scrolling="no"
-          title="Live Location Map"
+        <Image
+          source={{ uri: generateStaticMapUrl(journeyData) }}
+          style={styles.staticMap}
+          resizeMode="cover"
         />
+        <TouchableOpacity style={styles.mapOverlay} onPress={openInMaps}>
+          <Text style={styles.mapOverlayText}>Tap to open in Google Maps</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Location Coordinates Display */}
       <View style={styles.coordinatesContainer}>
         <Text style={styles.coordinatesTitle}>All Locations:</Text>
         
-        {/* User Locations */}
+        {/* User Locations with Labels */}
         {usersWithLocations.map((participant, index) => (
           <View key={participant.id} style={styles.coordinateItem}>
             <View style={styles.coordinateHeader}>
+              <View style={[styles.coordinateLabel, styles.userLabel]}>
+                <Text style={styles.coordinateLabelText}>
+                  {String.fromCharCode(65 + index)}
+                </Text>
+              </View>
               {participant.profiles.avatar_url ? (
                 <img 
                   src={participant.profiles.avatar_url} 
@@ -357,8 +411,8 @@ export default function JourneyShareScreen() {
         {journeyData.next_stop && (
           <View style={styles.coordinateItem}>
             <View style={styles.coordinateHeader}>
-              <View style={[styles.coordinateIcon, styles.nextStopIcon]}>
-                <Text style={styles.coordinateIconText}>➡️</Text>
+              <View style={[styles.coordinateLabel, styles.nextStopLabel]}>
+                <Text style={styles.coordinateLabelText}>N</Text>
               </View>
               <View style={styles.coordinateInfo}>
                 <Text style={styles.coordinateName}>Next Stop</Text>
@@ -376,8 +430,8 @@ export default function JourneyShareScreen() {
         {!userWithGPS && (
           <View style={styles.coordinateItem}>
             <View style={styles.coordinateHeader}>
-              <View style={[styles.coordinateIcon, styles.currentStopIcon]}>
-                <Text style={styles.coordinateIconText}>📍</Text>
+              <View style={[styles.coordinateLabel, styles.currentStopLabel]}>
+                <Text style={styles.coordinateLabelText}>S</Text>
               </View>
               <View style={styles.coordinateInfo}>
                 <Text style={styles.coordinateName}>Current Stop</Text>
@@ -502,33 +556,14 @@ export default function JourneyShareScreen() {
               : 'Route-based tracking • Enable GPS for live location'
             }
           </Text>
+          <Text style={styles.footerNote}>
+            Static map updates every refresh • Tap map for interactive version
+          </Text>
         </View>
       </ScrollView>
     </View>
   );
 }
-
-// Generate OpenStreetMap URL - Focus on primary location
-const generateOpenStreetMapUrl = (journey: SharedJourneyData) => {
-  const baseUrl = 'https://www.openstreetmap.org/export/embed.html';
-  
-  const userWithGPS = journey.participants.find(p => p.latitude && p.longitude);
-  
-  // Use the primary user's location for the map focus
-  const primaryLat = userWithGPS?.latitude || journey.user_stop.latitude;
-  const primaryLon = userWithGPS?.longitude || journey.user_stop.longitude;
-  
-  // Create a tight zoom around the primary location
-  const zoomLevel = 16;
-  const padding = 0.005;
-  
-  const bbox = `${primaryLon - padding},${primaryLat - padding},${primaryLon + padding},${primaryLat + padding}`;
-  
-  // Show primary marker only (OpenStreetMap limitation)
-  const markers = `marker=${primaryLat},${primaryLon}`;
-  
-  return `${baseUrl}?bbox=${bbox}&layer=mapnik&${markers}`;
-};
 
 const styles = StyleSheet.create({
   container: {
@@ -604,14 +639,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#cccccc',
   },
+  // Static Map
   mapContainer: {
     height: 300,
     width: '100%',
+    position: 'relative',
   },
-  mapIframe: {
+  staticMap: {
     width: '100%',
     height: '100%',
-    border: 'none',
+  },
+  mapOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 8,
+    alignItems: 'center',
+  },
+  mapOverlayText: {
+    color: '#1ea2b1',
+    fontSize: 12,
+    fontWeight: '600',
   },
   // Coordinates Display
   coordinatesContainer: {
@@ -637,6 +687,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  coordinateLabel: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  userLabel: {
+    backgroundColor: '#1ea2b1',
+  },
+  nextStopLabel: {
+    backgroundColor: '#fbbf24',
+  },
+  currentStopLabel: {
+    backgroundColor: '#10b981',
+  },
+  coordinateLabelText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   coordinateAvatar: {
     width: 40,
     height: 40,
@@ -652,23 +724,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: 'bold',
-  },
-  coordinateIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  nextStopIcon: {
-    backgroundColor: '#fbbf24',
-  },
-  currentStopIcon: {
-    backgroundColor: '#10b981',
-  },
-  coordinateIconText: {
-    fontSize: 16,
   },
   coordinateInfo: {
     flex: 1,
@@ -861,6 +916,12 @@ const styles = StyleSheet.create({
     color: '#666666',
     textAlign: 'center',
     marginBottom: 4,
+  },
+  footerNote: {
+    fontSize: 10,
+    color: '#444444',
+    textAlign: 'center',
+    marginTop: 8,
   },
   loadingText: {
     color: '#ffffff',
