@@ -741,6 +741,57 @@ Current route: ${activeJourney?.routes?.start_point} to ${activeJourney?.routes?
     }
   };
 
+  // Add this to your main JourneyScreen component
+const updateUserLocation = async (latitude: number, longitude: number) => {
+  if (!activeJourney || !currentUserId) return;
+
+  try {
+    const { error } = await supabase
+      .from('journey_participants')
+      .update({
+        latitude: latitude,
+        longitude: longitude,
+        last_location_update: new Date().toISOString()
+      })
+      .eq('journey_id', activeJourney.id)
+      .eq('user_id', currentUserId)
+      .eq('is_active', true);
+
+    if (error) {
+      console.error('Error updating user location:', error);
+    } else {
+      console.log('User location updated:', { latitude, longitude });
+    }
+  } catch (error) {
+    console.error('Error in updateUserLocation:', error);
+  }
+};
+
+// Use this with geolocation in your main app:
+useEffect(() => {
+  if (activeJourney) {
+    // Start watching position
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        updateUserLocation(latitude, longitude);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 5000, // Update every 5 seconds
+      }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }
+}, [activeJourney]);
+
   const getCurrentStopName = () => {
     if (!activeJourney || !journeyStops.length) return 'Current Stop';
     
