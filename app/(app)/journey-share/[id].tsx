@@ -47,6 +47,7 @@ export default function JourneyShareScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<string>('');
+  const [mapKey, setMapKey] = useState(0); // Force iframe refresh
 
   const journeyId = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -195,6 +196,7 @@ export default function JourneyShareScreen() {
 
       setJourneyData(journeyData);
       setLastUpdate(new Date().toLocaleTimeString());
+      setMapKey(prev => prev + 1); // Force iframe refresh
       console.log('✅ Journey data loaded with real-time locations');
 
     } catch (err: any) {
@@ -241,6 +243,198 @@ export default function JourneyShareScreen() {
     return `${diffHours} hours ago`;
   };
 
+  // Generate HTML content for the iframe
+  const generateMapHTML = () => {
+    if (!journeyData) return '';
+    
+    const userWithGPS = journeyData.participants.find(p => p.latitude && p.longitude);
+    
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uthutho Live Location</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+        }
+        #map { 
+            width: 100%; 
+            height: 100%;
+            background: #1a1a1a;
+        }
+        .profile-marker {
+            border-radius: 50%;
+            border: 3px solid #1ea2b1;
+            box-shadow: 0 2px 10px rgba(30, 162, 177, 0.5);
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .profile-marker img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .next-stop-marker {
+            background: #fbbf24;
+            border-radius: 50%;
+            border: 3px solid #ffffff;
+            width: 20px;
+            height: 20px;
+            box-shadow: 0 2px 10px rgba(251, 191, 36, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #000000;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .stop-marker {
+            background: #10b981;
+            border-radius: 50%;
+            border: 3px solid #ffffff;
+            width: 16px;
+            height: 16px;
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.5);
+        }
+        .leaflet-popup-content {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .custom-popup {
+            background: #1a1a1a;
+            color: #ffffff;
+            border-radius: 8px;
+            padding: 8px;
+            border: 1px solid #333;
+        }
+        .popup-name {
+            font-weight: bold;
+            margin-bottom: 4px;
+            color: #1ea2b1;
+        }
+        .popup-location {
+            font-size: 12px;
+            color: #cccccc;
+        }
+        .leaflet-container {
+            background: #1a1a1a;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <script>
+        // Initialize the map
+        const map = L.map('map').setView([${journeyData.user_stop.latitude}, ${journeyData.user_stop.longitude}], 17);
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        // Array to hold all markers for bounds calculation
+        const allMarkers = [];
+        
+        // Add user markers with profile pictures
+        ${journeyData.participants.filter(p => p.latitude && p.longitude).map(participant => `
+            (function() {
+                const avatarHtml = ${participant.profiles.avatar_url ? 
+                    `'<img src="${participant.profiles.avatar_url}" alt="${participant.profiles.first_name}" style="width: 40px; height: 40px; border-radius: 50%;" />'` : 
+                    `'<div style="width: 40px; height: 40px; background: #1ea2b1; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px;">${participant.profiles.first_name?.[0]}${participant.profiles.last_name?.[0]}</div>'`
+                };
+                
+                const marker = L.marker([${participant.latitude}, ${participant.longitude}], {
+                    icon: L.divIcon({
+                        className: 'profile-marker',
+                        html: avatarHtml,
+                        iconSize: [46, 46],
+                        iconAnchor: [23, 23]
+                    })
+                }).addTo(map);
+                
+                marker.bindPopup(\`
+                    <div class="custom-popup">
+                        <div class="popup-name">${participant.profiles.first_name} ${participant.profiles.last_name}</div>
+                        <div class="popup-location">Live Location</div>
+                        <div class="popup-location">Last update: ${participant.last_location_update ? new Date(participant.last_location_update).toLocaleTimeString() : 'Unknown'}</div>
+                    </div>
+                \`);
+                
+                allMarkers.push(marker);
+            })();
+        `).join('')}
+        
+        // Add next stop marker
+        ${journeyData.next_stop ? `
+            (function() {
+                const marker = L.marker([${journeyData.next_stop.latitude}, ${journeyData.next_stop.longitude}], {
+                    icon: L.divIcon({
+                        className: 'next-stop-marker',
+                        html: '➡️',
+                        iconSize: [26, 26],
+                        iconAnchor: [13, 13]
+                    })
+                }).addTo(map);
+                
+                marker.bindPopup(\`
+                    <div class="custom-popup">
+                        <div class="popup-name">Next Stop</div>
+                        <div class="popup-location">${journeyData.next_stop.name}</div>
+                    </div>
+                \`);
+                
+                allMarkers.push(marker);
+            })();
+        ` : ''}
+        
+        // Add current stop marker (fallback when no GPS)
+        ${!userWithGPS ? `
+            (function() {
+                const marker = L.marker([${journeyData.user_stop.latitude}, ${journeyData.user_stop.longitude}], {
+                    icon: L.divIcon({
+                        className: 'stop-marker',
+                        html: '',
+                        iconSize: [22, 22],
+                        iconAnchor: [11, 11]
+                    })
+                }).addTo(map);
+                
+                marker.bindPopup(\`
+                    <div class="custom-popup">
+                        <div class="popup-name">Current Stop</div>
+                        <div class="popup-location">${journeyData.user_stop.name}</div>
+                    </div>
+                \`);
+                
+                allMarkers.push(marker);
+            })();
+        ` : ''}
+        
+        // Fit map to show all markers if we have any
+        if (allMarkers.length > 0) {
+            const group = L.featureGroup(allMarkers);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+        
+        console.log('Map initialized with', allMarkers.length, 'markers');
+    </script>
+</body>
+</html>
+    `;
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -282,15 +476,18 @@ export default function JourneyShareScreen() {
 
       {/* Custom Map with Profile Picture Markers */}
       <View style={styles.mapContainer}>
-        <div
-          dangerouslySetInnerHTML={{
-            __html: generateCustomMapHTML(journeyData)
-          }}
-          style={styles.customMap}
+        <iframe
+          key={mapKey}
+          srcDoc={generateMapHTML()}
+          style={styles.mapIframe}
+          frameBorder="0"
+          scrolling="no"
+          title="Live Location Map"
+          allowFullScreen
         />
       </View>
 
-      {/* Rest of your existing JSX remains the same */}
+      {/* Rest of your content remains exactly the same */}
       <ScrollView 
         style={styles.infoContainer}
         refreshControl={
@@ -432,178 +629,6 @@ export default function JourneyShareScreen() {
   );
 }
 
-// Generate custom HTML map with profile picture markers
-const generateCustomMapHTML = (journey: SharedJourneyData) => {
-  const userWithGPS = journey.participants.find(p => p.latitude && p.longitude);
-  
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Uthutho Live Location</title>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <style>
-            body { 
-                margin: 0; 
-                padding: 0; 
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: #000000;
-                color: #ffffff;
-            }
-            #map { 
-                width: 100%; 
-                height: 100%;
-                background: #1a1a1a;
-            }
-            .profile-marker {
-                border-radius: 50%;
-                border: 3px solid #1ea2b1;
-                box-shadow: 0 2px 10px rgba(30, 162, 177, 0.5);
-                background: #ffffff;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                overflow: hidden;
-            }
-            .profile-marker img {
-                width: 100%;
-                height: 100%;
-                object-fit: cover;
-            }
-            .next-stop-marker {
-                background: #fbbf24;
-                border-radius: 50%;
-                border: 3px solid #ffffff;
-                width: 20px;
-                height: 20px;
-                box-shadow: 0 2px 10px rgba(251, 191, 36, 0.5);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: #000000;
-                font-weight: bold;
-                font-size: 12px;
-            }
-            .stop-marker {
-                background: #10b981;
-                border-radius: 50%;
-                border: 3px solid #ffffff;
-                width: 16px;
-                height: 16px;
-                box-shadow: 0 2px 10px rgba(16, 185, 129, 0.5);
-            }
-            .leaflet-popup-content {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            }
-            .custom-popup {
-                background: #1a1a1a;
-                color: #ffffff;
-                border-radius: 8px;
-                padding: 8px;
-            }
-            .popup-name {
-                font-weight: bold;
-                margin-bottom: 4px;
-                color: #1ea2b1;
-            }
-            .popup-location {
-                font-size: 12px;
-                color: #cccccc;
-            }
-        </style>
-    </head>
-    <body>
-        <div id="map"></div>
-        
-        <script>
-            // Initialize the map
-            const map = L.map('map').setView([${journey.user_stop.latitude}, ${journey.user_stop.longitude}], 17);
-            
-            // Add OpenStreetMap tiles
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors',
-                className: 'map-tiles'
-            }).addTo(map);
-            
-            // Add user markers with profile pictures
-            ${journey.participants.filter(p => p.latitude && p.longitude).map(participant => `
-                const profileMarker${participant.id} = L.marker([${participant.latitude}, ${participant.longitude}], {
-                    icon: L.divIcon({
-                        className: 'profile-marker',
-                        html: \`${participant.profiles.avatar_url ? 
-                            `<img src="${participant.profiles.avatar_url}" alt="${participant.profiles.first_name}" />` : 
-                            `<div style="width: 40px; height: 40px; background: #1ea2b1; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">${participant.profiles.first_name?.[0]}${participant.profiles.last_name?.[0]}</div>`
-                        }\`,
-                        iconSize: [40, 40],
-                        iconAnchor: [20, 20]
-                    })
-                }).addTo(map);
-                
-                profileMarker${participant.id}.bindPopup(\`
-                    <div class="custom-popup">
-                        <div class="popup-name">${participant.profiles.first_name} ${participant.profiles.last_name}</div>
-                        <div class="popup-location">Live Location</div>
-                        <div class="popup-location">${new Date(participant.last_location_update).toLocaleTimeString()}</div>
-                    </div>
-                \`);
-            `).join('')}
-            
-            // Add next stop marker
-            ${journey.next_stop ? `
-                const nextStopMarker = L.marker([${journey.next_stop.latitude}, ${journey.next_stop.longitude}], {
-                    icon: L.divIcon({
-                        className: 'next-stop-marker',
-                        html: '➡️',
-                        iconSize: [20, 20],
-                        iconAnchor: [10, 10]
-                    })
-                }).addTo(map);
-                
-                nextStopMarker.bindPopup(\`
-                    <div class="custom-popup">
-                        <div class="popup-name">Next Stop</div>
-                        <div class="popup-location">${journey.next_stop.name}</div>
-                    </div>
-                \`);
-            ` : ''}
-            
-            // Add current stop marker (fallback when no GPS)
-            ${!userWithGPS ? `
-                const currentStopMarker = L.marker([${journey.user_stop.latitude}, ${journey.user_stop.longitude}], {
-                    icon: L.divIcon({
-                        className: 'stop-marker',
-                        html: '',
-                        iconSize: [16, 16],
-                        iconAnchor: [8, 8]
-                    })
-                }).addTo(map);
-                
-                currentStopMarker.bindPopup(\`
-                    <div class="custom-popup">
-                        <div class="popup-name">Current Stop</div>
-                        <div class="popup-location">${journey.user_stop.name}</div>
-                    </div>
-                \`);
-            ` : ''}
-            
-            // Fit map to show all markers
-            const group = new L.featureGroup([
-                ${journey.participants.filter(p => p.latitude && p.longitude).map(p => `profileMarker${p.id}`).join(', ')}
-                ${journey.next_stop ? ', nextStopMarker' : ''}
-                ${!userWithGPS ? ', currentStopMarker' : ''}
-            ].filter(Boolean));
-            
-            map.fitBounds(group.getBounds().pad(0.1));
-        </script>
-    </body>
-    </html>
-  `;
-};
-
-// Update styles to include custom map
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -641,11 +666,12 @@ const styles = StyleSheet.create({
     height: 300,
     width: '100%',
   },
-  customMap: {
+  mapIframe: {
     width: '100%',
     height: '100%',
+    border: 'none',
+    backgroundColor: '#1a1a1a',
   },
-  // ... rest of your existing styles remain the same
   infoContainer: {
     flex: 1,
   },
