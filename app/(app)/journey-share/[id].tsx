@@ -53,7 +53,6 @@ export default function JourneyShareScreen() {
   useEffect(() => {
     if (journeyId && isValidUUID(journeyId)) {
       loadJourneyData();
-      // Set up real-time updates
       const subscription = setupRealtimeUpdates();
       return () => {
         subscription?.unsubscribe();
@@ -84,7 +83,6 @@ export default function JourneyShareScreen() {
         },
         (payload) => {
           console.log('📍 Real-time location update:', payload);
-          // Refresh data when location updates
           loadJourneyData();
         }
       )
@@ -95,7 +93,6 @@ export default function JourneyShareScreen() {
     try {
       console.log('🚀 Loading journey data for ID:', journeyId);
 
-      // STEP 1: Get journey with route info
       const { data: journey, error: journeyError } = await supabase
         .from('journeys')
         .select(`
@@ -115,7 +112,6 @@ export default function JourneyShareScreen() {
       if (journeyError) throw journeyError;
       if (!journey) throw new Error('Journey not found');
 
-      // STEP 2: Get ALL active participants with their real-time locations
       const { data: participants, error: participantsError } = await supabase
         .from('journey_participants')
         .select(`
@@ -136,9 +132,6 @@ export default function JourneyShareScreen() {
 
       if (participantsError) throw participantsError;
 
-      console.log('📍 Participants with locations:', participants);
-
-      // STEP 3: Get user's current stop from stop_waiting (fallback)
       const { data: userWaiting, error: waitingError } = await supabase
         .from('stop_waiting')
         .select(`
@@ -154,7 +147,6 @@ export default function JourneyShareScreen() {
         .limit(1)
         .single();
 
-      // STEP 4: Get next stop in sequence
       let nextStop = null;
       if (userWaiting && !waitingError) {
         try {
@@ -186,7 +178,6 @@ export default function JourneyShareScreen() {
         }
       }
 
-      // STEP 5: Find the user with the most recent location
       const userWithLocation = participants?.find(p => p.latitude && p.longitude);
       const userStop = userWaiting?.stops;
 
@@ -289,18 +280,17 @@ export default function JourneyShareScreen() {
         </View>
       </View>
 
-      {/* OpenStreetMap */}
+      {/* Custom Map with Profile Picture Markers */}
       <View style={styles.mapContainer}>
-        <iframe
-          src={generateOpenStreetMapUrl(journeyData)}
-          style={styles.mapIframe}
-          frameBorder="0"
-          scrolling="no"
-          title="Live Location Map"
+        <div
+          dangerouslySetInnerHTML={{
+            __html: generateCustomMapHTML(journeyData)
+          }}
+          style={styles.customMap}
         />
       </View>
 
-      {/* Journey Info */}
+      {/* Rest of your existing JSX remains the same */}
       <ScrollView 
         style={styles.infoContainer}
         refreshControl={
@@ -442,32 +432,178 @@ export default function JourneyShareScreen() {
   );
 }
 
-// Generate OpenStreetMap URL focusing on user's exact location
-const generateOpenStreetMapUrl = (journey: SharedJourneyData) => {
-  const baseUrl = 'https://www.openstreetmap.org/export/embed.html';
+// Generate custom HTML map with profile picture markers
+const generateCustomMapHTML = (journey: SharedJourneyData) => {
+  const userWithGPS = journey.participants.find(p => p.latitude && p.longitude);
   
-  const userLat = journey.user_stop.latitude;
-  const userLon = journey.user_stop.longitude;
-  
-  // Very tight zoom for exact location (zoom level 17 = building level)
-  const zoomLevel = 17;
-  const padding = 0.001; // Very small padding
-  
-  const bbox = `${userLon - padding},${userLat - padding},${userLon + padding},${userLat + padding}`;
-  
-  // Add user's location marker
-  let markers = `marker=${userLat},${userLon}`;
-  
-  // Add next stop marker if available
-  if (journey.next_stop) {
-    markers += `&marker=${journey.next_stop.latitude},${journey.next_stop.longitude}`;
-  }
-  
-  return `${baseUrl}?bbox=${bbox}&layer=mapnik&${markers}`;
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Uthutho Live Location</title>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+            body { 
+                margin: 0; 
+                padding: 0; 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: #000000;
+                color: #ffffff;
+            }
+            #map { 
+                width: 100%; 
+                height: 100%;
+                background: #1a1a1a;
+            }
+            .profile-marker {
+                border-radius: 50%;
+                border: 3px solid #1ea2b1;
+                box-shadow: 0 2px 10px rgba(30, 162, 177, 0.5);
+                background: #ffffff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+            }
+            .profile-marker img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+            .next-stop-marker {
+                background: #fbbf24;
+                border-radius: 50%;
+                border: 3px solid #ffffff;
+                width: 20px;
+                height: 20px;
+                box-shadow: 0 2px 10px rgba(251, 191, 36, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #000000;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            .stop-marker {
+                background: #10b981;
+                border-radius: 50%;
+                border: 3px solid #ffffff;
+                width: 16px;
+                height: 16px;
+                box-shadow: 0 2px 10px rgba(16, 185, 129, 0.5);
+            }
+            .leaflet-popup-content {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+            .custom-popup {
+                background: #1a1a1a;
+                color: #ffffff;
+                border-radius: 8px;
+                padding: 8px;
+            }
+            .popup-name {
+                font-weight: bold;
+                margin-bottom: 4px;
+                color: #1ea2b1;
+            }
+            .popup-location {
+                font-size: 12px;
+                color: #cccccc;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
+        
+        <script>
+            // Initialize the map
+            const map = L.map('map').setView([${journey.user_stop.latitude}, ${journey.user_stop.longitude}], 17);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                className: 'map-tiles'
+            }).addTo(map);
+            
+            // Add user markers with profile pictures
+            ${journey.participants.filter(p => p.latitude && p.longitude).map(participant => `
+                const profileMarker${participant.id} = L.marker([${participant.latitude}, ${participant.longitude}], {
+                    icon: L.divIcon({
+                        className: 'profile-marker',
+                        html: \`${participant.profiles.avatar_url ? 
+                            `<img src="${participant.profiles.avatar_url}" alt="${participant.profiles.first_name}" />` : 
+                            `<div style="width: 40px; height: 40px; background: #1ea2b1; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">${participant.profiles.first_name?.[0]}${participant.profiles.last_name?.[0]}</div>`
+                        }\`,
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 20]
+                    })
+                }).addTo(map);
+                
+                profileMarker${participant.id}.bindPopup(\`
+                    <div class="custom-popup">
+                        <div class="popup-name">${participant.profiles.first_name} ${participant.profiles.last_name}</div>
+                        <div class="popup-location">Live Location</div>
+                        <div class="popup-location">${new Date(participant.last_location_update).toLocaleTimeString()}</div>
+                    </div>
+                \`);
+            `).join('')}
+            
+            // Add next stop marker
+            ${journey.next_stop ? `
+                const nextStopMarker = L.marker([${journey.next_stop.latitude}, ${journey.next_stop.longitude}], {
+                    icon: L.divIcon({
+                        className: 'next-stop-marker',
+                        html: '➡️',
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
+                    })
+                }).addTo(map);
+                
+                nextStopMarker.bindPopup(\`
+                    <div class="custom-popup">
+                        <div class="popup-name">Next Stop</div>
+                        <div class="popup-location">${journey.next_stop.name}</div>
+                    </div>
+                \`);
+            ` : ''}
+            
+            // Add current stop marker (fallback when no GPS)
+            ${!userWithGPS ? `
+                const currentStopMarker = L.marker([${journey.user_stop.latitude}, ${journey.user_stop.longitude}], {
+                    icon: L.divIcon({
+                        className: 'stop-marker',
+                        html: '',
+                        iconSize: [16, 16],
+                        iconAnchor: [8, 8]
+                    })
+                }).addTo(map);
+                
+                currentStopMarker.bindPopup(\`
+                    <div class="custom-popup">
+                        <div class="popup-name">Current Stop</div>
+                        <div class="popup-location">${journey.user_stop.name}</div>
+                    </div>
+                \`);
+            ` : ''}
+            
+            // Fit map to show all markers
+            const group = new L.featureGroup([
+                ${journey.participants.filter(p => p.latitude && p.longitude).map(p => `profileMarker${p.id}`).join(', ')}
+                ${journey.next_stop ? ', nextStopMarker' : ''}
+                ${!userWithGPS ? ', currentStopMarker' : ''}
+            ].filter(Boolean));
+            
+            map.fitBounds(group.getBounds().pad(0.1));
+        </script>
+    </body>
+    </html>
+  `;
 };
 
-// ... (keep the same styles as before, with additions for new components)
-
+// Update styles to include custom map
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -505,11 +641,11 @@ const styles = StyleSheet.create({
     height: 300,
     width: '100%',
   },
-  mapIframe: {
+  customMap: {
     width: '100%',
     height: '100%',
-    border: 'none',
   },
+  // ... rest of your existing styles remain the same
   infoContainer: {
     flex: 1,
   },
