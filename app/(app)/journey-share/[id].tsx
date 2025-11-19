@@ -289,7 +289,7 @@ export default function JourneyShareScreen() {
         </View>
       </View>
 
-      {/* OpenStreetMap */}
+      {/* OpenStreetMap with Custom Markers */}
       <View style={styles.mapContainer}>
         <iframe
           src={generateOpenStreetMapUrl(journeyData)}
@@ -298,6 +298,35 @@ export default function JourneyShareScreen() {
           scrolling="no"
           title="Live Location Map"
         />
+      </View>
+
+      {/* Profile Pictures Display Below Map */}
+      <View style={styles.profileMarkersContainer}>
+        <Text style={styles.profileMarkersTitle}>Live Locations:</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.profileMarkersScroll}>
+          {journeyData.participants
+            .filter(p => p.latitude && p.longitude)
+            .map((participant) => (
+              <View key={participant.id} style={styles.profileMarker}>
+                {participant.profiles.avatar_url ? (
+                  <img 
+                    src={participant.profiles.avatar_url} 
+                    style={styles.profileMarkerImage}
+                    alt={`${participant.profiles.first_name}'s location`}
+                  />
+                ) : (
+                  <View style={[styles.profileMarkerImage, styles.profileMarkerPlaceholder]}>
+                    <Text style={styles.profileMarkerText}>
+                      {participant.profiles.first_name?.[0]}{participant.profiles.last_name?.[0]}
+                    </Text>
+                  </View>
+                )}
+                <Text style={styles.profileMarkerName}>
+                  {participant.profiles.first_name}
+                </Text>
+              </View>
+            ))}
+        </ScrollView>
       </View>
 
       {/* Journey Info */}
@@ -442,31 +471,59 @@ export default function JourneyShareScreen() {
   );
 }
 
-// Generate OpenStreetMap URL focusing on user's exact location
+// Generate OpenStreetMap URL with multiple markers
 const generateOpenStreetMapUrl = (journey: SharedJourneyData) => {
   const baseUrl = 'https://www.openstreetmap.org/export/embed.html';
   
+  const userWithGPS = journey.participants.find(p => p.latitude && p.longitude);
   const userLat = journey.user_stop.latitude;
   const userLon = journey.user_stop.longitude;
   
-  // Very tight zoom for exact location (zoom level 17 = building level)
-  const zoomLevel = 17;
-  const padding = 0.001; // Very small padding
+  // Calculate bounds to include all markers
+  const allCoordinates = [
+    { lat: userLat, lon: userLon },
+    ...journey.participants
+      .filter(p => p.latitude && p.longitude)
+      .map(p => ({ lat: p.latitude!, lon: p.longitude! })),
+    ...(journey.next_stop ? [{ lat: journey.next_stop.latitude, lon: journey.next_stop.longitude }] : [])
+  ];
+
+  const lats = allCoordinates.map(c => c.lat);
+  const lons = allCoordinates.map(c => c.lon);
   
-  const bbox = `${userLon - padding},${userLat - padding},${userLon + padding},${userLat + padding}`;
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons);
+  const maxLon = Math.max(...lons);
   
-  // Add user's location marker
-  let markers = `marker=${userLat},${userLon}`;
+  const padding = 0.01;
+  const bbox = `${minLon - padding},${minLat - padding},${maxLon + padding},${maxLat + padding}`;
   
-  // Add next stop marker if available
+  // Build markers - using different colors to distinguish
+  let markers = '';
+  
+  // Add user location markers (blue)
+  journey.participants
+    .filter(p => p.latitude && p.longitude)
+    .forEach((participant, index) => {
+      if (markers) markers += '&';
+      markers += `marker=${participant.latitude},${participant.longitude}`;
+    });
+  
+  // Add next stop marker (yellow) if available
   if (journey.next_stop) {
-    markers += `&marker=${journey.next_stop.latitude},${journey.next_stop.longitude}`;
+    if (markers) markers += '&';
+    markers += `marker=${journey.next_stop.latitude},${journey.next_stop.longitude}`;
+  }
+  
+  // Add current stop marker (green) as fallback when no GPS
+  if (!userWithGPS) {
+    if (markers) markers += '&';
+    markers += `marker=${journey.user_stop.latitude},${journey.user_stop.longitude}`;
   }
   
   return `${baseUrl}?bbox=${bbox}&layer=mapnik&${markers}`;
 };
-
-// ... (keep the same styles as before, with additions for new components)
 
 const styles = StyleSheet.create({
   container: {
@@ -509,6 +566,49 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     border: 'none',
+  },
+  // Profile markers below map
+  profileMarkersContainer: {
+    backgroundColor: '#1a1a1a',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  profileMarkersTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  profileMarkersScroll: {
+    flexDirection: 'row',
+  },
+  profileMarker: {
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  profileMarkerImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 3,
+    borderColor: '#1ea2b1',
+  },
+  profileMarkerPlaceholder: {
+    backgroundColor: '#1ea2b1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileMarkerText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  profileMarkerName: {
+    fontSize: 12,
+    color: '#cccccc',
+    marginTop: 4,
+    fontWeight: '500',
   },
   infoContainer: {
     flex: 1,
