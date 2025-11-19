@@ -214,14 +214,14 @@ export default function JourneyShareScreen() {
   const openInMaps = () => {
     if (!journeyData) return;
     
-    const url = `https://www.google.com/maps/search/?api=1&query=${journeyData.user_stop.latitude},${journeyData.user_stop.longitude}`;
+    const url = `https://www.openstreetmap.org/?mlat=${journeyData.user_stop.latitude}&mlon=${journeyData.user_stop.longitude}#map=17/${journeyData.user_stop.latitude}/${journeyData.user_stop.longitude}`;
     Linking.openURL(url);
   };
 
   const openDirections = () => {
     if (!journeyData) return;
     
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${journeyData.user_stop.latitude},${journeyData.user_stop.longitude}`;
+    const url = `https://www.openstreetmap.org/directions?from=&to=${journeyData.user_stop.latitude},${journeyData.user_stop.longitude}`;
     Linking.openURL(url);
   };
 
@@ -245,45 +245,31 @@ export default function JourneyShareScreen() {
     const usersWithGPS = journey.participants.filter(p => p.latitude && p.longitude);
     const primaryLocation = usersWithGPS[0] || journey.user_stop;
     
-    // Base URL for Google Static Maps
-    const baseUrl = 'https://maps.googleapis.com/maps/api/staticmap';
+    const baseUrl = 'https://staticmap.openstreetmap.de/staticmap.php';
     
-    // Map parameters
-    const size = '600x300';
-    const zoom = '15';
-    const mapType = 'roadmap';
-    const scale = '2'; // For better quality on mobile
-    
-    // Center map on primary location
-    const center = `${primaryLocation.latitude},${primaryLocation.longitude}`;
-    
-    // Create markers for different locations
     const markers = [];
     
-    // User GPS locations (blue markers)
-    usersWithGPS.forEach((user, index) => {
-      const label = String.fromCharCode(65 + index); // A, B, C, etc.
-      markers.push(`color:blue|label:${label}|${user.latitude},${user.longitude}`);
+    // User GPS locations (blue)
+    usersWithGPS.forEach(user => {
+      markers.push(`${user.latitude},${user.longitude},lightblue7`);
     });
     
-    // Next stop (yellow marker)
+    // Next stop (yellow)
     if (journey.next_stop) {
-      markers.push(`color:yellow|label:N|${journey.next_stop.latitude},${journey.next_stop.longitude}`);
+      markers.push(`${journey.next_stop.latitude},${journey.next_stop.longitude},yellow7`);
     }
     
-    // Current stop (green marker) - only show if no GPS users
+    // Current stop (green) - only show if no GPS users
     if (usersWithGPS.length === 0) {
-      markers.push(`color:green|label:S|${journey.user_stop.latitude},${journey.user_stop.longitude}`);
+      markers.push(`${journey.user_stop.latitude},${journey.user_stop.longitude},green7`);
     }
     
-    // Combine all parameters
     const params = new URLSearchParams({
-      center: center,
-      zoom: zoom,
-      size: size,
-      maptype: mapType,
-      scale: scale,
-      markers: markers.join('&markers='),
+      center: `${primaryLocation.latitude},${primaryLocation.longitude}`,
+      zoom: '15',
+      size: '600x300',
+      markers: markers.join('|'),
+      attribution: 'false'
     });
     
     return `${baseUrl}?${params.toString()}`;
@@ -342,19 +328,19 @@ export default function JourneyShareScreen() {
           {journeyData.next_stop && (
             <View style={styles.legendItem}>
               <View style={[styles.legendMarker, styles.nextStopMarker]} />
-              <Text style={styles.legendText}>Next Stop (N)</Text>
+              <Text style={styles.legendText}>Next Stop</Text>
             </View>
           )}
           {!userWithGPS && (
             <View style={styles.legendItem}>
               <View style={[styles.legendMarker, styles.currentStopMarker]} />
-              <Text style={styles.legendText}>Current Stop (S)</Text>
+              <Text style={styles.legendText}>Current Stop</Text>
             </View>
           )}
         </View>
       </View>
 
-      {/* Static Google Map */}
+      {/* StaticMap.org Static Map */}
       <View style={styles.mapContainer}>
         <Image
           source={{ uri: generateStaticMapUrl(journeyData) }}
@@ -362,7 +348,7 @@ export default function JourneyShareScreen() {
           resizeMode="cover"
         />
         <TouchableOpacity style={styles.mapOverlay} onPress={openInMaps}>
-          <Text style={styles.mapOverlayText}>Tap to open in Google Maps</Text>
+          <Text style={styles.mapOverlayText}>Tap to open interactive map</Text>
         </TouchableOpacity>
       </View>
 
@@ -370,14 +356,12 @@ export default function JourneyShareScreen() {
       <View style={styles.coordinatesContainer}>
         <Text style={styles.coordinatesTitle}>All Locations:</Text>
         
-        {/* User Locations with Labels */}
+        {/* User Locations */}
         {usersWithLocations.map((participant, index) => (
           <View key={participant.id} style={styles.coordinateItem}>
             <View style={styles.coordinateHeader}>
-              <View style={[styles.coordinateLabel, styles.userLabel]}>
-                <Text style={styles.coordinateLabelText}>
-                  {String.fromCharCode(65 + index)}
-                </Text>
+              <View style={[styles.coordinateMarker, styles.userCoordinateMarker]}>
+                <Text style={styles.coordinateMarkerText}>📍</Text>
               </View>
               {participant.profiles.avatar_url ? (
                 <img 
@@ -402,7 +386,7 @@ export default function JourneyShareScreen() {
               </View>
             </View>
             <Text style={styles.coordinateText}>
-              📍 {participant.latitude?.toFixed(6)}, {participant.longitude?.toFixed(6)}
+              {participant.latitude?.toFixed(6)}, {participant.longitude?.toFixed(6)}
             </Text>
           </View>
         ))}
@@ -411,8 +395,8 @@ export default function JourneyShareScreen() {
         {journeyData.next_stop && (
           <View style={styles.coordinateItem}>
             <View style={styles.coordinateHeader}>
-              <View style={[styles.coordinateLabel, styles.nextStopLabel]}>
-                <Text style={styles.coordinateLabelText}>N</Text>
+              <View style={[styles.coordinateMarker, styles.nextStopCoordinateMarker]}>
+                <Text style={styles.coordinateMarkerText}>🟡</Text>
               </View>
               <View style={styles.coordinateInfo}>
                 <Text style={styles.coordinateName}>Next Stop</Text>
@@ -420,7 +404,7 @@ export default function JourneyShareScreen() {
               </View>
             </View>
             <Text style={styles.coordinateText}>
-              📍 {journeyData.next_stop.latitude.toFixed(6)}, {journeyData.next_stop.longitude.toFixed(6)}
+              {journeyData.next_stop.latitude.toFixed(6)}, {journeyData.next_stop.longitude.toFixed(6)}
             </Text>
             <Text style={styles.locationName}>{journeyData.next_stop.name}</Text>
           </View>
@@ -430,8 +414,8 @@ export default function JourneyShareScreen() {
         {!userWithGPS && (
           <View style={styles.coordinateItem}>
             <View style={styles.coordinateHeader}>
-              <View style={[styles.coordinateLabel, styles.currentStopLabel]}>
-                <Text style={styles.coordinateLabelText}>S</Text>
+              <View style={[styles.coordinateMarker, styles.currentStopCoordinateMarker]}>
+                <Text style={styles.coordinateMarkerText}>🟢</Text>
               </View>
               <View style={styles.coordinateInfo}>
                 <Text style={styles.coordinateName}>Current Stop</Text>
@@ -439,7 +423,7 @@ export default function JourneyShareScreen() {
               </View>
             </View>
             <Text style={styles.coordinateText}>
-              📍 {journeyData.user_stop.latitude.toFixed(6)}, {journeyData.user_stop.longitude.toFixed(6)}
+              {journeyData.user_stop.latitude.toFixed(6)}, {journeyData.user_stop.longitude.toFixed(6)}
             </Text>
             <Text style={styles.locationName}>{journeyData.user_stop.name}</Text>
           </View>
@@ -557,7 +541,7 @@ export default function JourneyShareScreen() {
             }
           </Text>
           <Text style={styles.footerNote}>
-            Static map updates every refresh • Tap map for interactive version
+            Powered by OpenStreetMap • Map updates every refresh
           </Text>
         </View>
       </ScrollView>
@@ -687,27 +671,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  coordinateLabel: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  coordinateMarker: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
   },
-  userLabel: {
-    backgroundColor: '#1ea2b1',
+  userCoordinateMarker: {
+    backgroundColor: 'rgba(30, 162, 177, 0.2)',
   },
-  nextStopLabel: {
-    backgroundColor: '#fbbf24',
+  nextStopCoordinateMarker: {
+    backgroundColor: 'rgba(251, 191, 36, 0.2)',
   },
-  currentStopLabel: {
-    backgroundColor: '#10b981',
+  currentStopCoordinateMarker: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
   },
-  coordinateLabelText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
+  coordinateMarkerText: {
+    fontSize: 16,
   },
   coordinateAvatar: {
     width: 40,
