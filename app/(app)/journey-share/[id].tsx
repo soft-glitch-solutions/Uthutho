@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { View, Text, StyleSheet, ActivityIndicator, Linking, TouchableOpacity, RefreshControl, ScrollView } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { RefreshCw, MapPin, Navigation, Users, Clock, User, Navigation2 } from 'lucide-react-native';
+import { RefreshCw, MapPin, Navigation, Users, Clock, User } from 'lucide-react-native';
 
 interface SharedJourneyData {
   id: string;
@@ -288,7 +288,7 @@ export default function JourneyShareScreen() {
           {usersWithLocations.length > 0 && (
             <View style={styles.legendItem}>
               <View style={[styles.legendMarker, styles.userMarker]} />
-              <Text style={styles.legendText}>User Locations</Text>
+              <Text style={styles.legendText}>User Locations ({usersWithLocations.length})</Text>
             </View>
           )}
           {journeyData.next_stop && (
@@ -306,7 +306,7 @@ export default function JourneyShareScreen() {
         </View>
       </View>
 
-      {/* OpenStreetMap */}
+      {/* OpenStreetMap - Focus on primary location */}
       <View style={styles.mapContainer}>
         <iframe
           src={generateOpenStreetMapUrl(journeyData)}
@@ -317,35 +317,80 @@ export default function JourneyShareScreen() {
         />
       </View>
 
-      {/* Profile Pictures Display */}
-      {usersWithLocations.length > 0 && (
-        <View style={styles.profilesContainer}>
-          <Text style={styles.profilesTitle}>Live Locations:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.profilesScroll}>
-            {usersWithLocations.map((participant) => (
-              <View key={participant.id} style={styles.profileCard}>
-                {participant.profiles.avatar_url ? (
-                  <img 
-                    src={participant.profiles.avatar_url} 
-                    style={styles.profileImage}
-                    alt={`${participant.profiles.first_name}'s location`}
-                  />
-                ) : (
-                  <View style={[styles.profileImage, styles.profilePlaceholder]}>
-                    <User size={20} color="#ffffff" />
-                  </View>
-                )}
-                <Text style={styles.profileName}>
-                  {participant.profiles.first_name}
+      {/* Location Coordinates Display */}
+      <View style={styles.coordinatesContainer}>
+        <Text style={styles.coordinatesTitle}>All Locations:</Text>
+        
+        {/* User Locations */}
+        {usersWithLocations.map((participant, index) => (
+          <View key={participant.id} style={styles.coordinateItem}>
+            <View style={styles.coordinateHeader}>
+              {participant.profiles.avatar_url ? (
+                <img 
+                  src={participant.profiles.avatar_url} 
+                  style={styles.coordinateAvatar}
+                  alt={`${participant.profiles.first_name}'s location`}
+                />
+              ) : (
+                <View style={[styles.coordinateAvatar, styles.coordinateAvatarPlaceholder]}>
+                  <Text style={styles.coordinateAvatarText}>
+                    {participant.profiles.first_name?.[0]}{participant.profiles.last_name?.[0]}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.coordinateInfo}>
+                <Text style={styles.coordinateName}>
+                  {participant.profiles.first_name} {participant.profiles.last_name}
                 </Text>
-                <Text style={styles.profileLocation}>
-                  Live Location
+                <Text style={styles.coordinateStatus}>
+                  Live Location • {getLocationAge(participant.last_location_update)}
                 </Text>
               </View>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+            </View>
+            <Text style={styles.coordinateText}>
+              📍 {participant.latitude?.toFixed(6)}, {participant.longitude?.toFixed(6)}
+            </Text>
+          </View>
+        ))}
+
+        {/* Next Stop */}
+        {journeyData.next_stop && (
+          <View style={styles.coordinateItem}>
+            <View style={styles.coordinateHeader}>
+              <View style={[styles.coordinateIcon, styles.nextStopIcon]}>
+                <Text style={styles.coordinateIconText}>➡️</Text>
+              </View>
+              <View style={styles.coordinateInfo}>
+                <Text style={styles.coordinateName}>Next Stop</Text>
+                <Text style={styles.coordinateStatus}>Scheduled Stop</Text>
+              </View>
+            </View>
+            <Text style={styles.coordinateText}>
+              📍 {journeyData.next_stop.latitude.toFixed(6)}, {journeyData.next_stop.longitude.toFixed(6)}
+            </Text>
+            <Text style={styles.locationName}>{journeyData.next_stop.name}</Text>
+          </View>
+        )}
+
+        {/* Current Stop (fallback) */}
+        {!userWithGPS && (
+          <View style={styles.coordinateItem}>
+            <View style={styles.coordinateHeader}>
+              <View style={[styles.coordinateIcon, styles.currentStopIcon]}>
+                <Text style={styles.coordinateIconText}>📍</Text>
+              </View>
+              <View style={styles.coordinateInfo}>
+                <Text style={styles.coordinateName}>Current Stop</Text>
+                <Text style={styles.coordinateStatus}>Scheduled Location</Text>
+              </View>
+            </View>
+            <Text style={styles.coordinateText}>
+              📍 {journeyData.user_stop.latitude.toFixed(6)}, {journeyData.user_stop.longitude.toFixed(6)}
+            </Text>
+            <Text style={styles.locationName}>{journeyData.user_stop.name}</Text>
+          </View>
+        )}
+      </View>
 
       {/* Journey Info */}
       <ScrollView 
@@ -369,7 +414,7 @@ export default function JourneyShareScreen() {
           </View>
           <Text style={styles.statusText}>
             {userWithGPS 
-              ? 'Tracking real-time position via GPS' 
+              ? `Tracking ${usersWithLocations.length} user${usersWithLocations.length > 1 ? 's' : ''} via GPS` 
               : 'Showing scheduled stop location'
             }
           </Text>
@@ -432,32 +477,6 @@ export default function JourneyShareScreen() {
           </View>
         </View>
 
-        {/* Location Details */}
-        <View style={styles.locationCard}>
-          <View style={styles.locationItem}>
-            <View style={[styles.statusDot, styles.currentDot]} />
-            <View style={styles.locationText}>
-              <Text style={styles.locationLabel}>
-                {userWithGPS ? 'Current GPS Position' : 'Current Stop'}
-              </Text>
-              <Text style={styles.locationName}>{journeyData.user_stop.name}</Text>
-              <Text style={styles.coordinates}>
-                {journeyData.user_stop.latitude.toFixed(6)}, {journeyData.user_stop.longitude.toFixed(6)}
-              </Text>
-            </View>
-          </View>
-
-          {journeyData.next_stop && (
-            <View style={styles.locationItem}>
-              <View style={[styles.statusDot, styles.nextDot]} />
-              <View style={styles.locationText}>
-                <Text style={styles.locationLabel}>Next Stop</Text>
-                <Text style={styles.locationName}>{journeyData.next_stop.name}</Text>
-              </View>
-            </View>
-          )}
-        </View>
-
         {/* Actions */}
         <View style={styles.actionsCard}>
           <Text style={styles.actionsTitle}>Map Actions</Text>
@@ -489,54 +508,24 @@ export default function JourneyShareScreen() {
   );
 }
 
-// Generate OpenStreetMap URL with multiple markers
+// Generate OpenStreetMap URL - Focus on primary location
 const generateOpenStreetMapUrl = (journey: SharedJourneyData) => {
   const baseUrl = 'https://www.openstreetmap.org/export/embed.html';
   
   const userWithGPS = journey.participants.find(p => p.latitude && p.longitude);
   
-  // Get all coordinates for bounds calculation
-  const allCoordinates = [
-    { lat: journey.user_stop.latitude, lon: journey.user_stop.longitude },
-    ...journey.participants
-      .filter(p => p.latitude && p.longitude)
-      .map(p => ({ lat: p.latitude!, lon: p.longitude! })),
-    ...(journey.next_stop ? [{ lat: journey.next_stop.latitude, lon: journey.next_stop.longitude }] : [])
-  ];
-
-  const lats = allCoordinates.map(c => c.lat);
-  const lons = allCoordinates.map(c => c.lon);
+  // Use the primary user's location for the map focus
+  const primaryLat = userWithGPS?.latitude || journey.user_stop.latitude;
+  const primaryLon = userWithGPS?.longitude || journey.user_stop.longitude;
   
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLon = Math.min(...lons);
-  const maxLon = Math.max(...lons);
+  // Create a tight zoom around the primary location
+  const zoomLevel = 16;
+  const padding = 0.005;
   
-  const padding = 0.01;
-  const bbox = `${minLon - padding},${minLat - padding},${maxLon + padding},${maxLat + padding}`;
+  const bbox = `${primaryLon - padding},${primaryLat - padding},${primaryLon + padding},${primaryLat + padding}`;
   
-  // Build markers string
-  let markers = '';
-  
-  // Add user location markers
-  journey.participants
-    .filter(p => p.latitude && p.longitude)
-    .forEach((participant) => {
-      if (markers) markers += '&';
-      markers += `marker=${participant.latitude},${participant.longitude}`;
-    });
-  
-  // Add next stop marker
-  if (journey.next_stop) {
-    if (markers) markers += '&';
-    markers += `marker=${journey.next_stop.latitude},${journey.next_stop.longitude}`;
-  }
-  
-  // Add current stop marker as fallback
-  if (!userWithGPS) {
-    if (markers) markers += '&';
-    markers += `marker=${journey.user_stop.latitude},${journey.user_stop.longitude}`;
-  }
+  // Show primary marker only (OpenStreetMap limitation)
+  const markers = `marker=${primaryLat},${primaryLon}`;
   
   return `${baseUrl}?bbox=${bbox}&layer=mapnik&${markers}`;
 };
@@ -590,6 +579,7 @@ const styles = StyleSheet.create({
   legendItems: {
     flexDirection: 'row',
     gap: 16,
+    flexWrap: 'wrap',
   },
   legendItem: {
     flexDirection: 'row',
@@ -623,50 +613,86 @@ const styles = StyleSheet.create({
     height: '100%',
     border: 'none',
   },
-  // Profile Pictures
-  profilesContainer: {
+  // Coordinates Display
+  coordinatesContainer: {
     backgroundColor: '#1a1a1a',
-    padding: 12,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
   },
-  profilesTitle: {
-    fontSize: 14,
+  coordinatesTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
+    marginBottom: 12,
+  },
+  coordinateItem: {
+    backgroundColor: '#2a2a2a',
+    padding: 12,
+    borderRadius: 8,
     marginBottom: 8,
   },
-  profilesScroll: {
+  coordinateHeader: {
     flexDirection: 'row',
-  },
-  profileCard: {
     alignItems: 'center',
-    marginRight: 16,
-    backgroundColor: '#2a2a2a',
-    padding: 8,
-    borderRadius: 8,
-    minWidth: 80,
+    marginBottom: 8,
   },
-  profileImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginBottom: 4,
+  coordinateAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
   },
-  profilePlaceholder: {
+  coordinateAvatarPlaceholder: {
     backgroundColor: '#1ea2b1',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  profileName: {
-    fontSize: 12,
+  coordinateAvatarText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  coordinateIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  nextStopIcon: {
+    backgroundColor: '#fbbf24',
+  },
+  currentStopIcon: {
+    backgroundColor: '#10b981',
+  },
+  coordinateIconText: {
+    fontSize: 16,
+  },
+  coordinateInfo: {
+    flex: 1,
+  },
+  coordinateName: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
     marginBottom: 2,
   },
-  profileLocation: {
-    fontSize: 10,
+  coordinateStatus: {
+    fontSize: 12,
+    color: '#cccccc',
+  },
+  coordinateText: {
+    fontSize: 12,
     color: '#1ea2b1',
+    fontFamily: 'monospace',
+    marginBottom: 4,
+  },
+  locationName: {
+    fontSize: 14,
+    color: '#ffffff',
+    fontWeight: '500',
   },
   infoContainer: {
     flex: 1,
@@ -792,42 +818,6 @@ const styles = StyleSheet.create({
   endpoint: {
     fontSize: 14,
     color: '#cccccc',
-  },
-  locationCard: {
-    backgroundColor: '#1a1a1a',
-    padding: 16,
-    marginHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  locationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  currentDot: {
-    backgroundColor: '#1ea2b1',
-  },
-  nextDot: {
-    backgroundColor: '#fbbf24',
-  },
-  locationText: {
-    flex: 1,
-  },
-  locationLabel: {
-    fontSize: 14,
-    color: '#cccccc',
-    marginBottom: 2,
-  },
-  locationName: {
-    fontSize: 16,
-    color: '#ffffff',
-    fontWeight: '600',
-  },
-  coordinates: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 2,
   },
   actionsCard: {
     backgroundColor: '#1a1a1a',
