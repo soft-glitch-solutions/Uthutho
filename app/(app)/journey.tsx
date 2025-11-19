@@ -662,7 +662,7 @@ export default function JourneyScreen() {
       // For development, use localhost. For production, use your actual domain
       const baseUrl = __DEV__ 
         ? 'http://localhost:8081' 
-        : 'https://uthutho.app'; // Change to your domain
+        : 'https://mobile.uthutho.co.za'; // Change to your domain
       
       const shareUrl = `${baseUrl}/journey-share/${activeJourney.id}`;
       
