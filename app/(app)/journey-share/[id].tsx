@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { View, Text, StyleSheet, ActivityIndicator, Linking, Image, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Linking, TouchableOpacity, ScrollView, RefreshControl, Image } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { RefreshCw, ZoomIn, ZoomOut, MapPin, Navigation, Users, Clock, User } from 'lucide-react-native';
+import { RefreshCw, MapPin, Navigation, Users, Clock, User, Bus } from 'lucide-react-native';
 
 interface SharedJourneyData {
   id: string;
@@ -40,112 +40,424 @@ interface SharedJourneyData {
   } | null;
 }
 
+// Helper function for location age
+const getLocationAge = (updateTime: string | null) => {
+  if (!updateTime) return 'Unknown';
+  const updateDate = new Date(updateTime);
+  const now = new Date();
+  const diffMinutes = Math.floor((now.getTime() - updateDate.getTime()) / (1000 * 60));
+  
+  if (diffMinutes < 1) return 'Just now';
+  if (diffMinutes === 1) return '1 minute ago';
+  if (diffMinutes < 60) return `${diffMinutes} minutes ago`;
+  
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours === 1) return '1 hour ago';
+  return `${diffHours} hours ago`;
+};
+
 // Skeleton Loading Component
 const SkeletonLoader = () => {
   return (
-    <View style={styles.container}>
-      {/* Header Skeleton */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View>
-            <View style={[styles.skeleton, styles.skeletonTitle]} />
-            <View style={[styles.skeleton, styles.skeletonSubtitle]} />
-          </View>
-          <View style={[styles.skeleton, styles.skeletonButton]} />
-        </View>
-      </View>
-
+    <View style={styles.skeletonContainer}>
       {/* Map Skeleton */}
-      <View style={styles.mapContainer}>
-        <View style={[styles.skeleton, styles.skeletonMap]} />
-        <View style={styles.zoomControls}>
-          <View style={[styles.skeleton, styles.skeletonZoomButton]} />
-          <View style={[styles.skeleton, styles.skeletonZoomButton]} />
-        </View>
-      </View>
-
+      <View style={styles.skeletonMap} />
+      
       {/* Legend Skeleton */}
-      <View style={styles.legendContainer}>
-        <View style={[styles.skeleton, styles.skeletonText]} />
-        <View style={styles.legendItems}>
-          <View style={styles.legendItem}>
-            <View style={[styles.skeleton, styles.skeletonDot]} />
-            <View style={[styles.skeleton, styles.skeletonLegendText]} />
+      <View style={styles.skeletonLegend}>
+        <View style={styles.skeletonText} />
+        <View style={styles.skeletonLegendItems}>
+          <View style={styles.skeletonLegendItem} />
+          <View style={styles.skeletonLegendItem} />
+        </View>
+      </View>
+
+      {/* Info Cards Skeleton */}
+      <View style={styles.skeletonSection}>
+        <View style={styles.skeletonTitle} />
+        <View style={styles.skeletonCard}>
+          <View style={styles.skeletonAvatar} />
+          <View style={styles.skeletonContent}>
+            <View style={styles.skeletonText} />
+            <View style={[styles.skeletonText, { width: '60%' }]} />
           </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.skeleton, styles.skeletonDot]} />
-            <View style={[styles.skeleton, styles.skeletonLegendText]} />
+        </View>
+        <View style={styles.skeletonCard}>
+          <View style={styles.skeletonAvatar} />
+          <View style={styles.skeletonContent}>
+            <View style={styles.skeletonText} />
+            <View style={[styles.skeletonText, { width: '60%' }]} />
           </View>
         </View>
       </View>
 
-      {/* Content Skeleton */}
-      <ScrollView style={styles.infoContainer}>
-        {/* Status Card Skeleton */}
-        <View style={styles.statusCard}>
-          <View style={styles.statusHeader}>
-            <View style={[styles.skeleton, styles.skeletonDot]} />
-            <View style={[styles.skeleton, styles.skeletonStatusTitle]} />
+      {/* Route Info Skeleton */}
+      <View style={styles.skeletonSection}>
+        <View style={styles.skeletonTitle} />
+        <View style={styles.skeletonCard}>
+          <View style={styles.skeletonContent}>
+            <View style={styles.skeletonText} />
+            <View style={[styles.skeletonText, { width: '80%' }]} />
           </View>
-          <View style={[styles.skeleton, styles.skeletonText]} />
-          <View style={[styles.skeleton, styles.skeletonSmallText]} />
         </View>
+      </View>
+    </View>
+  );
+};
 
-        {/* Participants Skeleton */}
-        <View style={styles.participantsCard}>
-          <View style={styles.participantsHeader}>
-            <View style={[styles.skeleton, styles.skeletonIcon]} />
-            <View style={[styles.skeleton, styles.skeletonParticipantsTitle]} />
+// Simple interactive map using OpenStreetMap
+const InteractiveMap = ({ 
+  usersWithGPS, 
+  nextStop, 
+  userStop 
+}: { 
+  usersWithGPS: any[];
+  nextStop: any;
+  userStop: any;
+}) => {
+  const [mapHtml, setMapHtml] = useState('');
+
+  useEffect(() => {
+    const generateMapHtml = () => {
+      const allLocations = [
+        ...usersWithGPS.map(u => ({ lat: u.latitude!, lng: u.longitude!, type: 'user', data: u })),
+        ...(nextStop ? [{ lat: nextStop.latitude, lng: nextStop.longitude, type: 'next_stop', data: nextStop }] : []),
+        ...(usersWithGPS.length === 0 ? [{ lat: userStop.latitude, lng: userStop.longitude, type: 'current_stop', data: userStop }] : [])
+      ];
+
+      if (allLocations.length === 0) return '';
+
+      // Calculate bounds
+      const lats = allLocations.map(loc => loc.lat);
+      const lngs = allLocations.map(loc => loc.lng);
+      
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
+      const minLng = Math.min(...lngs);
+      const maxLng = Math.max(...lngs);
+      
+      // Add padding
+      const latPadding = (maxLat - minLat) * 0.1;
+      const lngPadding = (maxLng - minLng) * 0.1;
+
+      const bounds = `${minLng - lngPadding},${minLat - latPadding},${maxLng + lngPadding},${maxLat + latPadding}`;
+
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Journey Map</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <style>
+                body { margin: 0; padding: 0; }
+                #map { height: 100vh; width: 100%; }
+                .custom-marker {
+                    border-radius: 50%;
+                    border: 3px solid white;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: bold;
+                    overflow: hidden;
+                }
+                .user-marker { 
+                    background-color: #1ea2b1; 
+                    position: relative;
+                }
+                .pulsing-marker::before {
+                    content: '';
+                    position: absolute;
+                    width: 100%;
+                    height: 100%;
+                    border-radius: 50%;
+                    background-color: #1ea2b1;
+                    animation: pulse 2s infinite;
+                    z-index: -1;
+                }
+                @keyframes pulse {
+                    0% {
+                        transform: scale(1);
+                        opacity: 1;
+                    }
+                    100% {
+                        transform: scale(2.5);
+                        opacity: 0;
+                    }
+                }
+                .next-stop-marker { background-color: #fbbf24; }
+                .current-stop-marker { background-color: #10b981; }
+            </style>
+        </head>
+        <body>
+            <div id="map"></div>
+            <script>
+                // Initialize map
+                const map = L.map('map').setView([${(minLat + maxLat) / 2}, ${(minLng + maxLng) / 2}], 13);
+                
+                // Add OpenStreetMap tiles
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+                
+                // Create custom icons
+                function createUserIcon(avatarUrl, firstName, lastName) {
+                    const initials = (firstName?.[0] || '') + (lastName?.[0] || '');
+                    if (avatarUrl) {
+                        return L.divIcon({
+                            html: '<div class="custom-marker user-marker pulsing-marker" style="width: 48px; height: 48px; border-radius: 24px; background-image: url(\\'' + avatarUrl + '\\'); background-size: cover; background-position: center; border: 3px solid #1ea2b1; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
+                            className: '',
+                            iconSize: [48, 48],
+                            iconAnchor: [24, 48]
+                        });
+                    } else {
+                        return L.divIcon({
+                            html: '<div class="custom-marker user-marker pulsing-marker" style="width: 48px; height: 48px; border-radius: 24px; background-color: #1ea2b1; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">' + initials.toUpperCase() + '</div>',
+                            className: '',
+                            iconSize: [48, 48],
+                            iconAnchor: [24, 48]
+                        });
+                    }
+                }
+                
+                function createStopIcon(color, emoji) {
+                    return L.divIcon({
+                        html: '<div style="width: 40px; height: 40px; border-radius: 20px; background-color: ' + color + '; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">' + emoji + '</div>',
+                        className: 'custom-marker',
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 40]
+                    });
+                }
+                
+                // Add markers
+                const locations = ${JSON.stringify(allLocations)};
+                const bounds = L.latLngBounds();
+                
+                locations.forEach(location => {
+                    let marker;
+                    
+                    if (location.type === 'user') {
+                        marker = L.marker([location.lat, location.lng], {
+                            icon: createUserIcon(
+                                location.data.profiles.avatar_url,
+                                location.data.profiles.first_name,
+                                location.data.profiles.last_name
+                            )
+                        });
+                        
+marker.bindPopup(
+    '<div style="padding: 12px; min-width: 200px;">' +
+        '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
+            (location.data.profiles.avatar_url ? 
+                '<img src="' + location.data.profiles.avatar_url + '" style="width: 32px; height: 32px; border-radius: 16px;" />' : 
+                '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #1ea2b1; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">' + 
+                (location.data.profiles.first_name?.[0] || '') + (location.data.profiles.last_name?.[0] || '') + '</div>'
+            ) +
+            '<div>' +
+                '<strong>' + location.data.profiles.first_name + ' ' + location.data.profiles.last_name + '</strong><br>' +
+                '<small>' + location.data.status + '</small>' +
+            '</div>' +
+        '</div>' +
+        '<div style="font-size: 12px; color: #666;">' +
+            '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
+        '</div>' +
+    '</div>'
+);
+                    } else if (location.type === 'next_stop') {
+                        marker = L.marker([location.lat, location.lng], {
+                            icon: createStopIcon('#fbbf24', '➡️')
+                        });
+                        
+marker.bindPopup(
+    '<div style="padding: 12px; min-width: 200px;">' +
+        '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
+            '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #fbbf24; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">➡️</div>' +
+            '<div>' +
+                '<strong>Next Stop</strong><br>' +
+                '<small>' + location.data.name + '</small>' +
+            '</div>' +
+        '</div>' +
+        '<div style="font-size: 12px; color: #666;">' +
+            '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
+        '</div>' +
+    '</div>'
+);
+                    } else if (location.type === 'current_stop') {
+                        marker = L.marker([location.lat, location.lng], {
+                            icon: createStopIcon('#10b981', '📍')
+                        });
+                        
+marker.bindPopup(
+    '<div style="padding: 12px; min-width: 200px;">' +
+        '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
+            '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">📍</div>' +
+            '<div>' +
+                '<strong>Current Stop</strong><br>' +
+                '<small>' + location.data.name + '</small>' +
+            '</div>' +
+        '</div>' +
+        '<div style="font-size: 12px; color: #666;">' +
+            '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
+        '</div>' +
+    '</div>'
+);
+                    }
+                    
+                    if (marker) {
+                        marker.addTo(map);
+                        bounds.extend([location.lat, location.lng]);
+                    }
+                });
+                
+                // Fit map to bounds
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds, { padding: [20, 20] });
+                }
+            </script>
+        </body>
+        </html>
+      `;
+    };
+
+    setMapHtml(generateMapHtml());
+  }, [usersWithGPS, nextStop, userStop]);
+
+  return (
+    <View style={styles.mapContainer}>
+      {mapHtml ? (
+        <iframe
+          srcDoc={mapHtml}
+          style={styles.mapIframe}
+          title="Interactive Journey Map"
+        />
+      ) : (
+        <View style={styles.mapLoading}>
+          <ActivityIndicator size="large" color="#1ea2b1" />
+          <Text style={styles.mapLoadingText}>Loading map...</Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
+// User Status Card Component
+const UserStatusCard = ({ user }: { user: any }) => {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'waiting': return '#fbbf24';
+      case 'picked_up': return '#10b981';
+      case 'arrived': return '#6b7280';
+      default: return '#6b7280';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'waiting': return 'Waiting for pickup';
+      case 'picked_up': return 'On the way';
+      case 'arrived': return 'Arrived at destination';
+      default: return status;
+    }
+  };
+
+  return (
+    <View style={styles.userCard}>
+      <View style={styles.userAvatarContainer}>
+        {user.profiles.avatar_url ? (
+          <Image 
+            source={{ uri: user.profiles.avatar_url }} 
+            style={styles.userAvatar}
+          />
+        ) : (
+          <View style={styles.userAvatarPlaceholder}>
+            <Text style={styles.userAvatarText}>
+              {user.profiles.first_name?.[0]}{user.profiles.last_name?.[0]}
+            </Text>
           </View>
-          {[1, 2].map((item) => (
-            <View key={item} style={styles.participantItem}>
-              <View style={[styles.skeleton, styles.skeletonAvatar]} />
-              <View style={styles.participantInfo}>
-                <View style={[styles.skeleton, styles.skeletonText]} />
-                <View style={[styles.skeleton, styles.skeletonSmallText]} />
-                <View style={[styles.skeleton, styles.skeletonCoordinates]} />
+        )}
+        <View 
+          style={[
+            styles.statusIndicator, 
+            { backgroundColor: getStatusColor(user.status) }
+          ]} 
+        />
+      </View>
+      
+      <View style={styles.userInfo}>
+        <Text style={styles.userName}>
+          {user.profiles.first_name} {user.profiles.last_name}
+        </Text>
+        <View style={styles.statusContainer}>
+          <View 
+            style={[
+              styles.statusDot, 
+              { backgroundColor: getStatusColor(user.status) }
+            ]} 
+          />
+          <Text style={styles.userStatus}>{getStatusText(user.status)}</Text>
+        </View>
+        {user.last_location_update && (
+          <Text style={styles.locationTime}>
+            Updated {getLocationAge(user.last_location_update)}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+};
+
+// Route Info Component
+const RouteInfoCard = ({ journeyData }: { journeyData: SharedJourneyData }) => {
+  return (
+    <View style={styles.routeCard}>
+      <View style={styles.routeHeader}>
+        <Bus size={20} color="#1ea2b1" />
+        <Text style={styles.routeTitle}>Route Information</Text>
+      </View>
+      
+      <View style={styles.routeDetails}>
+        <Text style={styles.routeName}>{journeyData.routes.name}</Text>
+        <Text style={styles.routeType}>
+          {journeyData.routes.transport_type || 'Transport'} • Stop {journeyData.user_stop.order_number}
+        </Text>
+        
+        <View style={styles.routeStops}>
+          <View style={styles.stopItem}>
+            <View style={[styles.stopDot, styles.startDot]} />
+            <Text style={styles.stopText}>{journeyData.routes.start_point}</Text>
+          </View>
+          
+          <View style={styles.stopConnector} />
+          
+          <View style={styles.stopItem}>
+            <View style={[styles.stopDot, styles.currentDot]} />
+            <Text style={styles.stopText}>
+              Current: {journeyData.user_stop.name}
+            </Text>
+          </View>
+          
+          {journeyData.next_stop && (
+            <>
+              <View style={styles.stopConnector} />
+              <View style={styles.stopItem}>
+                <View style={[styles.stopDot, styles.nextDot]} />
+                <Text style={styles.stopText}>
+                  Next: {journeyData.next_stop.name}
+                </Text>
               </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Route Card Skeleton */}
-        <View style={styles.routeCard}>
-          <View style={[styles.skeleton, styles.skeletonRouteName]} />
-          <View style={[styles.skeleton, styles.skeletonRouteType]} />
-          <View style={[styles.skeleton, styles.skeletonText]} />
-          <View style={[styles.skeleton, styles.skeletonText]} />
-        </View>
-
-        {/* Location Card Skeleton */}
-        <View style={styles.locationCard}>
-          {[1, 2].map((item) => (
-            <View key={item} style={styles.locationItem}>
-              <View style={[styles.skeleton, styles.skeletonDot]} />
-              <View style={styles.locationText}>
-                <View style={[styles.skeleton, styles.skeletonText]} />
-                <View style={[styles.skeleton, styles.skeletonLocationName]} />
-                <View style={[styles.skeleton, styles.skeletonCoordinates]} />
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Actions Skeleton */}
-        <View style={styles.actionsCard}>
-          <View style={[styles.skeleton, styles.skeletonActionsTitle]} />
-          <View style={styles.actionButtons}>
-            <View style={[styles.skeleton, styles.skeletonActionButton]} />
-            <View style={[styles.skeleton, styles.skeletonActionButton]} />
+            </>
+          )}
+          
+          <View style={styles.stopConnector} />
+          
+          <View style={styles.stopItem}>
+            <View style={[styles.stopDot, styles.endDot]} />
+            <Text style={styles.stopText}>{journeyData.routes.end_point}</Text>
           </View>
         </View>
-
-        {/* Footer Skeleton */}
-        <View style={styles.footer}>
-          <View style={[styles.skeleton, styles.skeletonSmallText]} />
-          <View style={[styles.skeleton, styles.skeletonSmallText]} />
-        </View>
-      </ScrollView>
+      </View>
     </View>
   );
 };
@@ -156,23 +468,18 @@ export default function JourneyShareScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [zoomLevel, setZoomLevel] = useState(15);
   const [lastUpdate, setLastUpdate] = useState<string>('');
 
   const journeyId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   useEffect(() => {
     if (journeyId && isValidUUID(journeyId)) {
-      console.log('✅ [DEBUG] journeyId is valid UUID, loading data...');
       loadJourneyData();
-      
-      // Set up real-time subscriptions for location updates
       const subscription = setupRealtimeUpdates();
       return () => {
         subscription?.unsubscribe();
       };
     } else {
-      console.log('❌ [DEBUG] Invalid journeyId:', journeyId);
       setError('Invalid journey link');
       setLoading(false);
     }
@@ -197,8 +504,7 @@ export default function JourneyShareScreen() {
           filter: `journey_id=eq.${journeyId}`
         },
         (payload) => {
-          console.log('📍 Real-time location update:', payload);
-          loadJourneyData(); // Reload data when locations update
+          loadJourneyData();
         }
       )
       .subscribe();
@@ -206,10 +512,6 @@ export default function JourneyShareScreen() {
 
   const loadJourneyData = async () => {
     try {
-      console.log('🚀 [DEBUG] Starting to load journey data for ID:', journeyId);
-
-      // STEP 1: Get journey with route info
-      console.log('📋 [DEBUG] STEP 1: Fetching journey data...');
       const { data: journey, error: journeyError } = await supabase
         .from('journeys')
         .select(`
@@ -226,22 +528,9 @@ export default function JourneyShareScreen() {
         .eq('id', journeyId)
         .single();
 
-      console.log('📋 [DEBUG] Journey query result:', { journey, journeyError });
+      if (journeyError) throw journeyError;
+      if (!journey) throw new Error('Journey not found');
 
-      if (journeyError) {
-        console.error('❌ [DEBUG] Journey fetch error:', journeyError);
-        throw journeyError;
-      }
-
-      if (!journey) {
-        console.log('❌ [DEBUG] No journey found with ID:', journeyId);
-        throw new Error('Journey not found');
-      }
-
-      console.log('✅ [DEBUG] Journey found:', journey);
-
-      // STEP 2: Get participants with GPS locations
-      console.log('👥 [DEBUG] STEP 2: Fetching participants with locations...');
       const { data: participants, error: participantsError } = await supabase
         .from('journey_participants')
         .select(`
@@ -260,15 +549,8 @@ export default function JourneyShareScreen() {
         .eq('journey_id', journeyId)
         .eq('is_active', true);
 
-      console.log('👥 [DEBUG] Participants query result:', { participants, participantsError });
+      if (participantsError) throw participantsError;
 
-      if (participantsError) {
-        console.error('❌ [DEBUG] Participants fetch error:', participantsError);
-        throw participantsError;
-      }
-
-      // STEP 3: Get user's current stop from stop_waiting
-      console.log('📍 [DEBUG] STEP 3: Fetching stop_waiting data...');
       const { data: userWaiting, error: waitingError } = await supabase
         .from('stop_waiting')
         .select(`
@@ -284,27 +566,16 @@ export default function JourneyShareScreen() {
         .limit(1)
         .single();
 
-      console.log('📍 [DEBUG] Stop waiting query result:', { userWaiting, waitingError });
-
-      if (waitingError) {
-        console.error('❌ [DEBUG] Stop waiting fetch error:', waitingError);
-        throw waitingError;
-      }
-
+      if (waitingError) throw waitingError;
       if (!userWaiting || !userWaiting.stops) {
-        console.log('❌ [DEBUG] No active users found for this journey');
         throw new Error('No active users found for this journey');
       }
 
-      console.log('✅ [DEBUG] User waiting data:', userWaiting);
-
-      // STEP 4: Get next stop in sequence
-      console.log('➡️ [DEBUG] STEP 4: Fetching next stop data...');
       let nextStop = null;
       const currentStopOrder = userWaiting.stops.order_number || 0;
 
       try {
-        const { data: nextStopData, error: nextStopError } = await supabase
+        const { data: nextStopData } = await supabase
           .from('route_stops')
           .select(`
             order_number,
@@ -319,24 +590,18 @@ export default function JourneyShareScreen() {
           .eq('order_number', currentStopOrder + 1)
           .single();
 
-        console.log('➡️ [DEBUG] Next stop query result:', { nextStopData, nextStopError });
-
-        if (!nextStopError && nextStopData) {
+        if (nextStopData) {
           nextStop = {
             name: nextStopData.stops.name,
             latitude: nextStopData.stops.latitude,
             longitude: nextStopData.stops.longitude,
             order_number: nextStopData.order_number,
           };
-          console.log('✅ [DEBUG] Next stop found:', nextStop);
-        } else {
-          console.log('ℹ️ [DEBUG] No next stop found - probably final destination');
         }
       } catch (nextStopErr) {
-        console.log('ℹ️ [DEBUG] Next stop query error (this is okay):', nextStopErr);
+        console.log('No next stop found');
       }
 
-      // STEP 5: Combine all data
       const journeyData = {
         ...journey,
         participants: participants || [],
@@ -349,23 +614,12 @@ export default function JourneyShareScreen() {
         next_stop: nextStop,
       };
 
-      console.log('🎯 [DEBUG] Final journey data:', journeyData);
       setJourneyData(journeyData);
       setLastUpdate(new Date().toLocaleTimeString());
-      console.log('✅ [DEBUG] Journey data loaded successfully!');
 
     } catch (err: any) {
-      console.error('💥 [DEBUG] Error loading journey data:', err);
-      
-      if (err.code === '22P02') {
-        setError('Invalid journey ID format');
-      } else if (err.message?.includes('not found')) {
-        setError('Journey not found or no longer active');
-      } else if (err.message?.includes('No active users')) {
-        setError('No one is currently active on this journey');
-      } else {
-        setError('Failed to load journey data');
-      }
+      console.error('Error loading journey data:', err);
+      setError('Failed to load journey data');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -377,104 +631,6 @@ export default function JourneyShareScreen() {
     loadJourneyData();
   };
 
-  const zoomIn = () => {
-    setZoomLevel(prev => Math.min(prev + 1, 18));
-  };
-
-  const zoomOut = () => {
-    setZoomLevel(prev => Math.max(prev - 1, 10));
-  };
-
-  const openInMaps = () => {
-    if (!journeyData) return;
-    
-    const url = `https://www.openstreetmap.org/?mlat=${journeyData.user_stop.latitude}&mlon=${journeyData.user_stop.longitude}#map=15/${journeyData.user_stop.latitude}/${journeyData.user_stop.longitude}`;
-    Linking.openURL(url);
-  };
-
-  const openDirections = () => {
-    if (!journeyData) return;
-    
-    const url = `https://www.openstreetmap.org/directions?from=&to=${journeyData.user_stop.latitude},${journeyData.user_stop.longitude}`;
-    Linking.openURL(url);
-  };
-
-  const getLocationAge = (updateTime: string | null) => {
-    if (!updateTime) return 'Unknown';
-    
-    const updateDate = new Date(updateTime);
-    const now = new Date();
-    const diffMinutes = Math.floor((now.getTime() - updateDate.getTime()) / (1000 * 60));
-    
-    if (diffMinutes < 1) return 'Just now';
-    if (diffMinutes === 1) return '1 minute ago';
-    if (diffMinutes < 60) return `${diffMinutes} minutes ago`;
-    
-    const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours === 1) return '1 hour ago';
-    return `${diffHours} hours ago`;
-  };
-
-  // Generate custom markers with user profile photos
-  const generateCustomMarkerUrl = (avatarUrl: string | null, firstName: string, lastName: string) => {
-    if (avatarUrl) {
-      // For users with avatars, we'll use a custom marker with their photo
-      // Note: LocationIQ doesn't support custom image URLs directly
-      // So we'll use different colored markers and show photos in the list
-      return 'large-blue-cutout'; // Default blue marker for users with photos
-    } else {
-      // For users without avatars, use initial-based markers
-      const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
-      if (initials) {
-        return `large-blue-${initials}`;
-      }
-      return 'large-blue-cutout';
-    }
-  };
-
-  // Generate LocationIQ Static Map URL with multiple markers
-  const generateLocationIQMapUrl = (journey: SharedJourneyData) => {
-    const baseUrl = 'https://maps.locationiq.com/v3/staticmap';
-    
-    const markers = [];
-    
-    // User GPS locations with custom markers
-    const usersWithGPS = journey.participants.filter(p => p.latitude && p.longitude);
-    usersWithGPS.forEach((user, index) => {
-      const markerType = generateCustomMarkerUrl(
-        user.profiles.avatar_url,
-        user.profiles.first_name,
-        user.profiles.last_name
-      );
-      markers.push(`icon:${markerType}|${user.latitude},${user.longitude}`);
-    });
-    
-    // Next stop (yellow marker) - if exists
-    if (journey.next_stop) {
-      markers.push(`icon:large-yellow-cutout|${journey.next_stop.latitude},${journey.next_stop.longitude}`);
-    }
-    
-    // Current stop (green marker) - only show if no GPS users
-    if (usersWithGPS.length === 0) {
-      markers.push(`icon:large-green-cutout|${journey.user_stop.latitude},${journey.user_stop.longitude}`);
-    }
-    
-    // Use the first GPS location or fallback to user stop for center
-    const primaryLocation = usersWithGPS[0] || journey.user_stop;
-    
-    const params = new URLSearchParams({
-      key: 'pk.b2d15bd53c7924b147a7acac22ee3e3e',
-      center: `${primaryLocation.latitude},${primaryLocation.longitude}`,
-      zoom: zoomLevel.toString(),
-      size: '600x300',
-      markers: markers.join('|'),
-      format: 'png'
-    });
-    
-    return `${baseUrl}?${params.toString()}`;
-  };
-
-  // Show skeleton loader while loading
   if (loading && !journeyData) {
     return <SkeletonLoader />;
   }
@@ -482,9 +638,7 @@ export default function JourneyShareScreen() {
   if (error || !journeyData) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>
-          {error || 'Journey not found'}
-        </Text>
+        <Text style={styles.errorText}>{error || 'Journey not found'}</Text>
         <Text style={styles.subText}>
           The share link may have expired or the journey is no longer active.
         </Text>
@@ -493,6 +647,9 @@ export default function JourneyShareScreen() {
   }
 
   const usersWithGPS = journeyData.participants.filter(p => p.latitude && p.longitude);
+  const waitingUsers = journeyData.participants.filter(p => p.status === 'waiting');
+  const pickedUpUsers = journeyData.participants.filter(p => p.status === 'picked_up');
+  const arrivedUsers = journeyData.participants.filter(p => p.status === 'arrived');
 
   return (
     <View style={styles.container}>
@@ -503,6 +660,7 @@ export default function JourneyShareScreen() {
             <Text style={styles.title}>Uthutho Live Location</Text>
             <Text style={styles.subtitle}>
               {usersWithGPS.length > 0 ? 'Real-time GPS Tracking' : 'Route-based Location'}
+              {lastUpdate && ` • Updated ${lastUpdate}`}
             </Text>
           </View>
           <TouchableOpacity style={styles.refreshButton} onPress={onRefresh} disabled={refreshing}>
@@ -511,30 +669,14 @@ export default function JourneyShareScreen() {
         </View>
       </View>
 
-      {/* LocationIQ Static Map with Zoom Controls */}
-      <View style={styles.mapContainer}>
-        <Image
-          source={{ uri: generateLocationIQMapUrl(journeyData) }}
-          style={styles.staticMap}
-          resizeMode="cover"
-        />
-        
-        {/* Zoom Controls */}
-        <View style={styles.zoomControls}>
-          <TouchableOpacity style={styles.zoomButton} onPress={zoomIn}>
-            <ZoomIn size={16} color="#ffffff" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.zoomButton} onPress={zoomOut}>
-            <ZoomOut size={16} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.mapOverlay}>
-          <Text style={styles.mapOverlayText}>Zoom: {zoomLevel}x • Powered by LocationIQ</Text>
-        </View>
-      </View>
+      {/* Interactive Map */}
+      <InteractiveMap
+        usersWithGPS={usersWithGPS}
+        nextStop={journeyData.next_stop}
+        userStop={journeyData.user_stop}
+      />
 
-      {/* Map Legend */}
+      {/* Legend */}
       <View style={styles.legendContainer}>
         <Text style={styles.legendTitle}>Map Markers:</Text>
         <View style={styles.legendItems}>
@@ -559,7 +701,6 @@ export default function JourneyShareScreen() {
         </View>
       </View>
 
-      {/* Journey Info with Refresh Control */}
       <ScrollView 
         style={styles.infoContainer}
         refreshControl={
@@ -571,141 +712,44 @@ export default function JourneyShareScreen() {
           />
         }
       >
-        {/* Location Status */}
-        <View style={styles.statusCard}>
-          <View style={styles.statusHeader}>
-            <View style={[styles.statusDot, usersWithGPS.length > 0 ? styles.liveDot : styles.estimatedDot]} />
-            <Text style={styles.statusTitle}>
-              {usersWithGPS.length > 0 ? 'Live GPS Location' : 'Estimated Location'}
+        {/* User Status Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Users size={20} color="#ffffff" />
+            <Text style={styles.sectionTitle}>
+              Passengers ({journeyData.participants.length})
             </Text>
           </View>
-          <Text style={styles.statusText}>
-            {usersWithGPS.length > 0 
-              ? `Tracking ${usersWithGPS.length} user${usersWithGPS.length > 1 ? 's' : ''} via GPS` 
-              : 'Showing scheduled stop location'
-            }
-          </Text>
-          {usersWithGPS.length > 0 && (
-            <View style={styles.updateTime}>
-              <Clock size={12} color="#666" />
-              <Text style={styles.updateTimeText}>
-                Updated {lastUpdate}
-              </Text>
-            </View>
-          )}
-        </View>
 
-        {/* Participants with GPS Locations */}
-        {usersWithGPS.length > 0 && (
-          <View style={styles.participantsCard}>
-            <View style={styles.participantsHeader}>
-              <Users size={16} color="#1ea2b1" />
-              <Text style={styles.participantsTitle}>
-                Live Locations ({usersWithGPS.length})
-              </Text>
+          {/* Status Summary */}
+          <View style={styles.statusSummary}>
+            <View style={styles.statusItem}>
+              <Text style={styles.statusCount}>{waitingUsers.length}</Text>
+              <Text style={styles.statusLabel}>Waiting</Text>
             </View>
-            {usersWithGPS.map((participant) => (
-              <View key={participant.id} style={styles.participantItem}>
-                {participant.profiles.avatar_url ? (
-                  <Image 
-                    source={{ uri: participant.profiles.avatar_url }} 
-                    style={styles.avatar}
-                  />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <User size={20} color="#ffffff" />
-                  </View>
-                )}
-                <View style={styles.participantInfo}>
-                  <Text style={styles.participantName}>
-                    {participant.profiles.first_name} {participant.profiles.last_name}
-                  </Text>
-                  <Text style={styles.participantStatus}>
-                    {participant.status === 'waiting' ? 'Waiting' : 
-                     participant.status === 'picked_up' ? 'On the way' : 'Arrived'}
-                    {' • '}{getLocationAge(participant.last_location_update)}
-                  </Text>
-                  <Text style={styles.coordinates}>
-                    {participant.latitude?.toFixed(6)}, {participant.longitude?.toFixed(6)}
-                  </Text>
-                </View>
-              </View>
-            ))}
+            <View style={styles.statusItem}>
+              <Text style={styles.statusCount}>{pickedUpUsers.length}</Text>
+              <Text style={styles.statusLabel}>On Trip</Text>
+            </View>
+            <View style={styles.statusItem}>
+              <Text style={styles.statusCount}>{arrivedUsers.length}</Text>
+              <Text style={styles.statusLabel}>Arrived</Text>
+            </View>
           </View>
-        )}
+
+          {/* User Cards */}
+          {journeyData.participants.map((user) => (
+            <UserStatusCard key={user.id} user={user} />
+          ))}
+        </View>
 
         {/* Route Information */}
-        <View style={styles.routeCard}>
-          <Text style={styles.routeName}>{journeyData.routes.name}</Text>
-          <Text style={styles.routeType}>{journeyData.routes.transport_type}</Text>
-          <View style={styles.routeEndpoints}>
-            <Text style={styles.endpoint}>From: {journeyData.routes.start_point}</Text>
-            <Text style={styles.endpoint}>To: {journeyData.routes.end_point}</Text>
-          </View>
-        </View>
+        <RouteInfoCard journeyData={journeyData} />
 
-        {/* Stop Information */}
-        <View style={styles.locationCard}>
-          <View style={styles.locationItem}>
-            <View style={[styles.statusDot, styles.currentDot]} />
-            <View style={styles.locationText}>
-              <Text style={styles.locationLabel}>Current Location</Text>
-              <Text style={styles.locationName}>{journeyData.user_stop.name}</Text>
-              <Text style={styles.coordinates}>
-                {journeyData.user_stop.latitude.toFixed(6)}, {journeyData.user_stop.longitude.toFixed(6)}
-              </Text>
-            </View>
-          </View>
-
-          {journeyData.next_stop ? (
-            <View style={styles.locationItem}>
-              <View style={[styles.statusDot, styles.nextDot]} />
-              <View style={styles.locationText}>
-                <Text style={styles.locationLabel}>Next Stop</Text>
-                <Text style={styles.locationName}>{journeyData.next_stop.name}</Text>
-                <Text style={styles.coordinates}>
-                  {journeyData.next_stop.latitude.toFixed(6)}, {journeyData.next_stop.longitude.toFixed(6)}
-                </Text>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.locationItem}>
-              <View style={[styles.statusDot, styles.finalDot]} />
-              <View style={styles.locationText}>
-                <Text style={styles.locationLabel}>Status</Text>
-                <Text style={styles.locationName}>Final Destination Reached</Text>
-              </View>
-            </View>
-          )}
-        </View>
-
-        {/* Actions */}
-        <View style={styles.actionsCard}>
-          <Text style={styles.actionsTitle}>Map Actions</Text>
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.actionButton} onPress={openInMaps}>
-              <MapPin size={16} color="#1ea2b1" />
-              <Text style={styles.actionButtonText}>View on Map</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={openDirections}>
-              <Navigation size={16} color="#1ea2b1" />
-              <Text style={styles.actionButtonText}>Get Directions</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
+        {/* Last Update */}
+        <View style={styles.updateContainer}>
+          <Text style={styles.updateText}>
             Last updated: {lastUpdate}
-          </Text>
-          <Text style={styles.footerText}>
-            {usersWithGPS.length > 0 
-              ? 'Live GPS tracking active • Pull down to refresh' 
-              : 'Route-based tracking • Enable GPS for live location'
-            }
-          </Text>
-          <Text style={styles.footerNote}>
-            Map powered by LocationIQ • Zoom: {zoomLevel}x
           </Text>
         </View>
       </ScrollView>
@@ -751,40 +795,30 @@ const styles = StyleSheet.create({
   },
   // Map Container
   mapContainer: {
-    height: 300,
+    height: 400,
     width: '100%',
     position: 'relative',
+    backgroundColor: '#1a1a1a',
   },
-  staticMap: {
+  mapIframe: {
     width: '100%',
     height: '100%',
+    border: 'none',
   },
-  zoomControls: {
+  mapLoading: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    flexDirection: 'column',
-    gap: 8,
-  },
-  zoomButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 8,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapOverlay: {
-    position: 'absolute',
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 4,
+    bottom: 0,
+    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#1a1a1a',
   },
-  mapOverlayText: {
-    color: '#cccccc',
-    fontSize: 10,
+  mapLoadingText: {
+    color: '#ffffff',
+    marginTop: 12,
+    fontSize: 16,
   },
   // Legend
   legendContainer: {
@@ -815,219 +849,206 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   userMarker: {
-    backgroundColor: '#1ea2b1', // Blue
+    backgroundColor: '#1ea2b1',
   },
   nextStopMarker: {
-    backgroundColor: '#fbbf24', // Yellow
+    backgroundColor: '#fbbf24',
   },
   currentStopMarker: {
-    backgroundColor: '#10b981', // Green
+    backgroundColor: '#10b981',
   },
   legendText: {
     fontSize: 12,
     color: '#cccccc',
   },
-  // Info Container
   infoContainer: {
     flex: 1,
   },
-  statusCard: {
-    backgroundColor: '#1a1a1a',
+  // Sections
+  section: {
     padding: 16,
-    margin: 16,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#1ea2b1',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
   },
-  statusHeader: {
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  // Status Summary
+  statusSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  statusItem: {
+    alignItems: 'center',
+  },
+  statusCount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  statusLabel: {
+    fontSize: 12,
+    color: '#cccccc',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  // User Cards
+  userCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 12,
     marginBottom: 8,
+  },
+  userAvatarContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  userAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  userAvatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#1ea2b1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userAvatarText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  statusIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#2a2a2a',
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: 8,
+    marginRight: 6,
   },
-  liveDot: {
-    backgroundColor: '#10b981',
-  },
-  estimatedDot: {
-    backgroundColor: '#f59e0b',
-  },
-  statusTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  statusText: {
+  userStatus: {
     fontSize: 14,
     color: '#cccccc',
-    marginBottom: 8,
   },
-  updateTime: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  updateTimeText: {
+  locationTime: {
     fontSize: 12,
     color: '#666666',
   },
-  participantsCard: {
-    backgroundColor: '#1a1a1a',
-    padding: 16,
-    marginHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  participantsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-  participantsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  participantItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 8,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  avatarPlaceholder: {
-    backgroundColor: '#1ea2b1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  participantInfo: {
-    flex: 1,
-  },
-  participantName: {
-    fontSize: 16,
-    color: '#ffffff',
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  participantStatus: {
-    fontSize: 12,
-    color: '#cccccc',
-    marginBottom: 4,
-  },
-  coordinates: {
-    fontSize: 11,
-    color: '#666666',
-    fontFamily: 'monospace',
-  },
+  // Route Card
   routeCard: {
-    backgroundColor: '#1a1a1a',
-    padding: 16,
-    marginHorizontal: 16,
+    backgroundColor: '#2a2a2a',
     borderRadius: 12,
+    padding: 16,
+    margin: 16,
+    marginTop: 0,
+  },
+  routeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 12,
+  },
+  routeTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  routeDetails: {
+    gap: 8,
   },
   routeName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 4,
   },
   routeType: {
     fontSize: 14,
-    color: '#1ea2b1',
-    marginBottom: 8,
-    textTransform: 'capitalize',
+    color: '#cccccc',
+    marginBottom: 12,
   },
-  routeEndpoints: {
+  routeStops: {
     gap: 4,
   },
-  endpoint: {
-    fontSize: 14,
-    color: '#cccccc',
-  },
-  locationCard: {
-    backgroundColor: '#1a1a1a',
-    padding: 16,
-    marginHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  locationItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 8,
-  },
-  locationText: {
-    flex: 1,
-  },
-  locationLabel: {
-    fontSize: 14,
-    color: '#cccccc',
-    marginBottom: 2,
-  },
-  locationName: {
-    fontSize: 16,
-    color: '#ffffff',
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  actionsCard: {
-    backgroundColor: '#1a1a1a',
-    padding: 16,
-    marginHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  actionsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 12,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
+  stopItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2a2a2a',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
     gap: 8,
   },
-  actionButtonText: {
-    color: '#1ea2b1',
+  stopDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  startDot: {
+    backgroundColor: '#10b981',
+  },
+  currentDot: {
+    backgroundColor: '#1ea2b1',
+  },
+  nextDot: {
+    backgroundColor: '#fbbf24',
+  },
+  endDot: {
+    backgroundColor: '#ef4444',
+  },
+  stopConnector: {
+    width: 2,
+    height: 12,
+    backgroundColor: '#666666',
+    marginLeft: 3,
+  },
+  stopText: {
     fontSize: 14,
-    fontWeight: '600',
+    color: '#cccccc',
   },
-  footer: {
+  // Update Container
+  updateContainer: {
     padding: 16,
-    paddingBottom: 32,
+    alignItems: 'center',
   },
-  footerText: {
+  updateText: {
     fontSize: 12,
     color: '#666666',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  footerNote: {
-    fontSize: 10,
-    color: '#444444',
-    textAlign: 'center',
-    marginTop: 8,
   },
   loadingText: {
     color: '#ffffff',
@@ -1047,97 +1068,65 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 20,
   },
-  // Skeleton Loading Styles
-  skeleton: {
+  // Skeleton Styles
+  skeletonContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  skeletonMap: {
+    height: 400,
+    backgroundColor: '#2a2a2a',
+  },
+  skeletonLegend: {
+    backgroundColor: '#1a1a1a',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  skeletonText: {
+    height: 16,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonLegendItems: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  skeletonLegendItem: {
+    width: 80,
+    height: 16,
     backgroundColor: '#2a2a2a',
     borderRadius: 4,
   },
+  skeletonSection: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
   skeletonTitle: {
-    width: 200,
-    height: 24,
-    marginBottom: 4,
-  },
-  skeletonSubtitle: {
-    width: 150,
-    height: 14,
-  },
-  skeletonButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-  },
-  skeletonMap: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 0,
-  },
-  skeletonZoomButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-  },
-  skeletonText: {
-    height: 14,
+    height: 20,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 4,
+    marginBottom: 16,
     width: '60%',
   },
-  skeletonSmallText: {
-    height: 12,
-    width: '40%',
-    marginTop: 4,
-  },
-  skeletonDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  skeletonLegendText: {
-    height: 12,
-    width: 80,
-  },
-  skeletonStatusTitle: {
-    height: 16,
-    width: 120,
-  },
-  skeletonIcon: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-  },
-  skeletonParticipantsTitle: {
-    height: 16,
-    width: 140,
-  },
-  skeletonAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  skeletonCoordinates: {
-    height: 11,
-    width: 120,
-  },
-  skeletonRouteName: {
-    height: 18,
-    width: '70%',
-    marginBottom: 4,
-  },
-  skeletonRouteType: {
-    height: 14,
-    width: '40%',
+  skeletonCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 12,
     marginBottom: 8,
   },
-  skeletonLocationName: {
-    height: 16,
-    width: '80%',
-    marginBottom: 4,
+  skeletonAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#333333',
+    marginRight: 12,
   },
-  skeletonActionsTitle: {
-    height: 16,
-    width: 100,
-    marginBottom: 12,
-  },
-  skeletonActionButton: {
-    height: 44,
+  skeletonContent: {
     flex: 1,
   },
 });
