@@ -196,11 +196,11 @@ export default function NotificationScreen() {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'post_reaction':
-        return <Heart size={20} color="#ff6b35" fill="#ff6b35" />;
+        return <Flame size={20} color="#ff6b35" fill="#ff6b35" />;
       case 'post_comment':
         return <MessageCircle size={20} color="#1ea2b1" />;
       case 'comment_reaction':
-        return <Heart size={20} color="#ff6b35" fill="#ff6b35" />;
+        return <Flame size={20} color="#ff6b35" fill="#ff6b35" />;
       case 'new_follower':
         return <UserPlus size={20} color="#10b981" />;
       case 'journey_update':
