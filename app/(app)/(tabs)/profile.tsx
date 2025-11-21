@@ -2,202 +2,33 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   View, 
   Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Image, 
   ScrollView, 
-  ActivityIndicator, 
-  Platform, 
-  Modal 
+  TouchableOpacity, 
+  StyleSheet,
+  Platform 
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
-import { formatTimeAgo } from '../../../components/utils';
-import { router } from 'expo-router';
-import { Settings, LogOut, Camera, Captions, Edit, Badge, Star, MessageSquare, MapPin, Flame, Trash, MoreVertical, Mail, Globe, Facebook, AlertTriangle } from 'lucide-react-native';
 import { useProfile } from '@/hook/useProfile';
-import { Animated } from 'react-native';
+import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
 
-// Skeleton Loading Components
-const Shimmer = ({ children, colors }) => {
-  const animatedValue = new Animated.Value(0);
+// Components
+import { ProfileHeader } from '@/components/profile/ProfileHeader';
+import { PostsTab } from '@/components/profile/PostsTab';
+import { BasicInfoTab } from '@/components/profile/BasicInfoTab';
+import { AchievementsTab } from '@/components/profile/AchievementsTab';
+import { DeleteConfirmationModal } from '@/components/profile/DeleteConfirmationModal';
 
-  React.useEffect(() => {
-    const shimmerAnimation = () => {
-      Animated.sequence([
-        Animated.timing(animatedValue, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(animatedValue, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ]).start(() => shimmerAnimation());
-    };
-
-    shimmerAnimation();
-  }, []);
-
-  const translateX = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-100, 100],
-  });
-
-  return (
-    <View style={{ overflow: 'hidden' }}>
-      <>
-      {children}
-      <Animated.View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: '-100%',
-          right: '-100%',
-          bottom: 0,
-          backgroundColor: colors.text,
-          opacity: 0.1,
-          transform: [{ translateX }],
-        }}
-      />
-      </>
-    </View>
-  );
-};
-
-const ProfileHeaderSkeleton = ({ colors }) => (
-  <View style={[styles.header, { backgroundColor: colors.card }]}>
-    <Shimmer colors={colors}>
-      <View style={[styles.avatar, { backgroundColor: colors.border }]} />
-    </Shimmer>
-    <Shimmer colors={colors}>
-      <View style={[styles.skeletonName, { backgroundColor: colors.border }]} />
-    </Shimmer>
-    <Shimmer colors={colors}>
-      <View style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
-    </Shimmer>
-  </View>
-);
-
-const PostSkeleton = ({ colors }) => (
-  <Shimmer colors={colors}>
-    <View style={[styles.postItem, { backgroundColor: colors.card }]}>
-      <View style={[styles.skeletonPostContent, { backgroundColor: colors.border }]} />
-      <View style={styles.postFooter}>
-        <View style={[styles.skeletonPostLocation, { backgroundColor: colors.border }]} />
-        <View style={[styles.skeletonPostReactions, { backgroundColor: colors.border }]} />
-      </View>
-    </View>
-  </Shimmer>
-);
-
-const MenuItemSkeleton = ({ colors }) => (
-  <Shimmer colors={colors}>
-    <View style={[styles.menuItem, { backgroundColor: colors.card }]}>
-      <View style={[styles.skeletonIcon, { backgroundColor: colors.border }]} />
-      <View style={styles.menuText}>
-        <View style={[styles.skeletonText, { backgroundColor: colors.border }]} />
-        <View style={[styles.skeletonSubtext, { backgroundColor: colors.border }]} />
-      </View>
-    </View>
-  </Shimmer>
-);
-
-const AchievementBannerSkeleton = ({ colors }) => (
- <Shimmer colors={colors}>
-    <View style={[styles.achievementBanner, { backgroundColor: colors.border }]}>
-      <View style={[styles.skeletonIcon, { backgroundColor: colors.text }]} />
-      <View style={styles.achievementText}>
-        <View style={[styles.skeletonText, { backgroundColor: colors.text }]} />
-        <View style={[styles.skeletonSubtext, { backgroundColor: colors.text }]} />
-      </View>
-    </View>
-  </Shimmer>
-);
-
-interface UserPost {
-  id: string;
-  content: string;
-  created_at: string;
-  type: 'hub' | 'stop';
-  location_name: string;
-  likes_count: number;
-  comments_count: number;
-}
-
-interface LinkedAccount {
-  provider: 'google' | 'facebook' | 'email';
-  connected: boolean;
-  email?: string;
-}
-
-interface DeleteModalProps {
-  visible: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-}
-
-const DeleteConfirmationModal: React.FC<DeleteModalProps> = ({
-  visible,
-  onConfirm,
-  onCancel,
-}) => {
-  const { colors } = useTheme();
-
-  return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={onCancel}
-    >
-      <View style={styles.deleteModalOverlay}>
-        <View style={[styles.deleteModalContent, { backgroundColor: colors.card }]}>
-          <View style={styles.deleteModalHeader}>
-            <AlertTriangle size={24} color="#ef4444" />
-            <Text style={[styles.deleteModalTitle, { color: colors.text }]}>Delete Post</Text>
-          </View>
-          
-          <Text style={[styles.deleteModalMessage, { color: colors.text }]}>
-            Are you sure you want to delete this post?{'\n\n'}
-            <Text style={styles.warningText}>
-              This action cannot be undone. The post and all its comments will be permanently removed.
-            </Text>
-          </Text>
-
-          <View style={styles.deleteModalActions}>
-            <TouchableOpacity 
-              style={[styles.deleteCancelButton, { backgroundColor: colors.border }]}
-              onPress={onCancel}
-            >
-              <Text style={[styles.deleteCancelButtonText, { color: colors.text }]}>Cancel</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.deleteConfirmButton}
-              onPress={onConfirm}
-            >
-              <Trash size={16} color="#ffffff" />
-              <Text style={styles.deleteConfirmButtonText}>Delete Post</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-};
+// Types
+import { UserPost, LinkedAccount } from '@/types/profile';
 
 export default function ProfileScreen() {
-  const { formatTimeAgo } = require('../../../components/utils.tsx');
+  const { formatTimeAgo } = require('@/components/utils');
   const { colors } = useTheme();
   const {
     loading,
     profile,
-    titles,
-    handleSelectTitle,
     handleSignOut,
     uploadAvatar,
     uploading,
@@ -206,7 +37,6 @@ export default function ProfileScreen() {
   const [selectedTab, setSelectedTab] = useState('posts');
   const [userPosts, setUserPosts] = useState<UserPost[]>([]);
   const [postsLoading, setPostsLoading] = useState(true);
-  const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -215,6 +45,7 @@ export default function ProfileScreen() {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [postToDelete, setPostToDelete] = useState<{id: string; type: 'hub' | 'stop'} | null>(null);
 
+  // Load data effects
   useEffect(() => {
     if (profile?.id) {
       loadLinkedAccounts();
@@ -227,11 +58,10 @@ export default function ProfileScreen() {
     }
   }, [selectedTab, profile?.id]);
 
+  // Data loading functions
   const loadLinkedAccounts = async () => {
     try {
       setAccountsLoading(true);
-      
-      // Get current session to check auth providers
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) throw error;
@@ -240,7 +70,6 @@ export default function ProfileScreen() {
         const { user } = session;
         const accounts: LinkedAccount[] = [];
         
-        // Check email provider
         if (user.email) {
           accounts.push({
             provider: 'email',
@@ -249,10 +78,8 @@ export default function ProfileScreen() {
           });
         }
         
-        // Check if user has identities from OAuth providers
         const identities = user.identities || [];
         
-        // Check Google
         const hasGoogle = identities.some(identity => identity.provider === 'google');
         accounts.push({
           provider: 'google',
@@ -260,7 +87,6 @@ export default function ProfileScreen() {
           email: hasGoogle ? user.email : undefined
         });
         
-        // Check Facebook
         const hasFacebook = identities.some(identity => identity.provider === 'facebook');
         accounts.push({
           provider: 'facebook',
@@ -343,6 +169,7 @@ export default function ProfileScreen() {
     }
   };
 
+  // Event handlers
   const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       const file = event.target.files?.[0];
@@ -378,7 +205,6 @@ export default function ProfileScreen() {
   const handleDeletePost = async (postId: string, postType: 'hub' | 'stop') => {
     setPostToDelete({ id: postId, type: postType });
     setDeleteModalVisible(true);
-    setActiveMenu(null); // Close the menu when opening delete modal
   };
 
   const confirmDeletePost = async () => {
@@ -402,7 +228,6 @@ export default function ProfileScreen() {
       console.log('Post deleted successfully');
     } catch (error) {
       console.error('Error deleting post:', error);
-      // You could show an error toast here instead of alert
     } finally {
       setDeleteModalVisible(false);
       setPostToDelete(null);
@@ -414,74 +239,42 @@ export default function ProfileScreen() {
     setPostToDelete(null);
   };
 
-  const toggleMenu = (postId: string) => {
-    setActiveMenu(activeMenu === postId ? null : postId);
-  };
-
   const navigateToPost = (postId: string, postType: 'hub' | 'stop') => {
-    if (postType === 'hub') {
-      router.push(`/post/${postId}`);
-    } else {
-      router.push(`/post/${postId}`);
-    }
+    router.push(`/post/${postId}`);
   };
 
-  const getProviderIcon = (provider: string, size: number = 16) => {
-    switch (provider) {
-      case 'google':
+  const renderTabContent = () => {
+    switch (selectedTab) {
+      case 'posts':
         return (
-          <Image
-            source={require('../../../assets/images/google-icon.png')}
-            style={{ width: size, height: size }}
+          <PostsTab
+            loading={postsLoading}
+            posts={userPosts}
+            onDeletePost={handleDeletePost}
+            onNavigateToPost={navigateToPost}
+            formatTimeAgo={formatTimeAgo}
           />
         );
-      case 'facebook':
-        return <Facebook size={size} color="#1877F2" />;
-      case 'email':
-        return <Mail size={size} color="#666" />;
+      case 'basic-info':
+        return (
+          <BasicInfoTab
+            colors={colors}
+            accountsLoading={accountsLoading}
+            linkedAccounts={linkedAccounts}
+            onSignOut={handleSignOut}
+          />
+        );
+      case 'achievements':
+        return (
+          <AchievementsTab
+            colors={colors}
+            loading={loading}
+          />
+        );
       default:
-        return <Globe size={size} color="#666" />;
+        return null;
     }
   };
-
-  const getProviderName = (provider: string) => {
-    switch (provider) {
-      case 'google':
-        return 'Google';
-      case 'facebook':
-        return 'Facebook';
-      case 'email':
-        return 'Email';
-      default:
-        return provider;
-    }
-  };
-
-  const basicMenuItems = [
-    {
-      icon: <Edit size={24} color={colors.primary} />,
-      title: 'Edit Profile',
-      subtitle: 'Update your profile details',
-      route: '/EditProfileScreen'
-    },
-    {
-      icon: <Settings size={24} color={colors.primary} />,
-      title: 'Settings',
-      subtitle: 'App settings and preferences',
-      route: '/settings'
-    },
-  ];
-
-  const rankMenuItems = [
-    {
-      icon: <Badge size={24} color={colors.primary} />,
-      title: 'Change Title',
-      subtitle: 'Change your profile title',
-      route: '/changetitle'
-    },
-  ];
-
-  // ... (keep all your existing loading skeleton and main component JSX)
 
   return (
     <>
@@ -497,72 +290,17 @@ export default function ProfileScreen() {
           />
         )}
 
-        {/* Header */}
-        <View style={[styles.header, { backgroundColor: colors.card }]}>
-          {/* Linked Accounts Badge - Top Right Corner */}
-          <View style={styles.linkedAccountsContainer}>
-            {accountsLoading ? (
-              <Shimmer colors={colors}>
-                <View style={[styles.skeletonLinkedAccounts, { backgroundColor: colors.border }]} />
-              </Shimmer>
-            ) : (
-              <View style={styles.linkedAccountsBadge}>
-                {linkedAccounts.filter(account => account.connected).map((account, index) => (
-                  <View key={account.provider} style={styles.providerIcon}>
-                    {getProviderIcon(account.provider, 20)}
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
+        {/* Profile Header */}
+        <ProfileHeader
+          loading={loading}
+          profile={profile}
+          uploading={uploading}
+          onImagePicker={handleImagePicker}
+          accountsLoading={accountsLoading}
+          linkedAccounts={linkedAccounts}
+        />
 
-          <TouchableOpacity
-            style={styles.avatarContainer}
-            onPress={handleImagePicker}
-            disabled={uploading}
-          >
-            {loading ? (
-              <Shimmer colors={colors}>
-                <View style={[styles.avatar, { backgroundColor: colors.border }]} />
-              </Shimmer>
-            ) : (
-              <>
-                <Image
-                  source={{
-                    uri: profile?.avatar_url ||
-                      'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop',
-                  }}
-                  style={styles.avatar}
-                />
-                <View style={[styles.cameraButton, { backgroundColor: colors.primary }]}>
-                  <Camera size={16} color="white" />
-                </View>
-                {uploading && (
-                  <View style={styles.uploadingOverlay}>
-                    <ActivityIndicator color="white" />
-                  </View>
-                )}
-              </>
-            )}
-          </TouchableOpacity>
-          {loading ? (
-            <Shimmer colors={colors}>
-              <View style={[styles.skeletonName, { backgroundColor: colors.border }]} />
-            </Shimmer>
-          ) : (
-            <Text style={[styles.name, { color: colors.text }]}>
-              {profile?.first_name} {profile?.last_name}
-            </Text>
-          )}
-          {loading ? (
-            <Shimmer colors={colors}>
-              <View style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
-            </Shimmer>
-          ) : (
-            <Text style={[styles.userTitle, { color: colors.primary }]}>{profile?.selected_title}</Text>
-          )}
-        </View>
-
+        {/* Tabs */}
         <View style={styles.tabs}>
           <TouchableOpacity
             style={[styles.tab, selectedTab === 'posts' && styles.activeTab]}
@@ -584,215 +322,8 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Linked Accounts Details - Show in Basic Info tab */}
-        {selectedTab === 'basic-info' && (
-          <View style={styles.linkedAccountsSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Linked Accounts</Text>
-            {accountsLoading ? (
-              <View style={styles.accountsLoading}>
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={[styles.loadingText, { color: colors.text }]}>Loading accounts...</Text>
-              </View>
-            ) : (
-              <View style={styles.accountsList}>
-                {linkedAccounts.map((account, index) => (
-                  <View key={account.provider} style={[styles.accountItem, { backgroundColor: colors.card }]}>
-                    <View style={styles.accountInfo}>
-                      <View style={styles.accountProvider}>
-                        {getProviderIcon(account.provider, 24)}
-                        <Text style={[styles.providerName, { color: colors.text }]}>
-                          {getProviderName(account.provider)}
-                        </Text>
-                      </View>
-                      <View style={[
-                        styles.connectionStatus,
-                        { backgroundColor: account.connected ? '#1ea2b1' : '#6b7280' }
-                      ]}>
-                        <Text style={styles.statusText}>
-                          {account.connected ? 'Connected' : 'Not Connected'}
-                        </Text>
-                      </View>
-                    </View>
-                    {account.connected && account.email && (
-                      <Text style={[styles.accountEmail, { color: colors.text }]}>
-                        {account.email}
-                      </Text>
-                    )}
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-
         {/* Tab Content */}
-        {selectedTab === 'posts' && (
-          <View style={styles.postsContainer}>
-            {postsLoading ? (
-              <>
-                <PostSkeleton colors={colors} />
-                <PostSkeleton colors={colors} />
-                <PostSkeleton colors={colors} />
-              </>
-            ) : userPosts.length === 0 ? (
-              <View style={styles.noPosts}>
-                <MessageSquare size={48} color={colors.text} opacity={0.5} />
-                <Text style={[styles.noPostsText, { color: colors.text }]}>
-                  No posts yet
-                </Text>
-                <Text style={[styles.noPostsSubtext, { color: colors.text }]}>
-                  Start sharing your transportation experiences!
-                </Text>
-              </View>
-            ) : (
-              userPosts.map((post) => (
-                <View key={post.id} style={[styles.postItem, { backgroundColor: colors.card }]}>
-                  <View style={styles.postHeader}>
-                    <TouchableOpacity 
-                      style={{flex: 1}} 
-                      onPress={() => navigateToPost(post.id, post.type)}
-                    >
-                      <Text style={[styles.postContent, { color: colors.text }]} numberOfLines={3}>
-                        {post.content}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => toggleMenu(post.id)}>
-                      <MoreVertical size={20} color={colors.text} />
-                    </TouchableOpacity>
-                  </View>
-                  
-                  {activeMenu === post.id && (
-                    <View style={[styles.postMenu, { backgroundColor: colors.card }]}>
-                      <TouchableOpacity 
-                        style={styles.menuOption}
-                        onPress={() => handleDeletePost(post.id, post.type)}
-                      >
-                        <Trash size={16} color="#ef4444" />
-                        <Text style={[styles.menuOptionText, { color: '#ef4444' }]}>
-                          Delete Post
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                  
-                  <Text style={[styles.postTimeAgo, { color: colors.text }]}>
-                    {formatTimeAgo(post.created_at)}
-                  </Text>
-                  
-                  <View style={styles.postFooter}>
-                    <View style={styles.postLocation}>
-                      <MapPin size={12} color="#666666" />
-                      <Text style={[styles.postLocationText, { color: colors.text }]}>
-                        {post.location_name}
-                      </Text>
-                    </View>
-                    <View style={styles.postReactions}>
-                      <Flame size={14} color="#ff6b35" />
-                      <Text style={[styles.postReactionCount, { color: colors.text }]}>
-                        {post.likes_count}
-                      </Text>
-                      <MessageSquare size={14} color="#666666" style={{ marginLeft: 12 }} />
-                      <Text style={[styles.postReactionCount, { color: colors.text }]}>
-                        {post.comments_count}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              ))
-            )}
-          </View>
-        )}
-
-        {selectedTab === 'basic-info' && (
-          <View style={styles.menuContainer}>
-            {basicMenuItems.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.menuItem, { backgroundColor: colors.card }]}
-                onPress={() => router.push(item.route)}
-              >
-                {item.icon}
-                <View style={styles.menuText}>
-                  <Text style={[styles.menuTitle, { color: colors.text }]}>
-                    {item.title}
-                  </Text>
-                  <Text style={[styles.menuSubtitle, { color: colors.text }]}>
-                    {item.subtitle}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {selectedTab === 'achievements' && (
-          <View style={styles.menuContainer}>
-            {rankMenuItems.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.menuItem, { backgroundColor: colors.card }]}
-                onPress={() => {
-                  if (item.title === 'Change Title') {
-                    router.push('/changetitle');
-                  }
-                  if (item.title === 'Title To Earn') {
-                    router.push('/titleearn');
-                  }
-                }}
-              >
-                {item.icon}
-                <View style={styles.menuText}>
-                  <Text style={[styles.menuTitle, { color: colors.text }]}>
-                    {item.title}
-                  </Text>
-                  <Text style={[styles.menuSubtitle, { color: colors.text }]}>
-                    {item.subtitle}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-            {/* Achievement Banners */}
-            {loading ? (
-              <>
-                <AchievementBannerSkeleton colors={colors} />
-                <AchievementBannerSkeleton colors={colors} />
-              </>
-            ) : (
-              <>
-                <View style={[styles.achievementBanner, { backgroundColor: colors.card }]}>
-                  <Star size={24} color="#fbbf24" />
-                  <View style={styles.achievementText}>
-                    <Text style={[styles.achievementTitle, { color: colors.text }]}>Eco Warrior</Text>
-                    <Text style={[styles.achievementDescription, { color: colors.text }]}>
-                      You've helped reduce carbon emissions by using public transport!
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={[styles.achievementBanner, { backgroundColor: colors.card }]}>
-                  <Star size={24} color="#34d399" />
-                  <View style={styles.achievementText}>
-                    <Text style={[styles.achievementTitle, { color: colors.text }]}>Early Adopter</Text>
-                    <Text style={[styles.achievementDescription, { color: colors.text }]}>
-                      Thanks for being one of the first to try Uthutho!
-                    </Text>
-                  </View>
-                </View>
-              </>
-            )}
-          </View>
-        )}
-
-        {/* Sign Out Button (only show on basic-info tab) */}
-        {selectedTab === 'basic-info' && (
-          <TouchableOpacity
-            style={[styles.signOutButton, { borderColor: '#ef4444' }]}
-            onPress={handleSignOut}
-          >
-            <LogOut size={24} color="#ef4444" />
-            <Text style={styles.signOutText}>Sign Out</Text>
-          </TouchableOpacity>
-        )}
+        {renderTabContent()}
 
         <View style={styles.bottomSpace} />
 
@@ -814,35 +345,8 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  postTimeAgo: {
-    fontSize: 12,
-    color: '#999999',
-    marginBottom: 8,
-  },
   container: {
     flex: 1,
-  },
-  header: {
-    padding: 20,
-    paddingTop: 30,
-    alignItems: 'center',
-  },
-  avatarContainer: {
-    position: 'relative',
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 15,
-  },
-  name: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  userTitle: {
-    fontSize: 16,
   },
   tabs: {
     flexDirection: 'row',
@@ -861,136 +365,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  postsContainer: {
-    padding: 20,
-    gap: 15,
-  },
-  postItem: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  postHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  postContent: {
-    fontSize: 14,
-    lineHeight: 20,
-    flex: 1,
-    marginRight: 12,
-  },
-  postFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  postLocation: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  postLocationText: {
-    fontSize: 12,
-    marginLeft: 4,
-  },
-  postReactions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  postReactionCount: {
-    fontSize: 12,
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  postMenu: {
-    position: 'absolute',
-    top: 40,
-    right: 16,
-    borderRadius: 8,
-    padding: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    zIndex: 10,
-  },
-  menuOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-  },
-  menuOptionText: {
-    fontSize: 14,
-    marginLeft: 8,
-  },
-  noPosts: {
-    alignItems: 'center',
-    padding: 40,
-  },
-  noPostsText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  noPostsSubtext: {
-    fontSize: 14,
-    opacity: 0.8,
-    textAlign: 'center',
-  },
-  menuContainer: {
-    padding: 20,
-    gap: 15,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 15,
-    borderRadius: 10,
-    gap: 15,
-  },
-  menuText: {
-    flex: 1,
-  },
-  menuTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  menuSubtitle: {
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  cameraButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  uploadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  signOutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 30,
+  bottomSpace: {
+    height: 20,
   },
   appInfo: {
     alignItems: 'center',
@@ -1005,245 +381,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontStyle: 'italic',
     textAlign: 'center',
-  },
-  signOutText: {
-    color: '#ef4444',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  bottomSpace: {
-    height: 20,
-  },
-  achievementBanner: {
-    marginBottom: 20,
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#fbbf2450',
-  },
-  achievementTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  achievementDescription: {
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  achievementText: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  // Skeleton styles
-  skeletonName: {
-    width: 200,
-    height: 30,
-    borderRadius: 4,
-    marginBottom: 10,
-  },
-  skeletonTitle: {
-    width: 150,
-    height: 20,
-    borderRadius: 4,
-  },
-  skeletonTab: {
-    width: 80,
-    height: 30,
-    borderRadius: 4,
-  },
-  skeletonIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-  },
-  skeletonText: {
-    height: 16,
-    borderRadius: 4,
-    marginBottom: 6,
-    width: '70%',
-  },
-  skeletonSubtext: {
-    height: 14,
-    borderRadius: 4,
-    width: '90%',
-  },
-  skeletonSignOut: {
-    height: 50,
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginBottom: 30,
-  },
-  skeletonAppInfo: {
-    height: 16,
-    width: 100,
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  skeletonMotto: {
-    height: 16,
-    width: 200,
-    borderRadius: 4,
-  },
-  skeletonPostContent: {
-    height: 60,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  skeletonPostLocation: {
-    width: 80,
-    height: 14,
-    borderRadius: 4,
-  },
-  skeletonPostReactions: {
-    width: 40,
-    height: 14,
-    borderRadius: 4,
-  },
-  // Linked Accounts Styles
-  linkedAccountsContainer: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-  },
-  linkedAccountsBadge: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 20,
-    padding: 8,
-    gap: 6,
-  },
-  providerIcon: {
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  skeletonLinkedAccounts: {
-    width: 80,
-    height: 32,
-    borderRadius: 20,
-  },
-  linkedAccountsSection: {
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  accountsLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    marginLeft: 12,
-    fontSize: 14,
-  },
-  accountsList: {
-    gap: 12,
-  },
-  accountItem: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  accountInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  accountProvider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  providerName: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  connectionStatus: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  statusText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  accountEmail: {
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  deleteModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  deleteModalContent: {
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  deleteModalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
-  },
-  deleteModalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  deleteModalMessage: {
-    fontSize: 16,
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  warningText: {
-    color: '#ef4444',
-    fontWeight: '500',
-    fontSize: 14,
-  },
-  deleteModalActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  deleteCancelButton: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  deleteCancelButtonText: {
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  deleteConfirmButton: {
-    flex: 1,
-    backgroundColor: '#ef4444',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  deleteConfirmButtonText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 16,
   },
 });
