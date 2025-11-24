@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { MessageSquare, MapPin, Flame, MoreVertical, Trash } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { MessageSquare, MapPin, Flame, MoreVertical, Trash, User } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { UserPost } from '@/types/profile';
 import { PostSkeleton } from './SkeletonComponents';
+import { useProfile } from '@/hook/useProfile';
 
 interface PostsTabProps {
   loading: boolean;
@@ -21,10 +22,29 @@ export const PostsTab: React.FC<PostsTabProps> = ({
   formatTimeAgo
 }) => {
   const { colors } = useTheme();
+  const { profile: currentUserProfile } = useProfile();
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
   const toggleMenu = (postId: string) => {
     setActiveMenu(activeMenu === postId ? null : postId);
+  };
+
+  // Get latest comment for display (PostCard style)
+  const getLatestComment = (post: UserPost) => {
+    if (!post.comments || post.comments.length === 0) return null;
+    
+    const sortedComments = [...post.comments].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    
+    return sortedComments[0];
+  };
+
+  // Check if current user liked the post
+  const hasUserLiked = (post: UserPost) => {
+    return post.reactions?.some((r: any) => 
+      r.reaction_type === 'fire' && r.user_id === currentUserProfile?.id
+    ) || false;
   };
 
   if (loading) {
@@ -53,68 +73,132 @@ export const PostsTab: React.FC<PostsTabProps> = ({
 
   return (
     <View style={styles.postsContainer}>
-      {posts.map((post) => (
-        <View key={post.id} style={[styles.postItem, { backgroundColor: colors.card }]}>
-          <View style={styles.postHeader}>
+      {posts.map((post) => {
+        const latestComment = getLatestComment(post);
+        const userHasLiked = hasUserLiked(post);
+
+        return (
+          <View key={post.id} style={[styles.postItem, { backgroundColor: colors.card }]}>
+            {/* Post Header with User Info (PostCard style) */}
+            <View style={styles.postHeader}>
+              <View style={styles.userInfo}>
+                <View style={styles.avatarContainer}>
+                  {post.user_avatar_url ? (
+                    <Image 
+                      source={{ uri: post.user_avatar_url }} 
+                      style={styles.avatar}
+                    />
+                  ) : (
+                    <User size={16} color={colors.text} />
+                  )}
+                </View>
+                <View style={styles.userDetails}>
+                  <Text style={[styles.userName, { color: '#1ea2b1' }]}>
+                    {post.user_first_name} {post.user_last_name}
+                  </Text>
+                  <Text style={[styles.userTitle, { color: colors.text }]}>
+                    {post.user_title || 'Traveler'}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.headerRight}>
+                <Text style={[styles.postTimeAgo, { color: '#666666' }]}>
+                  {formatTimeAgo(post.created_at)}
+                </Text>
+                <TouchableOpacity onPress={() => toggleMenu(post.id)}>
+                  <MoreVertical size={20} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Delete Menu */}
+            {activeMenu === post.id && (
+              <View style={[styles.postMenu, { backgroundColor: colors.card }]}>
+                <TouchableOpacity 
+                  style={styles.menuOption}
+                  onPress={() => onDeletePost(post.id, post.type)}
+                >
+                  <Trash size={16} color="#ef4444" />
+                  <Text style={[styles.menuOptionText, { color: '#ef4444' }]}>
+                    Delete Post
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Post Content */}
             <TouchableOpacity 
               style={{flex: 1}} 
               onPress={() => onNavigateToPost(post.id, post.type)}
             >
-              <Text style={[styles.postContent, { color: colors.text }]} numberOfLines={3}>
+              <Text style={[styles.postContent, { color: colors.text }]}>
                 {post.content}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => toggleMenu(post.id)}>
-              <MoreVertical size={20} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-          
-          {activeMenu === post.id && (
-            <View style={[styles.postMenu, { backgroundColor: colors.card }]}>
-              <TouchableOpacity 
-                style={styles.menuOption}
-                onPress={() => onDeletePost(post.id, post.type)}
-              >
-                <Trash size={16} color="#ef4444" />
-                <Text style={[styles.menuOptionText, { color: '#ef4444' }]}>
-                  Delete Post
+
+            {/* Latest Comment (PostCard style) */}
+            {latestComment && (
+              <View style={styles.latestComment}>
+                <Text style={[styles.commentAuthor, { color: '#1ea2b1' }]}>
+                  {latestComment.profiles?.first_name}: 
                 </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          <Text style={[styles.postTimeAgo, { color: colors.text }]}>
-            {formatTimeAgo(post.created_at)}
-          </Text>
-          
-          <View style={styles.postFooter}>
-            <View style={styles.postLocation}>
-              <MapPin size={12} color="#666666" />
-              <Text style={[styles.postLocationText, { color: colors.text }]}>
-                {post.location_name}
-              </Text>
-            </View>
-            <View style={styles.postReactions}>
-              <Flame size={14} color="#ff6b35" />
-              <Text style={[styles.postReactionCount, { color: colors.text }]}>
-                {post.likes_count}
-              </Text>
-              <MessageSquare size={14} color="#666666" style={{ marginLeft: 12 }} />
-              <Text style={[styles.postReactionCount, { color: colors.text }]}>
-                {post.comments_count}
-              </Text>
+                <Text style={[styles.commentText, { color: colors.text }]} numberOfLines={1}>
+                  {latestComment.content}
+                </Text>
+              </View>
+            )}
+
+            {/* Post Footer with Reactions (PostCard style) */}
+            <View style={styles.postFooter}>
+              <View style={styles.postLocation}>
+                <MapPin size={12} color="#666666" />
+                <Text style={[styles.postLocationText, { color: colors.text }]}>
+                  {post.location_name}
+                </Text>
+              </View>
+              
+              <View style={styles.postReactions}>
+                <TouchableOpacity 
+                  style={styles.reactionButton}
+                  onPress={() => {/* Add like functionality if needed */}}
+                >
+                  <Flame 
+                    size={16} 
+                    color={userHasLiked ? "#ff6b35" : "#666666"} 
+                    fill={userHasLiked ? "#ff6b35" : "none"}
+                  />
+                  <Text style={[
+                    styles.postReactionCount, 
+                    { color: colors.text },
+                    userHasLiked && styles.activeReaction
+                  ]}>
+                    {post.likes_count}
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.reactionButton}
+                  onPress={() => onNavigateToPost(post.id, post.type)}
+                >
+                  <MessageSquare size={16} color="#666666" />
+                  <Text style={[styles.postReactionCount, { color: colors.text }]}>
+                    {post.comments_count}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   postsContainer: {
-    padding: 20,
-    gap: 15,
+    padding: 16,
+    gap: 16,
   },
   postItem: {
     padding: 16,
@@ -126,23 +210,77 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  avatarContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#333333',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    overflow: 'hidden',
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  userDetails: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  userTitle: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 2,
+  },
+  headerRight: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    gap: 8,
   },
   postContent: {
-    fontSize: 14,
-    lineHeight: 20,
-    flex: 1,
-    marginRight: 12,
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 12,
   },
   postTimeAgo: {
     fontSize: 12,
-    color: '#999999',
-    marginBottom: 8,
+  },
+  latestComment: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
+  },
+  commentAuthor: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  commentText: {
+    fontSize: 14,
+    flex: 1,
+    color: '#cccccc',
   },
   postFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
   },
   postLocation: {
     flexDirection: 'row',
@@ -151,19 +289,31 @@ const styles = StyleSheet.create({
   postLocationText: {
     fontSize: 12,
     marginLeft: 4,
+    color: '#666666',
   },
   postReactions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 16,
+  },
+  reactionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 16,
   },
   postReactionCount: {
-    fontSize: 12,
-    marginLeft: 4,
+    fontSize: 14,
+    marginLeft: 6,
     fontWeight: '500',
+  },
+  activeReaction: {
+    color: '#ff6b35',
   },
   postMenu: {
     position: 'absolute',
-    top: 40,
+    top: 50,
     right: 16,
     borderRadius: 8,
     padding: 8,

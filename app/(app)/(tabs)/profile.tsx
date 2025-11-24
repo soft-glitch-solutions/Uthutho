@@ -106,7 +106,22 @@ export default function ProfileScreen() {
   const loadUserPosts = async () => {
     try {
       setPostsLoading(true);
+      console.log('🔄 Loading posts for user:', profile.id);
       
+      // First, get the user's profile data
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, avatar_url, selected_title')
+        .eq('id', profile.id)
+        .single();
+
+      if (profileError) {
+        console.error('❌ Profile fetch error:', profileError);
+        throw profileError;
+      }
+
+      console.log('✅ User profile data:', userProfile);
+
       // Load hub posts
       const { data: hubPosts, error: hubError } = await supabase
         .from('hub_posts')
@@ -114,6 +129,7 @@ export default function ProfileScreen() {
           id, 
           content, 
           created_at,
+          user_id,
           hubs (name),
           post_reactions (reaction_type),
           post_comments (id)
@@ -121,7 +137,12 @@ export default function ProfileScreen() {
         .eq('user_id', profile.id)
         .order('created_at', { ascending: false });
 
-      if (hubError) throw hubError;
+      if (hubError) {
+        console.error('❌ Hub posts fetch error:', hubError);
+        throw hubError;
+      }
+
+      console.log('✅ Hub posts:', hubPosts);
 
       // Load stop posts
       const { data: stopPosts, error: stopError } = await supabase
@@ -130,6 +151,7 @@ export default function ProfileScreen() {
           id, 
           content, 
           created_at,
+          user_id,
           stops (name),
           post_reactions (reaction_type),
           post_comments (id)
@@ -137,33 +159,54 @@ export default function ProfileScreen() {
         .eq('user_id', profile.id)
         .order('created_at', { ascending: false });
 
-      if (stopError) throw stopError;
+      if (stopError) {
+        console.error('❌ Stop posts fetch error:', stopError);
+        throw stopError;
+      }
 
-      // Combine and format posts
+      console.log('✅ Stop posts:', stopPosts);
+
+      // Combine and format posts with the profile data
       const combinedPosts = [
         ...(hubPosts || []).map(post => ({
           id: post.id,
           content: post.content,
           created_at: post.created_at,
+          user_id: post.user_id,
           type: 'hub' as const,
           location_name: post.hubs?.name || 'Unknown Hub',
           likes_count: post.post_reactions?.filter(r => r.reaction_type === 'fire').length || 0,
-          comments_count: post.post_comments?.length || 0
+          comments_count: post.post_comments?.length || 0,
+          user_first_name: userProfile?.first_name,
+          user_last_name: userProfile?.last_name,
+          user_avatar_url: userProfile?.avatar_url,
+          user_title: userProfile?.selected_title,
+          reactions: post.post_reactions || [],
+          comments: post.post_comments || []
         })),
         ...(stopPosts || []).map(post => ({
           id: post.id,
           content: post.content,
           created_at: post.created_at,
+          user_id: post.user_id,
           type: 'stop' as const,
           location_name: post.stops?.name || 'Unknown Stop',
           likes_count: post.post_reactions?.filter(r => r.reaction_type === 'fire').length || 0,
-          comments_count: post.post_comments?.length || 0
+          comments_count: post.post_comments?.length || 0,
+          user_first_name: userProfile?.first_name,
+          user_last_name: userProfile?.last_name,
+          user_avatar_url: userProfile?.avatar_url,
+          user_title: userProfile?.selected_title,
+          reactions: post.post_reactions || [],
+          comments: post.post_comments || []
         }))
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+      console.log('📊 Final combined posts:', combinedPosts);
       setUserPosts(combinedPosts);
+
     } catch (error) {
-      console.error('Error loading user posts:', error);
+      console.error('❌ Error loading user posts:', error);
     } finally {
       setPostsLoading(false);
     }
