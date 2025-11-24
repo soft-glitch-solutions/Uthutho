@@ -387,7 +387,7 @@ export default function EnhancedTabLayout() {
         <Tabs.Screen
           name="routes"
           options={{
-            title: 'Journey',
+            title: 'Planner',
             tabBarIcon: ({ color, size, focused }) => (
               <Route color={color} size={size} />
             ),
