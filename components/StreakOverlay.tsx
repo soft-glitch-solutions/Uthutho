@@ -205,17 +205,39 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
     }
   };
 
-  if (isLoading) {
-    return (
-      <Modal visible={visible} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={styles.container}>
-            <Text style={styles.title}>Updating your streak...</Text>
-            <Text style={styles.dayText}>Please wait</Text>
+  const SkeletonLoader = () => (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.overlay}>
+        <View style={styles.container}>
+          <View style={styles.skeletonCloseButton} />
+          
+          <View style={styles.content}>
+            <View style={[styles.skeletonIcon, styles.skeleton]} />
+            
+            <View style={[styles.skeletonTitle, styles.skeleton]} />
+            <View style={[styles.skeletonDayText, styles.skeleton]} />
+            
+            <View style={styles.streakContainer}>
+              <View style={[styles.skeletonStreakNumber, styles.skeleton]} />
+              <View style={[styles.skeletonStreakLabel, styles.skeleton]} />
+            </View>
+
+            <View style={[styles.skeletonRecordBadge, styles.skeleton]} />
+
+            <View style={styles.statsContainer}>
+              <View style={[styles.skeletonStatItem, styles.skeleton]} />
+              <View style={[styles.skeletonStatItem, styles.skeleton]} />
+            </View>
+
+            <View style={[styles.skeletonButton, styles.skeleton]} />
           </View>
         </View>
-      </Modal>
-    );
+      </View>
+    </Modal>
+  );
+
+  if (isLoading) {
+    return <SkeletonLoader />;
   }
 
   return (
@@ -384,5 +406,60 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Skeleton styles
+  skeleton: {
+    backgroundColor: '#333333',
+    borderRadius: 4,
+  },
+  skeletonCloseButton: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#333333',
+  },
+  skeletonIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginBottom: 20,
+  },
+  skeletonTitle: {
+    width: 200,
+    height: 28,
+    marginBottom: 8,
+  },
+  skeletonDayText: {
+    width: 120,
+    height: 18,
+    marginBottom: 20,
+  },
+  skeletonStreakNumber: {
+    width: 80,
+    height: 52,
+    marginBottom: 8,
+  },
+  skeletonStreakLabel: {
+    width: 80,
+    height: 16,
+  },
+  skeletonRecordBadge: {
+    width: 140,
+    height: 32,
+    borderRadius: 16,
+    marginBottom: 20,
+  },
+  skeletonStatItem: {
+    width: 100,
+    height: 80,
+    borderRadius: 12,
+  },
+  skeletonButton: {
+    width: 120,
+    height: 44,
+    borderRadius: 12,
   },
 });
