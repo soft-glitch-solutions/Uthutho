@@ -21,19 +21,46 @@ import * as WebBrowser from 'expo-web-browser';
 // Required for Expo OAuth
 WebBrowser.maybeCompleteAuthSession();
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+const isSmallScreen = height < 700;
+const isVerySmallScreen = height < 600;
+const isTinyScreen = height < 500;
 const isTablet = width >= 768;
 const isDesktop = width >= 1024;
+const isLargeDesktop = width >= 1440;
 
-// Enhanced scaling for all screen sizes
+// Conservative scaling for desktop
 const scale = (size: number) => {
+  if (isDesktop) {
+    // Minimal scaling for desktop
+    return Math.min(size * (width / 375), size * 1.1);
+  }
+  
   const baseWidth = 375;
   let scaleFactor = 1;
   
-  if (isTablet) scaleFactor = 1.2;
-  else if (isDesktop) scaleFactor = 1.4;
+  if (isTinyScreen) scaleFactor = 0.8;
+  else if (isVerySmallScreen) scaleFactor = 0.9;
+  else if (isSmallScreen) scaleFactor = 1;
+  else if (isTablet) scaleFactor = 1.1;
   
   return (width / baseWidth) * size * scaleFactor;
+};
+
+const verticalScale = (size: number) => {
+  if (isDesktop) {
+    return Math.min(size * (height / 667), size * 1.1);
+  }
+  
+  const baseHeight = 667;
+  let scaleFactor = 1;
+  
+  if (isTinyScreen) scaleFactor = 0.7;
+  else if (isVerySmallScreen) scaleFactor = 0.8;
+  else if (isSmallScreen) scaleFactor = 0.9;
+  else if (isTablet) scaleFactor = 1;
+  
+  return (height / baseHeight) * size * scaleFactor;
 };
 
 export default function Auth() {
@@ -64,6 +91,34 @@ export default function Auth() {
   // URLs for Terms and Privacy Policy
   const termsUrl = 'https://www.uthutho.co.za/terms-and-conditions';
   const privacyUrl = 'https://www.uthutho.co.za/privacy-policy';
+
+  // Desktop layout configuration
+  const getLayoutConfig = () => {
+    if (isDesktop) {
+      return {
+        maxContentWidth: 800,
+        formWidth: '70%',
+        formAlignSelf: 'center' as const,
+        optionsDirection: 'row' as const,
+        optionsJustify: 'space-between' as const,
+        optionsColumnWidth: '48%',
+        socialButtonsDirection: 'row' as const,
+        socialButtonsGap: 20,
+      };
+    }
+    return {
+      maxContentWidth: '100%',
+      formWidth: '100%',
+      formAlignSelf: 'stretch' as const,
+      optionsDirection: isTablet ? 'row' : 'column',
+      optionsJustify: 'space-between' as const,
+      optionsColumnWidth: isTablet ? '48%' : '100%',
+      socialButtonsDirection: 'row' as const,
+      socialButtonsGap: 20,
+    };
+  };
+
+  const layoutConfig = getLayoutConfig();
 
   const handleOpenLink = async (url: string) => {
     try {
@@ -457,7 +512,7 @@ export default function Auth() {
           style={styles.backButton}
           onPress={() => setShowOtpInput(false)}
         >
-          <ArrowLeft size={24} color={colors.text} />
+          <ArrowLeft size={isDesktop ? 20 : 24} color={colors.text} />
           <Text style={[styles.backText, { color: colors.text }]}>Back</Text>
         </TouchableOpacity>
 
@@ -517,7 +572,10 @@ export default function Auth() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.contentContainer}
+      contentContainerStyle={[
+        styles.contentContainer,
+        { maxWidth: layoutConfig.maxContentWidth, alignSelf: 'center' }
+      ]}
       showsVerticalScrollIndicator={false}
     >
       {/* Logo */}
@@ -537,7 +595,7 @@ export default function Auth() {
         </View>
       )}
 
-      <View style={styles.form}>
+      <View style={[styles.form, { width: layoutConfig.formWidth, alignSelf: layoutConfig.formAlignSelf }]}>
         {!isLogin && !showForgotPassword && (
           <>
             <TextInput
@@ -555,13 +613,19 @@ export default function Auth() {
               onChangeText={setLastName}
             />
             
-            <View style={styles.optionsRow}>
-              <View style={styles.optionsColumn}>
+            <View style={[
+              styles.optionsRow,
+              { 
+                flexDirection: layoutConfig.optionsDirection,
+                justifyContent: layoutConfig.optionsJustify,
+              }
+            ]}>
+              <View style={[styles.optionsColumn, { width: layoutConfig.optionsColumnWidth }]}>
                 <Text style={[styles.sectionLabel, { color: colors.text }]}>Preferred Transport</Text>
                 {renderOptionButtons(transportOptions, preferredTransport, setPreferredTransport)}
               </View>
               
-              <View style={styles.optionsColumn}>
+              <View style={[styles.optionsColumn, { width: layoutConfig.optionsColumnWidth }]}>
                 <Text style={[styles.sectionLabel, { color: colors.text }]}>Preferred Language</Text>
                 {renderOptionButtons(languageOptions, preferredLanguage, setPreferredLanguage)}
               </View>
@@ -570,7 +634,7 @@ export default function Auth() {
         )}
 
         <View style={[styles.emailContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Mail size={20} color="#1ea2b1" style={styles.inputIcon} />
+          <Mail size={isDesktop ? 18 : 20} color="#1ea2b1" style={styles.inputIcon} />
           <TextInput
             style={[styles.input, { flex: 1, color: colors.text }]}
             placeholder="Email"
@@ -584,7 +648,7 @@ export default function Auth() {
 
         {!showForgotPassword && (
           <View style={[styles.passwordContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Lock size={20} color="#1ea2b1" style={styles.inputIcon} />
+            <Lock size={isDesktop ? 18 : 20} color="#1ea2b1" style={styles.inputIcon} />
             <TextInput
               style={[styles.input, { flex: 1, color: colors.text }]}
               placeholder="Password"
@@ -597,9 +661,9 @@ export default function Auth() {
               onPress={() => setPasswordVisible(!passwordVisible)}
             >
               {passwordVisible ? (
-                <EyeOff size={24} color={colors.text} />
+                <EyeOff size={isDesktop ? 20 : 24} color={colors.text} />
               ) : (
-                <Eye size={24} color={colors.text} />
+                <Eye size={isDesktop ? 20 : 24} color={colors.text} />
               )}
             </TouchableOpacity>
           </View>
@@ -684,7 +748,13 @@ export default function Auth() {
             {isLogin ? 'Continue with' : 'Sign up with'}
           </Text>
           
-          <View style={styles.socialButtonsRow}>
+          <View style={[
+            styles.socialButtonsRow,
+            { 
+              flexDirection: layoutConfig.socialButtonsDirection,
+              gap: layoutConfig.socialButtonsGap,
+            }
+          ]}>
             <TouchableOpacity
               style={[styles.socialButton, { backgroundColor: colors.card }]}
               onPress={handleGoogleSignIn}
@@ -770,146 +840,144 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    padding: scale(20),
+    padding: isDesktop ? 32 : scale(20),
     justifyContent: 'center',
     minHeight: '100%',
+    width: '100%',
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: scale(30),
+    marginBottom: isDesktop ? 20 : scale(30),
   },
   logo: {
-    width: scale(150),
-    height: scale(150),
+    width: isDesktop ? 120 : scale(150),
+    height: isDesktop ? 120 : scale(150),
   },
   logoText: {
-    fontSize: scale(48),
+    fontSize: isDesktop ? 36 : scale(48),
     fontWeight: 'bold',
     color: '#1ea2b1',
-    marginBottom: scale(8),
+    marginBottom: isDesktop ? 8 : scale(8),
     textAlign: 'center',
   },
   header: {
-    marginBottom: scale(20),
+    marginBottom: isDesktop ? 16 : scale(20),
   },
   title: {
-    fontSize: scale(20),
+    fontSize: isDesktop ? 20 : scale(20),
     fontWeight: 'bold',
-    marginBottom: scale(20),
+    marginBottom: isDesktop ? 16 : scale(20),
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: scale(16),
+    fontSize: isDesktop ? 14 : scale(16),
     textAlign: 'center',
     opacity: 0.8,
-    marginBottom: scale(10),
+    marginBottom: isDesktop ? 8 : scale(10),
   },
   form: {
-    gap: scale(15),
+    gap: isDesktop ? 12 : scale(15),
   },
   button: {
-    padding: scale(15),
-    borderRadius: scale(10),
+    padding: isDesktop ? 12 : scale(15),
+    borderRadius: isDesktop ? 8 : scale(10),
     alignItems: 'center',
-    marginTop: scale(10),
+    marginTop: isDesktop ? 8 : scale(10),
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
     color: 'white',
-    fontSize: scale(16),
+    fontSize: isDesktop ? 14 : scale(16),
     fontWeight: 'bold',
   },
   switchButton: {
-    marginTop: scale(20),
+    marginTop: isDesktop ? 16 : scale(20),
     alignItems: 'center',
   },
   switchText: {
-    fontSize: scale(14),
+    fontSize: isDesktop ? 13 : scale(14),
   },
   switchActionText: {
     fontWeight: 'bold',
   },
   footer: {
-    marginTop: scale(20),
+    marginTop: isDesktop ? 16 : scale(20),
     alignItems: 'center',
   },
   footerText: {
-    fontSize: scale(12),
+    fontSize: isDesktop ? 11 : scale(12),
     opacity: 0.6,
   },
   emailContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: scale(12),
-    marginBottom: scale(10),
-    paddingHorizontal: scale(16),
+    borderRadius: isDesktop ? 10 : scale(12),
+    marginBottom: isDesktop ? 8 : scale(10),
+    paddingHorizontal: isDesktop ? 14 : scale(16),
     borderWidth: 1,
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: scale(12),
-    marginBottom: scale(10),
-    paddingHorizontal: scale(16),
+    borderRadius: isDesktop ? 10 : scale(12),
+    marginBottom: isDesktop ? 8 : scale(10),
+    paddingHorizontal: isDesktop ? 14 : scale(16),
     borderWidth: 1,
   },
   input: {
-    padding: scale(15),
-    fontSize: scale(16),
-    borderRadius: scale(10),
-    margin: scale(5),
+    padding: isDesktop ? 12 : scale(15),
+    fontSize: isDesktop ? 14 : scale(16),
+    borderRadius: isDesktop ? 8 : scale(10),
+    margin: isDesktop ? 4 : scale(5),
   },
   otpInput: {
-    padding: scale(15),
-    fontSize: scale(18),
+    padding: isDesktop ? 12 : scale(15),
+    fontSize: isDesktop ? 16 : scale(18),
     textAlign: 'center',
-    borderRadius: scale(10),
+    borderRadius: isDesktop ? 8 : scale(10),
     borderWidth: 1,
-    marginBottom: scale(20),
+    marginBottom: isDesktop ? 16 : scale(20),
   },
   inputIcon: {
-    marginRight: scale(12),
+    marginRight: isDesktop ? 10 : scale(12),
   },
   forgotPasswordButton: {
     alignSelf: 'flex-end',
   },
   forgotPasswordText: {
-    fontSize: scale(14),
+    fontSize: isDesktop ? 13 : scale(14),
   },
   sectionLabel: {
-    fontSize: scale(16),
+    fontSize: isDesktop ? 14 : scale(16),
     fontWeight: '500',
-    marginBottom: scale(8),
+    marginBottom: isDesktop ? 6 : scale(8),
   },
   optionsRow: {
-    flexDirection: isTablet ? 'row' : 'column',
-    justifyContent: 'space-between',
-    marginBottom: scale(20),
-    gap: scale(15),
+    marginBottom: isDesktop ? 16 : scale(20),
+    gap: isDesktop ? 12 : scale(15),
   },
   optionsColumn: {
-    width: isTablet ? '48%' : '100%',
   },
   optionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: scale(8),
+    gap: isDesktop ? 6 : scale(8),
   },
   optionButton: {
-    borderRadius: scale(20),
-    paddingHorizontal: scale(12),
-    paddingVertical: scale(8),
+    borderRadius: isDesktop ? 16 : scale(20),
+    paddingHorizontal: isDesktop ? 10 : scale(12),
+    paddingVertical: isDesktop ? 6 : scale(8),
     borderWidth: 1,
-    marginBottom: scale(8),
+    marginBottom: isDesktop ? 6 : scale(8),
   },
   optionButtonActive: {
     backgroundColor: '#1ea2b1',
     borderColor: '#1ea2b1',
   },
   optionText: {
-    fontSize: scale(14),
+    fontSize: isDesktop ? 12 : scale(14),
     fontWeight: '500',
   },
   optionTextActive: {
@@ -917,34 +985,32 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     backgroundColor: '#FFEBEE',
-    padding: scale(15),
-    borderRadius: scale(8),
-    marginBottom: scale(20),
+    padding: isDesktop ? 12 : scale(15),
+    borderRadius: isDesktop ? 6 : scale(8),
+    marginBottom: isDesktop ? 16 : scale(20),
     borderLeftWidth: 4,
     borderLeftColor: '#F44336',
   },
   errorText: {
     color: '#D32F2F',
-    fontSize: scale(14),
+    fontSize: isDesktop ? 13 : scale(14),
   },
   socialLoginContainer: {
-    marginTop: scale(30),
+    marginTop: isDesktop ? 24 : scale(30),
     alignItems: 'center',
   },
   socialLoginText: {
-    fontSize: scale(14),
-    marginBottom: scale(15),
+    fontSize: isDesktop ? 13 : scale(14),
+    marginBottom: isDesktop ? 12 : scale(15),
     color: '#666',
   },
   socialButtonsRow: {
-    flexDirection: 'row',
     justifyContent: 'center',
-    gap: scale(20),
   },
   socialButton: {
-    width: scale(50),
-    height: scale(50),
-    borderRadius: scale(25),
+    width: isDesktop ? 45 : scale(50),
+    height: isDesktop ? 45 : scale(50),
+    borderRadius: isDesktop ? 22 : scale(25),
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 3,
@@ -954,8 +1020,8 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   socialIcon: {
-    width: scale(24),
-    height: scale(24),
+    width: isDesktop ? 20 : scale(24),
+    height: isDesktop ? 20 : scale(24),
   },
   socialButtonLoading: {
     position: 'absolute',
@@ -964,53 +1030,53 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(255,255,255,0.8)',
-    borderRadius: scale(25),
+    borderRadius: isDesktop ? 22 : scale(25),
     justifyContent: 'center',
     alignItems: 'center',
   },
   socialButtonLoadingText: {
-    fontSize: scale(16),
+    fontSize: isDesktop ? 14 : scale(16),
     fontWeight: 'bold',
     color: '#1ea2b1',
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: scale(20),
+    marginBottom: isDesktop ? 16 : scale(20),
   },
   backText: {
-    fontSize: scale(16),
-    marginLeft: scale(8),
+    fontSize: isDesktop ? 14 : scale(16),
+    marginLeft: isDesktop ? 6 : scale(8),
   },
   resendButton: {
-    padding: scale(10),
+    padding: isDesktop ? 8 : scale(10),
     alignItems: 'center',
   },
   resendText: {
-    fontSize: scale(14),
+    fontSize: isDesktop ? 13 : scale(14),
     fontWeight: '500',
   },
   // Checkbox Styles
   checkboxesContainer: {
-    marginBottom: scale(10),
+    marginBottom: isDesktop ? 8 : scale(10),
   },
   agreementTitle: {
-    fontSize: scale(16),
+    fontSize: isDesktop ? 14 : scale(16),
     fontWeight: '600',
-    marginBottom: scale(12),
+    marginBottom: isDesktop ? 10 : scale(12),
   },
   checkboxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: scale(12),
-    paddingVertical: scale(4),
+    marginBottom: isDesktop ? 10 : scale(12),
+    paddingVertical: isDesktop ? 3 : scale(4),
   },
   checkbox: {
-    width: scale(20),
-    height: scale(20),
-    borderRadius: scale(4),
+    width: isDesktop ? 18 : scale(20),
+    height: isDesktop ? 18 : scale(20),
+    borderRadius: isDesktop ? 3 : scale(4),
     borderWidth: 2,
-    marginRight: scale(12),
+    marginRight: isDesktop ? 10 : scale(12),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1019,7 +1085,7 @@ const styles = StyleSheet.create({
     borderColor: '#1ea2b1',
   },
   checkboxLabel: {
-    fontSize: scale(14),
+    fontSize: isDesktop ? 13 : scale(14),
     flex: 1,
     flexWrap: 'wrap',
   },

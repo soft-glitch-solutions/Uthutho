@@ -26,30 +26,37 @@ const isTablet = width >= 768;
 const isDesktop = width >= 1024;
 const isLargeDesktop = width >= 1440;
 
-// Enhanced scaling for all screen sizes
+// Much more conservative scaling for desktop
 const scale = (size: number) => {
+  if (isDesktop) {
+    // For desktop, use minimal scaling - treat it like a large mobile screen
+    return Math.min(size * (width / 375), size * 1.2);
+  }
+  
   const baseWidth = 375;
   let scaleFactor = 1;
   
   if (isTinyScreen) scaleFactor = 0.8;
   else if (isVerySmallScreen) scaleFactor = 0.9;
-  else if (isTablet) scaleFactor = 1.2;
-  else if (isDesktop) scaleFactor = 1.4;
-  else if (isLargeDesktop) scaleFactor = 1.6;
+  else if (isSmallScreen) scaleFactor = 1;
+  else if (isTablet) scaleFactor = 1.1;
   
   return (width / baseWidth) * size * scaleFactor;
 };
 
 const verticalScale = (size: number) => {
+  if (isDesktop) {
+    // Minimal vertical scaling for desktop
+    return Math.min(size * (height / 667), size * 1.1);
+  }
+  
   const baseHeight = 667;
   let scaleFactor = 1;
   
   if (isTinyScreen) scaleFactor = 0.7;
   else if (isVerySmallScreen) scaleFactor = 0.8;
   else if (isSmallScreen) scaleFactor = 0.9;
-  else if (isTablet) scaleFactor = 1.1;
-  else if (isDesktop) scaleFactor = 1.2;
-  else if (isLargeDesktop) scaleFactor = 1.3;
+  else if (isTablet) scaleFactor = 1;
   
   return (height / baseHeight) * size * scaleFactor;
 };
@@ -107,7 +114,7 @@ const BACKGROUND_COLOR = '#000000';
 
 // Fallback component for when animations fail to load
 const AnimationFallback = ({ icon: Icon, size = 200 }) => {
-  const scaledSize = scale(size);
+  const scaledSize = isDesktop ? Math.min(size, 180) : scale(size);
   return (
     <View style={[styles.fallbackContainer, { width: scaledSize, height: scaledSize }]}>
       <Icon size={scaledSize * 0.6} color={BRAND_COLOR} />
@@ -206,50 +213,89 @@ export default function Onboarding() {
   const slides = getSlideConfig();
   const isMobile = Platform.OS !== 'web';
 
-  // Calculate max content width for desktop
-  const maxContentWidth = isDesktop ? 600 : isTablet ? 500 : '100%';
+  // Reasonable max content width
+  const maxContentWidth = isLargeDesktop ? 1000 : isDesktop ? 900 : isTablet ? 700 : '100%';
 
-  // Calculate dynamic heights based on screen size
+  // Conservative heights for desktop
   const getDynamicHeights = () => {
     if (isTinyScreen) {
       return {
         headerHeight: verticalScale(35),
         animationHeight: verticalScale(120),
         textMarginBottom: verticalScale(10),
-        footerMarginTop: verticalScale(5)
+        footerMarginTop: verticalScale(5),
+        contentPaddingTop: verticalScale(10),
+        contentPaddingBottom: verticalScale(5),
       };
     } else if (isVerySmallScreen) {
       return {
         headerHeight: verticalScale(40),
         animationHeight: verticalScale(140),
         textMarginBottom: verticalScale(15),
-        footerMarginTop: verticalScale(10)
+        footerMarginTop: verticalScale(10),
+        contentPaddingTop: verticalScale(15),
+        contentPaddingBottom: verticalScale(10),
       };
     } else if (isSmallScreen) {
       return {
         headerHeight: verticalScale(45),
         animationHeight: verticalScale(160),
         textMarginBottom: verticalScale(20),
-        footerMarginTop: verticalScale(15)
+        footerMarginTop: verticalScale(15),
+        contentPaddingTop: verticalScale(20),
+        contentPaddingBottom: verticalScale(15),
       };
     } else if (isTablet) {
       return {
         headerHeight: verticalScale(50),
-        animationHeight: verticalScale(220),
+        animationHeight: verticalScale(200),
         textMarginBottom: verticalScale(25),
-        footerMarginTop: verticalScale(20)
+        footerMarginTop: verticalScale(20),
+        contentPaddingTop: verticalScale(25),
+        contentPaddingBottom: verticalScale(20),
       };
     } else {
+      // Desktop - keep it compact
       return {
-        headerHeight: verticalScale(55),
-        animationHeight: verticalScale(250),
-        textMarginBottom: verticalScale(30),
-        footerMarginTop: verticalScale(25)
+        headerHeight: 50,
+        animationHeight: 200,
+        textMarginBottom: 25,
+        footerMarginTop: 20,
+        contentPaddingTop: 30,
+        contentPaddingBottom: 20,
       };
     }
   };
 
   const dynamicHeights = getDynamicHeights();
+
+  // Desktop layout with proper proportions
+  const getLayoutConfig = () => {
+    if (isDesktop) {
+      return {
+        contentFlexDirection: 'row',
+        contentJustifyContent: 'space-between',
+        contentAlignItems: 'center',
+        animationWidth: '40%',
+        textWidth: '55%',
+        textAlign: 'left',
+        animationMaxWidth: 300,
+        textMaxWidth: 500,
+      };
+    }
+    return {
+      contentFlexDirection: 'column',
+      contentJustifyContent: 'center',
+      contentAlignItems: 'center',
+      animationWidth: isTablet ? '60%' : isTinyScreen ? '60%' : isVerySmallScreen ? '70%' : '80%',
+      textWidth: '100%',
+      textAlign: 'center',
+      animationMaxWidth: isTablet ? 320 : 280,
+      textMaxWidth: '100%',
+    };
+  };
+
+  const layoutConfig = getLayoutConfig();
 
   // Prevent double tap zoom
   const handleDoubleTapProtection = () => {
@@ -478,7 +524,14 @@ export default function Onboarding() {
         onStartShouldSetResponder={() => true}
       >
         <View 
-          style={[styles.content, { maxWidth: maxContentWidth }]} 
+          style={[
+            styles.content, 
+            { 
+              maxWidth: maxContentWidth,
+              paddingTop: dynamicHeights.contentPaddingTop,
+              paddingBottom: dynamicHeights.contentPaddingBottom,
+            }
+          ]} 
           {...panResponder.panHandlers}
           onStartShouldSetResponder={() => true}
           onResponderTerminationRequest={() => false}
@@ -493,7 +546,7 @@ export default function Onboarding() {
                 hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                 delayPressIn={0}
               >
-                <ChevronLeft size={scale(24)} color={BRAND_COLOR} />
+                <ChevronLeft size={isDesktop ? 20 : scale(24)} color={BRAND_COLOR} />
               </TouchableOpacity>
             ) : (
               <View style={styles.placeholder} />
@@ -515,11 +568,26 @@ export default function Onboarding() {
 
           {/* Main Content with Slide Animation */}
           <Animated.View 
-            style={[styles.mainContent, slideStyle]}
+            style={[
+              styles.mainContent, 
+              slideStyle,
+              {
+                flexDirection: layoutConfig.contentFlexDirection,
+                justifyContent: layoutConfig.contentJustifyContent,
+                alignItems: layoutConfig.contentAlignItems,
+              }
+            ]}
             onStartShouldSetResponder={() => true}
           >
             {/* Animation */}
-            <View style={[styles.animationContainer, { height: dynamicHeights.animationHeight }]}>
+            <View style={[
+              styles.animationContainer, 
+              { 
+                height: dynamicHeights.animationHeight,
+                width: layoutConfig.animationWidth,
+                maxWidth: layoutConfig.animationMaxWidth,
+              }
+            ]}>
               <SafeAnimation
                 slide={currentItem}
                 style={styles.animation}
@@ -530,10 +598,32 @@ export default function Onboarding() {
             </View>
 
             {/* Text Content */}
-            <View style={[styles.textContainer, { marginBottom: dynamicHeights.textMarginBottom }]}>
-              <Text style={styles.title}>{currentItem.title}</Text>
-              <Text style={styles.subtitle}>{currentItem.subtitle}</Text>
-              <Text style={styles.description}>{currentItem.description}</Text>
+            <View style={[
+              styles.textContainer, 
+              { 
+                marginBottom: dynamicHeights.textMarginBottom,
+                width: layoutConfig.textWidth,
+                maxWidth: layoutConfig.textMaxWidth,
+              }
+            ]}>
+              <Text style={[
+                styles.title,
+                { textAlign: layoutConfig.textAlign }
+              ]}>
+                {currentItem.title}
+              </Text>
+              <Text style={[
+                styles.subtitle,
+                { textAlign: layoutConfig.textAlign }
+              ]}>
+                {currentItem.subtitle}
+              </Text>
+              <Text style={[
+                styles.description,
+                { textAlign: layoutConfig.textAlign }
+              ]}>
+                {currentItem.description}
+              </Text>
             </View>
           </Animated.View>
 
@@ -548,7 +638,7 @@ export default function Onboarding() {
                     styles.dot,
                     {
                       backgroundColor: index === currentSlide ? BRAND_COLOR : 'rgba(30, 162, 177, 0.3)',
-                      width: index === currentSlide ? scale(20) : scale(6),
+                      width: index === currentSlide ? (isDesktop ? 16 : scale(20)) : (isDesktop ? 6 : scale(6)),
                     },
                   ]}
                 />
@@ -570,7 +660,7 @@ export default function Onboarding() {
               <Text style={styles.buttonText}>
                 {currentSlide === slides.length - 1 ? 'Get Started' : 'Next'}
               </Text>
-              <ArrowRight size={scale(18)} color="white" />
+              <ArrowRight size={isDesktop ? 16 : scale(18)} color="white" />
             </TouchableOpacity>
           </View>
 
@@ -635,135 +725,120 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: isDesktop ? scale(40) : isTablet ? scale(32) : scale(16),
-    paddingTop: verticalScale(20), // Reduced top padding
-    paddingBottom: verticalScale(10), // Reduced bottom padding
+    paddingHorizontal: isLargeDesktop ? 40 : isDesktop ? 32 : isTablet ? scale(24) : scale(16),
     alignSelf: 'center',
     width: '100%',
-    justifyContent: 'space-between', // Better distribution of space
+    justifyContent: 'space-between',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: verticalScale(5), // Reduced margin
+    marginBottom: verticalScale(5),
     minHeight: verticalScale(30),
   },
   backButton: {
-    padding: scale(8),
+    padding: isDesktop ? 8 : scale(8),
     opacity: 0.9,
   },
   placeholder: {
-    width: scale(32),
-    height: scale(32),
+    width: isDesktop ? 32 : scale(32),
+    height: isDesktop ? 32 : scale(32),
   },
   skipButton: {
-    padding: scale(8),
+    padding: isDesktop ? 8 : scale(8),
   },
   skipText: {
-    fontSize: scale(14),
+    fontSize: isDesktop ? 14 : scale(14),
     fontWeight: '600',
     color: BRAND_COLOR,
     opacity: 0.9,
   },
   mainContent: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    // Removed negative margins that were causing issues
+    width: '100%',
   },
   animationContainer: {
-    width: isDesktop ? '50%' : isTablet ? '60%' : isTinyScreen ? '60%' : isVerySmallScreen ? '70%' : '80%',
-    maxWidth: isDesktop ? scale(400) : isTablet ? scale(320) : scale(280),
     justifyContent: 'center',
     alignItems: 'center',
-    // Height is now dynamic via props
   },
   animation: {
     width: '100%',
     height: '100%',
   },
   textContainer: {
-    alignItems: 'center',
-    paddingHorizontal: isDesktop ? scale(40) : isTablet ? scale(24) : scale(12),
-    width: '100%',
-    // Margin bottom is now dynamic via props
+    justifyContent: 'center',
   },
   title: {
-    fontSize: isDesktop ? scale(36) : isTablet ? scale(32) : isTinyScreen ? scale(22) : isVerySmallScreen ? scale(26) : scale(30),
+    fontSize: isDesktop ? 24 : isTablet ? scale(26) : isTinyScreen ? scale(20) : isVerySmallScreen ? scale(22) : scale(24),
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: verticalScale(8),
+    marginBottom: isDesktop ? 8 : verticalScale(8),
     letterSpacing: -0.5,
     color: '#ffffff',
-    lineHeight: isDesktop ? scale(42) : isTablet ? scale(38) : isTinyScreen ? scale(26) : isVerySmallScreen ? scale(30) : scale(36),
+    lineHeight: isDesktop ? 30 : isTablet ? scale(32) : isTinyScreen ? scale(24) : isVerySmallScreen ? scale(26) : scale(30),
   },
   subtitle: {
-    fontSize: isDesktop ? scale(20) : isTablet ? scale(18) : isTinyScreen ? scale(14) : isVerySmallScreen ? scale(16) : scale(18),
-    textAlign: 'center',
-    marginBottom: isDesktop ? verticalScale(16) : isTablet ? verticalScale(14) : verticalScale(12),
+    fontSize: isDesktop ? 14 : isTablet ? scale(15) : isTinyScreen ? scale(12) : isVerySmallScreen ? scale(13) : scale(14),
+    marginBottom: isDesktop ? 12 : isTablet ? verticalScale(14) : verticalScale(12),
     fontWeight: '600',
     color: BRAND_COLOR,
     opacity: 0.9,
-    lineHeight: isDesktop ? scale(24) : isTablet ? scale(22) : isTinyScreen ? scale(18) : isVerySmallScreen ? scale(20) : scale(22),
+    lineHeight: isDesktop ? 18 : isTablet ? scale(19) : isTinyScreen ? scale(16) : isVerySmallScreen ? scale(17) : scale(18),
   },
   description: {
-    fontSize: isDesktop ? scale(16) : isTablet ? scale(15) : isTinyScreen ? scale(12) : isVerySmallScreen ? scale(13) : scale(15),
-    textAlign: 'center',
-    lineHeight: isDesktop ? scale(24) : isTablet ? scale(22) : isTinyScreen ? scale(16) : isVerySmallScreen ? scale(18) : scale(20),
+    fontSize: isDesktop ? 13 : isTablet ? scale(13) : isTinyScreen ? scale(11) : isVerySmallScreen ? scale(12) : scale(13),
+    lineHeight: isDesktop ? 18 : isTablet ? scale(19) : isTinyScreen ? scale(15) : isVerySmallScreen ? scale(16) : scale(18),
     color: '#ffffff',
     opacity: 0.7,
-    maxWidth: isDesktop ? '80%' : isTablet ? '90%' : '95%',
   },
   footer: {
     alignItems: 'center',
-    // Margin top is now dynamic via props
-    paddingBottom: verticalScale(5), // Reduced padding
+    paddingBottom: isDesktop ? 5 : verticalScale(5),
   },
   pagination: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: isDesktop ? verticalScale(20) : isTablet ? verticalScale(15) : isTinyScreen ? verticalScale(10) : verticalScale(15),
-    height: verticalScale(12), // Reduced height
+    marginBottom: isDesktop ? 15 : isTablet ? verticalScale(15) : isTinyScreen ? verticalScale(10) : verticalScale(15),
+    height: isDesktop ? 12 : verticalScale(12),
   },
   dot: {
-    height: scale(6),
-    borderRadius: scale(3),
-    marginHorizontal: scale(4),
+    height: isDesktop ? 6 : scale(6),
+    borderRadius: isDesktop ? 3 : scale(3),
+    marginHorizontal: isDesktop ? 4 : scale(4),
     transition: 'all 0.3s ease',
   },
   button: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: isDesktop ? scale(40) : isTablet ? scale(36) : scale(32),
-    paddingVertical: isDesktop ? verticalScale(16) : isTablet ? verticalScale(14) : verticalScale(12), // Reduced padding
-    borderRadius: scale(20),
+    paddingHorizontal: isDesktop ? 24 : isTablet ? scale(28) : scale(24),
+    paddingVertical: isDesktop ? 12 : isTablet ? verticalScale(12) : verticalScale(10),
+    borderRadius: isDesktop ? 16 : scale(16),
     backgroundColor: BRAND_COLOR,
     shadowColor: BRAND_COLOR,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-    minWidth: isDesktop ? scale(160) : isTablet ? scale(150) : scale(140),
-    minHeight: isDesktop ? verticalScale(52) : isTablet ? verticalScale(48) : verticalScale(44), // Reduced height
+    shadowRadius: 4,
+    elevation: 3,
+    minWidth: isDesktop ? 120 : isTablet ? scale(130) : scale(120),
+    minHeight: isDesktop ? 40 : isTablet ? verticalScale(40) : verticalScale(36),
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
     color: 'white',
-    fontSize: isDesktop ? scale(18) : isTablet ? scale(17) : scale(16),
+    fontSize: isDesktop ? 14 : isTablet ? scale(15) : scale(14),
     fontWeight: 'bold',
-    marginRight: scale(6),
+    marginRight: isDesktop ? 6 : scale(6),
   },
   credit: {
     alignItems: 'center',
-    marginTop: verticalScale(5), // Reduced margin
+    marginTop: isDesktop ? 5 : verticalScale(5),
   },
   creditText: {
-    fontSize: scale(10),
+    fontSize: isDesktop ? 10 : scale(10),
     color: BRAND_COLOR,
     opacity: 0.5,
   },
@@ -771,6 +846,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(30, 162, 177, 0.1)',
-    borderRadius: scale(80),
+    borderRadius: isDesktop ? 40 : scale(80),
   },
 });
