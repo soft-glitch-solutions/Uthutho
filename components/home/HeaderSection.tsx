@@ -5,6 +5,10 @@ import { Search } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import HeaderSkeleton from './skeletons/HeaderSkeleton';
 import { useTranslation } from '@/hook/useTranslation';
+import { Dimensions } from 'react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 interface HeaderSectionProps {
   isProfileLoading: boolean;
@@ -21,21 +25,26 @@ const HeaderSection = ({ isProfileLoading, userProfile, colors }: HeaderSectionP
   }
 
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, isDesktop && styles.headerDesktop]}>
       <View>
-        <View style={styles.firstRow}>
+        <View style={[styles.firstRow, isDesktop && styles.firstRowDesktop]}>
           <Pressable onPress={() => router.push('/profile')}>
-            <Text style={[styles.title, { color: colors.text }]}>
+            <Text style={[styles.title, { color: colors.text }, isDesktop && styles.titleDesktop]}>
               {t('greeting')}, {userProfile?.first_name || 'User'}
             </Text>
-            <Text style={styles.subGreeting}>{t('ready_journey')}</Text>
+            <Text style={[styles.subGreeting, isDesktop && styles.subGreetingDesktop]}>
+              {t('ready_journey')}
+            </Text>
           </Pressable>
-          <Pressable onPress={() => router.push('/favorites')} style={styles.addButton}>
-            <Search size={24} color={colors.text} />
+          <Pressable 
+            onPress={() => router.push('/favorites')} 
+            style={[styles.addButton, isDesktop && styles.addButtonDesktop]}
+          >
+            <Search size={isDesktop ? 20 : 24} color={colors.text} />
           </Pressable>
         </View>
         {userProfile?.selected_title && (
-          <Text style={[styles.selectedTitle, { color: colors.primary }]}>
+          <Text style={[styles.selectedTitle, { color: colors.primary }, isDesktop && styles.selectedTitleDesktop]}>
             {userProfile.selected_title}
           </Text>
         )}
@@ -47,28 +56,47 @@ const HeaderSection = ({ isProfileLoading, userProfile, colors }: HeaderSectionP
 const styles = {
   header: {
     marginBottom: 20,
+    paddingTop: 60,
+  },
+  headerDesktop: {
+    marginBottom: 16,
   },
   firstRow: {
     flexDirection: 'row' as 'row',
     alignItems: 'center' as 'center',
     justifyContent: 'space-between' as 'space-between',
   },
+  firstRowDesktop: {
+    alignItems: 'flex-start' as 'flex-start',
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold' as 'bold',
+  },
+  titleDesktop: {
+    fontSize: 20,
   },
   selectedTitle: {
     fontSize: 16,
     fontStyle: 'italic' as 'italic',
     marginTop: 4,
   },
+  selectedTitleDesktop: {
+    fontSize: 14,
+  },
   addButton: {
     padding: 8,
+  },
+  addButtonDesktop: {
+    padding: 6,
   },
   subGreeting: {
     fontSize: 16,
     color: '#cccccc',
     marginTop: 4,
+  },
+  subGreetingDesktop: {
+    fontSize: 14,
   },
 };
 

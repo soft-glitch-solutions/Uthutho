@@ -1,137 +1,83 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
-import { Flag, MapPin } from 'lucide-react-native';
+import { View, Text, Dimensions, StyleSheet } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
-import StopBlock from '@/components/stop/StopBlock';
-import HubFollowButton from '@/components/hub/HubFollowButton'; // Updated import
+import InteractiveNearbyMap from './InteractiveNearbyMap';
+import NearbyCards from './NearbyCards';
 import NearestLocationsSkeleton from './skeletons/NearestLocationsSkeleton';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 interface NearbySectionProps {
   locationError: string | null;
   isNearestLoading: boolean;
-  userLocation: any;
-  nearestLocations: any;
-  colors: any;
+  userLocation: {
+    lat: number;
+    lng: number;
+  } | null;
+  nearestLocations: {
+    nearestStop: any;
+    nearestHub: any;
+  } | null;
   handleNearestStopPress: (stopId: string) => void;
   handleNearestHubPress: (hubId: string) => void;
   calculateWalkingTime: (lat1: number, lng1: number, lat2: number, lng2: number) => number;
+  hasActiveJourney: boolean;
+  onMarkAsWaiting: (locationId: string, locationType: string, locationName: string) => void;
 }
 
-const NearbySection = ({
-  locationError,
-  isNearestLoading,
-  userLocation,
-  nearestLocations,
-  colors,
-  handleNearestStopPress,
-  handleNearestHubPress,
-  calculateWalkingTime
-}: NearbySectionProps) => {
+const NearbySection: React.FC<NearbySectionProps> = (props) => {
+  const { colors } = useTheme();
+  const { 
+    locationError, 
+    isNearestLoading, 
+    userLocation 
+  } = props;
+
   return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Nearby You</Text>
+    <View style={[styles.section, isDesktop && styles.sectionDesktop]}>
+      <Text style={[styles.sectionTitle, { color: colors.text }, isDesktop && styles.sectionTitleDesktop]}>
+        Nearby You
+      </Text>
+      
       {locationError ? (
         <View style={[styles.card, { backgroundColor: colors.card }]}>
-          <Text style={[styles.errorText, { color: colors.error }]}>{locationError}</Text>
+          <Text style={[styles.errorText, { color: colors.error || '#ef4444' }]}>{locationError}</Text>
         </View>
       ) : isNearestLoading || !userLocation ? (
         <NearestLocationsSkeleton colors={colors} />
+      ) : isDesktop ? (
+        <InteractiveNearbyMap
+          userLocation={userLocation}
+          nearestLocations={props.nearestLocations}
+          calculateWalkingTime={props.calculateWalkingTime}
+          handleNearestStopPress={props.handleNearestStopPress}
+          handleNearestHubPress={props.handleNearestHubPress}
+        />
       ) : (
-        <View style={styles.grid}>
-          {/* Nearest Stop Card */}
-          <Pressable
-            style={[styles.card, { backgroundColor: colors.primary }]}
-            onPress={() => nearestLocations?.nearestStop && handleNearestStopPress(nearestLocations.nearestStop.id)}
-          >
-            <View style={styles.favoriteItem}>
-              <Flag size={24} color={colors.text} />
-              <Text style={[styles.cardTitle, { color: colors.text, marginLeft: 8 }]}>Nearest Stop</Text>
-            </View>
-            {nearestLocations?.nearestStop ? (
-              <>
-                <Text style={[styles.cardText, { color: colors.text }]}>
-                  {nearestLocations.nearestStop.name}
-                </Text>
-                <Text style={[styles.distanceText, { color: colors.text }]}>
-                  {calculateWalkingTime(
-                    userLocation.lat,
-                    userLocation.lng,
-                    nearestLocations.nearestStop.latitude,
-                    nearestLocations.nearestStop.longitude
-                  )} min walk
-                </Text>
-                <StopBlock
-                  stopId={nearestLocations.nearestStop.id}
-                  stopName={nearestLocations.nearestStop.name}
-                  stopLocation={{
-                    latitude: nearestLocations.nearestStop.latitude,
-                    longitude: nearestLocations.nearestStop.longitude,
-                  }}
-                  colors={colors}
-                  radius={0.5}
-                />
-              </>
-            ) : (
-              <Text style={[styles.emptyText, { color: colors.text }]}>No stops found.</Text>
-            )}
-          </Pressable>
-
-          {/* Nearest Hub Card */}
-          <Pressable
-            style={[styles.card, { backgroundColor: colors.primary }]}
-            onPress={() => nearestLocations?.nearestHub && handleNearestHubPress(nearestLocations.nearestHub.id)}
-          >
-            <View style={styles.favoriteItem}>
-              <MapPin size={24} color={colors.text} />
-              <Text style={[styles.cardTitle, { color: colors.text, marginLeft: 8 }]}>Nearest Hub</Text>
-            </View>
-            {nearestLocations?.nearestHub ? (
-              <>
-                <Text style={[styles.cardText, { color: colors.text }]}>
-                  {nearestLocations.nearestHub.name}
-                </Text>
-                <Text style={[styles.distanceText, { color: colors.text }]}>
-                  {calculateWalkingTime(
-                    userLocation.lat,
-                    userLocation.lng,
-                    nearestLocations.nearestHub.latitude,
-                    nearestLocations.nearestHub.longitude
-                  )} min walk
-                </Text>
-                
-                {/* Simple Follow Button */}
-                <HubFollowButton
-                  hubId={nearestLocations.nearestHub.id}
-                  hubName={nearestLocations.nearestHub.name}
-                  colors={colors}
-                />
-              </>
-            ) : (
-              <Text style={[styles.emptyText, { color: colors.text }]}>No hubs found.</Text>
-            )}
-          </Pressable>
-        </View>
+        <NearbyCards {...props} />
       )}
     </View>
   );
 };
 
-const styles = {
+const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
+  sectionDesktop: {
+    marginBottom: 20,
+  },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold' as 'bold',
+    fontWeight: 'bold',
     marginBottom: 12,
   },
-  grid: {
-    flexDirection: 'row' as 'row',
-    flexWrap: 'wrap' as 'wrap',
-    gap: 12,
+  sectionTitleDesktop: {
+    fontSize: 16,
+    marginBottom: 10,
   },
   card: {
-    flex: 1,
     borderRadius: 8,
     padding: 16,
     shadowColor: '#000',
@@ -139,29 +85,10 @@ const styles = {
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    minWidth: '48%',
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold' as 'bold',
-    marginBottom: 8,
-  },
-  cardText: {
-    fontSize: 14,
-  },
-  distanceText: {
-    fontSize: 12,
-  },
-  emptyText: {
-    fontSize: 14,
   },
   errorText: {
     fontSize: 14,
   },
-  favoriteItem: {
-    flexDirection: 'row' as 'row',
-    alignItems: 'center' as 'center',
-  },
-};
+});
 
 export default NearbySection;

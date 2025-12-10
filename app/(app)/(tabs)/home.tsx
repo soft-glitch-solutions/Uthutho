@@ -9,7 +9,8 @@ import {
   Platform,
   TouchableOpacity,
   Alert,
-  RefreshControl
+  RefreshControl,
+  Dimensions
 } from 'react-native';
 import { useRouter, useNavigation , useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -25,6 +26,9 @@ import GamificationSection from '@/components/home/GamificationSection';
 import ScreenTransition from '@/components/ScreenTransition';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import LottieView from 'lottie-react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 interface FavoriteItem {
   id: string;
@@ -66,13 +70,13 @@ const calculateWalkingTime = (lat1, lng1, lat2, lng2) => {
 const getIconForType = (type: string) => {
   switch (type) {
     case 'stop':
-      return <MapPin size={16} color="#1ea2b1" />;
+      return <MapPin size={isDesktop ? 14 : 16} color="#1ea2b1" />;
     case 'hub':
-      return <Navigation size={16} color="#1ea2b1" />;
+      return <Navigation size={isDesktop ? 14 : 16} color="#1ea2b1" />;
     case 'route':
-      return <Bus size={16} color="#1ea2b1" />;
+      return <Bus size={isDesktop ? 14 : 16} color="#1ea2b1" />;
     default:
-      return <MapPin size={16} color="#1ea2b1" />;
+      return <MapPin size={isDesktop ? 14 : 16} color="#1ea2b1" />;
   }
 };
 
@@ -634,27 +638,30 @@ useEffect(() => {
           />
         }
       >
-        <View style={styles.topHeader}>
-          <Pressable onPress={openSidebar} style={styles.logoContainer}>
-            <Image
-              source={require('../../../assets/uthutho-logo.png')}
-              style={styles.logo}
-            />
-            <Text style={[styles.uthuthoText, { color: colors.text }]}>Uthutho</Text>
-          </Pressable>
-          {isProfileLoading ? (
-            <View style={[styles.pointsContainer, { 
-              backgroundColor: colors.border,
-              width: 80,
-              height: 30,
-              borderRadius: 15
-            }]} />
-          ) : (
-            <View style={styles.pointsContainer}>
-              <Text style={[styles.pointsText, { color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
-            </View>
-          )}
-        </View>
+        {/* Only show top header on mobile */}
+        {!isDesktop && (
+          <View style={styles.topHeader}>
+            <Pressable onPress={openSidebar} style={styles.logoContainer}>
+              <Image
+                source={require('../../../assets/uthutho-logo.png')}
+                style={styles.logo}
+              />
+              <Text style={[styles.uthuthoText, { color: colors.text }]}>Uthutho</Text>
+            </Pressable>
+            {isProfileLoading ? (
+              <View style={[styles.pointsContainer, { 
+                backgroundColor: colors.border,
+                width: 80,
+                height: 30,
+                borderRadius: 15
+              }]} />
+            ) : (
+              <View style={styles.pointsContainer}>
+                <Text style={[styles.pointsText, { color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         <HeaderSection
           isProfileLoading={isProfileLoading}
@@ -664,33 +671,33 @@ useEffect(() => {
 
         {!journeyLoading && activeJourney && (
           <Pressable 
-            style={styles.journeyBanner}
+            style={[styles.journeyBanner, isDesktop && styles.journeyBannerDesktop]}
             onPress={() => router.push('/journey')}
           >
             <View style={styles.journeyBannerContent}>
               <View style={styles.journeyIcon}>
-                <Navigation size={20} color="#ffffff" />
+                <Navigation size={isDesktop ? 18 : 20} color="#ffffff" />
               </View>
               <View style={styles.journeyInfo}>
-                <Text style={styles.journeyTitle}>Active Journey</Text>
-                <Text style={styles.journeyRoute}>{activeJourney.routes.name}</Text>
-                <Text style={styles.journeyProgress}>
+                <Text style={[styles.journeyTitle, isDesktop && styles.journeyTitleDesktop]}>Active Journey</Text>
+                <Text style={[styles.journeyRoute, isDesktop && styles.journeyRouteDesktop]}>{activeJourney.routes.name}</Text>
+                <Text style={[styles.journeyProgress, isDesktop && styles.journeyProgressDesktop]}>
                   Stop {activeJourney.current_stop_sequence || 0} of {activeJourney.stops?.length || 0}
                 </Text>
               </View>
               <View style={styles.journeyStats}>
                 <View style={styles.journeyStatItem}>
-                  <Users size={14} color="#1ea2b1" />
-                  <Text style={styles.journeyStatText}>Live</Text>
+                  <Users size={isDesktop ? 12 : 14} color="#1ea2b1" />
+                  <Text style={[styles.journeyStatText, isDesktop && styles.journeyStatTextDesktop]}>Live</Text>
                 </View>
                 <View style={styles.journeyStatItem}>
-                  <Clock size={14} color="#1ea2b1" />
-                  <Text style={styles.journeyStatText}>Active</Text>
+                  <Clock size={isDesktop ? 12 : 14} color="#1ea2b1" />
+                  <Text style={[styles.journeyStatText, isDesktop && styles.journeyStatTextDesktop]}>Active</Text>
                 </View>
               </View>
             </View>
             <View style={styles.journeyArrow}>
-              <Text style={styles.journeyArrowText}>›</Text>
+              <Text style={[styles.journeyArrowText, isDesktop && styles.journeyArrowTextDesktop]}>›</Text>
             </View>
           </Pressable>
         )}
@@ -717,17 +724,17 @@ useEffect(() => {
             <CommunitySkeletonLoader colors={colors} />
           ) : favorites.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <FlyboxAnimation style={styles.lottieAnimation} />
+              <FlyboxAnimation style={[styles.lottieAnimation, isDesktop && styles.lottieAnimationDesktop]} />
               <Text style={[styles.emptyText, { color: colors.text}]}>
                 You haven't added any locations to your community yet.
               </Text>
-              <TouchableOpacity style={styles.addButton} onPress={() => router.push('/favorites')}>
-                <Plus size={20} color="#fff" />
-                <Text style={styles.addButtonText}>Add Community</Text>
+              <TouchableOpacity style={[styles.addButton, isDesktop && styles.addButtonDesktop]} onPress={() => router.push('/favorites')}>
+                <Plus size={isDesktop ? 18 : 20} color="#fff" />
+                <Text style={[styles.addButtonText, isDesktop && styles.addButtonTextDesktop]}>Add Community</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.communityList}>
+            <View style={[styles.communityList, isDesktop && styles.communityListDesktop]}>
               {favorites.map((favorite, index) => {
                 const details = favoriteDetails.find(detail => detail.id === favorite.id);
                 const type = details?.type || favorite.type;
@@ -771,7 +778,7 @@ useEffect(() => {
                             paddingHorizontal: 8,
                             paddingVertical: 2,
                           }}>
-                            <Text style={{ color: '#1ea2b1', fontSize: 12 }}>
+                            <Text style={{ color: '#1ea2b1', fontSize: isDesktop ? 11 : 12 }}>
                               Followers: {favoritesCountMap[details.id] || 0}
                             </Text>
                           </View>
@@ -814,7 +821,7 @@ useEffect(() => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 8,
+    padding: isDesktop ? 16 : 8,
   },
   topHeader: {
     flexDirection: 'row',
@@ -846,7 +853,7 @@ const styles = StyleSheet.create({
   },
   section: {
     borderRadius: 12,
-    padding: 16,
+    padding: isDesktop ? 20 : 16,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -855,7 +862,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: isDesktop ? 18 : 20,
     fontWeight: 'bold',
     marginBottom: 16,
   },
@@ -871,7 +878,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: isDesktop ? 14 : 16,
     textAlign: 'center',
     marginBottom: 8,
   },
@@ -882,11 +889,14 @@ const styles = StyleSheet.create({
   communityList: {
     gap: 12,
   },
+  communityListDesktop: {
+    gap: 10,
+  },
   communityItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
+    padding: isDesktop ? 10 : 12,
     borderRadius: 8,
     borderWidth: 1,
   },
@@ -896,13 +906,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   communityIcon: {
-    marginRight: 12,
+    marginRight: isDesktop ? 10 : 12,
   },
   communityInfo: {
     flex: 1,
   },
   communityName: {
-    fontSize: 16,
+    fontSize: isDesktop ? 14 : 16,
     fontWeight: '600',
     marginBottom: 4,
   },
@@ -911,7 +921,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   communityType: {
-    fontSize: 14,
+    fontSize: isDesktop ? 12 : 14,
   },
   addButton: {
     flexDirection: 'row',
@@ -921,19 +931,26 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
   },
+  addButtonDesktop: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
   addButtonText: {
     color: '#ffffff',
     fontWeight: '600',
     marginLeft: 8,
     fontSize: 16,
   },
+  addButtonTextDesktop: {
+    fontSize: 14,
+  },
   removeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: isDesktop ? 10 : 12,
+    paddingVertical: isDesktop ? 5 : 6,
     borderRadius: 6,
   },
   removeButtonText: {
-    fontSize: 12,
+    fontSize: isDesktop ? 11 : 12,
     fontWeight: '600',
   },
   journeyBanner: {
@@ -950,19 +967,23 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+  journeyBannerDesktop: {
+    marginHorizontal: 0,
+    padding: 14,
+  },
   journeyBannerContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
   },
   journeyIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: isDesktop ? 36 : 40,
+    height: isDesktop ? 36 : 40,
+    borderRadius: isDesktop ? 18 : 20,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: isDesktop ? 10 : 12,
   },
   journeyInfo: {
     flex: 1,
@@ -973,16 +994,25 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginBottom: 2,
   },
+  journeyTitleDesktop: {
+    fontSize: 14,
+  },
   journeyRoute: {
     fontSize: 14,
     color: '#ffffff',
     opacity: 0.9,
     marginBottom: 2,
   },
+  journeyRouteDesktop: {
+    fontSize: 13,
+  },
   journeyProgress: {
     fontSize: 12,
     color: '#ffffff',
     opacity: 0.8,
+  },
+  journeyProgressDesktop: {
+    fontSize: 11,
   },
   journeyStats: {
     alignItems: 'flex-end',
@@ -998,6 +1028,9 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     opacity: 0.9,
   },
+  journeyStatTextDesktop: {
+    fontSize: 11,
+  },
   journeyArrow: {
     marginLeft: 12,
   },
@@ -1006,43 +1039,55 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     opacity: 0.7,
   },
+  journeyArrowTextDesktop: {
+    fontSize: 20,
+  },
   // Skeleton Styles
   communityItemSkeleton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
+    padding: isDesktop ? 10 : 12,
     borderRadius: 8,
     borderWidth: 1,
   },
   communityIconSkeleton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    marginRight: 12,
+    width: isDesktop ? 20 : 24,
+    height: isDesktop ? 20 : 24,
+    borderRadius: isDesktop ? 10 : 12,
+    marginRight: isDesktop ? 10 : 12,
   },
   communityInfoSkeleton: {
     flex: 1,
     gap: 6,
   },
   skeletonTextLarge: {
-    height: 16,
+    height: isDesktop ? 14 : 16,
     borderRadius: 4,
     width: '70%',
   },
   skeletonTextMedium: {
-    height: 12,
+    height: isDesktop ? 11 : 12,
     borderRadius: 4,
     width: '40%',
   },
   skeletonTextSmall: {
-    height: 10,
+    height: isDesktop ? 9 : 10,
     borderRadius: 4,
     width: '30%',
   },
   removeButtonSkeleton: {
-    width: 60,
-    height: 24,
+    width: isDesktop ? 50 : 60,
+    height: isDesktop ? 22 : 24,
     borderRadius: 6,
+  },
+  lottieAnimation: {
+    width: 150,
+    height: 150,
+    marginBottom: 16,
+  },
+  lottieAnimationDesktop: {
+    width: 120,
+    height: 120,
   },
 });

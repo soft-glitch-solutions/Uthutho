@@ -4,6 +4,10 @@ import { useRouter } from 'expo-router';
 import { MapPin, Flag, Route, BookmarkCheck, Plus } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import FavoritesSkeleton from './skeletons/FavoritesSkeleton';
+import { Dimensions } from 'react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 interface FavoriteItem {
   id: string;
@@ -36,18 +40,20 @@ const FavoritesSection = ({
   }
 
   return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Favorites</Text>
+    <View style={[styles.section, isDesktop && styles.sectionDesktop]}>
+      <Text style={[styles.sectionTitle, { color: colors.text }, isDesktop && styles.sectionTitleDesktop]}>
+        Your Favorites
+      </Text>
       
       {favorites.length > 0 ? (
-        <View style={styles.grid}>
+        <View style={[styles.grid, isDesktop && styles.gridDesktop]}>
           {favorites.map((favorite, index) => {
             const details = favoriteDetails.find(d => d.id === favorite.id) || {};
             
             return (
               <Pressable
                 key={`${favorite.id}-${index}`}
-                style={[styles.card, { backgroundColor: colors.card }]}
+                style={[styles.card, { backgroundColor: colors.card }, isDesktop && styles.cardDesktop]}
                 onPress={() => {
                   if (details.type === 'hub') {
                     router.push(`/hub-details?hubId=${details.id}`);
@@ -61,15 +67,15 @@ const FavoritesSection = ({
                 }}
               >
                 <View style={styles.favoriteItem}>
-                  {details.type === 'hub' && <MapPin size={24} color={colors.primary} />}
-                  {details.type === 'stop' && <Flag size={24} color={colors.primary} />}
-                  {details.type === 'route' && <Route size={24} color={colors.primary} />}
+                  {details.type === 'hub' && <MapPin size={isDesktop ? 20 : 24} color={colors.primary} />}
+                  {details.type === 'stop' && <Flag size={isDesktop ? 20 : 24} color={colors.primary} />}
+                  {details.type === 'route' && <Route size={isDesktop ? 20 : 24} color={colors.primary} />}
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.cardText, { color: colors.text }]}>
+                    <Text style={[styles.cardText, { color: colors.text }, isDesktop && styles.cardTextDesktop]}>
                       {favorite.name}
                     </Text>
                     {favorite.distance && (
-                      <Text style={[styles.distanceText, { color: colors.text }]}>
+                      <Text style={[styles.distanceText, { color: colors.text }, isDesktop && styles.distanceTextDesktop]}>
                         {favorite.distance} away
                       </Text>
                     )}
@@ -83,27 +89,29 @@ const FavoritesSection = ({
                         paddingHorizontal: 8,
                         paddingVertical: 2,
                       }}>
-                        <Text style={{ color: '#1ea2b1', fontSize: 12 }}>
+                        <Text style={{ color: '#1ea2b1', fontSize: isDesktop ? 11 : 12 }}>
                           Followers: {favoritesCountMap[details.id] || 0}
                         </Text>
                       </View>
                     )}
                   </View>
                   {/* show bookmarked status */}
-                  <BookmarkCheck size={20} color={colors.primary} />
+                  <BookmarkCheck size={isDesktop ? 18 : 20} color={colors.primary} />
                 </View>
               </Pressable>
             );
           })}
         </View>
       ) : (
-        <View style={styles.emptyFavoritesContainer}>
-          <Text style={[styles.emptyText, { color: colors.text }]}>No favorites added yet.</Text>
+        <View style={[styles.emptyFavoritesContainer, isDesktop && styles.emptyFavoritesContainerDesktop]}>
+          <Text style={[styles.emptyText, { color: colors.text }, isDesktop && styles.emptyTextDesktop]}>
+            No favorites added yet.
+          </Text>
           <Pressable
             onPress={() => router.push('/favorites')}
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
+            style={[styles.addButton, { backgroundColor: colors.primary }, isDesktop && styles.addButtonDesktop]}
           >
-            <Plus size={24} color="white" />
+            <Plus size={isDesktop ? 20 : 24} color="white" />
           </Pressable>
         </View>
       )}
@@ -115,15 +123,25 @@ const styles = {
   section: {
     marginBottom: 24,
   },
+  sectionDesktop: {
+    marginBottom: 20,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold' as 'bold',
     marginBottom: 12,
   },
+  sectionTitleDesktop: {
+    fontSize: 16,
+    marginBottom: 10,
+  },
   grid: {
     flexDirection: 'row' as 'row',
     flexWrap: 'wrap' as 'wrap',
     gap: 12,
+  },
+  gridDesktop: {
+    gap: 10,
   },
   card: {
     flex: 1,
@@ -136,14 +154,27 @@ const styles = {
     elevation: 2,
     minWidth: '48%',
   },
+  cardDesktop: {
+    padding: 14,
+    minWidth: '48%',
+  },
   cardText: {
     fontSize: 14,
+  },
+  cardTextDesktop: {
+    fontSize: 13,
   },
   distanceText: {
     fontSize: 12,
   },
+  distanceTextDesktop: {
+    fontSize: 11,
+  },
   emptyText: {
     fontSize: 14,
+  },
+  emptyTextDesktop: {
+    fontSize: 13,
   },
   emptyFavoritesContainer: {
     flexDirection: 'row' as 'row',
@@ -151,12 +182,18 @@ const styles = {
     justifyContent: 'space-between' as 'space-between',
     marginTop: 10,
   },
+  emptyFavoritesContainerDesktop: {
+    marginTop: 8,
+  },
   favoriteItem: {
     flexDirection: 'row' as 'row',
     alignItems: 'center' as 'center',
   },
   addButton: {
     padding: 8,
+  },
+  addButtonDesktop: {
+    padding: 6,
   },
 };
 

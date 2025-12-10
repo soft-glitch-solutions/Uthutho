@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
-import { House, User, Rss, Route, WalletCards } from 'lucide-react-native';
-import { View, Text, Dimensions, Pressable } from 'react-native';
+import { House, User, Rss, Route, WalletCards, Search } from 'lucide-react-native';
+import { View, Text, Dimensions, Pressable, Image } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -20,18 +20,23 @@ import { useNotifications } from '../../../hook/useNotifications';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import StreakOverlay from '@/components/StreakOverlay'; // Adjust path as needed
+import StreakOverlay from '@/components/StreakOverlay';
+import { Platform } from 'react-native';
+import { useRouter, useNavigation } from 'expo-router';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const TAB_COUNT = 5;
 const TAB_BAR_MARGIN = 20;
 const TAB_BAR_WIDTH = SCREEN_WIDTH - (TAB_BAR_MARGIN * 2);
+
+// Check if desktop
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 // Animated Components
 const AnimatedView = Animated.createAnimatedComponent(View);
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
-// Floating Background Indicator
+// Floating Background Indicator for Mobile
 const FloatingBackground = ({ activeIndex, colors }) => {
   const translateX = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -80,7 +85,7 @@ const FloatingBackground = ({ activeIndex, colors }) => {
   );
 };
 
-// Animated Tab Icon with Floating Effect
+// Animated Tab Icon with Floating Effect for Mobile
 const FloatingTabIcon = ({ color, size, focused, children, notificationCount = 0, index, colors }) => {
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -183,7 +188,180 @@ const FloatingTabIcon = ({ color, size, focused, children, notificationCount = 0
   );
 };
 
-// Custom Floating Tab Bar
+// Desktop Top Navigation Bar
+const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount }) => {
+  const router = useRouter();
+  const openSidebar = () => {
+    navigation.toggleDrawer();
+  };
+
+  return (
+    <AnimatedView
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 60,
+        backgroundColor: colors.card || 'rgba(30, 30, 30, 0.95)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: {
+          width: 0,
+          height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border || 'rgba(255, 255, 255, 0.1)',
+        zIndex: 1000,
+      }}
+      entering={FadeIn.duration(500)}
+    >
+      {/* App Logo/Brand */}
+      <View style={{ 
+        position: 'absolute', 
+        left: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8
+      }}>
+        <Pressable 
+          onPress={openSidebar}
+          style={{ flexDirection: 'row', alignItems: 'center' }}
+        >
+          <Image
+            source={require('../../../assets/uthutho-logo.png')}
+            style={{ width: 30, height: 30, marginRight: 8 }}
+          />
+          <Text style={{ 
+            fontSize: 20, 
+            fontWeight: 'bold', 
+            color: colors.primary,
+            letterSpacing: -0.5 
+          }}>
+            Uthutho
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* Navigation Items */}
+      <View style={{ 
+        flexDirection: 'row', 
+        alignItems: 'center',
+        gap: 8,
+      }}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const isFocused = state.index === index;
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name, route.params);
+            }
+          };
+
+          const onLongPress = () => {
+            navigation.emit({
+              type: 'tabLongPress',
+              target: route.key,
+            });
+          };
+
+          const IconComponent = options.tabBarIcon;
+
+          // Get notification count for feeds tab
+          const notificationCount = route.name === 'feeds' ? unreadCount : 0;
+
+          return (
+            <Pressable
+              key={route.key}
+              onPress={onPress}
+              onLongPress={onLongPress}
+              style={{
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                borderRadius: 8,
+                backgroundColor: isFocused ? colors.primary : 'transparent',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                position: 'relative',
+              }}
+            >
+              <IconComponent 
+                color={isFocused ? '#ffffff' : colors.text} 
+                size={18} 
+                focused={isFocused}
+              />
+              
+              <Text style={{
+                fontSize: 14,
+                fontWeight: '600',
+                color: isFocused ? '#ffffff' : colors.text,
+              }}>
+                {options.title || route.name}
+              </Text>
+
+              {notificationCount > 0 && (
+                <View 
+                  style={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -2,
+                    backgroundColor: '#ef4444',
+                    borderRadius: 8,
+                    minWidth: 16,
+                    height: 16,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    borderWidth: 2,
+                    borderColor: colors.card,
+                    zIndex: 10,
+                  }}
+                >
+                  <Text style={{ 
+                    color: 'white', 
+                    fontSize: 8, 
+                    fontWeight: 'bold',
+                    lineHeight: 12,
+                  }}>
+                    {notificationCount > 9 ? '9+' : notificationCount}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Search Icon instead of Profile Icon */}
+      <View style={{ position: 'absolute', right: 20 }}>
+        <Pressable
+          onPress={() => router.push('/favorites')}
+          style={{
+            padding: 8,
+            borderRadius: 20,
+            backgroundColor: colors.primary + '20',
+          }}
+        >
+          <Search size={20} color={colors.primary} />
+        </Pressable>
+      </View>
+    </AnimatedView>
+  );
+};
+
+// Custom Floating Tab Bar for Mobile
 const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount }) => {
   return (
     <AnimatedView
@@ -342,7 +520,11 @@ export default function EnhancedTabLayout() {
   return (
     <>
       <Tabs
-        tabBar={(props) => <FloatingTabBar {...props} colors={colors} unreadCount={unreadCount} />}
+        tabBar={(props) => 
+          isDesktop ? 
+            <DesktopTopNavBar {...props} colors={colors} unreadCount={unreadCount} /> 
+            : <FloatingTabBar {...props} colors={colors} unreadCount={unreadCount} />
+        }
         screenOptions={{
           headerStyle: {
             backgroundColor: colors.background,
@@ -352,6 +534,11 @@ export default function EnhancedTabLayout() {
             display: 'none', // Hide default tab bar
           },
           headerShown: false,
+          // Add padding to content for desktop to account for top nav bar
+          contentStyle: isDesktop ? {
+            paddingTop: 60, // Height of desktop top nav
+            backgroundColor: colors.background,
+          } : undefined,
         }}
       >
         <Tabs.Screen
