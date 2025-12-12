@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform, Alert, Image, Dimensions } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { MapPin, Clock, Users, Bookmark, BookmarkCheck, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon, Trophy } from 'lucide-react-native';
@@ -7,6 +7,9 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import { useFavorites } from '@/hook/useFavorites';
 import { formatTimeAgo } from '@/components/utils';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 interface Hub {
   id: string;
@@ -43,7 +46,64 @@ interface Post {
 type TabType = 'routes' | 'activity';
 
 // Skeleton Loading Components
-const SkeletonLoader = () => {
+const SkeletonLoader = ({ isDesktop: propIsDesktop = false }) => {
+  const desktopMode = isDesktop || propIsDesktop;
+  
+  if (desktopMode) {
+    return (
+      <View style={[styles.container, styles.containerDesktop]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        
+        <View style={styles.desktopWrapper}>
+          {/* Left column - Image and basic info */}
+          <View style={styles.desktopLeftColumn}>
+            {/* Header Skeleton */}
+            <View style={styles.headerDesktop}>
+              <View style={[styles.backButton, styles.backButtonDesktop, styles.skeleton]} />
+              <View style={[styles.favoriteButton, styles.favoriteButtonDesktop, styles.skeleton]} />
+            </View>
+
+            {/* Hub Image Skeleton */}
+            <View style={[styles.imageContainer, styles.imageContainerDesktop, styles.skeleton]} />
+
+            {/* Hub Info Skeleton */}
+            <View style={[styles.infoSection, styles.infoSectionDesktop]}>
+              <View style={[styles.skeletonTextLarge, styles.skeleton, { width: '80%', marginBottom: 12 }]} />
+              <View style={[styles.skeletonTextMedium, styles.skeleton, { width: '100%', marginBottom: 8 }]} />
+              <View style={[styles.skeletonTextSmall, styles.skeleton, { width: '70%', marginBottom: 16 }]} />
+              <View style={[styles.skeletonBadge, styles.skeleton, { width: '40%' }]} />
+            </View>
+          </View>
+
+          {/* Right column - Content */}
+          <View style={styles.desktopRightColumn}>
+            {/* Action Buttons Skeleton */}
+            <View style={styles.actionButtonsDesktop}>
+              <View style={[styles.actionButton, styles.actionButtonDesktop, styles.skeleton]} />
+              <View style={[styles.actionButton, styles.actionButtonDesktop, styles.skeleton]} />
+            </View>
+
+            {/* Leaderboard Button Skeleton */}
+            <View style={[styles.leaderboardButton, styles.leaderboardButtonDesktop, styles.skeleton]} />
+
+            {/* Tab Skeleton */}
+            <View style={[styles.tabContainer, styles.tabContainerDesktop]}>
+              <View style={[styles.tab, styles.tabDesktop, styles.skeleton, { flex: 1, height: 40 }]} />
+              <View style={[styles.tab, styles.tabDesktop, styles.skeleton, { flex: 1, height: 40 }]} />
+            </View>
+
+            {/* Content Skeleton */}
+            <View style={[styles.section, styles.sectionDesktop]}>
+              {[1, 2, 3].map((item) => (
+                <View key={item} style={[styles.routeItem, styles.routeItemDesktop, styles.skeleton, { height: 90 }]} />
+              ))}
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -396,13 +456,13 @@ export default function HubDetailScreen() {
   };
 
   const renderRoutesTab = () => (
-    <View style={styles.tabContent}>
-      <Text style={styles.sectionTitle}>Routes from this Hub ({routes.length})</Text>
+    <View style={[styles.tabContent, isDesktop && styles.tabContentDesktop]}>
+      <Text style={[styles.sectionTitle, isDesktop && styles.sectionTitleDesktop]}>Routes from this Hub ({routes.length})</Text>
       {routes.length === 0 ? (
-        <View style={styles.emptyState}>
-          <RouteIcon size={24} color="#666666" />
-          <Text style={styles.emptyStateText}>No routes available from this hub</Text>
-          <Text style={styles.emptyStateSubtext}>
+        <View style={[styles.emptyState, isDesktop && styles.emptyStateDesktop]}>
+          <RouteIcon size={isDesktop ? 32 : 24} color="#666666" />
+          <Text style={[styles.emptyStateText, isDesktop && styles.emptyStateTextDesktop]}>No routes available from this hub</Text>
+          <Text style={[styles.emptyStateSubtext, isDesktop && styles.emptyStateSubtextDesktop]}>
             Check back later for new routes or explore other hubs
           </Text>
         </View>
@@ -410,22 +470,22 @@ export default function HubDetailScreen() {
         routes.map((route) => (
           <TouchableOpacity
             key={route.id}
-            style={styles.routeItem}
+            style={[styles.routeItem, isDesktop && styles.routeItemDesktop]}
             onPress={() => navigateToRoute(route.id)}
           >
-            <View style={styles.routeInfo}>
-              <Text style={styles.routeName}>{route.name}</Text>
-              <Text style={styles.routeDestination}>
+            <View style={[styles.routeInfo, isDesktop && styles.routeInfoDesktop]}>
+              <Text style={[styles.routeName, isDesktop && styles.routeNameDesktop]}>{route.name}</Text>
+              <Text style={[styles.routeDestination, isDesktop && styles.routeDestinationDesktop]}>
                 {route.start_point} → {route.end_point}
               </Text>
-              <View style={styles.routeDetails}>
-                <Text style={styles.routeType}>{route.transport_type}</Text>
-                <Text style={styles.routeCost}>R {route.cost}</Text>
+              <View style={[styles.routeDetails, isDesktop && styles.routeDetailsDesktop]}>
+                <Text style={[styles.routeType, isDesktop && styles.routeTypeDesktop]}>{route.transport_type}</Text>
+                <Text style={[styles.routeCost, isDesktop && styles.routeCostDesktop]}>R {route.cost}</Text>
               </View>
             </View>
             
-            <View style={styles.routeArrow}>
-              <Text style={styles.routeArrowText}>›</Text>
+            <View style={[styles.routeArrow, isDesktop && styles.routeArrowDesktop]}>
+              <Text style={[styles.routeArrowText, isDesktop && styles.routeArrowTextDesktop]}>›</Text>
             </View>
           </TouchableOpacity>
         ))
@@ -434,44 +494,44 @@ export default function HubDetailScreen() {
   );
 
   const renderActivityTab = () => (
-    <View style={styles.tabContent}>
-      <Text style={styles.sectionTitle}>This Week's Activity ({thisWeeksPosts.length})</Text>
+    <View style={[styles.tabContent, isDesktop && styles.tabContentDesktop]}>
+      <Text style={[styles.sectionTitle, isDesktop && styles.sectionTitleDesktop]}>This Week's Activity ({thisWeeksPosts.length})</Text>
       {thisWeeksPosts.length === 0 ? (
-        <View style={styles.emptyState}>
-          <MessageSquare size={24} color="#666666" />
-          <Text style={styles.emptyStateText}>No activity this week</Text>
-          <Text style={styles.emptyStateSubtext}>
+        <View style={[styles.emptyState, isDesktop && styles.emptyStateDesktop]}>
+          <MessageSquare size={isDesktop ? 32 : 24} color="#666666" />
+          <Text style={[styles.emptyStateText, isDesktop && styles.emptyStateTextDesktop]}>No activity this week</Text>
+          <Text style={[styles.emptyStateSubtext, isDesktop && styles.emptyStateSubtextDesktop]}>
             Be the first to share updates about this hub
           </Text>
         </View>
       ) : (
         thisWeeksPosts.map((post) => (
-          <View key={post.id} style={styles.postItem}>
-            <View style={styles.postHeader}>
-              <View style={styles.postAuthorInfo}>
+          <View key={post.id} style={[styles.postItem, isDesktop && styles.postItemDesktop]}>
+            <View style={[styles.postHeader, isDesktop && styles.postHeaderDesktop]}>
+              <View style={[styles.postAuthorInfo, isDesktop && styles.postAuthorInfoDesktop]}>
                 {post.profiles.avatar_url ? (
                   <Image 
                     source={{ uri: post.profiles.avatar_url }} 
-                    style={styles.avatar}
+                    style={[styles.avatar, isDesktop && styles.avatarDesktop]}
                   />
                 ) : (
-                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Text style={styles.avatarText}>
+                  <View style={[styles.avatar, styles.avatarPlaceholder, isDesktop && styles.avatarDesktop]}>
+                    <Text style={[styles.avatarText, isDesktop && styles.avatarTextDesktop]}>
                       {post.profiles.first_name[0]}{post.profiles.last_name[0]}
                     </Text>
                   </View>
                 )}
                 <View>
-                  <Text style={styles.postAuthor}>
+                  <Text style={[styles.postAuthor, isDesktop && styles.postAuthorDesktop]}>
                     {post.profiles.first_name} {post.profiles.last_name}
                   </Text>
-                  <Text style={styles.postTime}>
+                  <Text style={[styles.postTime, isDesktop && styles.postTimeDesktop]}>
                     {formatTimeAgo(post.created_at)}
                   </Text>
                 </View>
               </View>
             </View>
-            <Text style={styles.postContent}>{post.content}</Text>
+            <Text style={[styles.postContent, isDesktop && styles.postContentDesktop]}>{post.content}</Text>
           </View>
         ))
       )}
@@ -482,20 +542,173 @@ export default function HubDetailScreen() {
   const shouldShowActivityTab = hasRecentActivity;
   
   if (loading) {
-    return <SkeletonLoader />;
+    return <SkeletonLoader isDesktop={isDesktop} />;
   }
 
   if (!hub) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Hub not found</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>Go Back</Text>
+      <View style={[styles.errorContainer, isDesktop && styles.errorContainerDesktop]}>
+        <Text style={[styles.errorText, isDesktop && styles.errorTextDesktop]}>Hub not found</Text>
+        <TouchableOpacity style={[styles.backButton, isDesktop && styles.backButtonDesktop]} onPress={() => router.back()}>
+          <Text style={[styles.backButtonText, isDesktop && styles.backButtonTextDesktop]}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
+  if (isDesktop) {
+    return (
+      <ScrollView style={[styles.container, styles.containerDesktop]}>
+        <Stack.Screen options={{ headerShown: false }} />
+
+        <View style={styles.desktopWrapper}>
+          {/* Left column - Image and basic info */}
+          <View style={styles.desktopLeftColumn}>
+            {/* Header */}
+            <View style={styles.headerDesktop}>
+              <TouchableOpacity style={[styles.backButton, styles.backButtonDesktop]} onPress={() => router.back()}>
+                <ArrowLeft size={24} color="#ffffff" />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.favoriteButton, styles.favoriteButtonDesktop]} onPress={toggleFollow}>
+                {isFollowing ? (
+                  <BookmarkCheck size={24} color="#1ea2b1" fill="#1ea2b1" />
+                ) : (
+                  <Bookmark size={24} color="#ffffff" />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Hub Image */}
+            <View style={[styles.imageContainer, styles.imageContainerDesktop]}>
+              {hub.image ? (
+                <Image
+                  source={{ uri: hub.image }}
+                  style={styles.hubImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.imagePlaceholder}>
+                  <Text style={[styles.hubName, styles.hubNameDesktop]}>{hub.name}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Hub Info */}
+            <View style={[styles.infoSection, styles.infoSectionDesktop]}>
+              <Text style={[styles.hubName, styles.hubNameDesktop]}>{hub.name}</Text>
+              {hub.address && (
+                <Text style={[styles.hubAddress, styles.hubAddressDesktop]}>{hub.address}</Text>
+              )}
+              
+              {/* Follower Count */}
+              <View style={[styles.followerContainer, styles.followerContainerDesktop]}>
+                <Users size={16} color="#1ea2b1" />
+                <Text style={[styles.followerText, styles.followerTextDesktop]}>
+                  {favoritesCountMap[hub.id] || followerCount} {favoritesCountMap[hub.id] === 1 ? 'follower' : 'followers'}
+                </Text>
+              </View>
+
+              {hub.transport_type && (
+                <View style={[styles.transportBadge, styles.transportBadgeDesktop]}>
+                  <Text style={[styles.transportType, styles.transportTypeDesktop]}>{hub.transport_type}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Right column - Content */}
+          <View style={styles.desktopRightColumn}>
+            {/* Action Buttons */}
+            <View style={styles.actionButtonsDesktop}>
+              <TouchableOpacity style={[styles.actionButton, styles.actionButtonDesktop]} onPress={openInMaps}>
+                <Navigation size={20} color="#ffffff" />
+                <Text style={[styles.actionButtonText, styles.actionButtonTextDesktop]}>Directions</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.actionButtonDesktop]} 
+                onPress={() => {
+                  if (isFollowing) {
+                    router.push('/(tabs)/feeds');
+                  } else {
+                    router.push(`/community-preview?communityId=${hub.id}&communityType=hub&communityName=${encodeURIComponent(hub.name)}`);
+                  }
+                }}
+              >
+                <MessageSquare size={20} color="#ffffff" />
+                <Text style={[styles.actionButtonText, styles.actionButtonTextDesktop]}>
+                  {isFollowing ? 'View Posts' : 'Preview Posts'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Leaderboard Button */}
+            <TouchableOpacity 
+              style={[styles.leaderboardButton, styles.leaderboardButtonDesktop, { backgroundColor: '#1ea2b1' }]}
+              onPress={navigateToLeaderboard}
+            >
+              <Trophy size={20} color="#ffffff" />
+              <Text style={[styles.leaderboardButtonText, styles.leaderboardButtonTextDesktop]}>Leaderboard</Text>
+            </TouchableOpacity>
+
+            {/* Tab Selectors - Only show activity tab if there's recent activity */}
+            {shouldShowActivityTab && (
+              <View style={[styles.tabContainer, styles.tabContainerDesktop]}>
+                <TouchableOpacity
+                  style={[
+                    styles.tab,
+                    styles.tabDesktop,
+                    activeTab === 'routes' && [styles.activeTab, { backgroundColor: '#1ea2b1' }]
+                  ]}
+                  onPress={() => setActiveTab('routes')}
+                >
+                  <RouteIcon size={16} color={activeTab === 'routes' ? '#ffffff' : '#666666'} />
+                  <Text style={[
+                    styles.tabText,
+                    styles.tabTextDesktop,
+                    { color: activeTab === 'routes' ? '#ffffff' : '#666666' }
+                  ]}>
+                    Routes ({routes.length})
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.tab,
+                    styles.tabDesktop,
+                    activeTab === 'activity' && [styles.activeTab, { backgroundColor: '#1ea2b1' }]
+                  ]}
+                  onPress={() => setActiveTab('activity')}
+                >
+                  <MessageSquare size={16} color={activeTab === 'activity' ? '#ffffff' : '#666666'} />
+                  <Text style={[
+                    styles.tabText,
+                    styles.tabTextDesktop,
+                    { color: activeTab === 'activity' ? '#ffffff' : '#666666' }
+                  ]}>
+                    This Week ({thisWeeksPosts.length})
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Tab Content */}
+            <View style={[styles.section, styles.sectionDesktop]}>
+              {!shouldShowActivityTab ? (
+                renderRoutesTab()
+              ) : (
+                activeTab === 'routes' ? renderRoutesTab() : renderActivityTab()
+              )}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.bottomSpace} />
+      </ScrollView>
+    );
+  }
+
+  // Mobile layout
   return (
     <ScrollView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -562,10 +775,8 @@ export default function HubDetailScreen() {
           style={styles.actionButton} 
           onPress={() => {
             if (isFollowing) {
-              // If it's a favorite, go to feeds
               router.push('/(tabs)/feeds');
             } else {
-              // If it's NOT a favorite, go to preview
               router.push(`/community-preview?communityId=${hub.id}&communityType=hub&communityName=${encodeURIComponent(hub.name)}`);
             }
           }}
@@ -628,10 +839,8 @@ export default function HubDetailScreen() {
       {/* Tab Content */}
       <View style={styles.section}>
         {!shouldShowActivityTab ? (
-          // If no activity tab, always show routes
           renderRoutesTab()
         ) : (
-          // If activity tab exists, show based on active tab
           activeTab === 'routes' ? renderRoutesTab() : renderActivityTab()
         )}
       </View>
@@ -646,6 +855,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+  containerDesktop: {
+    width: '100%',
+  },
+  
+  // Desktop layout
+  desktopWrapper: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    maxWidth: 1200,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  desktopLeftColumn: {
+    width: '45%',
+    paddingRight: 24,
+  },
+  desktopRightColumn: {
+    width: '55%',
+    paddingLeft: 24,
+  },
+  
   // Skeleton styles
   skeleton: {
     backgroundColor: '#1a1a1a',
@@ -665,7 +896,220 @@ const styles = StyleSheet.create({
   skeletonBadge: {
     height: 28,
   },
-  // Tab styles
+  
+  // Header
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    backgroundColor: '#000000',
+  },
+  headerDesktop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 24,
+    backgroundColor: '#000000',
+  },
+  backButton: {
+    backgroundColor: '#1a1a1a',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backButtonDesktop: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  favoriteButton: {
+    backgroundColor: '#1a1a1a',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  favoriteButtonDesktop: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  
+  // Image
+  imageContainer: {
+    height: 200,
+    backgroundColor: '#1a1a1a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    borderRadius: 16,
+    marginBottom: 20,
+  },
+  imageContainerDesktop: {
+    height: 300,
+    marginHorizontal: 0,
+    marginBottom: 24,
+  },
+  imagePlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hubImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+  },
+  
+  // Info section
+  infoSection: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  infoSectionDesktop: {
+    paddingHorizontal: 0,
+    marginBottom: 24,
+  },
+  hubName: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  hubNameDesktop: {
+    fontSize: 32,
+    marginBottom: 12,
+  },
+  hubAddress: {
+    fontSize: 16,
+    color: '#cccccc',
+    marginBottom: 12,
+    lineHeight: 22,
+  },
+  hubAddressDesktop: {
+    fontSize: 17,
+    lineHeight: 24,
+    marginBottom: 16,
+  },
+  
+  // Follower container
+  followerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    alignSelf: 'flex-start',
+    backgroundColor: '#1ea2b120',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  followerContainerDesktop: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginBottom: 20,
+  },
+  followerText: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+  followerTextDesktop: {
+    fontSize: 15,
+    marginLeft: 8,
+  },
+  
+  // Transport badge
+  transportBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#1ea2b120',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  transportBadgeDesktop: {
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  transportType: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  transportTypeDesktop: {
+    fontSize: 15,
+  },
+  
+  // Action buttons
+  actionButtons: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    gap: 12,
+  },
+  actionButtonsDesktop: {
+    paddingHorizontal: 0,
+    marginBottom: 24,
+    gap: 16,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: '#1ea2b1',
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionButtonDesktop: {
+    paddingVertical: 14,
+    borderRadius: 10,
+  },
+  actionButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  actionButtonTextDesktop: {
+    fontSize: 15,
+    marginLeft: 10,
+  },
+  
+  // Leaderboard button
+  leaderboardButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  leaderboardButtonDesktop: {
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginBottom: 24,
+  },
+  leaderboardButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  leaderboardButtonTextDesktop: {
+    fontSize: 15,
+    marginLeft: 10,
+  },
+  
+  // Tab container
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: '#1a1a1a',
@@ -673,6 +1117,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderRadius: 12,
     padding: 4,
+  },
+  tabContainerDesktop: {
+    marginHorizontal: 0,
+    marginBottom: 24,
+    borderRadius: 10,
+    padding: 6,
   },
   tab: {
     flex: 1,
@@ -684,6 +1134,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     gap: 8,
   },
+  tabDesktop: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 6,
+  },
   activeTab: {
     backgroundColor: '#1ea2b1',
   },
@@ -691,185 +1146,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  tabContent: {
-    minHeight: 200,
+  tabTextDesktop: {
+    fontSize: 13,
   },
-  // Leaderboard button styles
-  leaderboardButton: {
-    borderRadius: 12,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  leaderboardButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  // Rest of the styles
-  followerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    alignSelf: 'flex-start',
-    backgroundColor: '#1ea2b120',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  followerText: {
-    color: '#1ea2b1',
-    fontSize: 14,
-    fontWeight: '500',
-    marginLeft: 4,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#ffffff',
-    fontSize: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  errorText: {
-    color: '#ffffff',
-    fontSize: 18,
-    marginBottom: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-  },
-  backButton: {
-    backgroundColor: '#1a1a1a',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backButtonText: {
-    color: '#1ea2b1',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  favoriteButton: {
-    backgroundColor: '#1a1a1a',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageContainer: {
-    height: 200,
-    backgroundColor: '#1a1a1a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 20,
-    borderRadius: 16,
-    marginBottom: 20,
-  },
-  imagePlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  infoSection: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  hubName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  hubAddress: {
-    fontSize: 16,
-    color: '#cccccc',
-    marginBottom: 12,
-  },
-  coordinates: {
-    marginBottom: 12,
-  },
-  coordinatesText: {
-    fontSize: 14,
-    color: '#666666',
-    fontFamily: 'monospace',
-  },
-  transportBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#1ea2b120',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  transportType: {
-    color: '#1ea2b1',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    gap: 12,
-  },
-  hubImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 16,
-  },
-  actionButton: {
-    flex: 1,
-    backgroundColor: '#1ea2b1',
-    borderRadius: 12,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
+  
+  // Section
   section: {
     paddingHorizontal: 20,
     marginBottom: 30,
   },
+  sectionDesktop: {
+    paddingHorizontal: 0,
+    marginBottom: 40,
+  },
+  
+  // Tab content
+  tabContent: {
+    minHeight: 200,
+  },
+  tabContentDesktop: {
+    minHeight: 300,
+  },
+  
+  // Section title
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 16,
   },
+  sectionTitleDesktop: {
+    fontSize: 22,
+    marginBottom: 20,
+  },
+  
+  // Empty state
   emptyState: {
     alignItems: 'center',
     paddingVertical: 40,
+  },
+  emptyStateDesktop: {
+    paddingVertical: 60,
   },
   emptyStateText: {
     color: '#666666',
     fontSize: 16,
     marginTop: 12,
     textAlign: 'center',
+  },
+  emptyStateTextDesktop: {
+    fontSize: 18,
+    marginTop: 16,
   },
   emptyStateSubtext: {
     color: '#666666',
@@ -878,6 +1205,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 300,
   },
+  emptyStateSubtextDesktop: {
+    fontSize: 15,
+    maxWidth: 400,
+  },
+  
+  // Route item
   routeItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -888,8 +1221,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
   },
+  routeItemDesktop: {
+    padding: 14,
+    marginBottom: 10,
+    borderRadius: 10,
+  },
   routeInfo: {
     flex: 1,
+  },
+  routeInfoDesktop: {
+    paddingRight: 8,
   },
   routeName: {
     fontSize: 16,
@@ -897,15 +1238,25 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginBottom: 4,
   },
+  routeNameDesktop: {
+    fontSize: 15,
+  },
   routeDestination: {
     fontSize: 14,
     color: '#cccccc',
     marginBottom: 8,
   },
+  routeDestinationDesktop: {
+    fontSize: 13,
+    marginBottom: 6,
+  },
   routeDetails: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  routeDetailsDesktop: {
+    gap: 10,
   },
   routeType: {
     fontSize: 12,
@@ -915,18 +1266,35 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
+  routeTypeDesktop: {
+    fontSize: 11,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 5,
+  },
   routeCost: {
     fontSize: 14,
     color: '#1ea2b1',
     fontWeight: '500',
   },
+  routeCostDesktop: {
+    fontSize: 13,
+  },
   routeArrow: {
     marginLeft: 12,
+  },
+  routeArrowDesktop: {
+    marginLeft: 8,
   },
   routeArrowText: {
     fontSize: 24,
     color: '#666666',
   },
+  routeArrowTextDesktop: {
+    fontSize: 22,
+  },
+  
+  // Post item
   postItem: {
     backgroundColor: '#1a1a1a',
     borderRadius: 12,
@@ -935,18 +1303,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
   },
+  postItemDesktop: {
+    padding: 14,
+    marginBottom: 10,
+    borderRadius: 10,
+  },
   postHeader: {
     marginBottom: 8,
+  },
+  postHeaderDesktop: {
+    marginBottom: 10,
   },
   postAuthorInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
+  postAuthorInfoDesktop: {
+    gap: 14,
+  },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
+  },
+  avatarDesktop: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   avatarPlaceholder: {
     backgroundColor: '#1ea2b1',
@@ -958,21 +1342,63 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
+  avatarTextDesktop: {
+    fontSize: 16,
+  },
   postAuthor: {
     fontSize: 14,
     fontWeight: '500',
     color: '#1ea2b1',
+  },
+  postAuthorDesktop: {
+    fontSize: 15,
   },
   postTime: {
     fontSize: 12,
     color: '#666666',
     marginTop: 2,
   },
+  postTimeDesktop: {
+    fontSize: 11,
+  },
   postContent: {
     fontSize: 14,
     color: '#ffffff',
     lineHeight: 20,
   },
+  postContentDesktop: {
+    fontSize: 13,
+    lineHeight: 22,
+  },
+  
+  // Error container
+  errorContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  errorContainerDesktop: {
+    paddingTop: 100,
+  },
+  errorText: {
+    color: '#ffffff',
+    fontSize: 18,
+    marginBottom: 20,
+  },
+  errorTextDesktop: {
+    fontSize: 20,
+  },
+  backButtonText: {
+    color: '#1ea2b1',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  backButtonTextDesktop: {
+    fontSize: 15,
+  },
+  
   bottomSpace: {
     height: 20,
   },

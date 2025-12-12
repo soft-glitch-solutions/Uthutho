@@ -8,8 +8,8 @@ import {
   Modal,
   Alert,
   TextInput,
-  Animated,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
@@ -17,6 +17,27 @@ import { supabase } from '../../lib/supabase';
 import { Route as RouteIcon, MapPin, Clock, DollarSign, Bookmark, BookmarkCheck, ArrowLeft, Users, TrendingUp, Shield, Trophy } from 'lucide-react-native';
 import { useAuth } from '@/hook/useAuth';
 import { useFavorites } from '@/hook/useFavorites';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
+
+interface Route {
+  id: string;
+  name: string;
+  cost: number;
+  transport_type: string;
+  start_point: string;
+  end_point: string;
+  hub_id?: string;
+  created_at: string;
+}
+
+interface Stop {
+  id: string;
+  name: string;
+  waitingCount: number;
+  order_number: number;
+}
 
 interface RouteStats {
   avg_journey_time: string;
@@ -27,7 +48,98 @@ interface RouteStats {
 }
 
 // Skeleton Loading Component
-const RouteDetailsSkeleton = ({ colors }) => {
+const RouteDetailsSkeleton = ({ colors, isDesktop: propIsDesktop = false }) => {
+  const desktopMode = isDesktop || propIsDesktop;
+  
+  if (desktopMode) {
+    return (
+      <View style={[styles.container, styles.containerDesktop, { backgroundColor: colors.background }]}>
+        <View style={styles.desktopWrapper}>
+          {/* Left Column - Route Info */}
+          <View style={styles.desktopLeftColumn}>
+            {/* Header Skeleton */}
+            <View style={styles.skeletonHeader}>
+              <View style={[styles.skeletonCircle, { backgroundColor: colors.card }]} />
+              <View style={[styles.skeletonCircle, { backgroundColor: colors.card }]} />
+            </View>
+
+            {/* Route Header Skeleton */}
+            <View style={styles.skeletonRouteHeader}>
+              <View style={[styles.skeletonCircleLarge, { backgroundColor: colors.card }]} />
+              <View style={[styles.skeletonTextLarge, { backgroundColor: colors.card }]} />
+              <View style={[styles.skeletonTextMedium, { backgroundColor: colors.card }]} />
+            </View>
+
+            {/* Info Cards Skeleton */}
+            <View style={styles.skeletonInfoCards}>
+              {[1, 2, 3].map((item) => (
+                <View key={item} style={[styles.skeletonInfoCard, { backgroundColor: colors.card }]}>
+                  <View style={[styles.skeletonCircleSmall, { backgroundColor: colors.border }]} />
+                  <View style={[styles.skeletonTextSmall, { backgroundColor: colors.border }]} />
+                  <View style={[styles.skeletonTextMedium, { backgroundColor: colors.border }]} />
+                </View>
+              ))}
+            </View>
+
+            {/* Leaderboard Button Skeleton */}
+            <View style={[styles.skeletonButton, { backgroundColor: colors.card }]} />
+
+            {/* Price Change Requests Skeleton */}
+            <View style={styles.skeletonSection}>
+              <View style={[styles.skeletonSectionTitle, { backgroundColor: colors.card }]} />
+              {[1, 2].map((item) => (
+                <View key={item} style={[styles.skeletonRequestItem, { backgroundColor: colors.card }]}>
+                  <View style={[styles.skeletonTextRequest, { backgroundColor: colors.border }]} />
+                  <View style={[styles.skeletonTextRequest, { backgroundColor: colors.border }]} />
+                  <View style={[styles.skeletonTextRequest, { backgroundColor: colors.border }]} />
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Right Column - Content */}
+          <View style={styles.desktopRightColumn}>
+            {/* Route Statistics Skeleton */}
+            <View style={styles.skeletonSection}>
+              <View style={[styles.skeletonSectionTitle, { backgroundColor: colors.card }]} />
+              <View style={[styles.skeletonStatsCard, { backgroundColor: colors.card }]}>
+                {[1, 2, 3, 4, 5].map((item) => (
+                  <View key={item} style={styles.skeletonStatRow}>
+                    <View style={[styles.skeletonCircleTiny, { backgroundColor: colors.border }]} />
+                    <View style={[styles.skeletonTextStatLabel, { backgroundColor: colors.border }]} />
+                    <View style={[styles.skeletonTextStatValue, { backgroundColor: colors.border }]} />
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Points Container Skeleton */}
+            <View style={styles.skeletonPointsContainer}>
+              {[1, 2].map((item) => (
+                <View key={item} style={[styles.skeletonPointColumn, { backgroundColor: colors.card }]}>
+                  <View style={[styles.skeletonTextLabel, { backgroundColor: colors.border }]} />
+                  <View style={[styles.skeletonTextValue, { backgroundColor: colors.border }]} />
+                </View>
+              ))}
+            </View>
+
+            {/* Stops Section Skeleton */}
+            <View style={styles.skeletonSection}>
+              <View style={[styles.skeletonSectionTitle, { backgroundColor: colors.card }]} />
+              {[1, 2, 3].map((item) => (
+                <View key={item} style={[styles.skeletonStopItem, { backgroundColor: colors.card }]}>
+                  <View style={[styles.skeletonTextStopName, { backgroundColor: colors.border }]} />
+                  <View style={[styles.skeletonTextStopDetails, { backgroundColor: colors.border }]} />
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // Mobile skeleton
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
@@ -53,6 +165,9 @@ const RouteDetailsSkeleton = ({ colors }) => {
             </View>
           ))}
         </View>
+
+        {/* Leaderboard Button Skeleton */}
+        <View style={[styles.skeletonButton, { backgroundColor: colors.card }]} />
 
         {/* Route Statistics Skeleton */}
         <View style={styles.skeletonSection}>
@@ -89,7 +204,7 @@ const RouteDetailsSkeleton = ({ colors }) => {
           ))}
         </View>
 
-        {/* Button Skeleton */}
+        {/* Price Change Button Skeleton */}
         <View style={[styles.skeletonButton, { backgroundColor: colors.card }]} />
 
         {/* Price Requests Skeleton */}
@@ -114,12 +229,12 @@ export default function RouteDetailsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { favorites, addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
-  const [route, setRoute] = useState(null);
-  const [stops, setStops] = useState([]);
+  const [route, setRoute] = useState<Route | null>(null);
+  const [stops, setStops] = useState<Stop[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [newPrice, setNewPrice] = useState('');
-  const [priceChangeRequests, setPriceChangeRequests] = useState([]);
+  const [priceChangeRequests, setPriceChangeRequests] = useState<any[]>([]);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const [routeStats, setRouteStats] = useState<RouteStats | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -127,14 +242,16 @@ export default function RouteDetailsScreen() {
   const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    fetchRouteDetails();
-    loadRouteStats();
-    fetchPriceChangeRequests();
-    loadFollowerCount();
-    populateFollowerCounts();
+    if (routeId) {
+      fetchRouteDetails();
+      loadRouteStats();
+      fetchPriceChangeRequests();
+      loadFollowerCount();
+      populateFollowerCounts();
+    }
   }, [routeId]);
 
-  // Add this useEffect to check favorite status when route data or favorites change
+  // Check favorite status whenever route data or favorites change
   useEffect(() => {
     if (route && routeId) {
       checkIfFollowing();
@@ -366,9 +483,9 @@ export default function RouteDetailsScreen() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPriceChangeRequests(data);
+      setPriceChangeRequests(data || []);
 
-      const hasPending = data.some((request) => request.status === 'pending');
+      const hasPending = (data || []).some((request) => request.status === 'pending');
       setHasPendingRequest(hasPending);
     } catch (error) {
       console.error('Error fetching price change requests:', error);
@@ -400,7 +517,7 @@ export default function RouteDetailsScreen() {
           {
             route_id: routeId,
             user_id: user.id,
-            current_price: route.cost,
+            current_price: route?.cost || 0,
             new_price: Number(newPrice),
             status: 'pending',
           },
@@ -432,19 +549,266 @@ export default function RouteDetailsScreen() {
   };
 
   if (loading) {
-    return <RouteDetailsSkeleton colors={colors} />;
+    return <RouteDetailsSkeleton colors={colors} isDesktop={isDesktop} />;
   }
 
   if (!route) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.errorText, { color: colors.text }]}>
+      <View style={[styles.container, isDesktop && styles.containerDesktop, { backgroundColor: colors.background }]}>
+        <Text style={[styles.errorText, isDesktop && styles.errorTextDesktop, { color: colors.text }]}>
           Route not found.
         </Text>
+        <TouchableOpacity style={[styles.backButton, isDesktop && styles.backButtonDesktop]} onPress={() => router.back()}>
+          <Text style={[styles.backButtonText, isDesktop && styles.backButtonTextDesktop]}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
+  // Main render function - conditionally render desktop or mobile layout
+  if (isDesktop) {
+    return (
+      <ScrollView style={[styles.container, styles.containerDesktop, { backgroundColor: colors.background }]}>
+        <View style={styles.desktopWrapper}>
+          {/* Left Column - Route Info */}
+          <View style={styles.desktopLeftColumn}>
+            {/* Header */}
+            <View style={styles.headerDesktop}>
+              <TouchableOpacity style={[styles.backButton, styles.backButtonDesktop]} onPress={() => router.back()}>
+                <ArrowLeft size={24} color="#ffffff" />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.favoriteButton, styles.favoriteButtonDesktop]} onPress={toggleFollow}>
+                {isFollowing ? (
+                  <BookmarkCheck size={24} color="#1ea2b1" fill="#1ea2b1" />
+                ) : (
+                  <Bookmark size={24} color="#ffffff" />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Route Header */}
+            <View style={[styles.routeHeader, styles.routeHeaderDesktop]}>
+              <View style={[styles.routeIcon, styles.routeIconDesktop]}>
+                <RouteIcon size={40} color="#1ea2b1" />
+              </View>
+              <Text style={[styles.routeName, styles.routeNameDesktop]}>{route.name}</Text>
+              
+              {/* Follower Count */}
+              <View style={[styles.followerContainer, styles.followerContainerDesktop]}>
+                <Users size={16} color="#1ea2b1" />
+                <Text style={[styles.followerText, styles.followerTextDesktop]}>
+                  {favoritesCountMap[route.id] || followerCount} {favoritesCountMap[route.id] === 1 ? 'follower' : 'followers'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Route Info Cards */}
+            <View style={[styles.infoCards, styles.infoCardsDesktop]}>
+              <View style={[styles.infoCard, styles.infoCardDesktop]}>
+                <DollarSign size={20} color="#1ea2b1" />
+                <Text style={[styles.infoLabel, styles.infoLabelDesktop]}>Fare</Text>
+                <Text style={[styles.infoValue, styles.infoValueDesktop]}>R {route.cost}</Text>
+              </View>
+              
+              <View style={[styles.infoCard, styles.infoCardDesktop]}>
+                <RouteIcon size={20} color="#1ea2b1" />
+                <Text style={[styles.infoLabel, styles.infoLabelDesktop]}>Type</Text>
+                <Text style={[styles.infoValue, styles.infoValueDesktop]}>{route.transport_type}</Text>
+              </View>
+              
+              <View style={[styles.infoCard, styles.infoCardDesktop]}>
+                <MapPin size={20} color="#1ea2b1" />
+                <Text style={[styles.infoLabel, styles.infoLabelDesktop]}>Stops</Text>
+                <Text style={[styles.infoValue, styles.infoValueDesktop]}>{stops.length}</Text>
+              </View>
+            </View>
+
+            {/* Leaderboard Button */}
+            <TouchableOpacity 
+              style={[styles.leaderboardButton, styles.leaderboardButtonDesktop, { backgroundColor: '#1ea2b1' }]}
+              onPress={navigateToLeaderboard}
+            >
+              <Trophy size={20} color="#ffffff" />
+              <Text style={[styles.leaderboardButtonText, styles.leaderboardButtonTextDesktop]}>Leaderboard</Text>
+            </TouchableOpacity>
+
+            {/* Price Change Button */}
+            {!hasPendingRequest && (
+              <Pressable
+                style={[styles.priceChangeButton, styles.priceChangeButtonDesktop, { backgroundColor: colors.primary }]}
+                onPress={openPriceChangeModal}>
+                <Text style={[styles.buttonText, styles.buttonTextDesktop]}>Report Price Change</Text>
+              </Pressable>
+            )}
+
+            {/* Price Change Requests Section */}
+            <View style={[styles.section, styles.sectionDesktop]}>
+              <Text style={[styles.sectionTitle, styles.sectionTitleDesktop, { color: colors.text }]}>
+                Price Change Requests
+              </Text>
+              {priceChangeRequests.length > 0 ? (
+                priceChangeRequests.map((request) => (
+                  <View
+                    key={request.id}
+                    style={[styles.requestItem, styles.requestItemDesktop, { backgroundColor: colors.card }]}>
+                    <Text style={[styles.requestText, { color: colors.text }]}>
+                      Old Price: R{request.current_price.toFixed(2)}
+                    </Text>
+                    <Text style={[styles.requestText, { color: colors.text }]}>
+                      New Price: R{request.new_price.toFixed(2)}
+                    </Text>
+                    <Text style={[styles.requestText, { color: colors.text }]}>
+                      Status: {request.status}
+                    </Text>
+                    {request.profiles && (
+                      <Pressable onPress={() => router.push(`/user/${request.profiles.id}`)}>
+                        <Text style={[styles.requestText, { color: colors.text }]}>
+                          Requested by: {request.profiles.first_name} {request.profiles.last_name}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <Text style={[styles.noRequestsText, styles.noRequestsTextDesktop, { color: colors.text }]}>
+                  No price change requests available.
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {/* Right Column - Content */}
+          <View style={styles.desktopRightColumn}>
+            {/* Route Statistics */}
+            <View style={[styles.section, styles.sectionDesktop]}>
+              <Text style={[styles.sectionTitle, styles.sectionTitleDesktop]}>Route Information</Text>
+              <View style={[styles.statsCard, styles.statsCardDesktop]}>
+                <View style={[styles.statRow, styles.statRowDesktop]}>
+                  <Clock size={16} color="#1ea2b1" />
+                  <Text style={[styles.statLabel, styles.statLabelDesktop]}>Estimated Journey Time:</Text>
+                  <Text style={[styles.statValue, styles.statValueDesktop]}>{routeStats?.avg_journey_time || '45-60 min'}</Text>
+                </View>
+                <View style={[styles.statRow, styles.statRowDesktop]}>
+                  <Users size={16} color="#1ea2b1" />
+                  <Text style={[styles.statLabel, styles.statLabelDesktop]}>Peak Hours:</Text>
+                  <Text style={[styles.statValue, styles.statValueDesktop]}>{routeStats?.peak_hours || '7-9 AM, 5-7 PM'}</Text>
+                </View>
+                <View style={[styles.statRow, styles.statRowDesktop]}>
+                  <RouteIcon size={16} color="#1ea2b1" />
+                  <Text style={[styles.statLabel, styles.statLabelDesktop]}>Service Frequency:</Text>
+                  <Text style={[styles.statValue, styles.statValueDesktop]}>{routeStats?.service_frequency || 'Every 15-20 min'}</Text>
+                </View>
+                <View style={[styles.statRow, styles.statRowDesktop]}>
+                  <TrendingUp size={16} color="#1ea2b1" />
+                  <Text style={[styles.statLabel, styles.statLabelDesktop]}>Reliability Score:</Text>
+                  <Text style={[styles.statValue, styles.statValueDesktop]}>{routeStats?.reliability_score || 4}/5</Text>
+                </View>
+                <View style={[styles.statRow, styles.statRowDesktop]}>
+                  <Shield size={16} color="#1ea2b1" />
+                  <Text style={[styles.statLabel, styles.statLabelDesktop]}>Safety Rating:</Text>
+                  <Text style={[styles.statValue, styles.statValueDesktop]}>{routeStats?.safety_rating || 4}/5</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Start and End Points */}
+            <View style={[styles.detailsContainer, styles.detailsContainerDesktop]}>
+              <View style={[styles.pointsContainer, styles.pointsContainerDesktop]}>
+                <Pressable style={[styles.pointColumn, styles.pointColumnDesktop]}>
+                  <Text style={[styles.detailLabel, styles.detailLabelDesktop, { color: colors.text }]}>Start Point</Text>
+                  <Text style={[styles.detailValue, styles.detailValueDesktop, { color: colors.text }]}>
+                    {route.start_point}
+                  </Text>
+                </Pressable>
+
+                <Pressable style={[styles.pointColumn, styles.pointColumnDesktop]}>
+                  <Text style={[styles.detailLabel, styles.detailLabelDesktop, { color: colors.text }]}>End Point</Text>
+                  <Text style={[styles.detailValue, styles.detailValueDesktop, { color: colors.text }]}>
+                    {route.end_point}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Stops Section */}
+            <View style={[styles.section, styles.sectionDesktop]}>
+              <Text style={[styles.sectionTitle, styles.sectionTitleDesktop, { color: colors.text }]}>Stops</Text>
+              {stops.length > 0 ? (
+                stops.map((stop) => (
+                  <Pressable
+                    key={stop.id}
+                    style={[styles.stopItem, styles.stopItemDesktop, { backgroundColor: colors.card }]}
+                    onPress={() => router.push(`/stop-details?stopId=${stop.id}`)}>
+                    <View style={[styles.stopHeader, styles.stopHeaderDesktop]}>
+                      <Text style={[styles.stopName, styles.stopNameDesktop, { color: colors.text }]}>{stop.name}</Text>
+                      <Text style={[styles.stopOrder, styles.stopOrderDesktop, { color: '#1ea2b1' }]}>
+                        Stop #{stop.order_number}
+                      </Text>
+                    </View>
+                    <Text style={[styles.stopDetails, styles.stopDetailsDesktop, { color: colors.text }]}>
+                      People Waiting: {stop.waitingCount}
+                    </Text>
+                  </Pressable>
+                ))
+              ) : (
+                <Text style={[styles.noStopsText, styles.noStopsTextDesktop, { color: colors.text }]}>
+                  No stops available for this route.
+                </Text>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Price Change Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}>
+          <View style={styles.modalContainer}>
+            <View style={[styles.modalContent, styles.modalContentDesktop, { backgroundColor: colors.card }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Report Price Change
+              </Text>
+              <Text style={[styles.modalDescription, { color: colors.text }]}>
+                Please only submit a price change that is factual. If any data is submitted
+                maliciously, your account will be banned. If your price is correct with
+                current data, you will be awarded 10 points on your profile.
+              </Text>
+
+              <Text style={[styles.modalLabel, { color: colors.text }]}>
+                Current Price: R{route.cost.toFixed(2)}
+              </Text>
+
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.inputBackground }]}
+                placeholder="Enter new price"
+                placeholderTextColor={colors.text}
+                value={newPrice}
+                onChangeText={setNewPrice}
+                keyboardType="numeric"
+              />
+
+              <View style={styles.modalButtons}>
+                <Pressable
+                  style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                  onPress={handlePriceChangeRequest}>
+                  <Text style={styles.buttonText}>Submit</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.modalButton, { backgroundColor: colors.border }]}
+                  onPress={() => setModalVisible(false)}>
+                  <Text style={styles.buttonText}>Cancel</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </ScrollView>
+    );
+  }
+
+  // Mobile Layout
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
@@ -545,16 +909,14 @@ export default function RouteDetailsScreen() {
         <View style={styles.detailsContainer}>
           {/* Start and End Points in Two Columns */}
           <View style={styles.pointsContainer}>
-            <Pressable
-              style={styles.pointColumn}>
+            <Pressable style={styles.pointColumn}>
               <Text style={[styles.detailLabel, { color: colors.text }]}>Start Point</Text>
               <Text style={[styles.detailValue, { color: colors.text }]}>
                 {route.start_point}
               </Text>
             </Pressable>
 
-            <Pressable
-              style={styles.pointColumn}>
+            <Pressable style={styles.pointColumn}>
               <Text style={[styles.detailLabel, { color: colors.text }]}>End Point</Text>
               <Text style={[styles.detailValue, { color: colors.text }]}>
                 {route.end_point}
@@ -661,11 +1023,13 @@ export default function RouteDetailsScreen() {
               <Text style={[styles.requestText, { color: colors.text }]}>
                 Status: {request.status}
               </Text>
-              <Pressable onPress={() => router.push(`/user/${request.profiles.id}`)}>
-                <Text style={[styles.requestText, { color: colors.text }]}>
-                  Requested by: {request.profiles.first_name} {request.profiles.last_name}
-                </Text>
-              </Pressable>
+              {request.profiles && (
+                <Pressable onPress={() => router.push(`/user/${request.profiles.id}`)}>
+                  <Text style={[styles.requestText, { color: colors.text }]}>
+                    Requested by: {request.profiles.first_name} {request.profiles.last_name}
+                  </Text>
+                </Pressable>
+              )}
             </View>
           ))
         ) : (
@@ -682,6 +1046,206 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  containerDesktop: {
+    width: '100%',
+  },
+  
+  // Desktop layout
+  desktopWrapper: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    maxWidth: 1200,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  desktopLeftColumn: {
+    width: '45%',
+    paddingRight: 24,
+  },
+  desktopRightColumn: {
+    width: '55%',
+    paddingLeft: 24,
+  },
+  
+  // Header
+  headerDesktop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 24,
+    backgroundColor: 'transparent',
+  },
+  backButtonDesktop: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  favoriteButtonDesktop: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  
+  // Route Header
+  routeHeaderDesktop: {
+    marginBottom: 32,
+  },
+  routeIconDesktop: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 20,
+  },
+  routeNameDesktop: {
+    fontSize: 32,
+    marginBottom: 12,
+  },
+  
+  // Follower container
+  followerContainerDesktop: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  followerTextDesktop: {
+    fontSize: 15,
+    marginLeft: 8,
+  },
+  
+  // Info Cards
+  infoCardsDesktop: {
+    marginBottom: 32,
+    gap: 16,
+  },
+  infoCardDesktop: {
+    padding: 20,
+    borderRadius: 12,
+  },
+  infoLabelDesktop: {
+    fontSize: 13,
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  infoValueDesktop: {
+    fontSize: 18,
+  },
+  
+  // Section
+  sectionDesktop: {
+    marginBottom: 32,
+  },
+  sectionTitleDesktop: {
+    fontSize: 22,
+    marginBottom: 20,
+  },
+  
+  // Stats Card
+  statsCardDesktop: {
+    padding: 20,
+    borderRadius: 12,
+  },
+  statRowDesktop: {
+    marginBottom: 14,
+  },
+  statLabelDesktop: {
+    fontSize: 15,
+    marginLeft: 10,
+  },
+  statValueDesktop: {
+    fontSize: 15,
+  },
+  
+  // Details Container
+  detailsContainerDesktop: {
+    marginBottom: 24,
+  },
+  pointsContainerDesktop: {
+    marginBottom: 20,
+  },
+  pointColumnDesktop: {
+    marginRight: 16,
+  },
+  detailLabelDesktop: {
+    fontSize: 17,
+    marginBottom: 6,
+  },
+  detailValueDesktop: {
+    fontSize: 15,
+  },
+  
+  // Stop Item
+  stopItemDesktop: {
+    padding: 18,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  stopHeaderDesktop: {
+    marginBottom: 10,
+  },
+  stopNameDesktop: {
+    fontSize: 17,
+  },
+  stopOrderDesktop: {
+    fontSize: 15,
+  },
+  stopDetailsDesktop: {
+    fontSize: 15,
+  },
+  noStopsTextDesktop: {
+    fontSize: 17,
+  },
+  
+  // Leaderboard Button
+  leaderboardButtonDesktop: {
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginBottom: 24,
+  },
+  leaderboardButtonTextDesktop: {
+    fontSize: 15,
+    marginLeft: 10,
+  },
+  
+  // Price Change Button
+  priceChangeButtonDesktop: {
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 24,
+  },
+  buttonTextDesktop: {
+    fontSize: 16,
+  },
+  
+  // Price Change Requests
+  requestItemDesktop: {
+    padding: 18,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  noRequestsTextDesktop: {
+    fontSize: 17,
+  },
+  
+  // Modal
+  modalContentDesktop: {
+    width: '50%',
+    maxWidth: 500,
+    padding: 24,
+    borderRadius: 12,
+  },
+  
+  // Error
+  errorTextDesktop: {
+    fontSize: 20,
+  },
+  backButtonTextDesktop: {
+    fontSize: 15,
+  },
+  
+  // ... Keep all your existing mobile styles below ...
   content: {
     padding: 16,
   },
@@ -917,7 +1481,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
   },
-  // Leaderboard button styles
   leaderboardButton: {
     borderRadius: 12,
     paddingVertical: 16,
