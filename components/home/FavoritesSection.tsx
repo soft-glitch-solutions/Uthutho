@@ -1,10 +1,9 @@
 import React from 'react';
-import { View, Text, Pressable, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, Pressable, TouchableOpacity, Alert, StyleSheet, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MapPin, Flag, Route, BookmarkCheck, Plus } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import FavoritesSkeleton from './skeletons/FavoritesSkeleton';
-import { Dimensions } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -66,7 +65,7 @@ const FavoritesSection = ({
                   }
                 }}
               >
-                <View style={styles.favoriteItem}>
+                <View style={[styles.favoriteItem, isDesktop && styles.favoriteItemDesktop]}>
                   {details.type === 'hub' && <MapPin size={isDesktop ? 20 : 24} color={colors.primary} />}
                   {details.type === 'stop' && <Flag size={isDesktop ? 20 : 24} color={colors.primary} />}
                   {details.type === 'route' && <Route size={isDesktop ? 20 : 24} color={colors.primary} />}
@@ -81,15 +80,8 @@ const FavoritesSection = ({
                     )}
                     {/* Followers pill */}
                     {details.id && (
-                      <View style={{
-                        marginTop: 6,
-                        alignSelf: 'flex-start',
-                        backgroundColor: '#1ea2b120',
-                        borderRadius: 12,
-                        paddingHorizontal: 8,
-                        paddingVertical: 2,
-                      }}>
-                        <Text style={{ color: '#1ea2b1', fontSize: isDesktop ? 11 : 12 }}>
+                      <View style={[styles.followerPill, isDesktop && styles.followerPillDesktop]}>
+                        <Text style={[styles.followerText, isDesktop && styles.followerTextDesktop]}>
                           Followers: {favoritesCountMap[details.id] || 0}
                         </Text>
                       </View>
@@ -119,7 +111,7 @@ const FavoritesSection = ({
   );
 };
 
-const styles = {
+const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
@@ -189,12 +181,33 @@ const styles = {
     flexDirection: 'row' as 'row',
     alignItems: 'center' as 'center',
   },
+  favoriteItemDesktop: {
+    gap: 10,
+  },
   addButton: {
     padding: 8,
   },
   addButtonDesktop: {
     padding: 6,
   },
-};
+  followerPill: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: '#1ea2b120',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  followerPillDesktop: {
+    marginTop: 4,
+  },
+  followerText: {
+    color: '#1ea2b1',
+    fontSize: 12,
+  },
+  followerTextDesktop: {
+    fontSize: 11,
+  },
+});
 
 export default FavoritesSection;

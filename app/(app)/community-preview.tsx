@@ -8,6 +8,8 @@ import {
   RefreshControl,
   Alert,
   Platform,
+  Dimensions,
+  ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Bookmark, BookmarkCheck, Users } from 'lucide-react-native';
@@ -16,6 +18,9 @@ import { useAuth } from '@/hook/useAuth';
 import { useFavorites } from '@/hook/useFavorites';
 import PostCard from '@/components/feeds/PostCard';
 import SkeletonLoader from '@/components/feeds/SkeletonLoader';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 interface Community {
   id: string;
@@ -57,6 +62,51 @@ interface Post {
   post_reactions: PostReaction[];
   post_comments: PostComment[];
 }
+
+// Desktop Skeleton Loader
+const DesktopSkeletonLoader = () => (
+  <View style={[styles.container, styles.containerDesktop]}>
+    <View style={styles.desktopWrapper}>
+      {/* Left Column - Community Info */}
+      <View style={styles.desktopLeftColumn}>
+        {/* Header Skeleton */}
+        <View style={styles.headerDesktop}>
+          <View style={[styles.skeletonCircle, styles.skeleton]} />
+          <View style={[styles.skeletonHeaderTitle, styles.skeleton]} />
+          <View style={[styles.skeletonCircle, styles.skeleton]} />
+        </View>
+
+        {/* Community Info Skeleton */}
+        <View style={styles.skeletonCommunityInfo}>
+          <View style={[styles.skeletonTextLarge, styles.skeleton]} />
+          <View style={[styles.skeletonTextMedium, styles.skeleton]} />
+          <View style={[styles.skeletonBadge, styles.skeleton]} />
+        </View>
+
+        {/* Preview Notice Skeleton */}
+        <View style={[styles.skeletonPreviewNotice, styles.skeleton]} />
+      </View>
+
+      {/* Right Column - Posts */}
+      <View style={styles.desktopRightColumn}>
+        {/* Posts Skeleton */}
+        {[1, 2, 3].map((item) => (
+          <View key={item} style={[styles.skeletonPost, styles.skeleton]}>
+            <View style={styles.skeletonPostHeader}>
+              <View style={[styles.skeletonCircle, styles.skeleton]} />
+              <View>
+                <View style={[styles.skeletonTextMedium, styles.skeleton]} />
+                <View style={[styles.skeletonTextSmall, styles.skeleton]} />
+              </View>
+            </View>
+            <View style={[styles.skeletonTextLarge, styles.skeleton]} />
+            <View style={[styles.skeletonTextMedium, styles.skeleton]} />
+          </View>
+        ))}
+      </View>
+    </View>
+  </View>
+);
 
 export default function CommunityPreviewScreen() {
   const { communityId, communityType, communityName } = useLocalSearchParams();
@@ -333,9 +383,120 @@ export default function CommunityPreviewScreen() {
   };
 
   if (loading) {
-    return <SkeletonLoader />;
+    return isDesktop ? <DesktopSkeletonLoader /> : <SkeletonLoader />;
   }
 
+  // Desktop Layout
+  if (isDesktop) {
+    return (
+      <View style={[styles.container, styles.containerDesktop]}>
+        <View style={styles.desktopWrapper}>
+          {/* Left Column - Community Info */}
+          <View style={styles.desktopLeftColumn}>
+            {/* Header */}
+            <View style={styles.headerDesktop}>
+              <TouchableOpacity style={[styles.backButton, styles.backButtonDesktop]} onPress={() => router.back()}>
+                <ArrowLeft size={24} color="#ffffff" />
+              </TouchableOpacity>
+              
+              <View style={styles.headerTitleDesktop}>
+                <Text style={styles.headerTitleTextDesktop}>Community Preview</Text>
+              </View>
+
+              <TouchableOpacity style={[styles.followButton, styles.followButtonDesktop]} onPress={toggleFollow}>
+                {isFollowing ? (
+                  <BookmarkCheck size={24} color="#1ea2b1" fill="#1ea2b1" />
+                ) : (
+                  <Bookmark size={24} color="#ffffff" />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Community Info */}
+            <View style={[styles.communityInfo, styles.communityInfoDesktop]}>
+              <Text style={[styles.communityName, styles.communityNameDesktop]}>
+                {community?.name || communityName}
+              </Text>
+              <Text style={[styles.communityType, styles.communityTypeDesktop]}>
+                {communityType === 'hub' ? 'Transport Hub' : 'Bus Stop'}
+              </Text>
+              
+              <View style={[styles.followerContainer, styles.followerContainerDesktop]}>
+                <Users size={16} color="#1ea2b1" />
+                <Text style={[styles.followerText, styles.followerTextDesktop]}>
+                  {followerCount} {followerCount === 1 ? 'follower' : 'followers'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Preview Notice */}
+            <View style={[styles.previewNotice, styles.previewNoticeDesktop]}>
+              <Text style={[styles.previewNoticeText, styles.previewNoticeTextDesktop]}>
+                👀 You're previewing this community. Join to post and comment.
+              </Text>
+            </View>
+
+            {/* Join Community CTA */}
+            {!isFollowing && (
+              <View style={styles.joinCTADesktop}>
+                <TouchableOpacity 
+                  style={[styles.joinButton, styles.joinButtonDesktop]}
+                  onPress={toggleFollow}
+                >
+                  <Bookmark size={20} color="#ffffff" />
+                  <Text style={[styles.joinButtonText, styles.joinButtonTextDesktop]}>Join Community</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          {/* Right Column - Posts */}
+          <View style={styles.desktopRightColumn}>
+            <FlatList
+              data={posts}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <PostCard
+                  post={item}
+                  userId={user?.id || ''}
+                  toggleReaction={toggleReaction}
+                  sharePost={sharePost}
+                  downloadPost={downloadPost}
+                  sharingPost={sharingPost}
+                  router={router}
+                  viewShotRef={(ref: any) => {
+                    viewShotRefs.current[item.id] = ref;
+                  }}
+                  disabled={!isFollowing}
+                  isDesktop={isDesktop}
+                />
+              )}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  tintColor="#1ea2b1"
+                  colors={['#1ea2b1']}
+                />
+              }
+              ListEmptyComponent={
+                <View style={[styles.emptyState, styles.emptyStateDesktop]}>
+                  <Text style={[styles.emptyStateText, styles.emptyStateTextDesktop]}>No posts yet</Text>
+                  <Text style={[styles.emptyStateSubtext, styles.emptyStateSubtextDesktop]}>
+                    Be the first to post in this community
+                  </Text>
+                </View>
+              }
+              contentContainerStyle={[styles.postsList, styles.postsListDesktop]}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // Mobile Layout
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -397,7 +558,7 @@ export default function CommunityPreviewScreen() {
             viewShotRef={(ref: any) => {
               viewShotRefs.current[item.id] = ref;
             }}
-            disabled={!isFollowing} // Disable interactions if not following
+            disabled={!isFollowing}
           />
         )}
         refreshControl={
@@ -441,6 +602,188 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+  containerDesktop: {
+    width: '100%',
+  },
+  
+  // Desktop layout
+  desktopWrapper: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    maxWidth: 1400,
+    alignSelf: 'center',
+    width: '100%',
+    height: '100%',
+  },
+  desktopLeftColumn: {
+    width: '30%',
+    paddingRight: 24,
+    borderRightWidth: 1,
+    borderRightColor: '#333333',
+  },
+  desktopRightColumn: {
+    width: '70%',
+    paddingLeft: 24,
+    height: '100%',
+  },
+  
+  // Header
+  headerDesktop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 24,
+    marginBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  backButtonDesktop: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  followButtonDesktop: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  headerTitleDesktop: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitleTextDesktop: {
+    fontSize: 20,
+  },
+  
+  // Community Info
+  communityInfoDesktop: {
+    padding: 0,
+    alignItems: 'flex-start',
+    borderBottomWidth: 0,
+    marginBottom: 24,
+  },
+  communityNameDesktop: {
+    fontSize: 28,
+    marginBottom: 8,
+    textAlign: 'left',
+  },
+  communityTypeDesktop: {
+    fontSize: 18,
+    marginBottom: 16,
+  },
+  
+  // Follower container
+  followerContainerDesktop: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  followerTextDesktop: {
+    fontSize: 15,
+    marginLeft: 6,
+  },
+  
+  // Preview Notice
+  previewNoticeDesktop: {
+    margin: 0,
+    marginBottom: 24,
+    padding: 16,
+    borderRadius: 10,
+  },
+  previewNoticeTextDesktop: {
+    fontSize: 15,
+    textAlign: 'left',
+  },
+  
+  // Join CTA
+  joinCTADesktop: {
+    position: 'relative',
+    bottom: 'auto',
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
+    padding: 0,
+    borderTopWidth: 0,
+    marginBottom: 24,
+  },
+  joinButtonDesktop: {
+    width: '100%',
+  },
+  joinButtonTextDesktop: {
+    fontSize: 15,
+  },
+  
+  // Posts List
+  postsListDesktop: {
+    paddingBottom: 40,
+  },
+  
+  // Empty State
+  emptyStateDesktop: {
+    paddingVertical: 80,
+  },
+  emptyStateTextDesktop: {
+    fontSize: 18,
+  },
+  emptyStateSubtextDesktop: {
+    fontSize: 15,
+  },
+  
+  // Skeleton styles
+  skeleton: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+  },
+  skeletonCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  skeletonHeaderTitle: {
+    height: 24,
+    width: '60%',
+  },
+  skeletonCommunityInfo: {
+    marginBottom: 24,
+  },
+  skeletonTextLarge: {
+    height: 28,
+    width: '80%',
+    marginBottom: 12,
+  },
+  skeletonTextMedium: {
+    height: 16,
+    width: '60%',
+    marginBottom: 8,
+  },
+  skeletonTextSmall: {
+    height: 12,
+    width: '40%',
+    marginBottom: 4,
+  },
+  skeletonBadge: {
+    height: 32,
+    width: 120,
+    borderRadius: 16,
+  },
+  skeletonPreviewNotice: {
+    height: 60,
+    marginBottom: 24,
+  },
+  skeletonPost: {
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 16,
+  },
+  skeletonPostHeader: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    gap: 12,
+  },
+  
+  // Keep all existing mobile styles below
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
