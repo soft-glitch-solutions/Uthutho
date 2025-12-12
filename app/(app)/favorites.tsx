@@ -1,11 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  ScrollView, 
+  TextInput, 
+  TouchableOpacity, 
+  Alert,
+  Dimensions,
+  Platform,
+} from 'react-native';
 import { Search, MapPin, Navigation, Bookmark, BookmarkCheck, Clock, DollarSign } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useFavorites, FavoriteItem } from '@/hook/useFavorites';
 import { useAuth } from '@/hook/useAuth';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 interface SearchResult {
   id: string;
@@ -16,22 +30,24 @@ interface SearchResult {
 }
 
 // Skeleton Loading Component
-const SkeletonLoader = () => {
+const SkeletonLoader = ({ isDesktop: propIsDesktop = false }) => {
+  const desktopMode = isDesktop || propIsDesktop;
+  
   return (
-    <View style={styles.skeletonContainer}>
+    <View style={[styles.skeletonContainer, desktopMode && styles.skeletonContainerDesktop]}>
       {[1, 2, 3, 4, 5].map((item) => (
-        <View key={item} style={styles.skeletonCard}>
-          <View style={styles.skeletonHeader}>
-            <View style={styles.skeletonIcon} />
-            <View style={styles.skeletonTextContainer}>
-              <View style={[styles.skeletonLine, styles.skeletonTitle]} />
-              <View style={[styles.skeletonLine, styles.skeletonSubtitle]} />
+        <View key={item} style={[styles.skeletonCard, desktopMode && styles.skeletonCardDesktop]}>
+          <View style={[styles.skeletonHeader, desktopMode && styles.skeletonHeaderDesktop]}>
+            <View style={[styles.skeletonIcon, desktopMode && styles.skeletonIconDesktop]} />
+            <View style={[styles.skeletonTextContainer, desktopMode && styles.skeletonTextContainerDesktop]}>
+              <View style={[styles.skeletonLine, styles.skeletonTitle, desktopMode && styles.skeletonTitleDesktop]} />
+              <View style={[styles.skeletonLine, styles.skeletonSubtitle, desktopMode && styles.skeletonSubtitleDesktop]} />
             </View>
-            <View style={styles.skeletonFavorite} />
+            <View style={[styles.skeletonFavorite, desktopMode && styles.skeletonFavoriteDesktop]} />
           </View>
-          <View style={styles.skeletonMeta}>
-            <View style={styles.skeletonTag} />
-            <View style={styles.skeletonRouteInfo} />
+          <View style={[styles.skeletonMeta, desktopMode && styles.skeletonMetaDesktop]}>
+            <View style={[styles.skeletonTag, desktopMode && styles.skeletonTagDesktop]} />
+            <View style={[styles.skeletonRouteInfo, desktopMode && styles.skeletonRouteInfoDesktop]} />
           </View>
         </View>
       ))}
@@ -433,39 +449,39 @@ export default function SearchScreen() {
     return (
       <TouchableOpacity 
         key={result.id} 
-        style={styles.resultCard}
+        style={[styles.resultCard, isDesktop && styles.resultCardDesktop]}
         onPress={handlePress}
       >
-        <View style={styles.resultHeader}>
-          <View style={styles.resultInfo}>
-            <IconComponent size={20} color="#1ea2b1" />
-            <View style={styles.resultDetails}>
-              <Text style={styles.resultTitle}>{result.name}</Text>
-              <Text style={styles.resultSubtitle}>{getResultSubtitle(result)}</Text>
+        <View style={[styles.resultHeader, isDesktop && styles.resultHeaderDesktop]}>
+          <View style={[styles.resultInfo, isDesktop && styles.resultInfoDesktop]}>
+            <IconComponent size={isDesktop ? 18 : 20} color="#1ea2b1" />
+            <View style={[styles.resultDetails, isDesktop && styles.resultDetailsDesktop]}>
+              <Text style={[styles.resultTitle, isDesktop && styles.resultTitleDesktop]}>{result.name}</Text>
+              <Text style={[styles.resultSubtitle, isDesktop && styles.resultSubtitleDesktop]}>{getResultSubtitle(result)}</Text>
             </View>
           </View>
           
           <TouchableOpacity
-            style={styles.favoriteButton}
+            style={[styles.favoriteButton, isDesktop && styles.favoriteButtonDesktop]}
             onPress={() => handleFavoriteToggle(result)}
           >
             {isResultFavorite ? (
-              <BookmarkCheck size={20} color="#22c55e" />
+              <BookmarkCheck size={isDesktop ? 18 : 20} color="#22c55e" />
             ) : (
-              <Bookmark size={20} color="#888888" />
+              <Bookmark size={isDesktop ? 18 : 20} color="#888888" />
             )}
           </TouchableOpacity>
         </View>
         
-        <View style={styles.resultMeta}>
-          <View style={styles.resultType}>
-            <Text style={styles.resultTypeText}>
+        <View style={[styles.resultMeta, isDesktop && styles.resultMetaDesktop]}>
+          <View style={[styles.resultType, isDesktop && styles.resultTypeDesktop]}>
+            <Text style={[styles.resultTypeText, isDesktop && styles.resultTypeTextDesktop]}>
               {result.type.charAt(0).toUpperCase() + result.type.slice(1).replace('_', ' ')}
             </Text>
           </View>
   
           {(result.type === 'route' || result.type === 'hub' || result.type === 'stop') && (
-            <Text style={{ color: '#1ea2b1', fontSize: 12 }}>
+            <Text style={[styles.followersText, isDesktop && styles.followersTextDesktop]}>
               Followers: {favoritesCountMap[result.id] || 0}
             </Text>
           )}
@@ -494,104 +510,284 @@ export default function SearchScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Search Community</Text>
-        <Text style={styles.headerSubtitle}>Find your community by your favorite stops.</Text>
-      </View>
+    <View style={[styles.container, isDesktop && styles.containerDesktop]}>
+      {/* Desktop layout with centered content */}
+      {isDesktop ? (
+        <ScrollView 
+          style={styles.desktopScrollWrapper}
+          contentContainerStyle={styles.desktopScrollContent}
+          showsVerticalScrollIndicator={true}
+        >
+          <View style={styles.desktopContentWrapper}>
+            <View style={[styles.header, isDesktop && styles.headerDesktop]}>
+              <Text style={[styles.headerTitle, isDesktop && styles.headerTitleDesktop]}>Search Community</Text>
+              <Text style={[styles.headerSubtitle, isDesktop && styles.headerSubtitleDesktop]}>
+                Find your community by your favorite stops.
+              </Text>
+            </View>
 
-      {/* Search Input */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <Search size={20} color="#1ea2b1" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search for routes, stops, hubs..."
-            placeholderTextColor="#888888"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-      </View>
+            {/* Search Input */}
+            <View style={[styles.searchContainer, isDesktop && styles.searchContainerDesktop]}>
+              <View style={[styles.searchInputContainer, isDesktop && styles.searchInputContainerDesktop]}>
+                <Search size={isDesktop ? 18 : 20} color="#1ea2b1" />
+                <TextInput
+                  style={[styles.searchInput, isDesktop && styles.searchInputDesktop]}
+                  placeholder="Search for routes, stops, hubs..."
+                  placeholderTextColor="#888888"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+              </View>
+            </View>
 
-      <View style={styles.tabsWrapper}>
-      <FlatList
-        data={filters}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        renderItem={({item}) => (
-          <TouchableOpacity
-            key={item.key}
-            style={[styles.filterTab, selectedFilter === item.key && styles.activeFilterTab]}
-            onPress={() => setSelectedFilter(item.key as any)}
-          >
-            <item.icon size={16} color={selectedFilter === item.key ? '#FFFFFF' : '#888888'} />
-            <Text style={[styles.filterText, selectedFilter === item.key && styles.activeFilterText]}>
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        )}
-        keyExtractor={item => item.key}
-        contentContainerStyle={styles.filtersContainer}
-      />
-      </View>
+            <View style={[styles.tabsWrapper, isDesktop && styles.tabsWrapperDesktop]}>
+              <ScrollView 
+                horizontal={!isDesktop}
+                showsHorizontalScrollIndicator={!isDesktop}
+                contentContainerStyle={[styles.filtersContainer, isDesktop && styles.filtersContainerDesktop]}
+              >
+                {filters.map((item) => (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[
+                      styles.filterTab, 
+                      isDesktop && styles.filterTabDesktop,
+                      selectedFilter === item.key && styles.activeFilterTab
+                    ]}
+                    onPress={() => setSelectedFilter(item.key as any)}
+                  >
+                    <item.icon size={isDesktop ? 14 : 16} color={selectedFilter === item.key ? '#FFFFFF' : '#888888'} />
+                    <Text style={[
+                      styles.filterText, 
+                      isDesktop && styles.filterTextDesktop,
+                      selectedFilter === item.key && styles.activeFilterText
+                    ]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
 
-      {/* Search Results */}
-      <ScrollView style={styles.resultsContainer} contentContainerStyle={styles.resultsContent}>
-        {loading ? (
-          <SkeletonLoader />
-        ) : searchResults.length > 0 ? (
-          searchResults.map(renderResultItem)
-        ) : searchQuery.length > 2 ? (
-          <View style={styles.noResultsContainer}>
-            <Search size={48} color="#333333" />
-            <Text style={styles.noResultsTitle}>No results found</Text>
-            <Text style={styles.noResultsText}>
-              Try searching with different keywords or check your spelling.
+            {/* Search Results */}
+            <ScrollView 
+              style={[styles.resultsContainer, isDesktop && styles.resultsContainerDesktop]} 
+              contentContainerStyle={[styles.resultsContent, isDesktop && styles.resultsContentDesktop]}
+              showsVerticalScrollIndicator={isDesktop}
+            >
+              {loading ? (
+                <SkeletonLoader isDesktop={isDesktop} />
+              ) : searchResults.length > 0 ? (
+                <View style={styles.desktopResultsGrid}>
+                  {searchResults.map((result, index) => (
+                    <View key={result.id} style={[
+                      styles.desktopResultColumn,
+                      index % 2 === 0 ? styles.desktopResultLeft : styles.desktopResultRight
+                    ]}>
+                      {renderResultItem(result)}
+                    </View>
+                  ))}
+                </View>
+              ) : searchQuery.length > 2 ? (
+                <View style={[styles.noResultsContainer, isDesktop && styles.noResultsContainerDesktop]}>
+                  <Search size={isDesktop ? 40 : 48} color="#333333" />
+                  <Text style={[styles.noResultsTitle, isDesktop && styles.noResultsTitleDesktop]}>No results found</Text>
+                  <Text style={[styles.noResultsText, isDesktop && styles.noResultsTextDesktop]}>
+                    Try searching with different keywords or check your spelling.
+                  </Text>
+                </View>
+              ) : (
+                <View style={[styles.emptyStateContainer, isDesktop && styles.emptyStateContainerDesktop]}>
+                  <Text style={[styles.recommendedTitle, isDesktop && styles.recommendedTitleDesktop]}>
+                    Recommended Nearby
+                  </Text>
+                  {isLoadingRecommended ? (
+                    <SkeletonLoader isDesktop={isDesktop} />
+                  ) : recommendedNearby.length > 0 ? (
+                    <View style={styles.desktopResultsGrid}>
+                      {recommendedNearby.map((result, index) => (
+                        <View key={result.id} style={[
+                          styles.desktopResultColumn,
+                          index % 2 === 0 ? styles.desktopResultLeft : styles.desktopResultRight
+                        ]}>
+                          {renderResultItem(result)}
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={[styles.loadingRecommended, isDesktop && styles.loadingRecommendedDesktop]}>
+                      <Text style={[styles.loadingRecommendedText, isDesktop && styles.loadingRecommendedTextDesktop]}>
+                        No nearby locations found
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </ScrollView>
+      ) : (
+        // Mobile layout
+        <>
+          <View style={[styles.header, isDesktop && styles.headerDesktop]}>
+            <Text style={[styles.headerTitle, isDesktop && styles.headerTitleDesktop]}>Search Community</Text>
+            <Text style={[styles.headerSubtitle, isDesktop && styles.headerSubtitleDesktop]}>
+              Find your community by your favorite stops.
             </Text>
           </View>
-        ) : (
-          <View style={styles.emptyStateContainer}>
-            <Text style={styles.recommendedTitle}>Recommended Nearby</Text>
-            {isLoadingRecommended ? (
-              <SkeletonLoader />
-            ) : recommendedNearby.length > 0 ? (
-              recommendedNearby.map(renderResultItem)
+
+          {/* Search Input */}
+          <View style={[styles.searchContainer, isDesktop && styles.searchContainerDesktop]}>
+            <View style={[styles.searchInputContainer, isDesktop && styles.searchInputContainerDesktop]}>
+              <Search size={isDesktop ? 18 : 20} color="#1ea2b1" />
+              <TextInput
+                style={[styles.searchInput, isDesktop && styles.searchInputDesktop]}
+                placeholder="Search for routes, stops, hubs..."
+                placeholderTextColor="#888888"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+          </View>
+
+          <View style={[styles.tabsWrapper, isDesktop && styles.tabsWrapperDesktop]}>
+            <ScrollView 
+              horizontal={!isDesktop}
+              showsHorizontalScrollIndicator={!isDesktop}
+              contentContainerStyle={[styles.filtersContainer, isDesktop && styles.filtersContainerDesktop]}
+            >
+              {filters.map((item) => (
+                <TouchableOpacity
+                  key={item.key}
+                  style={[
+                    styles.filterTab, 
+                    isDesktop && styles.filterTabDesktop,
+                    selectedFilter === item.key && styles.activeFilterTab
+                  ]}
+                  onPress={() => setSelectedFilter(item.key as any)}
+                >
+                  <item.icon size={isDesktop ? 14 : 16} color={selectedFilter === item.key ? '#FFFFFF' : '#888888'} />
+                  <Text style={[
+                    styles.filterText, 
+                    isDesktop && styles.filterTextDesktop,
+                    selectedFilter === item.key && styles.activeFilterText
+                  ]}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Search Results */}
+          <ScrollView 
+            style={[styles.resultsContainer, isDesktop && styles.resultsContainerDesktop]} 
+            contentContainerStyle={[styles.resultsContent, isDesktop && styles.resultsContentDesktop]}
+            showsVerticalScrollIndicator={isDesktop}
+          >
+            {loading ? (
+              <SkeletonLoader isDesktop={isDesktop} />
+            ) : searchResults.length > 0 ? (
+              searchResults.map(renderResultItem)
+            ) : searchQuery.length > 2 ? (
+              <View style={[styles.noResultsContainer, isDesktop && styles.noResultsContainerDesktop]}>
+                <Search size={isDesktop ? 40 : 48} color="#333333" />
+                <Text style={[styles.noResultsTitle, isDesktop && styles.noResultsTitleDesktop]}>No results found</Text>
+                <Text style={[styles.noResultsText, isDesktop && styles.noResultsTextDesktop]}>
+                  Try searching with different keywords or check your spelling.
+                </Text>
+              </View>
             ) : (
-              <View style={styles.loadingRecommended}>
-                <Text style={styles.loadingRecommendedText}>No nearby locations found</Text>
+              <View style={[styles.emptyStateContainer, isDesktop && styles.emptyStateContainerDesktop]}>
+                <Text style={[styles.recommendedTitle, isDesktop && styles.recommendedTitleDesktop]}>
+                  Recommended Nearby
+                </Text>
+                {isLoadingRecommended ? (
+                  <SkeletonLoader isDesktop={isDesktop} />
+                ) : recommendedNearby.length > 0 ? (
+                  recommendedNearby.map(renderResultItem)
+                ) : (
+                  <View style={[styles.loadingRecommended, isDesktop && styles.loadingRecommendedDesktop]}>
+                    <Text style={[styles.loadingRecommendedText, isDesktop && styles.loadingRecommendedTextDesktop]}>
+                      No nearby locations found
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
-          </View>
-        )}
-      </ScrollView>
+          </ScrollView>
+        </>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Base styles
   container: {
     flex: 1,
     backgroundColor: '#000000',
+    width: '100%',
   },
+  containerDesktop: {
+    width: '100%',
+  },
+  
+  // Desktop wrapper styles
+  desktopScrollWrapper: {
+    flex: 1,
+    width: '100%',
+  },
+  desktopScrollContent: {
+    flexGrow: 1,
+    width: '100%',
+  },
+  desktopContentWrapper: {
+    width: '100%',
+    maxWidth: 1200,
+    alignSelf: 'center',
+  },
+  
   header: {
     padding: 24,
-    paddingTop: 40,
+    paddingTop: 60,
+    width: '100%',
   },
+  headerDesktop: {
+    paddingTop: 24,
+    paddingBottom: 20,
+    paddingHorizontal: 32,
+  },
+  
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
+  headerTitleDesktop: {
+    fontSize: 32,
+  },
+  
   headerSubtitle: {
     fontSize: 16,
     color: '#888888',
     marginTop: 4,
   },
+  headerSubtitleDesktop: {
+    fontSize: 18,
+    marginTop: 6,
+  },
+  
   searchContainer: {
     paddingHorizontal: 16,
     marginBottom: 16,
+    width: '100%',
   },
+  searchContainerDesktop: {
+    paddingHorizontal: 32,
+    marginBottom: 20,
+  },
+  
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -601,23 +797,55 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
   },
+  searchInputContainerDesktop: {
+    borderRadius: 10,
+    padding: 14,
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  
   searchInput: {
     flex: 1,
     marginLeft: 12,
     color: '#FFFFFF',
     fontSize: 16,
   },
+  searchInputDesktop: {
+    marginLeft: 10,
+    fontSize: 15,
+  },
+  
   tabsWrapper: {
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
     backgroundColor: '#000000',
+    width: '100%',
   },
+  tabsWrapperDesktop: {
+    borderBottomWidth: 0,
+    paddingHorizontal: 32,
+    marginBottom: 16,
+  },
+  
   filtersContainer: {
     flex: 0,
     paddingHorizontal: 16,
     marginBottom: 12,
-    paddingVertical: 4
+    paddingVertical: 4,
   },
+  filtersContainerDesktop: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 0,
+    marginBottom: 0,
+    paddingVertical: 0,
+    gap: 8,
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  
   filterTab: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -630,34 +858,75 @@ const styles = StyleSheet.create({
     borderColor: '#333333',
     width: 'auto',
   },
+  filterTabDesktop: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    margin: 0,
+  },
+  
   activeFilterTab: {
     backgroundColor: '#1ea2b1',
     borderColor: '#1ea2b1',
   },
+  
   filterText: {
     color: '#888888',
     fontSize: 14,
     marginLeft: 6,
     fontWeight: '500',
   },
+  filterTextDesktop: {
+    fontSize: 13,
+    marginLeft: 4,
+  },
+  
   activeFilterText: {
     color: '#FFFFFF',
   },
+  
   resultsContainer: {
     flex: 1,
+    width: '100%',
   },
+  resultsContainerDesktop: {
+    paddingHorizontal: 32,
+  },
+  
   resultsContent: {
     padding: 16,
     paddingBottom: 100,
+    width: '100%',
   },
+  resultsContentDesktop: {
+    padding: 0,
+    paddingBottom: 40,
+  },
+  
+  desktopResultsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    width: '100%',
+  },
+  
+  desktopResultColumn: {
+    width: '48%',
+    minWidth: 280,
+  },
+  
+  desktopResultLeft: {},
+  desktopResultRight: {},
+  
   loadingContainer: {
     alignItems: 'center',
     paddingVertical: 40,
   },
+  
   loadingText: {
     color: '#FFFFFF',
     fontSize: 16,
   },
+  
   resultCard: {
     backgroundColor: '#111111',
     padding: 16,
@@ -665,65 +934,126 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#333333',
+    width: '100%',
   },
+  resultCardDesktop: {
+    padding: 12,
+    marginBottom: 16,
+    borderRadius: 10,
+  },
+  
   resultHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
   },
+  resultHeaderDesktop: {
+    marginBottom: 10,
+  },
+  
   resultInfo: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     flex: 1,
   },
+  resultInfoDesktop: {
+    alignItems: 'center',
+  },
+  
   resultDetails: {
     marginLeft: 12,
     flex: 1,
   },
+  resultDetailsDesktop: {
+    marginLeft: 10,
+  },
+  
   resultTitle: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
   },
+  resultTitleDesktop: {
+    fontSize: 15,
+    marginBottom: 3,
+  },
+  
   resultSubtitle: {
     color: '#888888',
     fontSize: 14,
     lineHeight: 18,
   },
+  resultSubtitleDesktop: {
+    fontSize: 13,
+    lineHeight: 16,
+  },
+  
   favoriteButton: {
     padding: 4,
   },
+  favoriteButtonDesktop: {
+    padding: 2,
+  },
+  
   resultMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  resultMetaDesktop: {
+    marginTop: 2,
+  },
+  
   resultType: {
     backgroundColor: '#1ea2b1',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
+  resultTypeDesktop: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  
   resultTypeText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
   },
+  resultTypeTextDesktop: {
+    fontSize: 11,
+  },
+  
+  followersText: {
+    color: '#1ea2b1',
+    fontSize: 12,
+  },
+  followersTextDesktop: {
+    fontSize: 11,
+  },
+  
   routeInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  
   routeInfoText: {
     color: '#888888',
     fontSize: 12,
     marginLeft: 4,
   },
+  
   noResultsContainer: {
     alignItems: 'center',
     paddingVertical: 40,
   },
+  noResultsContainerDesktop: {
+    paddingVertical: 60,
+  },
+  
   noResultsTitle: {
     color: '#FFFFFF',
     fontSize: 20,
@@ -731,33 +1061,67 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
+  noResultsTitleDesktop: {
+    fontSize: 24,
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  
   noResultsText: {
     color: '#888888',
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 22,
   },
+  noResultsTextDesktop: {
+    fontSize: 18,
+    lineHeight: 24,
+    maxWidth: 400,
+  },
+  
   emptyStateContainer: {
     flex: 1,
   },
+  emptyStateContainerDesktop: {
+    paddingTop: 8,
+  },
+  
   recommendedTitle: {
     color: '#FFFFFF',
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 16,
   },
+  recommendedTitleDesktop: {
+    fontSize: 22,
+    marginBottom: 20,
+  },
+  
   loadingRecommended: {
     alignItems: 'center',
     paddingVertical: 40,
   },
+  loadingRecommendedDesktop: {
+    paddingVertical: 60,
+  },
+  
   loadingRecommendedText: {
     color: '#888888',
     fontSize: 16,
   },
+
+  loadingRecommendedTextDesktop: {
+    fontSize: 18,
+  },
+  
   // Skeleton Loading Styles
   skeletonContainer: {
     flex: 1,
   },
+  skeletonContainerDesktop: {
+    // Additional desktop styles for skeleton
+  },
+  
   skeletonCard: {
     backgroundColor: '#111111',
     padding: 16,
@@ -766,57 +1130,107 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
   },
+  skeletonCardDesktop: {
+    padding: 12,
+    marginBottom: 16,
+    borderRadius: 10,
+  },
+  
   skeletonHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
   },
+  skeletonHeaderDesktop: {
+    marginBottom: 10,
+  },
+  
   skeletonIcon: {
     width: 20,
     height: 20,
     borderRadius: 10,
     backgroundColor: '#333333',
   },
+  skeletonIconDesktop: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+  },
+  
   skeletonTextContainer: {
     marginLeft: 12,
     flex: 1,
   },
+  skeletonTextContainerDesktop: {
+    marginLeft: 10,
+  },
+  
   skeletonLine: {
     backgroundColor: '#333333',
     borderRadius: 4,
     marginBottom: 4,
   },
+  
   skeletonTitle: {
     height: 16,
     width: '70%',
     marginBottom: 8,
   },
+  skeletonTitleDesktop: {
+    height: 15,
+    marginBottom: 6,
+  },
+  
   skeletonSubtitle: {
     height: 14,
     width: '50%',
   },
+  skeletonSubtitleDesktop: {
+    height: 13,
+  },
+  
   skeletonFavorite: {
     width: 20,
     height: 20,
     borderRadius: 10,
     backgroundColor: '#333333',
   },
+  skeletonFavoriteDesktop: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+  },
+  
   skeletonMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  skeletonMetaDesktop: {
+    marginTop: 2,
+  },
+  
   skeletonTag: {
     width: 60,
     height: 20,
     borderRadius: 6,
     backgroundColor: '#333333',
   },
+  skeletonTagDesktop: {
+    width: 50,
+    height: 18,
+    borderRadius: 5,
+  },
+  
   skeletonRouteInfo: {
     width: 40,
     height: 14,
     borderRadius: 4,
     backgroundColor: '#333333',
+  },
+  skeletonRouteInfoDesktop: {
+    width: 35,
+    height: 13,
   },
 });

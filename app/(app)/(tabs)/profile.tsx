@@ -5,7 +5,8 @@ import {
   ScrollView, 
   TouchableOpacity, 
   StyleSheet,
-  Platform 
+  Platform,
+  Dimensions 
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { useProfile } from '@/hook/useProfile';
@@ -22,6 +23,9 @@ import { DeleteConfirmationModal } from '@/components/profile/DeleteConfirmation
 
 // Types
 import { UserPost, LinkedAccount } from '@/types/profile';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 export default function ProfileScreen() {
   const { formatTimeAgo } = require('@/components/utils');
@@ -296,6 +300,7 @@ export default function ProfileScreen() {
             onDeletePost={handleDeletePost}
             onNavigateToPost={navigateToPost}
             formatTimeAgo={formatTimeAgo}
+            isDesktop={isDesktop}
           />
         );
       case 'basic-info':
@@ -305,6 +310,7 @@ export default function ProfileScreen() {
             accountsLoading={accountsLoading}
             linkedAccounts={linkedAccounts}
             onSignOut={handleSignOut}
+            isDesktop={isDesktop}
           />
         );
       case 'achievements':
@@ -312,6 +318,7 @@ export default function ProfileScreen() {
           <AchievementsTab
             colors={colors}
             loading={loading}
+            isDesktop={isDesktop}
           />
         );
       default:
@@ -321,7 +328,11 @@ export default function ProfileScreen() {
 
   return (
     <>
-      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView 
+        style={[styles.container, { backgroundColor: '#000000' }]}
+        contentContainerStyle={[styles.contentContainer, isDesktop && styles.contentContainerDesktop]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Hidden file input for web */}
         {Platform.OS === 'web' && (
           <input
@@ -333,48 +344,123 @@ export default function ProfileScreen() {
           />
         )}
 
-        {/* Profile Header */}
-        <ProfileHeader
-          loading={loading}
-          profile={profile}
-          uploading={uploading}
-          onImagePicker={handleImagePicker}
-          accountsLoading={accountsLoading}
-          linkedAccounts={linkedAccounts}
-        />
+        {/* Desktop wrapper */}
+        {isDesktop ? (
+          <View style={styles.desktopWrapper}>
+            <View style={styles.desktopContentWrapper}>
+              {/* Profile Header */}
+              <ProfileHeader
+                loading={loading}
+                profile={profile}
+                uploading={uploading}
+                onImagePicker={handleImagePicker}
+                accountsLoading={accountsLoading}
+                linkedAccounts={linkedAccounts}
+                isDesktop={isDesktop}
+              />
 
-        {/* Tabs */}
-        <View style={styles.tabs}>
-          <TouchableOpacity
-            style={[styles.tab, selectedTab === 'posts' && styles.activeTab]}
-            onPress={() => setSelectedTab('posts')}
-          >
-            <Text style={[styles.tabText, { color: colors.text }]}>Posts</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, selectedTab === 'basic-info' && styles.activeTab]}
-            onPress={() => setSelectedTab('basic-info')}
-          >
-            <Text style={[styles.tabText, { color: colors.text }]}>Basic Info</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, selectedTab === 'achievements' && styles.activeTab]}
-            onPress={() => setSelectedTab('achievements')}
-          >
-            <Text style={[styles.tabText, { color: colors.text }]}>Awards</Text>
-          </TouchableOpacity>
-        </View>
+              {/* Tabs */}
+              <View style={[styles.tabs, isDesktop && styles.tabsDesktop]}>
+                <TouchableOpacity
+                  style={[styles.tab, isDesktop && styles.tabDesktop, selectedTab === 'posts' && styles.activeTab]}
+                  onPress={() => setSelectedTab('posts')}
+                >
+                  <Text style={[styles.tabText, isDesktop && styles.tabTextDesktop, selectedTab === 'posts' && styles.activeTabText]}>
+                    Posts
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.tab, isDesktop && styles.tabDesktop, selectedTab === 'basic-info' && styles.activeTab]}
+                  onPress={() => setSelectedTab('basic-info')}
+                >
+                  <Text style={[styles.tabText, isDesktop && styles.tabTextDesktop, selectedTab === 'basic-info' && styles.activeTabText]}>
+                    Basic Info
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.tab, isDesktop && styles.tabDesktop, selectedTab === 'achievements' && styles.activeTab]}
+                  onPress={() => setSelectedTab('achievements')}
+                >
+                  <Text style={[styles.tabText, isDesktop && styles.tabTextDesktop, selectedTab === 'achievements' && styles.activeTabText]}>
+                    Awards
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-        {/* Tab Content */}
-        {renderTabContent()}
+              {/* Tab Content */}
+              <View style={[styles.tabContent, isDesktop && styles.tabContentDesktop]}>
+                {renderTabContent()}
+              </View>
 
-        <View style={styles.bottomSpace} />
+              {/* App Info */}
+              <View style={[styles.appInfo, isDesktop && styles.appInfoDesktop]}>
+                <Text style={[styles.appInfoText, isDesktop && styles.appInfoTextDesktop]}>
+                  Uthutho v1.5.1
+                </Text>
+                <Text style={[styles.motto, isDesktop && styles.mottoDesktop]}>
+                  "Izindlela zakho ziqinisekisa impumelelo!"
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <>
+            {/* Mobile layout */}
+            {/* Profile Header */}
+            <ProfileHeader
+              loading={loading}
+              profile={profile}
+              uploading={uploading}
+              onImagePicker={handleImagePicker}
+              accountsLoading={accountsLoading}
+              linkedAccounts={linkedAccounts}
+              isDesktop={false}
+            />
 
-        {/* App Info */}
-        <View style={styles.appInfo}>
-          <Text style={[styles.appInfoText, { color: colors.text }]}>Uthutho v1.5.1</Text>
-          <Text style={[styles.motto, { color: colors.primary }]}>"Izindlela zakho ziqinisekisa impumelelo!"</Text>
-        </View>
+            {/* Tabs */}
+            <View style={styles.tabs}>
+              <TouchableOpacity
+                style={[styles.tab, selectedTab === 'posts' && styles.activeTab]}
+                onPress={() => setSelectedTab('posts')}
+              >
+                <Text style={[styles.tabText, selectedTab === 'posts' && styles.activeTabText]}>
+                  Posts
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tab, selectedTab === 'basic-info' && styles.activeTab]}
+                onPress={() => setSelectedTab('basic-info')}
+              >
+                <Text style={[styles.tabText, selectedTab === 'basic-info' && styles.activeTabText]}>
+                  Basic Info
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tab, selectedTab === 'achievements' && styles.activeTab]}
+                onPress={() => setSelectedTab('achievements')}
+              >
+                <Text style={[styles.tabText, selectedTab === 'achievements' && styles.activeTabText]}>
+                  Awards
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Tab Content */}
+            <View style={styles.tabContent}>
+              {renderTabContent()}
+            </View>
+
+            {/* App Info */}
+            <View style={styles.appInfo}>
+              <Text style={styles.appInfoText}>
+                Uthutho v1.5.1
+              </Text>
+              <Text style={styles.motto}>
+                "Izindlela zakho ziqinisekisa impumelelo!"
+              </Text>
+            </View>
+          </>
+        )}
       </ScrollView>
 
       {/* Delete Confirmation Modal */}
@@ -382,6 +468,7 @@ export default function ProfileScreen() {
         visible={deleteModalVisible}
         onConfirm={confirmDeletePost}
         onCancel={cancelDeletePost}
+        isDesktop={isDesktop}
       />
     </>
   );
@@ -390,15 +477,52 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000000',
+    width: '100%',
+  },
+  contentContainer: {
+    flexGrow: 1,
+    backgroundColor: '#000000',
+    width: '100%',
+  },
+  contentContainerDesktop: {
+    minHeight: '100vh',
+    alignItems: 'center',
+  },
+  desktopWrapper: {
+    width: '100%',
+    backgroundColor: '#000000',
+    flex: 1,
+  },
+  desktopContentWrapper: {
+    maxWidth: 800,
+    width: '100%',
+    alignSelf: 'center',
+    backgroundColor: '#000000',
+    paddingHorizontal: 24,
   },
   tabs: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginVertical: 20,
+    backgroundColor: '#000000',
+    width: '100%',
+  },
+  tabsDesktop: {
+    marginVertical: 24,
+    justifyContent: 'flex-start',
+    gap: 32,
+    paddingHorizontal: 0,
+    backgroundColor: '#000000',
   },
   tab: {
     padding: 10,
     borderRadius: 10,
+    backgroundColor: 'transparent',
+  },
+  tabDesktop: {
+    padding: 12,
+    borderRadius: 8,
   },
   activeTab: {
     borderBottomWidth: 2,
@@ -407,22 +531,48 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#FFFFFF',
   },
-  bottomSpace: {
-    height: 20,
+  tabTextDesktop: {
+    fontSize: 15,
+  },
+  activeTabText: {
+    color: '#1ea2b1',
+  },
+  tabContent: {
+    backgroundColor: '#000000',
+    width: '100%',
+  },
+  tabContentDesktop: {
+    paddingHorizontal: 0,
   },
   appInfo: {
     alignItems: 'center',
     paddingHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 40,
+    backgroundColor: '#000000',
+    width: '100%',
+  },
+  appInfoDesktop: {
+    marginTop: 32,
     marginBottom: 20,
   },
   appInfoText: {
     fontSize: 14,
     marginBottom: 8,
+    color: '#CCCCCC',
+  },
+  appInfoTextDesktop: {
+    fontSize: 13,
   },
   motto: {
     fontSize: 14,
     fontStyle: 'italic',
     textAlign: 'center',
+    color: '#1ea2b1',
+  },
+  mottoDesktop: {
+    fontSize: 13,
   },
 });

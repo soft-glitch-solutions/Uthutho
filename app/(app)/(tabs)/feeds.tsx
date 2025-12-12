@@ -1101,23 +1101,27 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     paddingHorizontal: 24,
+    backgroundColor: '#000000', // Add this for consistency
   },
   desktopSidebar: {
     width: 280,
     paddingRight: 20,
     borderRightWidth: 1,
     borderRightColor: '#333333',
+    backgroundColor: '#000000', // Add this for consistency
   },
   desktopMain: {
     flex: 1,
     paddingHorizontal: 24,
     maxWidth: 680,
+    backgroundColor: '#000000', // Add this for consistency
   },
   desktopSidebarRight: {
     width: 300,
     paddingLeft: 20,
     borderLeftWidth: 1,
     borderLeftColor: '#333333',
+    backgroundColor: '#000000', // Add this - crucial fix
   },
   communityStats: {
     backgroundColor: '#1a1a1a',
