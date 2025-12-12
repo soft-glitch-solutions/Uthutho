@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/lib/supabase';
 import { Header, TabNavigation, StopsTab, RoutesTab, HubsTab } from '@/components/routes';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 export interface Route {
   id: string;
@@ -232,6 +235,7 @@ export default function RoutesScreen() {
             onRefresh={handleRefreshStops}
             isSearchModeRef={isStopSearchMode}
             stopFollowerCounts={stopFollowerCounts}
+            isDesktop={isDesktop}
           />
         );
       case 'routes':
@@ -243,6 +247,7 @@ export default function RoutesScreen() {
             onRefresh={handleRefreshRoutes}
             isSearchModeRef={isRouteSearchMode}
             routeFollowerCounts={routeFollowerCounts}
+            isDesktop={isDesktop}
           />
         );
       case 'hubs':
@@ -254,6 +259,7 @@ export default function RoutesScreen() {
             onRefresh={handleRefreshHubs}
             isSearchModeRef={isHubSearchMode}
             hubFollowerCounts={hubFollowerCounts}
+            isDesktop={isDesktop}
           />
         );
       default:
@@ -264,9 +270,11 @@ export default function RoutesScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <Header />
-      <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
-      {renderTabContent()}
+      <View style={[styles.innerContainer, isDesktop && styles.innerContainerDesktop]}>
+        <Header isDesktop={isDesktop} />
+        <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} isDesktop={isDesktop} />
+        {renderTabContent()}
+      </View>
     </View>
   );
 }
@@ -275,5 +283,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+    width: '100%',
+  },
+  innerContainer: {
+    flex: 1,
+  },
+  innerContainerDesktop: {
+    maxWidth: 1200,
+    alignSelf: 'center',
+    width: '100%',
   },
 });

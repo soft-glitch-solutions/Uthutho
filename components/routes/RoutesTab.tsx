@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, FlatList, ScrollView } from 'react-native';
+import { View, FlatList, ScrollView, StyleSheet, Dimensions } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import SearchSection from '@/components/routes/SearchSection';
 import RouteItem from '@/components/routes/RouteItem';
@@ -9,16 +9,32 @@ import ListFooter from '@/components/routes/ListFooter';
 import FilterButton from '@/components/routes/FilterButton';
 import { Route } from './RoutesScreen';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
+
 interface RoutesTabProps {
   routes: Route[];
   routesLoading: boolean;
   onLoadMore: () => void;
+  onRefresh?: () => void;
   isSearchModeRef: React.MutableRefObject<boolean>;
+  routeFollowerCounts: Record<string, number>;
+  isDesktop?: boolean;
 }
 
 const transportTypes = ['All', 'Taxi', 'Bus', 'Train', 'Shuttle'];
 
-export default function RoutesTab({ routes, routesLoading, onLoadMore, isSearchModeRef }: RoutesTabProps) {
+export default function RoutesTab({ 
+  routes, 
+  routesLoading, 
+  onLoadMore, 
+  onRefresh,
+  isSearchModeRef, 
+  routeFollowerCounts,
+  isDesktop: propIsDesktop = false 
+}: RoutesTabProps) {
+  const desktopMode = isDesktop || propIsDesktop;
+  
   const [filteredRoutes, setFilteredRoutes] = useState<Route[]>([]);
   const [routeSearchQuery, setRouteSearchQuery] = useState('');
   const [selectedTransportType, setSelectedTransportType] = useState<string>('All');
@@ -72,48 +88,118 @@ export default function RoutesTab({ routes, routesLoading, onLoadMore, isSearchM
     }
   };
 
+  const handleRefresh = () => {
+    if (onRefresh) {
+      onRefresh();
+    }
+    setRoutesRefreshing(true);
+    setTimeout(() => setRoutesRefreshing(false), 1000);
+  };
+
   return (
-    <View style={{ flex: 1 }}>
+    <View style={[styles.container, desktopMode && styles.containerDesktop]}>
       <SearchSection
         searchQuery={routeSearchQuery}
         onSearchChange={setRouteSearchQuery}
         placeholder="Search routes..."
+        isDesktop={desktopMode}
       />
 
-      <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+      <View style={[styles.filterContainer, desktopMode && styles.filterContainerDesktop]}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          style={styles.scrollView}
+          contentContainerStyle={desktopMode && styles.scrollContentDesktop}
+        >
           {transportTypes.map((type) => (
             <FilterButton
               key={type}
               label={type}
               isActive={selectedTransportType === type}
               onPress={() => setSelectedTransportType(type)}
+              isDesktop={desktopMode}
             />
           ))}
         </ScrollView>
       </View>
 
       {(routesRefreshing || routesLoading) && filteredRoutes.length === 0 ? (
-        <SkeletonLoader type="route" />
+        <SkeletonLoader type="route" isDesktop={desktopMode} />
       ) : (
         <FlatList
           data={filteredRoutes}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <RouteItem route={item} />}
+          renderItem={({ item }) => (
+            <RouteItem 
+              route={item} 
+              followerCount={routeFollowerCounts[item.id] || 0}
+              isDesktop={desktopMode}
+            />
+          )}
           onEndReached={onLoadMore}
           onEndReachedThreshold={0.5}
-          ListFooterComponent={<ListFooter loadingMore={routesLoading} isSearchMode={isSearchModeRef.current} />}
+          onRefresh={handleRefresh}
+          refreshing={routesRefreshing}
+          ListFooterComponent={
+            <ListFooter 
+              loadingMore={routesLoading} 
+              isSearchMode={isSearchModeRef.current} 
+              isDesktop={desktopMode}
+            />
+          }
           ListEmptyComponent={
             <EmptyState 
               isSearching={isSearchingRoutes} 
               type="route" 
-              searchQuery={routeSearchQuery} 
+              searchQuery={routeSearchQuery}
+              isDesktop={desktopMode}
             />
           }
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
+          contentContainerStyle={[
+            styles.contentContainer,
+            desktopMode && styles.contentContainerDesktop
+          ]}
           showsVerticalScrollIndicator={false}
+          numColumns={desktopMode ? 2 : 1}
+          columnWrapperStyle={desktopMode && styles.columnWrapper}
         />
       )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  containerDesktop: {
+    paddingHorizontal: 24,
+  },
+  filterContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  filterContainerDesktop: {
+    paddingHorizontal: 0,
+    marginBottom: 16,
+  },
+  scrollView: {
+    marginBottom: 8,
+  },
+  scrollContentDesktop: {
+    paddingRight: 8,
+  },
+  contentContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  contentContainerDesktop: {
+    paddingHorizontal: 0,
+    paddingBottom: 32,
+  },
+  columnWrapper: {
+    gap: 16,
+    marginBottom: 16,
+  },
+});
