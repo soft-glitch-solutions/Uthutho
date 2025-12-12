@@ -261,34 +261,46 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+    width: '100%',
   },
   containerDesktop: {
-    maxWidth: 1400,
-    alignSelf: 'center',
     width: '100%',
+    alignItems: 'center',
   },
   
   // Desktop layout
   desktopLayout: {
     flex: 1,
     flexDirection: 'row',
-    paddingHorizontal: 24,
+    backgroundColor: '#000000',
+    width: '100%',
+    maxWidth: 1400,
   },
   desktopSidebar: {
     width: 280,
-    paddingRight: 20,
-    paddingTop: 20,
+    paddingRight: 24,
+    paddingTop: 24,
+    paddingBottom: 24,
+    backgroundColor: '#000000',
+    borderRightWidth: 1,
+    borderRightColor: '#333333',
   },
   desktopMain: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingTop: 24,
+    paddingBottom: 24,
     maxWidth: 680,
+    backgroundColor: '#000000',
   },
   desktopSidebarRight: {
     width: 300,
-    paddingLeft: 20,
-    paddingTop: 20,
+    paddingLeft: 24,
+    paddingTop: 24,
+    paddingBottom: 24,
+    backgroundColor: '#000000',
+    borderLeftWidth: 1,
+    borderLeftColor: '#333333',
   },
   
   header: {
@@ -299,15 +311,19 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 20,
     backgroundColor: '#000000',
+    width: '100%',
   },
   headerDesktop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 0,
-    paddingTop: 0,
+    paddingHorizontal: 24,
+    paddingTop: 24,
     paddingBottom: 16,
-    backgroundColor: 'transparent',
+    backgroundColor: '#000000',
+    width: '100%',
+    maxWidth: 1400,
+    alignSelf: 'center',
   },
   
   headerRight: {
@@ -349,18 +365,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     paddingVertical: 8,
+    backgroundColor: '#000000',
+    width: '100%',
   },
   
   tabsWrapper: {
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
     backgroundColor: '#000000',
+    width: '100%',
   },
   
   communityTabsContent: {
     flexDirection: 'row',
     paddingHorizontal: 8,
     paddingVertical: 8,
+    backgroundColor: '#000000',
   },
   
   communityTabSkeleton: {
@@ -383,6 +403,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#333333',
+    width: '100%',
   },
   
   postCard: {
@@ -401,6 +422,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#333333',
+    flex: 1,
+    minWidth: '48%',
+    maxWidth: '48%',
   },
   
   postsGridDesktop: {
@@ -408,6 +432,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 12,
     marginTop: 8,
+    backgroundColor: '#000000',
+    width: '100%',
   },
   
   postHeader: {
@@ -425,23 +451,36 @@ const styles = StyleSheet.create({
   
   searchContainer: {
     margin: 16,
+    width: '100%',
+    backgroundColor: '#000000',
   },
   searchContainerDesktop: {
     marginHorizontal: 24,
     marginVertical: 12,
+    maxWidth: 1400,
+    alignSelf: 'center',
+    width: '100%',
   },
   
   communitiesList: {
     padding: 16,
+    backgroundColor: '#000000',
+    width: '100%',
+    flex: 1,
   },
   communitiesListDesktop: {
     padding: 24,
+    maxWidth: 1400,
+    alignSelf: 'center',
+    width: '100%',
   },
   
   communitiesGridDesktop: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    backgroundColor: '#000000',
+    width: '100%',
   },
   
   communityItemSkeleton: {
@@ -454,10 +493,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#333333',
+    width: '100%',
   },
   communityItemSkeletonDesktop: {
     flex: 1,
     minWidth: '48%',
+    maxWidth: '48%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -482,6 +523,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderRadius: 8,
     backgroundColor: '#1a1a1a',
+    width: '100%',
   },
   
   desktopCommunityInfoSkeleton: {
@@ -494,6 +536,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    width: '100%',
   },
 });
 

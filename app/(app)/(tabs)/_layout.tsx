@@ -238,7 +238,7 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
             style={{ width: 30, height: 30, marginRight: 8 }}
           />
           <Text style={{ 
-            fontSize: 20, 
+            fontSize: 30, 
             fontWeight: 'bold', 
             color: colors.primary,
             letterSpacing: -0.5 

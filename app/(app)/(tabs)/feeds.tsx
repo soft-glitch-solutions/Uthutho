@@ -11,6 +11,7 @@ import {
   Platform,
   Share,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Users, MessageSquare } from 'lucide-react-native';
@@ -858,147 +859,151 @@ export default function FeedsScreen() {
 
   return (
     <View style={[styles.container, isDesktop && styles.containerDesktop]}>
-      <Header
-        unreadNotifications={unreadNotifications}
-        router={router}
-        isDesktop={isDesktop}
-      />
-
-      {/* Desktop layout wrapper */}
       {isDesktop ? (
-        <View style={styles.desktopLayout}>
-          {/* Left sidebar - Community tabs */}
-          <View style={styles.desktopSidebar}>
-            <CommunityTabs
-              communities={communities}
-              selectedCommunity={selectedCommunity}
-              setSelectedCommunity={setSelectedCommunity}
-              followerCounts={{}}
+        <>
+          {/* Desktop Header */}
+          <View style={styles.desktopHeaderContainer}>
+            <Header
+              unreadNotifications={unreadNotifications}
+              router={router}
               isDesktop={isDesktop}
             />
-            
-            {/* Desktop community stats */}
-            <View style={styles.communityStats}>
-              <Text style={styles.communityStatsTitle}>Community Stats</Text>
-              <View style={styles.communityStatItem}>
-                <Text style={styles.communityStatNumber}>{posts.length}</Text>
-                <Text style={styles.communityStatLabel}>Posts This Week</Text>
-              </View>
-              <View style={styles.communityStatItem}>
-                <Text style={styles.communityStatNumber}>
-                  {posts.reduce((acc, post) => acc + (post.post_reactions?.length || 0), 0)}
-                </Text>
-                <Text style={styles.communityStatLabel}>Reactions</Text>
-              </View>
-            </View>
           </View>
 
-          {/* Main feed area */}
-          <View style={styles.desktopMain}>
-            {/* Show preview header when in preview mode */}
-            {previewMode && previewCommunity && (
-              <PreviewHeader
-                previewCommunity={previewCommunity}
-                isFollowingPreview={isFollowingPreview}
-                onFollow={followPreviewCommunity}
-                onUnfollow={unfollowPreviewCommunity}
-                onViewFull={() => setPreviewMode(false)}
-                posts={posts}
-                isDesktop={isDesktop}
-              />
-            )}
-
-            {weekRange && (
-              <WeekRangeHeader
-                weekRange={weekRange}
-                postFilter={postFilter}
-                setPostFilter={setPostFilter}
-                isDesktop={isDesktop}
-              />
-            )}
-
-            {renderPostCreation()}
-
-            <FlatList
-              data={posts}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <PostCard
-                  post={item}
-                  userId={userId}
-                  toggleReaction={toggleReaction}
-                  sharePost={sharePost}
-                  downloadPost={downloadPost}
-                  sharingPost={sharingPost}
-                  router={router}
-                  viewShotRef={(ref: any) => {
-                    viewShotRefs.current[item.id] = ref;
-                  }}
-                  disabled={previewMode && !isFollowingPreview}
+          {/* Desktop main content */}
+          <View style={styles.desktopMainWrapper}>
+            <View style={styles.desktopContentWrapper}>
+              {/* Left sidebar - Community tabs */}
+              <View style={styles.desktopSidebar}>
+                <CommunityTabs
+                  communities={communities}
+                  selectedCommunity={selectedCommunity}
+                  setSelectedCommunity={setSelectedCommunity}
+                  followerCounts={{}}
                   isDesktop={isDesktop}
                 />
-              )}
-              ListEmptyComponent={
-                <EmptyPosts
-                  title={
-                    previewMode && !isFollowingPreview 
-                      ? "Follow to See Posts" 
-                      : selectedCommunity ? "No Posts Yet" : "Select a Community"
-                  }
-                  subtitle={
-                    previewMode && !isFollowingPreview
-                      ? "Follow this community to see what people are posting"
-                      : selectedCommunity 
-                        ? "Be the first to post in this community" 
-                        : "Choose a community to see posts"
-                  }
-                  showAnimation={!!selectedCommunity}
-                  isDesktop={isDesktop}
-                />
-              }
-              refreshControl={
-                <RefreshControl 
-                  refreshing={refreshing} 
-                  onRefresh={onRefresh}
-                  tintColor="#1ea2b1"
-                  colors={['#1ea2b1']}
-                />
-              }
-              contentContainerStyle={[
-                styles.desktopPostsListContent,
-                previewMode && styles.previewContent,
-              ]}
-              showsVerticalScrollIndicator={false}
-            />
-          </View>
-
-          {/* Right sidebar - Trending/Recent activity */}
-          <View style={styles.desktopSidebarRight}>
-            <View style={styles.trendingSection}>
-              <Text style={styles.trendingTitle}>Trending Posts</Text>
-              {posts.slice(0, 3).map((post, index) => (
-                <TouchableOpacity 
-                  key={post.id} 
-                  style={styles.trendingPost}
-                  onPress={() => router.push(`/post/${post.id}`)}
-                >
-                  <Text style={styles.trendingPostIndex}>#{index + 1}</Text>
-                  <View style={styles.trendingPostContent}>
-                    <Text style={styles.trendingPostText} numberOfLines={2}>
-                      {post.content}
-                    </Text>
-                    <Text style={styles.trendingPostReactions}>
-                      🔥 {post.post_reactions.filter(r => r.reaction_type === 'fire').length}
-                    </Text>
+                
+                {/* Desktop community stats */}
+                <View style={styles.communityStats}>
+                  <Text style={styles.communityStatsTitle}>Community Stats</Text>
+                  <View style={styles.communityStatItem}>
+                    <Text style={styles.communityStatNumber}>{posts.length}</Text>
+                    <Text style={styles.communityStatLabel}>Posts This Week</Text>
                   </View>
-                </TouchableOpacity>
-              ))}
+                  <View style={styles.communityStatItem}>
+                    <Text style={styles.communityStatNumber}>
+                      {posts.reduce((acc, post) => acc + (post.post_reactions?.length || 0), 0)}
+                    </Text>
+                    <Text style={styles.communityStatLabel}>Reactions</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Main feed area */}
+              <View style={styles.desktopMain}>
+                {/* Show preview header when in preview mode */}
+                {previewMode && previewCommunity && (
+                  <PreviewHeader
+                    previewCommunity={previewCommunity}
+                    isFollowingPreview={isFollowingPreview}
+                    onFollow={followPreviewCommunity}
+                    onUnfollow={unfollowPreviewCommunity}
+                    onViewFull={() => setPreviewMode(false)}
+                    posts={posts}
+                    isDesktop={isDesktop}
+                  />
+                )}
+
+                {weekRange && (
+                  <WeekRangeHeader
+                    weekRange={weekRange}
+                    postFilter={postFilter}
+                    setPostFilter={setPostFilter}
+                    isDesktop={isDesktop}
+                  />
+                )}
+
+                {renderPostCreation()}
+
+                <ScrollView 
+                  style={styles.desktopPostsScroll}
+                  contentContainerStyle={styles.desktopPostsContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {posts.length > 0 ? (
+                    posts.map((item) => (
+                      <PostCard
+                        key={item.id}
+                        post={item}
+                        userId={userId}
+                        toggleReaction={toggleReaction}
+                        sharePost={sharePost}
+                        downloadPost={downloadPost}
+                        sharingPost={sharingPost}
+                        router={router}
+                        viewShotRef={(ref: any) => {
+                          viewShotRefs.current[item.id] = ref;
+                        }}
+                        disabled={previewMode && !isFollowingPreview}
+                        isDesktop={isDesktop}
+                      />
+                    ))
+                  ) : (
+                    <EmptyPosts
+                      title={
+                        previewMode && !isFollowingPreview 
+                          ? "Follow to See Posts" 
+                          : selectedCommunity ? "No Posts Yet" : "Select a Community"
+                      }
+                      subtitle={
+                        previewMode && !isFollowingPreview
+                          ? "Follow this community to see what people are posting"
+                          : selectedCommunity 
+                            ? "Be the first to post in this community" 
+                            : "Choose a community to see posts"
+                      }
+                      showAnimation={!!selectedCommunity}
+                      isDesktop={isDesktop}
+                    />
+                  )}
+                </ScrollView>
+              </View>
+
+              {/* Right sidebar - Trending/Recent activity */}
+              <View style={styles.desktopSidebarRight}>
+                <View style={styles.trendingSection}>
+                  <Text style={styles.trendingTitle}>Trending Posts</Text>
+                  {posts.slice(0, 3).map((post, index) => (
+                    <TouchableOpacity 
+                      key={post.id} 
+                      style={styles.trendingPost}
+                      onPress={() => router.push(`/post/${post.id}`)}
+                    >
+                      <Text style={styles.trendingPostIndex}>#{index + 1}</Text>
+                      <View style={styles.trendingPostContent}>
+                        <Text style={styles.trendingPostText} numberOfLines={2}>
+                          {post.content}
+                        </Text>
+                        <Text style={styles.trendingPostReactions}>
+                          🔥 {post.post_reactions.filter(r => r.reaction_type === 'fire').length}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             </View>
           </View>
-        </View>
+        </>
       ) : (
         // Mobile layout
         <>
+          <Header
+            unreadNotifications={unreadNotifications}
+            router={router}
+            isDesktop={isDesktop}
+          />
+
           {/* Show preview header when in preview mode */}
           {previewMode && previewCommunity && (
             <PreviewHeader
@@ -1091,46 +1096,75 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
-  },
-  containerDesktop: {
-    maxWidth: 1400,
-    alignSelf: 'center',
     width: '100%',
   },
-  desktopLayout: {
+  containerDesktop: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  desktopHeaderContainer: {
+    width: '100%',
+    backgroundColor: '#000000',
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  desktopMainWrapper: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 1400,
+    backgroundColor: '#000000',
+  },
+  desktopContentWrapper: {
     flex: 1,
     flexDirection: 'row',
+    width: '100%',
+    backgroundColor: '#000000',
     paddingHorizontal: 24,
-    backgroundColor: '#000000', // Add this for consistency
   },
   desktopSidebar: {
     width: 280,
-    paddingRight: 20,
+    paddingRight: 24,
     borderRightWidth: 1,
     borderRightColor: '#333333',
-    backgroundColor: '#000000', // Add this for consistency
+    backgroundColor: '#000000',
+    paddingTop: 24,
+    paddingBottom: 24,
   },
   desktopMain: {
     flex: 1,
-    paddingHorizontal: 24,
     maxWidth: 680,
-    backgroundColor: '#000000', // Add this for consistency
+    backgroundColor: '#000000',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 24,
   },
   desktopSidebarRight: {
     width: 300,
-    paddingLeft: 20,
+    paddingLeft: 24,
     borderLeftWidth: 1,
     borderLeftColor: '#333333',
-    backgroundColor: '#000000', // Add this - crucial fix
+    backgroundColor: '#000000',
+    paddingTop: 24,
+    paddingBottom: 24,
+  },
+  desktopPostsScroll: {
+    flex: 1,
+  },
+  desktopPostsContent: {
+    paddingBottom: 40,
   },
   communityStats: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#111111',
     borderRadius: 12,
     padding: 16,
-    marginTop: 20,
+    marginTop: 24,
+    borderWidth: 1,
+    borderColor: '#333333',
   },
   communityStatsTitle: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 16,
@@ -1144,17 +1178,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   communityStatLabel: {
-    color: '#cccccc',
+    color: '#CCCCCC',
     fontSize: 12,
     marginTop: 2,
   },
   trendingSection: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#111111',
     borderRadius: 12,
     padding: 16,
+    borderWidth: 1,
+    borderColor: '#333333',
   },
   trendingTitle: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
@@ -1177,7 +1213,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   trendingPostText: {
-    color: '#cccccc',
+    color: '#CCCCCC',
     fontSize: 12,
     lineHeight: 16,
   },
@@ -1195,14 +1231,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
     backgroundColor: '#0a0a0a',
+    width: '100%',
   },
   weekRangeWrapperDesktop: {
     paddingHorizontal: 0,
     marginBottom: 16,
+    backgroundColor: '#111111',
+    padding: 12,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#333333',
   },
   weekRangeText: {
-    color: '#cccccc',
+    color: '#CCCCCC',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -1231,9 +1272,7 @@ const styles = StyleSheet.create({
   postsListContent: {
     paddingBottom: 24,
     flexGrow: 1,
-  },
-  desktopPostsListContent: {
-    paddingBottom: 32,
+    backgroundColor: '#000000',
   },
   // Preview styles
   previewHeader: {
@@ -1242,6 +1281,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#333333',
     paddingHorizontal: 16,
     paddingVertical: 20,
+    width: '100%',
   },
   previewHeaderDesktop: {
     paddingHorizontal: 0,
@@ -1250,6 +1290,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#333333',
+    backgroundColor: '#111111',
+    width: '100%',
   },
   previewHeaderContent: {
     marginBottom: 16,
@@ -1258,7 +1300,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   previewTitle: {
-    color: '#cccccc',
+    color: '#CCCCCC',
     fontSize: 14,
     fontWeight: '500',
     marginBottom: 4,
@@ -1267,7 +1309,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   previewCommunityName: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 8,
@@ -1276,7 +1318,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   previewDescription: {
-    color: '#cccccc',
+    color: '#CCCCCC',
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 16,
@@ -1302,7 +1344,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   followButtonText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1328,7 +1370,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   viewFullButtonText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1347,7 +1389,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   unfollowButtonText: {
-    color: '#cccccc',
+    color: '#CCCCCC',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1363,7 +1405,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   weekStatsTitle: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
@@ -1397,7 +1439,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   statLabel: {
-    color: '#cccccc',
+    color: '#CCCCCC',
     fontSize: 12,
   },
   statLabelDesktop: {
@@ -1427,8 +1469,13 @@ const styles = StyleSheet.create({
   },
   previewPostCreationDesktop: {
     marginHorizontal: 0,
-    marginBottom: 12,
-    padding: 12,
+    marginBottom: 16,
+    padding: 16,
+    backgroundColor: '#111111',
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#333333',
+    borderRadius: 8,
   },
   previewPostCreationText: {
     color: '#666666',
