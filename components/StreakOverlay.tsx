@@ -1,5 +1,12 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Modal, 
+  Animated 
+} from 'react-native';
 import { Trophy, Flame, Star, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
@@ -19,13 +26,28 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
     message: '',
   });
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible && userId) {
       updateLoginStreak();
     }
   }, [visible, userId]);
+
+  useEffect(() => {
+    if (visible && !isLoading) {
+      // Fade in when data is loaded and component becomes visible
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      // Reset fade value when hiding
+      fadeAnim.setValue(0);
+    }
+  }, [visible, isLoading]);
 
   const updateLoginStreak = async () => {
     if (!userId) return;
@@ -205,41 +227,6 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
     }
   };
 
-  const SkeletonLoader = () => (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.overlay}>
-        <View style={styles.container}>
-          <View style={styles.skeletonCloseButton} />
-          
-          <View style={styles.content}>
-            <View style={[styles.skeletonIcon, styles.skeleton]} />
-            
-            <View style={[styles.skeletonTitle, styles.skeleton]} />
-            <View style={[styles.skeletonDayText, styles.skeleton]} />
-            
-            <View style={styles.streakContainer}>
-              <View style={[styles.skeletonStreakNumber, styles.skeleton]} />
-              <View style={[styles.skeletonStreakLabel, styles.skeleton]} />
-            </View>
-
-            <View style={[styles.skeletonRecordBadge, styles.skeleton]} />
-
-            <View style={styles.statsContainer}>
-              <View style={[styles.skeletonStatItem, styles.skeleton]} />
-              <View style={[styles.skeletonStatItem, styles.skeleton]} />
-            </View>
-
-            <View style={[styles.skeletonButton, styles.skeleton]} />
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-
-  if (isLoading) {
-    return <SkeletonLoader />;
-  }
-
   return (
     <Modal
       visible={visible}
@@ -248,7 +235,12 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.container}>
+        <Animated.View 
+          style={[
+            styles.container,
+            { opacity: fadeAnim }
+          ]}
+        >
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <X size={24} color="#ffffff" />
           </TouchableOpacity>
@@ -296,7 +288,7 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
               <Text style={styles.continueButtonText}>Continue</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -406,60 +398,5 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  // Skeleton styles
-  skeleton: {
-    backgroundColor: '#333333',
-    borderRadius: 4,
-  },
-  skeletonCloseButton: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#333333',
-  },
-  skeletonIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginBottom: 20,
-  },
-  skeletonTitle: {
-    width: 200,
-    height: 28,
-    marginBottom: 8,
-  },
-  skeletonDayText: {
-    width: 120,
-    height: 18,
-    marginBottom: 20,
-  },
-  skeletonStreakNumber: {
-    width: 80,
-    height: 52,
-    marginBottom: 8,
-  },
-  skeletonStreakLabel: {
-    width: 80,
-    height: 16,
-  },
-  skeletonRecordBadge: {
-    width: 140,
-    height: 32,
-    borderRadius: 16,
-    marginBottom: 20,
-  },
-  skeletonStatItem: {
-    width: 100,
-    height: 80,
-    borderRadius: 12,
-  },
-  skeletonButton: {
-    width: 120,
-    height: 44,
-    borderRadius: 12,
   },
 });

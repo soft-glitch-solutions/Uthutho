@@ -1,70 +1,122 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  ScrollView, 
+  View, 
   KeyboardAvoidingView, 
   Platform,
-  RefreshControl,
   Alert,
-  View,
   Text,
-  FlatList,
   StyleSheet,
   TouchableOpacity,
-  Share
+  Share,
+  Image,
+  Animated,
+  Modal
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Share2, UserPlus, Award } from 'lucide-react-native';
+import { Share2, Users, Clock, MapPin, Car, User, ChevronRight } from 'lucide-react-native';
 
 import { useJourney } from '@/hook/useJourney';
 import { supabase } from '@/lib/supabase';
 import { JourneyHeader } from '@/components/journey/JourneyHeader';
-import { JourneyOverview } from '@/components/journey/JourneyOverview';
-import { UserStopHighlight } from '@/components/journey/UserStopHighlight';
-import { RouteProgress } from '@/components/journey/RouteProgress';
-import { PassengersList } from '@/components/journey/PassengersList';
-import { JourneyChat } from '@/components/journey/JourneyChat';
-import { CompleteJourneyButton } from '@/components/journey/CompleteJourneyButton';
+import { CompactRouteSlider } from '@/components/journey/CompactRouteSlider';
+import { JourneyTabs } from '@/components/journey/JourneyTabs';
 import { ConnectionError } from '@/components/journey/ConnectionError';
 import { JourneySkeleton } from '@/components/journey/JourneySkeleton';
 import { NoActiveJourney } from '@/components/journey/NoActiveJourney';
-import { JourneyTabs } from '@/components/journey/JourneyTabs';
 
 import type { JourneyStop, Passenger, ChatMessage } from '@/types/journey';
 
-// No Driver Promotion Component
-const NoDriverPromotion = ({ onShare, onDriverSignup, routeName, transportType }) => {
+// Stop Details Modal Component
+const StopDetailsModal = ({ stop, visible, onClose, passengers }) => {
+  if (!stop) return null;
+
+  const passengersAtStop = passengers.filter(p => p.stop_id === stop.id);
+  
   return (
-    <View style={styles.noDriverContainer}>
-      <View style={styles.noDriverHeader}>
-        <Text style={styles.noDriverTitle}>🚨 Oh no, no driver!</Text>
-        <Text style={styles.noDriverSubtitle}>
-          Get your driver to join Uthutho and earn <Text style={styles.pointsHighlight}>200 points</Text>
-        </Text>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{stop.name}</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.stopInfo}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Stop Number:</Text>
+              <Text style={styles.infoValue}>{stop.order_number}</Text>
+            </View>
+            
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Status:</Text>
+              <View style={[
+                styles.statusBadge,
+                stop.passed && styles.passedBadge,
+                stop.current && styles.currentBadge,
+                stop.upcoming && styles.upcomingBadge
+              ]}>
+                <Text style={styles.statusBadgeText}>
+                  {stop.passed ? 'Passed' : 
+                   stop.current ? 'Current' : 
+                   stop.upcoming ? 'Upcoming' : 'Future'}
+                </Text>
+              </View>
+            </View>
+            
+            {passengersAtStop.length > 0 ? (
+              <View style={styles.passengersSection}>
+                <Text style={styles.sectionTitle}>
+                  Passengers Waiting ({passengersAtStop.length})
+                </Text>
+                {passengersAtStop.map(passenger => (
+                  <View key={passenger.id} style={styles.passengerItem}>
+                    <View style={styles.passengerAvatar}>
+                      {passenger.profiles?.avatar_url ? (
+                        <Image 
+                          source={{ uri: passenger.profiles.avatar_url }}
+                          style={styles.avatarImage}
+                        />
+                      ) : (
+                        <View style={styles.avatarPlaceholder}>
+                          <Text style={styles.avatarInitial}>
+                            {passenger.profiles?.first_name?.[0] || 'U'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.passengerInfo}>
+                      <Text style={styles.passengerName}>
+                        {passenger.profiles?.first_name} {passenger.profiles?.last_name}
+                      </Text>
+                      <Text style={styles.waitingText}>
+                        Waiting at this stop
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.noPassengers}>
+                <Text style={styles.noPassengersText}>No passengers waiting at this stop</Text>
+              </View>
+            )}
+          </View>
+          
+          <TouchableOpacity style={styles.dismissButton} onPress={onClose}>
+            <Text style={styles.dismissButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      
-      <View style={styles.pointsBadge}>
-        <Award size={20} color="#fbbf24" />
-        <Text style={styles.pointsText}>200 POINTS REWARD</Text>
-      </View>
-
-      <TouchableOpacity 
-        style={styles.shareButton}
-        onPress={onShare}
-      >
-        <Share2 size={20} color="#ffffff" />
-        <Text style={styles.shareButtonText}>Share with Driver</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity 
-        style={styles.driverSignupButton}
-        onPress={onDriverSignup}
-      >
-        <UserPlus size={20} color="#1ea2b1" />
-        <Text style={styles.driverSignupButtonText}>Become a Driver</Text>
-      </TouchableOpacity>
-    </View>
+    </Modal>
   );
 };
 
@@ -80,13 +132,25 @@ export default function JourneyScreen() {
   const [newMessage, setNewMessage] = useState('');
   const [activeTab, setActiveTab] = useState<'info' | 'chat'>('info');
   const [userStopName, setUserStopName] = useState<string>('');
-  const [refreshing, setRefreshing] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [participantStatus, setParticipantStatus] = useState<'waiting' | 'picked_up' | 'arrived'>('waiting');
   const [isDriver, setIsDriver] = useState(false);
   const [hasDriverInJourney, setHasDriverInJourney] = useState(false);
-  const [journeyDriver, setJourneyDriver] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [selectedStop, setSelectedStop] = useState<JourneyStop | null>(null);
+  const [showStopDetails, setShowStopDetails] = useState(false);
+  
+  // Simple animation
+  const fadeAnim = useState(new Animated.Value(0))[0];
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   useEffect(() => {
     getCurrentUser();
@@ -94,10 +158,8 @@ export default function JourneyScreen() {
     
     if (activeJourney) {
       loadJourneyData();
-      checkJourneyDriver();
       subscribeToDriverChanges();
     } else {
-      // Reset stops when no active journey
       setJourneyStops([]);
     }
   }, [activeJourney]);
@@ -127,143 +189,22 @@ export default function JourneyScreen() {
     }
   };
 
-  const checkJourneyDriver = async () => {
-    if (!activeJourney) return;
-
+  const getUserProfile = async () => {
     try {
-      // First check if journey already has a driver assigned
-      const { data: journeyWithDriver } = await supabase
-        .from('journeys')
-        .select('driver_id, has_driver, drivers(user_id, profiles(first_name, last_name))')
-        .eq('id', activeJourney.id)
-        .maybeSingle();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (journeyWithDriver && journeyWithDriver.has_driver) {
-        // Journey already has a driver assigned
-        setHasDriverInJourney(true);
-        setJourneyDriver(journeyWithDriver.drivers);
-        return;
-      }
-
-      // If no driver assigned, check if any verified drivers have joined as participants
-      const { data: driverParticipants, error } = await supabase
-        .from('journey_participants')
-        .select(`
-          user_id,
-          profiles (
-            first_name,
-            last_name
-          ),
-          drivers!inner (
-            id,
-            is_verified,
-            is_active
-          )
-        `)
-        .eq('journey_id', activeJourney.id)
-        .eq('is_active', true)
-        .eq('drivers.is_verified', true)
-        .eq('drivers.is_active', true)
-        .limit(1);
-
-      if (error) {
-        console.error('Error checking driver participants:', error);
-        return;
-      }
-
-      if (driverParticipants && driverParticipants.length > 0) {
-        // Found a verified driver in participants - assign them as the journey driver
-        const driverParticipant = driverParticipants[0];
-        await assignDriverToJourney(driverParticipant.user_id, driverParticipant);
-      } else {
-        // No driver found
-        setHasDriverInJourney(false);
-        setJourneyDriver(null);
-      }
-    } catch (error) {
-      console.error('Error checking journey driver:', error);
-    }
-  };
-
-  const assignDriverToJourney = async (driverUserId: string, driverData: any) => {
-    if (!activeJourney) return;
-
-    try {
-      // First get the driver ID from the drivers table
-      const { data: driverRecord, error: driverError } = await supabase
-        .from('drivers')
-        .select('id')
-        .eq('user_id', driverUserId)
-        .eq('is_verified', true)
-        .eq('is_active', true)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, avatar_url')
+        .eq('id', user.id)
         .single();
 
-      if (driverError || !driverRecord) {
-        console.error('Error finding driver record:', driverError);
-        return;
+      if (profile) {
+        setUserProfile(profile);
       }
-
-      // Update the journey to assign the driver
-      const { error: updateError } = await supabase
-        .from('journeys')
-        .update({
-          driver_id: driverRecord.id,
-          has_driver: true
-        })
-        .eq('id', activeJourney.id);
-
-      if (updateError) {
-        console.error('Error assigning driver to journey:', updateError);
-        return;
-      }
-
-      // Update local state
-      setHasDriverInJourney(true);
-      setJourneyDriver({
-        user_id: driverUserId,
-        profiles: driverData.profiles
-      });
-
-      console.log('Driver assigned to journey:', driverUserId);
-      
-      // Send notification to passengers that a driver has joined
-      await notifyPassengersDriverJoined(driverData.profiles);
     } catch (error) {
-      console.error('Error in assignDriverToJourney:', error);
-    }
-  };
-
-  const notifyPassengersDriverJoined = async (driverProfile: any) => {
-    if (!activeJourney) return;
-
-    try {
-      const { data: passengers, error } = await supabase
-        .from('journey_participants')
-        .select('user_id')
-        .eq('journey_id', activeJourney.id)
-        .eq('is_active', true)
-        .neq('user_id', currentUserId); // Don't notify the driver themselves
-
-      if (error || !passengers) return;
-
-      const driverName = `${driverProfile.first_name} ${driverProfile.last_name}`;
-      const notifications = passengers.map(passenger => ({
-        user_id: passenger.user_id,
-        type: 'driver_joined',
-        title: 'Driver Joined! 🎉',
-        message: `${driverName} has joined as your driver for the ${activeJourney.routes.transport_type} journey`,
-        data: { 
-          journey_id: activeJourney.id,
-          driver_name: driverName
-        }
-      }));
-
-      await supabase
-        .from('notifications')
-        .insert(notifications);
-
-    } catch (error) {
-      console.error('Error notifying passengers:', error);
+      console.error('Error loading user profile:', error);
     }
   };
 
@@ -271,41 +212,8 @@ export default function JourneyScreen() {
     if (!activeJourney) return;
 
     try {
-      // Subscribe to journey participant changes to detect when drivers join
       const subscription = supabase
         .channel('journey-driver-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'journey_participants',
-            filter: `journey_id=eq.${activeJourney.id}`
-          },
-          async (payload) => {
-            console.log('New participant joined:', payload.new);
-            
-            // Check if the new participant is a verified driver
-            const { data: driverCheck, error } = await supabase
-              .from('drivers')
-              .select('id, is_verified, is_active')
-              .eq('user_id', payload.new.user_id)
-              .eq('is_verified', true)
-              .eq('is_active', true)
-              .maybeSingle();
-
-            if (driverCheck && !hasDriverInJourney) {
-              // Found a new verified driver - assign them to the journey
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('first_name, last_name')
-                .eq('id', payload.new.user_id)
-                .single();
-
-              await assignDriverToJourney(payload.new.user_id, { profiles: profile });
-            }
-          }
-        )
         .on(
           'postgres_changes',
           {
@@ -315,9 +223,8 @@ export default function JourneyScreen() {
             filter: `id=eq.${activeJourney.id}`
           },
           (payload) => {
-            // Journey was updated - refresh driver status
             if (payload.new.has_driver !== hasDriverInJourney) {
-              checkJourneyDriver();
+              setHasDriverInJourney(payload.new.has_driver);
             }
           }
         )
@@ -338,34 +245,14 @@ export default function JourneyScreen() {
         loadJourneyStops(),
         loadOtherPassengers(),
         loadCurrentUserStop(),
-        loadChatMessages(),
         loadParticipantStatus(),
-        checkJourneyDriver()
+        getUserProfile(),
       ]);
       startWaitingTimer();
       subscribeToChat();
-      subscribeToDriverChanges();
     } catch (error) {
       console.error('Error loading journey data:', error);
       setConnectionError(true);
-    }
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    setConnectionError(false);
-    
-    try {
-      await refreshActiveJourney();
-      
-      if (activeJourney) {
-        await loadJourneyData();
-      }
-    } catch (error) {
-      console.error('Error refreshing:', error);
-      setConnectionError(true);
-    } finally {
-      setRefreshing(false);
     }
   };
 
@@ -465,7 +352,7 @@ export default function JourneyScreen() {
 
       const { data: passengers } = await supabase
         .from('stop_waiting')
-        .select('*, profiles (first_name, last_name), stops (name, order_number)')
+        .select('*, profiles (first_name, last_name, avatar_url), stops (id, name, order_number)')
         .eq('journey_id', activeJourney.id)
         .neq('user_id', user.id)
         .gt('expires_at', new Date().toISOString());
@@ -473,28 +360,6 @@ export default function JourneyScreen() {
       setOtherPassengers(passengers || []);
     } catch (error) {
       console.error('Error loading other passengers:', error);
-      throw error;
-    }
-  };
-
-  const loadChatMessages = async () => {
-    if (!activeJourney) return;
-
-    try {
-      const { data: messages, error } = await supabase
-        .from('journey_messages')
-        .select('*, profiles (first_name, last_name, selected_title, avatar_url)')
-        .eq('journey_id', activeJourney.id)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        console.error('Error loading chat messages:', error);
-        return;
-      }
-
-      setChatMessages(messages || []);
-    } catch (error) {
-      console.error('Error loading chat messages:', error);
       throw error;
     }
   };
@@ -516,7 +381,7 @@ export default function JourneyScreen() {
           async (payload) => {
             const { data: profile } = await supabase
               .from('profiles')
-              .select('first_name, last_name, selected_title, avatar_url')
+              .select('first_name, last_name, avatar_url')
               .eq('id', payload.new.user_id)
               .single();
               
@@ -542,67 +407,18 @@ export default function JourneyScreen() {
     }
   };
 
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !activeJourney || !currentUserId) return;
-
-    try {
-      const { error } = await supabase
-        .from('journey_messages')
-        .insert({
-          journey_id: activeJourney.id,
-          user_id: currentUserId,
-          message: newMessage.trim(),
-          is_anonymous: true
-        });
-
-      if (error) {
-        console.error('Error sending message:', error);
-        Alert.alert('Error', 'Failed to send message');
-        return;
-      }
-
-      setNewMessage('');
-    } catch (error) {
-      console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message');
-    }
-  };
-
-  // ADDED: updateJourneyProgress function
-  const updateJourneyProgress = async (stopOrder: number) => {
-    if (!activeJourney) return;
-
-    try {
-      const { error } = await supabase
-        .from('journeys')
-        .update({ 
-          current_stop_sequence: stopOrder,
-          last_ping_time: new Date().toISOString()
-        })
-        .eq('id', activeJourney.id);
-
-      if (error) {
-        console.error('Error updating journey progress:', error);
-        Alert.alert('Error', 'Failed to update journey progress');
-      } else {
-        console.log(`Journey progress updated to stop ${stopOrder}`);
-        // Refresh the active journey to get updated data
-        await refreshActiveJourney();
-      }
-    } catch (error) {
-      console.error('Error in updateJourneyProgress:', error);
-      Alert.alert('Error', 'Failed to update journey progress');
-    }
-  };
-
-  // UPDATED: Fixed user reference to use currentUserId
   const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
     if (!activeJourney || !currentUserId) return;
 
     try {
       const { error } = await supabase
         .from('journey_participants')
-        .update({ status: newStatus })
+        .update({ 
+          status: newStatus,
+          ...(newStatus === 'picked_up' && {
+            stop_waiting_id: null
+          })
+        })
         .eq('journey_id', activeJourney.id)
         .eq('user_id', currentUserId)
         .eq('is_active', true);
@@ -616,17 +432,18 @@ export default function JourneyScreen() {
       setParticipantStatus(newStatus);
       
       if (newStatus === 'picked_up') {
-        // Award points for being picked up
         await awardPoints(2);
         
-        // Check if majority of passengers are picked up to advance journey
-        await checkAndUpdateJourneyProgress();
+        await supabase
+          .from('stop_waiting')
+          .delete()
+          .eq('user_id', currentUserId)
+          .eq('journey_id', activeJourney.id);
+        
+        await loadOtherPassengers();
         
       } else if (newStatus === 'arrived') {
-        // Award points for arriving
         await awardPoints(5);
-        
-        // Automatically complete the journey when user arrives
         await handleCompleteJourney();
       }
     } catch (error) {
@@ -654,15 +471,13 @@ export default function JourneyScreen() {
     }
   };
 
-  // NEW: Location Sharing Function
   const shareJourney = async () => {
     if (!activeJourney) return;
 
     try {
-      // For development, use localhost. For production, use your actual domain
       const baseUrl = __DEV__ 
         ? 'http://localhost:8081' 
-        : 'https://mobile.uthutho.co.za'; // Change to your domain
+        : 'https://mobile.uthutho.co.za';
       
       const shareUrl = `${baseUrl}/journey-share/${activeJourney.id}`;
       
@@ -677,11 +492,9 @@ Shared via Uthutho`;
 
       await Share.share({
         message: shareMessage,
-        url: shareUrl, // This will be used by some apps
+        url: shareUrl,
         title: 'Share My Location'
       });
-
-      console.log('Journey shared successfully');
 
     } catch (error) {
       console.error('Error sharing journey:', error);
@@ -689,31 +502,67 @@ Shared via Uthutho`;
     }
   };
 
-  const handleShareWithDriver = async () => {
-    const shareMessage = `Join me on Uthutho for our ${activeJourney?.routes?.transport_type} journey on route ${activeJourney?.routes?.name}!
-
-🚗 Drive with Uthutho and earn 200 points!
-• Real-time journey tracking
-• Connect with passengers
-• Build your driver reputation
-• Earn rewards and recognition
-
-Sign up: https://uthutho.app/driver-signup
-
-Current route: ${activeJourney?.routes?.start_point} to ${activeJourney?.routes?.end_point}`;
+  const pingPassengersAhead = async () => {
+    if (!activeJourney || !currentUserId) return;
 
     try {
-      await Share.share({
-        message: shareMessage,
-        title: 'Join Uthutho as a Driver'
-      });
-    } catch (error) {
-      Alert.alert('Error', 'Failed to share');
-    }
-  };
+      const { data: currentUserWaiting, error } = await supabase
+        .from('stop_waiting')
+        .select('*, stops (order_number, name)')
+        .eq('user_id', currentUserId)
+        .eq('journey_id', activeJourney.id)
+        .single();
 
-  const handleDriverSignup = () => {
-    router.push('/OnboardDriver');
+      if (error || !currentUserWaiting) {
+        Alert.alert('Error', 'Could not find your waiting stop');
+        return;
+      }
+
+      const currentStopSequence = currentUserWaiting.stops.order_number;
+
+      const { data: passengersAhead, error: passengersError } = await supabase
+        .from('stop_waiting')
+        .select('user_id, stops (order_number, name)')
+        .eq('journey_id', activeJourney.id)
+        .neq('user_id', currentUserId)
+        .gt('stops.order_number', currentStopSequence);
+
+      if (passengersError) {
+        console.error('Error finding passengers ahead:', passengersError);
+        Alert.alert('Error', 'Failed to find passengers ahead');
+        return;
+      }
+
+      if (passengersAhead && passengersAhead.length > 0) {
+        const notifications = passengersAhead.map(passenger => ({
+          user_id: passenger.user_id,
+          type: 'journey_update',
+          title: 'Transport Approaching',
+          message: `Your ${activeJourney.routes.transport_type} is approaching. Get ready!`,
+          data: { 
+            journey_id: activeJourney.id,
+            current_stop: currentUserWaiting.stops.name,
+          }
+        }));
+
+        const { error: notificationError } = await supabase
+          .from('notifications')
+          .insert(notifications);
+
+        if (notificationError) {
+          console.error('Error sending notifications:', notificationError);
+          Alert.alert('Error', 'Failed to send notifications');
+          return;
+        }
+
+        Alert.alert('Success', `Notified ${passengersAhead.length} passenger(s) ahead`);
+      } else {
+        Alert.alert('Info', 'No passengers ahead to notify');
+      }
+    } catch (error) {
+      console.error('Error pinging passengers ahead:', error);
+      Alert.alert('Error', 'Failed to notify passengers. Please check your connection.');
+    }
   };
 
   const handleCompleteJourney = async () => {
@@ -741,97 +590,10 @@ Current route: ${activeJourney?.routes?.start_point} to ${activeJourney?.routes?
     }
   };
 
-  // Add this to your main JourneyScreen component
-const updateUserLocation = async (latitude: number, longitude: number) => {
-  if (!activeJourney || !currentUserId) return;
-
-  try {
-    const { error } = await supabase
-      .from('journey_participants')
-      .update({
-        latitude: latitude,
-        longitude: longitude,
-        last_location_update: new Date().toISOString()
-      })
-      .eq('journey_id', activeJourney.id)
-      .eq('user_id', currentUserId)
-      .eq('is_active', true);
-
-    if (error) {
-      console.error('Error updating user location:', error);
-    } else {
-      console.log('User location updated:', { latitude, longitude });
-    }
-  } catch (error) {
-    console.error('Error in updateUserLocation:', error);
-  }
-};
-
-// Use this with geolocation in your main app:
-useEffect(() => {
-  if (activeJourney) {
-    // Start watching position
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        updateUserLocation(latitude, longitude);
-      },
-      (error) => {
-        console.error('Error getting location:', error);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 5000, // Update every 5 seconds
-      }
-    );
-
-    return () => {
-      navigator.geolocation.clearWatch(watchId);
-    };
-  }
-}, [activeJourney]);
-
-  const getCurrentStopName = () => {
-    if (!activeJourney || !journeyStops.length) return 'Current Stop';
-    
-    // Find the current stop based on current_stop_sequence
-    const currentStop = journeyStops.find(stop => 
-      stop.order_number === activeJourney.current_stop_sequence
-    );
-    
-    // If no exact match, find the first upcoming stop or last stop
-    if (!currentStop) {
-      const upcomingStop = journeyStops.find(stop => stop.upcoming);
-      if (upcomingStop) return upcomingStop.name;
-      
-      const lastStop = journeyStops[journeyStops.length - 1];
-      return lastStop?.name || 'Current Stop';
-    }
-    
-    return currentStop.name;
-  };
-
-  const getNextStopName = () => {
-    if (!activeJourney || !journeyStops.length) return 'Next Stop';
-    
-    // Find the next stop (first upcoming stop)
-    const nextStop = journeyStops.find(stop => stop.upcoming);
-    
-    // If no upcoming stops, we're at the end
-    if (!nextStop) {
-      const currentStop = journeyStops.find(stop => stop.current);
-      return currentStop ? 'Final Stop' : 'Next Stop';
-    }
-    
-    return nextStop.name;
-  };
-
   const loadJourneyStops = async () => {
     if (!activeJourney) return;
 
     try {
-      // Get stops through route_stops table with proper joins
       const { data: routeStopsData, error: routeStopsError } = await supabase
         .from('route_stops')
         .select(`
@@ -848,15 +610,9 @@ useEffect(() => {
 
       if (routeStopsError) throw routeStopsError;
 
-      console.log('Journey Route Stops Data:', routeStopsData); // Debug log
-
-      // Process stops with status (passed, current, upcoming)
       const processedStops = (routeStopsData || []).map((routeStop, index) => {
         const stop = routeStop.stops;
-        if (!stop) {
-          console.warn('Missing stop data for route stop:', routeStop);
-          return null;
-        }
+        if (!stop) return null;
 
         const currentStopSequence = activeJourney.current_stop_sequence || 0;
         const stopOrder = routeStop.order_number;
@@ -873,119 +629,11 @@ useEffect(() => {
         };
       });
 
-      // Filter out any null stops and set the state
       const validStops = processedStops.filter(stop => stop !== null) as JourneyStop[];
       setJourneyStops(validStops);
-      
-      console.log('Processed Journey Stops:', validStops); // Debug log
 
     } catch (error) {
       console.error('Error loading journey stops:', error);
-    }
-  };
-
-  const getProgressPercentage = () => {
-    if (!activeJourney || journeyStops.length === 0) return 0;
-    
-    const currentStopSequence = activeJourney.current_stop_sequence || 0;
-    return (currentStopSequence / journeyStops.length) * 100;
-  };
-
-  const getEstimatedArrival = () => {
-    if (!activeJourney || journeyStops.length === 0) return 'Unknown';
-    
-    const currentStopSequence = activeJourney.current_stop_sequence || 0;
-    const remainingStops = journeyStops.length - currentStopSequence;
-    const estimatedMinutes = remainingStops * 3;
-    
-    return `${estimatedMinutes} min`;
-  };
-
-  const sendJourneyProgressNotification = async (newStopSequence: number) => {
-    if (!activeJourney) return;
-
-    try {
-      // Find the stop name for the notification
-      const currentStop = journeyStops.find(stop => stop.order_number === newStopSequence);
-      const stopName = currentStop?.name || `Stop ${newStopSequence}`;
-
-      // Get all participants to notify
-      const { data: participants, error } = await supabase
-        .from('journey_participants')
-        .select('user_id')
-        .eq('journey_id', activeJourney.id)
-        .eq('is_active', true)
-        .neq('user_id', currentUserId);
-
-      if (error || !participants) return;
-
-      const notifications = participants.map(participant => ({
-        user_id: participant.user_id,
-        type: 'journey_progress',
-        title: 'Journey Progress Updated',
-        message: `The ${activeJourney.routes.transport_type} has advanced to ${stopName}`,
-        data: { 
-          journey_id: activeJourney.id,
-          current_stop: stopName,
-          stop_sequence: newStopSequence
-        }
-      }));
-
-      await supabase
-        .from('notifications')
-        .insert(notifications);
-
-    } catch (error) {
-      console.error('Error sending progress notification:', error);
-    }
-  };
-
-  const checkAndUpdateJourneyProgress = async () => {
-    if (!activeJourney) return;
-
-    try {
-      // Get all active participants for this journey
-      const { data: participants, error } = await supabase
-        .from('journey_participants')
-        .select('status, stop_waiting(stop_id, stops(order_number))')
-        .eq('journey_id', activeJourney.id)
-        .eq('is_active', true);
-
-      if (error) {
-        console.error('Error fetching participants:', error);
-        return;
-      }
-
-      if (!participants || participants.length === 0) return;
-
-      // Count how many passengers are picked up
-      const pickedUpCount = participants.filter(p => p.status === 'picked_up').length;
-      const totalPassengers = participants.length;
-      
-      // If majority (more than 50%) are picked up, advance the journey
-      if (pickedUpCount > totalPassengers / 2) {
-        // Find the most common stop where passengers were picked up
-        const stopOrders = participants
-          .filter(p => p.status === 'picked_up' && p.stop_waiting?.[0]?.stops?.order_number)
-          .map(p => p.stop_waiting[0].stops.order_number);
-        
-        if (stopOrders.length > 0) {
-          // Find the most frequent stop order (mode)
-          const mode = stopOrders.reduce((a, b, i, arr) => 
-            arr.filter(v => v === a).length >= arr.filter(v => v === b).length ? a : b
-          );
-          
-          // Only advance if this is further than current progress
-          if (mode > activeJourney.current_stop_sequence) {
-            await updateJourneyProgress(mode);
-            
-            // Send notification to all passengers
-            await sendJourneyProgressNotification(mode);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error checking journey progress:', error);
     }
   };
 
@@ -1000,159 +648,191 @@ useEffect(() => {
     return `${minutes}m ${remainingSeconds}s`;
   };
 
-  const getPassengerWaitingTime = (createdAt: string) => {
-    const now = new Date().getTime();
-    const created = new Date(createdAt).getTime();
-    const elapsed = Math.floor((now - created) / 1000);
+  const getEstimatedArrival = () => {
+    if (!activeJourney || journeyStops.length === 0) return 'Unknown';
     
-    return formatWaitingTime(elapsed);
+    const currentStopSequence = activeJourney.current_stop_sequence || 0;
+    const remainingStops = journeyStops.length - currentStopSequence;
+    const estimatedMinutes = remainingStops * 3;
+    
+    return `${estimatedMinutes}m`;
   };
 
-  const pingPassengersAhead = async () => {
-    if (!activeJourney || !currentUserId) return;
+  const handleStopPress = (stop: JourneyStop) => {
+    setSelectedStop(stop);
+    setShowStopDetails(true);
+  };
 
-    try {
-      const { data: currentUserWaiting, error } = await supabase
-        .from('stop_waiting')
-        .select('*, stops (order_number, name)')
-        .eq('user_id', currentUserId)
-        .eq('journey_id', activeJourney.id)
-        .single();
-
-      if (error || !currentUserWaiting) return;
-
-      const currentStopSequence = currentUserWaiting.stops.order_number;
-
-      const { data: passengersAhead, error: passengersError } = await supabase
-        .from('stop_waiting')
-        .select('user_id, stops (order_number, name)')
-        .eq('journey_id', activeJourney.id)
-        .neq('user_id', currentUserId)
-        .gt('stops.order_number', currentStopSequence);
-
-      if (passengersError) {
-        console.error('Error finding passengers ahead:', passengersError);
-        return;
-      }
-
-      if (passengersAhead && passengersAhead.length > 0) {
-        const notifications = passengersAhead.map(passenger => ({
-          user_id: passenger.user_id,
-          type: 'journey_update',
-          title: 'Transport Approaching',
-          message: `Your ${activeJourney.routes.transport_type} is approaching. Get ready!`,
-          data: { 
-            journey_id: activeJourney.id,
-            current_stop: currentUserWaiting.stops.name,
-          }
-        }));
-
-        const { error: notificationError } = await supabase
-          .from('notifications')
-          .insert(notifications);
-
-        if (notificationError) {
-          console.error('Error sending notifications:', notificationError);
-          return;
-        }
-
-        Alert.alert('Success', 'Passengers ahead have been notified');
-      } else {
-        Alert.alert('Info', 'No passengers ahead to notify');
-      }
-    } catch (error) {
-      console.error('Error pinging passengers ahead:', error);
-      Alert.alert('Error', 'Failed to notify passengers. Please check your connection.');
+  const getProfileInitial = () => {
+    if (!userProfile) return 'Y';
+    if (userProfile.first_name && userProfile.last_name) {
+      return `${userProfile.first_name[0]}${userProfile.last_name[0]}`;
+    } else if (userProfile.first_name) {
+      return userProfile.first_name[0];
     }
+    return 'Y';
   };
 
   const renderContent = () => {
     if (activeTab === 'info') {
       return (
-        <>
-          <JourneyOverview
-            routeName={activeJourney.routes.name}
+        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+          {/* Compact Journey Header */}
+          <View style={styles.compactHeader}>
+            <View style={styles.routeRow}>
+              <Text style={styles.routeName} numberOfLines={1}>
+                {activeJourney.routes.name}
+              </Text>
+              <View style={styles.transportBadge}>
+                <Car size={14} color="#1ea2b1" />
+                <Text style={styles.transportText}>
+                  {activeJourney.routes.transport_type}
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.routeEndpoints}>
+              <Text style={styles.startPoint} numberOfLines={1}>
+                {activeJourney.routes.start_point}
+              </Text>
+              <ChevronRight size={16} color="#666666" />
+              <Text style={styles.endPoint} numberOfLines={1}>
+                {activeJourney.routes.end_point}
+              </Text>
+            </View>
+          </View>
+
+          {/* Your Stop Section */}
+          <View style={styles.yourStopRow}>
+            <View style={styles.profileContainer}>
+              {userProfile?.avatar_url ? (
+                <Image 
+                  source={{ uri: userProfile.avatar_url }}
+                  style={styles.profileImage}
+                />
+              ) : (
+                <View style={styles.profilePlaceholder}>
+                  <Text style={styles.profileInitial}>{getProfileInitial()}</Text>
+                </View>
+              )}
+            </View>
+            
+            <View style={styles.yourStopInfo}>
+              <Text style={styles.yourStopName} numberOfLines={1}>
+                {userStopName}
+              </Text>
+              <View style={styles.statusRow}>
+                <View style={[
+                  styles.statusDot,
+                  participantStatus === 'waiting' ? styles.waitingDot : 
+                  participantStatus === 'picked_up' ? styles.pickedUpDot :
+                  styles.arrivedDot
+                ]} />
+                <Text style={styles.yourStopStatus}>
+                  {participantStatus === 'waiting' ? 'Waiting for pickup' : 
+                   participantStatus === 'picked_up' ? 'Picked up' : 
+                   'Arrived'}
+                </Text>
+              </View>
+              <Text style={styles.yourStopTime}>
+                Waiting: {formatWaitingTime(waitingTime)}
+              </Text>
+            </View>
+            
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Users size={16} color="#1ea2b1" />
+                <Text style={styles.statNumber}>{otherPassengers.length + 1}</Text>
+              </View>
+              
+              <View style={styles.statItem}>
+                <Clock size={16} color="#fbbf24" />
+                <Text style={styles.statNumber}>{getEstimatedArrival()}</Text>
+              </View>
+              
+              <View style={styles.statItem}>
+                <MapPin size={16} color="#34d399" />
+                <Text style={styles.statNumber}>
+                  {activeJourney.current_stop_sequence || 0}/{journeyStops.length}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Route Slider */}
+          <CompactRouteSlider
+            stops={journeyStops}
+            currentUserStopName={userStopName}
+            currentUserId={currentUserId}
+            passengers={otherPassengers}
             transportType={activeJourney.routes.transport_type}
-            startPoint={activeJourney.routes.start_point}
-            endPoint={activeJourney.routes.end_point}
-            getProgressPercentage={getProgressPercentage}
-            waitingTime={formatWaitingTime(waitingTime)}
-            estimatedArrival={getEstimatedArrival()}
-            passengerCount={otherPassengers.length + 1}
-            currentStop={activeJourney.current_stop_sequence || 0}
-            totalStops={journeyStops.length}
-            hasDriver={hasDriverInJourney}
-            driverName={journeyDriver?.profiles ? 
-              `${journeyDriver.profiles.first_name} ${journeyDriver.profiles.last_name}` : 
-              null
-            }
-            currentStopName={getCurrentStopName()}
-            nextStopName={getNextStopName()}
-            journeyStops={journeyStops}
+            currentStopSequence={activeJourney.current_stop_sequence || 0}
+            participantStatus={participantStatus}
+            onStopPress={handleStopPress}
           />
 
-          {/* Journey Status Buttons */}
-          <View style={styles.statusContainer}>
-            {/* NEW: Share Location Button */}
-            <TouchableOpacity
-              style={[styles.statusButton, styles.shareButton]}
-              onPress={shareJourney}
-            >
-              <Share2 size={20} color="#ffffff" />
-              <Text style={styles.statusButtonText}>Share My Location</Text>
-            </TouchableOpacity>
-
+          {/* Action Buttons */}
+          <View style={styles.actionsRow}>
             {participantStatus === 'waiting' && (
               <TouchableOpacity
-                style={styles.statusButton}
+                style={styles.primaryActionButton}
                 onPress={() => updateParticipantStatus('picked_up')}
               >
-                <Text style={styles.statusButtonText}>Mark as Picked Up</Text>
+                <Text style={styles.primaryActionText}>Mark as Picked Up</Text>
               </TouchableOpacity>
             )}
             
             {participantStatus === 'picked_up' && (
               <TouchableOpacity
-                style={[styles.statusButton, styles.arrivedButton]}
+                style={[styles.primaryActionButton, styles.arrivedButton]}
                 onPress={() => updateParticipantStatus('arrived')}
               >
-                <Text style={styles.statusButtonText}>I've Arrived</Text>
+                <Text style={styles.primaryActionText}>I've Arrived</Text>
               </TouchableOpacity>
             )}
+            
+            <TouchableOpacity
+              style={styles.secondaryActionButton}
+              onPress={pingPassengersAhead}
+            >
+              <Text style={styles.secondaryActionText}>Notify Ahead</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={shareJourney}
+            >
+              <Share2 size={20} color="#1ea2b1" />
+            </TouchableOpacity>
           </View>
-          
-          {/* Show driver promotion if no driver */}
-          {!hasDriverInJourney && (
-            <NoDriverPromotion 
-              onShare={handleShareWithDriver}
-              onDriverSignup={handleDriverSignup}
-              routeName={activeJourney.routes.name}
-              transportType={activeJourney.routes.transport_type}
-            />
+
+          {connectionError && (
+            <View style={styles.errorContainer}>
+              <ConnectionError />
+            </View>
           )}
 
-          <UserStopHighlight stopName={userStopName} />
-          
-          <RouteProgress
-            stops={journeyStops}
-            onPingPassengers={pingPassengersAhead}
-          />
-          
-          <PassengersList
+          {/* No Driver Indicator */}
+          {!hasDriverInJourney && !isDriver && (
+            <TouchableOpacity style={styles.noDriverCard}>
+              <Text style={styles.noDriverText}>No driver assigned</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Stop Details Modal */}
+          <StopDetailsModal
+            stop={selectedStop}
+            visible={showStopDetails}
+            onClose={() => setShowStopDetails(false)}
             passengers={otherPassengers}
-            getPassengerWaitingTime={getPassengerWaitingTime}
           />
-        </>
+        </Animated.View>
       );
     } else {
       return (
-        <JourneyChat
-          messages={chatMessages}
-          newMessage={newMessage}
-          setNewMessage={setNewMessage}
-          onSendMessage={sendMessage}
-          currentUserId={currentUserId}
-        />
+        <View style={styles.chatContainer}>
+          <Text style={styles.chatPlaceholder}>Chat would appear here</Text>
+        </View>
       );
     }
   };
@@ -1172,42 +852,19 @@ useEffect(() => {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <Stack.Screen options={{ headerShown: false }} />
-      <JourneyHeader title="Active Journey" />
+      <StatusBar style="light" />
       
-      <JourneyTabs
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        unreadMessages={unreadMessages}
-      />
-      
-      {activeTab === 'chat' ? (
-        <View style={{ flex: 1 }}>
-          <JourneyChat
-            messages={chatMessages}
-            newMessage={newMessage}
-            setNewMessage={setNewMessage}
-            onSendMessage={sendMessage}
-            currentUserId={currentUserId}
-            onlineCount={(otherPassengers?.length || 0) + 1}
-          />
-        </View>
-      ) : (
-        <ScrollView 
-          style={styles.scrollContainer}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#1ea2b1"
-              colors={["#1ea2b1"]}
-            />
-          }
-        >
-          {connectionError && <ConnectionError />}
-          {renderContent()}
-          <View style={styles.bottomSpace} />
-        </ScrollView>
-      )}
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <JourneyHeader title="Active Journey" />
+        
+        <JourneyTabs
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          unreadMessages={unreadMessages}
+        />
+        
+        {renderContent()}
+      </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }
@@ -1217,121 +874,366 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
-  scrollContainer: {
+  safeArea: {
     flex: 1,
   },
-  bottomSpace: {
-    height: 20,
+  content: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
-  statusContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  statusButton: {
-    backgroundColor: '#1ea2b1',
+  compactHeader: {
+    backgroundColor: '#1a1a1a',
+    padding: 16,
     borderRadius: 12,
-    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: '#333333',
+    marginBottom: 12,
+  },
+  routeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
-  shareButton: {
-    backgroundColor: '#8b5cf6',
+  routeName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    flex: 1,
+    marginRight: 12,
+  },
+  transportBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#1ea2b120',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+    gap: 4,
+  },
+  transportText: {
+    color: '#1ea2b1',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  routeEndpoints: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  startPoint: {
+    color: '#4ade80',
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
+  },
+  endPoint: {
+    color: '#ef4444',
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
+    textAlign: 'right',
+  },
+  yourStopRow: {
+    flexDirection: 'row',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#8b5cf6',
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  profileContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: '#8b5cf6',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+  },
+  profilePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#8b5cf6',
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileInitial: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  yourStopInfo: {
+    flex: 1,
+  },
+  yourStopName: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  waitingDot: {
+    backgroundColor: '#fbbf24',
+  },
+  pickedUpDot: {
+    backgroundColor: '#34d399',
+  },
+  arrivedDot: {
+    backgroundColor: '#4ade80',
+  },
+  yourStopStatus: {
+    fontSize: 11,
+    color: '#cccccc',
+    fontWeight: '500',
+  },
+  yourStopTime: {
+    color: '#666666',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginTop: 2,
+  },
+  actionsRow: {
+    flexDirection: 'row',
     gap: 8,
+    marginBottom: 12,
+  },
+  primaryActionButton: {
+    flex: 1,
+    backgroundColor: '#1ea2b1',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
   },
   arrivedButton: {
     backgroundColor: '#fbbf24',
   },
-  completeButton: {
-    backgroundColor: '#4ade80',
-  },
-  statusButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  // No Driver Promotion Styles
-  noDriverContainer: {
-    backgroundColor: '#1a1a1a',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    padding: 20,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#f59e0b',
-  },
-  noDriverHeader: {
-    marginBottom: 16,
-  },
-  noDriverTitle: {
-    color: '#f59e0b',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  noDriverSubtitle: {
+  primaryActionText: {
     color: '#ffffff',
     fontSize: 14,
-    lineHeight: 20,
-  },
-  pointsHighlight: {
-    color: '#fbbf24',
-    fontWeight: 'bold',
-  },
-  pointsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#78350f',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 16,
-  },
-  pointsText: {
-    color: '#fbbf24',
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginLeft: 6,
-  },
-  noDriverBenefits: {
-    marginBottom: 20,
-  },
-  noDriverBenefit: {
-    color: '#cccccc',
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  shareDriverButton: {
-    backgroundColor: '#1ea2b1',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    paddingVertical: 12,
-    marginBottom: 12,
-    gap: 8,
-  },
-  shareDriverButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
     fontWeight: '600',
   },
-  driverSignupButton: {
+  secondaryActionButton: {
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: '#1ea2b1',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     borderRadius: 8,
     paddingVertical: 12,
-    gap: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
   },
-  driverSignupButtonText: {
+  secondaryActionText: {
     color: '#1ea2b1',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  iconButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#333333',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorContainer: {
+    marginBottom: 12,
+  },
+  noDriverCard: {
+    backgroundColor: '#7f1d1d',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  noDriverText: {
+    color: '#fca5a5',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  chatContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatPlaceholder: {
+    color: '#666666',
+    fontSize: 16,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    flex: 1,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  closeButtonText: {
+    color: '#666666',
+    fontSize: 24,
+    fontWeight: '300',
+  },
+  stopInfo: {
+    marginBottom: 20,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  infoLabel: {
+    color: '#666666',
+    fontSize: 14,
+    fontWeight: '500',
+    width: 100,
+  },
+  infoValue: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  passedBadge: {
+    backgroundColor: '#065f46',
+  },
+  currentBadge: {
+    backgroundColor: '#1e40af',
+  },
+  upcomingBadge: {
+    backgroundColor: '#78350f',
+  },
+  statusBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  passengersSection: {
+    marginTop: 20,
+  },
+  sectionTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  passengerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#222222',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  passengerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#1ea2b1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  passengerInfo: {
+    flex: 1,
+  },
+  passengerName: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  waitingText: {
+    color: '#666666',
+    fontSize: 12,
+  },
+  noPassengers: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  noPassengersText: {
+    color: '#666666',
+    fontSize: 14,
+  },
+  dismissButton: {
+    backgroundColor: '#1ea2b1',
+    borderRadius: 8,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  dismissButtonText: {
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
   },
