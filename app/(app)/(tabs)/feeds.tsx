@@ -10,6 +10,7 @@ import {
   Alert,
   Platform,
   Share,
+  Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Users, MessageSquare } from 'lucide-react-native';
@@ -27,6 +28,9 @@ import EmptyState from '@/components/feeds/EmptyState';
 import SkeletonLoader from '@/components/feeds/SkeletonLoader';
 import PostCard from '@/components/feeds/PostCard';
 import EmptyPosts from '@/components/feeds/EmptyPosts';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 // Define basic types locally to avoid import issues
 interface Community {
@@ -79,14 +83,16 @@ const WeekRangeHeader: React.FC<{
   weekRange: string;
   postFilter: PostFilter;
   setPostFilter: (filter: PostFilter) => void;
-}> = ({ weekRange, postFilter, setPostFilter }) => {
+  isDesktop?: boolean;
+}> = ({ weekRange, postFilter, setPostFilter, isDesktop = false }) => {
   return (
-    <View style={styles.weekRangeWrapper}>
-      <Text style={styles.weekRangeText}>{weekRange}</Text>
-      <View style={styles.filterButtons}>
+    <View style={[styles.weekRangeWrapper, isDesktop && styles.weekRangeWrapperDesktop]}>
+      <Text style={[styles.weekRangeText, isDesktop && styles.weekRangeTextDesktop]}>{weekRange}</Text>
+      <View style={[styles.filterButtons, isDesktop && styles.filterButtonsDesktop]}>
         <TouchableOpacity onPress={() => setPostFilter('week')}>
           <Text style={[
             styles.filterText, 
+            isDesktop && styles.filterTextDesktop,
             postFilter === 'week' && styles.filterTextActive
           ]}>
             This Week
@@ -95,6 +101,7 @@ const WeekRangeHeader: React.FC<{
         <TouchableOpacity onPress={() => setPostFilter('today')}>
           <Text style={[
             styles.filterText, 
+            isDesktop && styles.filterTextDesktop,
             postFilter === 'today' && styles.filterTextActive
           ]}>
             Today
@@ -103,6 +110,7 @@ const WeekRangeHeader: React.FC<{
         <TouchableOpacity onPress={() => setPostFilter('all')}>
           <Text style={[
             styles.filterText, 
+            isDesktop && styles.filterTextDesktop,
             postFilter === 'all' && styles.filterTextActive
           ]}>
             All
@@ -120,13 +128,14 @@ const PreviewHeader: React.FC<{
   onUnfollow: () => void;
   onViewFull: () => void;
   posts: Post[];
-}> = ({ previewCommunity, isFollowingPreview, onFollow, onUnfollow, onViewFull, posts }) => {
+  isDesktop?: boolean;
+}> = ({ previewCommunity, isFollowingPreview, onFollow, onUnfollow, onViewFull, posts, isDesktop = false }) => {
   return (
-    <View style={styles.previewHeader}>
-      <View style={styles.previewHeaderContent}>
-        <Text style={styles.previewTitle}>Previewing Community</Text>
-        <Text style={styles.previewCommunityName}>{previewCommunity?.name}</Text>
-        <Text style={styles.previewDescription}>
+    <View style={[styles.previewHeader, isDesktop && styles.previewHeaderDesktop]}>
+      <View style={[styles.previewHeaderContent, isDesktop && styles.previewHeaderContentDesktop]}>
+        <Text style={[styles.previewTitle, isDesktop && styles.previewTitleDesktop]}>Previewing Community</Text>
+        <Text style={[styles.previewCommunityName, isDesktop && styles.previewCommunityNameDesktop]}>{previewCommunity?.name}</Text>
+        <Text style={[styles.previewDescription, isDesktop && styles.previewDescriptionDesktop]}>
           {isFollowingPreview 
             ? "You're following this community and can see all posts!" 
             : "Follow this community to see all posts and join the conversation"
@@ -135,56 +144,56 @@ const PreviewHeader: React.FC<{
         
         {!isFollowingPreview ? (
           <TouchableOpacity 
-            style={styles.followButton}
+            style={[styles.followButton, isDesktop && styles.followButtonDesktop]}
             onPress={onFollow}
           >
-            <Users size={20} color="#ffffff" />
-            <Text style={styles.followButtonText}>Follow Community</Text>
+            <Users size={isDesktop ? 18 : 20} color="#ffffff" />
+            <Text style={[styles.followButtonText, isDesktop && styles.followButtonTextDesktop]}>Follow Community</Text>
           </TouchableOpacity>
         ) : (
-          <View style={styles.followActions}>
+          <View style={[styles.followActions, isDesktop && styles.followActionsDesktop]}>
             <TouchableOpacity 
-              style={styles.viewFullButton}
+              style={[styles.viewFullButton, isDesktop && styles.viewFullButtonDesktop]}
               onPress={onViewFull}
             >
-              <Text style={styles.viewFullButtonText}>View Full Community</Text>
+              <Text style={[styles.viewFullButtonText, isDesktop && styles.viewFullButtonTextDesktop]}>View Full Community</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={styles.unfollowButton}
+              style={[styles.unfollowButton, isDesktop && styles.unfollowButtonDesktop]}
               onPress={onUnfollow}
             >
-              <Text style={styles.unfollowButtonText}>Unfollow</Text>
+              <Text style={[styles.unfollowButtonText, isDesktop && styles.unfollowButtonTextDesktop]}>Unfollow</Text>
             </TouchableOpacity>
           </View>
         )}
       </View>
       
       {/* Week stats preview - show what they're missing */}
-      <View style={styles.weekStats}>
-        <Text style={styles.weekStatsTitle}>
+      <View style={[styles.weekStats, isDesktop && styles.weekStatsDesktop]}>
+        <Text style={[styles.weekStatsTitle, isDesktop && styles.weekStatsTitleDesktop]}>
           {isFollowingPreview ? 'This Week' : 'This Week in Preview'}
         </Text>
-        <View style={styles.statsGrid}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{posts.length}</Text>
-            <Text style={styles.statLabel}>Posts</Text>
+        <View style={[styles.statsGrid, isDesktop && styles.statsGridDesktop]}>
+          <View style={[styles.statItem, isDesktop && styles.statItemDesktop]}>
+            <Text style={[styles.statNumber, isDesktop && styles.statNumberDesktop]}>{posts.length}</Text>
+            <Text style={[styles.statLabel, isDesktop && styles.statLabelDesktop]}>Posts</Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>
+          <View style={[styles.statItem, isDesktop && styles.statItemDesktop]}>
+            <Text style={[styles.statNumber, isDesktop && styles.statNumberDesktop]}>
               {posts.reduce((acc, post) => acc + (post.post_comments?.length || 0), 0)}
             </Text>
-            <Text style={styles.statLabel}>Comments</Text>
+            <Text style={[styles.statLabel, isDesktop && styles.statLabelDesktop]}>Comments</Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>
+          <View style={[styles.statItem, isDesktop && styles.statItemDesktop]}>
+            <Text style={[styles.statNumber, isDesktop && styles.statNumberDesktop]}>
               {posts.reduce((acc, post) => acc + (post.post_reactions?.length || 0), 0)}
             </Text>
-            <Text style={styles.statLabel}>Reactions</Text>
+            <Text style={[styles.statLabel, isDesktop && styles.statLabelDesktop]}>Reactions</Text>
           </View>
         </View>
         
         {!isFollowingPreview && posts.length > 0 && (
-          <Text style={styles.previewHint}>
+          <Text style={[styles.previewHint, isDesktop && styles.previewHintDesktop]}>
             Follow to see {posts.length} post{posts.length > 1 ? 's' : ''} from this week
           </Text>
         )}
@@ -805,9 +814,9 @@ export default function FeedsScreen() {
   const renderPostCreation = () => {
     if (previewMode && !isFollowingPreview) {
       return (
-        <View style={styles.previewPostCreation}>
-          <MessageSquare size={24} color="#666666" />
-          <Text style={styles.previewPostCreationText}>
+        <View style={[styles.previewPostCreation, isDesktop && styles.previewPostCreationDesktop]}>
+          <MessageSquare size={isDesktop ? 20 : 24} color="#666666" />
+          <Text style={[styles.previewPostCreationText, isDesktop && styles.previewPostCreationTextDesktop]}>
             Follow this community to post and comment
           </Text>
         </View>
@@ -821,6 +830,7 @@ export default function FeedsScreen() {
           setNewPost={setNewPost}
           createPost={createPost}
           selectedCommunity={selectedCommunity}
+          isDesktop={isDesktop}
         />
       );
     }
@@ -830,105 +840,249 @@ export default function FeedsScreen() {
 
   // Show loading state
   if (!initialLoadComplete || loading) {
-    return <SkeletonLoader />;
+    return <SkeletonLoader isDesktop={isDesktop} />;
   }
 
   // Show empty state if no communities
   if (communities.length === 0) {
     return (
-      <EmptyState
-        unreadNotifications={unreadNotifications}
-        router={router}
-        // Remove the onButtonPress prop since we're not using AddCommunityScreen anymore
-      />
+      <View style={[styles.container, isDesktop && styles.containerDesktop]}>
+        <EmptyState
+          unreadNotifications={unreadNotifications}
+          router={router}
+          isDesktop={isDesktop}
+        />
+      </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDesktop && styles.containerDesktop]}>
       <Header
         unreadNotifications={unreadNotifications}
         router={router}
-        // Remove the onAddCommunityPress prop
+        isDesktop={isDesktop}
       />
 
-      {/* Show preview header when in preview mode */}
-      {previewMode && previewCommunity && (
-        <PreviewHeader
-          previewCommunity={previewCommunity}
-          isFollowingPreview={isFollowingPreview}
-          onFollow={followPreviewCommunity}
-          onUnfollow={unfollowPreviewCommunity}
-          onViewFull={() => setPreviewMode(false)}
-          posts={posts}
-        />
-      )}
+      {/* Desktop layout wrapper */}
+      {isDesktop ? (
+        <View style={styles.desktopLayout}>
+          {/* Left sidebar - Community tabs */}
+          <View style={styles.desktopSidebar}>
+            <CommunityTabs
+              communities={communities}
+              selectedCommunity={selectedCommunity}
+              setSelectedCommunity={setSelectedCommunity}
+              followerCounts={{}}
+              isDesktop={isDesktop}
+            />
+            
+            {/* Desktop community stats */}
+            <View style={styles.communityStats}>
+              <Text style={styles.communityStatsTitle}>Community Stats</Text>
+              <View style={styles.communityStatItem}>
+                <Text style={styles.communityStatNumber}>{posts.length}</Text>
+                <Text style={styles.communityStatLabel}>Posts This Week</Text>
+              </View>
+              <View style={styles.communityStatItem}>
+                <Text style={styles.communityStatNumber}>
+                  {posts.reduce((acc, post) => acc + (post.post_reactions?.length || 0), 0)}
+                </Text>
+                <Text style={styles.communityStatLabel}>Reactions</Text>
+              </View>
+            </View>
+          </View>
 
-      <CommunityTabs
-        communities={communities}
-        selectedCommunity={selectedCommunity}
-        setSelectedCommunity={setSelectedCommunity}
-        followerCounts={{}}
-      />
+          {/* Main feed area */}
+          <View style={styles.desktopMain}>
+            {/* Show preview header when in preview mode */}
+            {previewMode && previewCommunity && (
+              <PreviewHeader
+                previewCommunity={previewCommunity}
+                isFollowingPreview={isFollowingPreview}
+                onFollow={followPreviewCommunity}
+                onUnfollow={unfollowPreviewCommunity}
+                onViewFull={() => setPreviewMode(false)}
+                posts={posts}
+                isDesktop={isDesktop}
+              />
+            )}
 
-      {weekRange && (
-        <WeekRangeHeader
-          weekRange={weekRange}
-          postFilter={postFilter}
-          setPostFilter={setPostFilter}
-        />
-      )}
+            {weekRange && (
+              <WeekRangeHeader
+                weekRange={weekRange}
+                postFilter={postFilter}
+                setPostFilter={setPostFilter}
+                isDesktop={isDesktop}
+              />
+            )}
 
-      <FlatList
-        data={posts}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <PostCard
-            post={item}
-            userId={userId}
-            toggleReaction={toggleReaction}
-            sharePost={sharePost}
-            downloadPost={downloadPost}
-            sharingPost={sharingPost}
-            router={router}
-            viewShotRef={(ref: any) => {
-              viewShotRefs.current[item.id] = ref;
-            }}
-            disabled={previewMode && !isFollowingPreview}
+            {renderPostCreation()}
+
+            <FlatList
+              data={posts}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <PostCard
+                  post={item}
+                  userId={userId}
+                  toggleReaction={toggleReaction}
+                  sharePost={sharePost}
+                  downloadPost={downloadPost}
+                  sharingPost={sharingPost}
+                  router={router}
+                  viewShotRef={(ref: any) => {
+                    viewShotRefs.current[item.id] = ref;
+                  }}
+                  disabled={previewMode && !isFollowingPreview}
+                  isDesktop={isDesktop}
+                />
+              )}
+              ListEmptyComponent={
+                <EmptyPosts
+                  title={
+                    previewMode && !isFollowingPreview 
+                      ? "Follow to See Posts" 
+                      : selectedCommunity ? "No Posts Yet" : "Select a Community"
+                  }
+                  subtitle={
+                    previewMode && !isFollowingPreview
+                      ? "Follow this community to see what people are posting"
+                      : selectedCommunity 
+                        ? "Be the first to post in this community" 
+                        : "Choose a community to see posts"
+                  }
+                  showAnimation={!!selectedCommunity}
+                  isDesktop={isDesktop}
+                />
+              }
+              refreshControl={
+                <RefreshControl 
+                  refreshing={refreshing} 
+                  onRefresh={onRefresh}
+                  tintColor="#1ea2b1"
+                  colors={['#1ea2b1']}
+                />
+              }
+              contentContainerStyle={[
+                styles.desktopPostsListContent,
+                previewMode && styles.previewContent,
+              ]}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+
+          {/* Right sidebar - Trending/Recent activity */}
+          <View style={styles.desktopSidebarRight}>
+            <View style={styles.trendingSection}>
+              <Text style={styles.trendingTitle}>Trending Posts</Text>
+              {posts.slice(0, 3).map((post, index) => (
+                <TouchableOpacity 
+                  key={post.id} 
+                  style={styles.trendingPost}
+                  onPress={() => router.push(`/post/${post.id}`)}
+                >
+                  <Text style={styles.trendingPostIndex}>#{index + 1}</Text>
+                  <View style={styles.trendingPostContent}>
+                    <Text style={styles.trendingPostText} numberOfLines={2}>
+                      {post.content}
+                    </Text>
+                    <Text style={styles.trendingPostReactions}>
+                      🔥 {post.post_reactions.filter(r => r.reaction_type === 'fire').length}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      ) : (
+        // Mobile layout
+        <>
+          {/* Show preview header when in preview mode */}
+          {previewMode && previewCommunity && (
+            <PreviewHeader
+              previewCommunity={previewCommunity}
+              isFollowingPreview={isFollowingPreview}
+              onFollow={followPreviewCommunity}
+              onUnfollow={unfollowPreviewCommunity}
+              onViewFull={() => setPreviewMode(false)}
+              posts={posts}
+              isDesktop={false}
+            />
+          )}
+
+          <CommunityTabs
+            communities={communities}
+            selectedCommunity={selectedCommunity}
+            setSelectedCommunity={setSelectedCommunity}
+            followerCounts={{}}
+            isDesktop={false}
           />
-        )}
-        ListHeaderComponent={renderPostCreation()}
-        ListEmptyComponent={
-          <EmptyPosts
-            title={
-              previewMode && !isFollowingPreview 
-                ? "Follow to See Posts" 
-                : selectedCommunity ? "No Posts Yet" : "Select a Community"
+
+          {weekRange && (
+            <WeekRangeHeader
+              weekRange={weekRange}
+              postFilter={postFilter}
+              setPostFilter={setPostFilter}
+              isDesktop={false}
+            />
+          )}
+
+          <FlatList
+            data={posts}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <PostCard
+                post={item}
+                userId={userId}
+                toggleReaction={toggleReaction}
+                sharePost={sharePost}
+                downloadPost={downloadPost}
+                sharingPost={sharingPost}
+                router={router}
+                viewShotRef={(ref: any) => {
+                  viewShotRefs.current[item.id] = ref;
+                }}
+                disabled={previewMode && !isFollowingPreview}
+                isDesktop={false}
+              />
+            )}
+            ListHeaderComponent={renderPostCreation()}
+            ListEmptyComponent={
+              <EmptyPosts
+                title={
+                  previewMode && !isFollowingPreview 
+                    ? "Follow to See Posts" 
+                    : selectedCommunity ? "No Posts Yet" : "Select a Community"
+                }
+                subtitle={
+                  previewMode && !isFollowingPreview
+                    ? "Follow this community to see what people are posting"
+                    : selectedCommunity 
+                      ? "Be the first to post in this community" 
+                      : "Choose a community to see posts"
+                }
+                showAnimation={!!selectedCommunity}
+                isDesktop={false}
+              />
             }
-            subtitle={
-              previewMode && !isFollowingPreview
-                ? "Follow this community to see what people are posting"
-                : selectedCommunity 
-                  ? "Be the first to post in this community" 
-                  : "Choose a community to see posts"
+            refreshControl={
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={onRefresh}
+                tintColor="#1ea2b1"
+                colors={['#1ea2b1']}
+              />
             }
-            showAnimation={!!selectedCommunity}
+            contentContainerStyle={[
+              styles.postsListContent,
+              previewMode && styles.previewContent,
+            ]}
+            showsVerticalScrollIndicator={false}
           />
-        }
-        refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={onRefresh}
-            tintColor="#1ea2b1"
-            colors={['#1ea2b1']}
-          />
-        }
-        contentContainerStyle={[
-          styles.postsListContent,
-          previewMode && styles.previewContent,
-        ]}
-        showsVerticalScrollIndicator={false}
-      />
+        </>
+      )}
     </View>
   );
 }
@@ -937,6 +1091,96 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  containerDesktop: {
+    maxWidth: 1400,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  desktopLayout: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+  },
+  desktopSidebar: {
+    width: 280,
+    paddingRight: 20,
+    borderRightWidth: 1,
+    borderRightColor: '#333333',
+  },
+  desktopMain: {
+    flex: 1,
+    paddingHorizontal: 24,
+    maxWidth: 680,
+  },
+  desktopSidebarRight: {
+    width: 300,
+    paddingLeft: 20,
+    borderLeftWidth: 1,
+    borderLeftColor: '#333333',
+  },
+  communityStats: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+  },
+  communityStatsTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  communityStatItem: {
+    marginBottom: 12,
+  },
+  communityStatNumber: {
+    color: '#1ea2b1',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  communityStatLabel: {
+    color: '#cccccc',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  trendingSection: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+  },
+  trendingTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  trendingPost: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  trendingPostIndex: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginRight: 8,
+    minWidth: 24,
+  },
+  trendingPostContent: {
+    flex: 1,
+  },
+  trendingPostText: {
+    color: '#cccccc',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  trendingPostReactions: {
+    color: '#ff7b25',
+    fontSize: 11,
+    marginTop: 4,
   },
   weekRangeWrapper: {
     flexDirection: 'row',
@@ -948,19 +1192,33 @@ const styles = StyleSheet.create({
     borderBottomColor: '#333333',
     backgroundColor: '#0a0a0a',
   },
+  weekRangeWrapperDesktop: {
+    paddingHorizontal: 0,
+    marginBottom: 16,
+    borderRadius: 8,
+  },
   weekRangeText: {
     color: '#cccccc',
     fontSize: 14,
     fontWeight: '500',
   },
+  weekRangeTextDesktop: {
+    fontSize: 13,
+  },
   filterButtons: {
     flexDirection: 'row',
     gap: 16,
+  },
+  filterButtonsDesktop: {
+    gap: 12,
   },
   filterText: {
     color: '#666666',
     fontSize: 14,
     fontWeight: '500',
+  },
+  filterTextDesktop: {
+    fontSize: 13,
   },
   filterTextActive: {
     color: '#1ea2b1',
@@ -970,6 +1228,9 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     flexGrow: 1,
   },
+  desktopPostsListContent: {
+    paddingBottom: 32,
+  },
   // Preview styles
   previewHeader: {
     backgroundColor: '#1a1a1a',
@@ -978,8 +1239,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 20,
   },
+  previewHeaderDesktop: {
+    paddingHorizontal: 0,
+    paddingVertical: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
   previewHeaderContent: {
     marginBottom: 16,
+  },
+  previewHeaderContentDesktop: {
+    marginBottom: 12,
   },
   previewTitle: {
     color: '#cccccc',
@@ -987,17 +1259,28 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 4,
   },
+  previewTitleDesktop: {
+    fontSize: 13,
+  },
   previewCommunityName: {
     color: '#ffffff',
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 8,
   },
+  previewCommunityNameDesktop: {
+    fontSize: 18,
+  },
   previewDescription: {
     color: '#cccccc',
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 16,
+  },
+  previewDescriptionDesktop: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
   },
   followButton: {
     backgroundColor: '#1ea2b1',
@@ -1009,14 +1292,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
+  followButtonDesktop: {
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
   followButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
   },
+  followButtonTextDesktop: {
+    fontSize: 14,
+  },
   followActions: {
     flexDirection: 'row',
     gap: 12,
+  },
+  followActionsDesktop: {
+    gap: 10,
   },
   viewFullButton: {
     flex: 2,
@@ -1025,10 +1319,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
+  viewFullButtonDesktop: {
+    borderRadius: 8,
+    paddingVertical: 10,
+  },
   viewFullButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  viewFullButtonTextDesktop: {
+    fontSize: 14,
   },
   unfollowButton: {
     flex: 1,
@@ -1037,15 +1338,25 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
+  unfollowButtonDesktop: {
+    borderRadius: 8,
+    paddingVertical: 10,
+  },
   unfollowButtonText: {
     color: '#cccccc',
     fontSize: 16,
     fontWeight: '600',
   },
+  unfollowButtonTextDesktop: {
+    fontSize: 14,
+  },
   weekStats: {
     backgroundColor: '#0a0a0a',
     borderRadius: 12,
     padding: 16,
+  },
+  weekStatsDesktop: {
+    padding: 12,
   },
   weekStatsTitle: {
     color: '#ffffff',
@@ -1054,13 +1365,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: 'center',
   },
+  weekStatsTitleDesktop: {
+    fontSize: 14,
+    marginBottom: 10,
+  },
   statsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 8,
   },
+  statsGridDesktop: {
+    marginBottom: 6,
+  },
   statItem: {
     alignItems: 'center',
+  },
+  statItemDesktop: {
+    paddingHorizontal: 8,
   },
   statNumber: {
     color: '#1ea2b1',
@@ -1068,15 +1389,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 4,
   },
+  statNumberDesktop: {
+    fontSize: 18,
+  },
   statLabel: {
     color: '#cccccc',
     fontSize: 12,
+  },
+  statLabelDesktop: {
+    fontSize: 11,
   },
   previewHint: {
     color: '#666666',
     fontSize: 12,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  previewHintDesktop: {
+    fontSize: 11,
   },
   previewPostCreation: {
     backgroundColor: '#1a1a1a',
@@ -1091,10 +1421,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
+  previewPostCreationDesktop: {
+    marginHorizontal: 0,
+    marginBottom: 12,
+    padding: 12,
+  },
   previewPostCreationText: {
     color: '#666666',
     fontSize: 14,
     textAlign: 'center',
+  },
+  previewPostCreationTextDesktop: {
+    fontSize: 13,
   },
   previewContent: {
     paddingTop: 0,

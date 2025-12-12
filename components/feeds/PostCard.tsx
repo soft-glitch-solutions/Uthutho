@@ -8,9 +8,13 @@ import {
   Pressable,
   StyleSheet,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { Flame, MessageCircle, Download, Share } from 'lucide-react-native';
 import ViewShot from 'react-native-view-shot';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 interface UserProfile {
   first_name: string;
@@ -57,6 +61,7 @@ interface PostCardProps {
   router: any;
   viewShotRef: (ref: any) => void;
   disabled?: boolean;
+  isDesktop?: boolean;
 }
 
 const PostCard = forwardRef<View, PostCardProps>((props, ref) => {
@@ -69,9 +74,11 @@ const PostCard = forwardRef<View, PostCardProps>((props, ref) => {
     sharingPost,
     router,
     viewShotRef,
-    disabled = false
+    disabled = false,
+    isDesktop: propIsDesktop = false
   } = props;
 
+  const desktopMode = isDesktop || propIsDesktop;
   const fireCount = post.post_reactions.filter((r) => r.reaction_type === 'fire').length;
   const hasUserFired = post.post_reactions.some((r) => r.reaction_type === 'fire' && r.user_id === userId);
   const latestComment = post.post_comments[post.post_comments.length - 1];
@@ -119,51 +126,52 @@ const PostCard = forwardRef<View, PostCardProps>((props, ref) => {
     <ViewShot 
       ref={viewShotRef}
       options={{ format: 'png', quality: 0.9 }}
-      style={[styles.container, disabled && styles.disabledCard]}
+      style={[styles.container, desktopMode && styles.containerDesktop, disabled && styles.disabledCard]}
     >
       <Pressable
         onPress={handlePostPress}
         android_ripple={{ color: '#0f0f0f' }}
         disabled={disabled}
       >
-        <View style={styles.postCard}>
-          <View style={styles.postHeader}>
+        <View style={[styles.postCard, desktopMode && styles.postCardDesktop]}>
+          <View style={[styles.postHeader, desktopMode && styles.postHeaderDesktop]}>
             <Pressable 
               onPress={handleUserPress}
               style={styles.userInfoContainer}
               disabled={disabled}
             >
-              <View style={styles.profilePicture}>
+              <View style={[styles.profilePicture, desktopMode && styles.profilePictureDesktop]}>
                 <Image
                   source={{ uri: post.profiles.avatar_url || 'https://via.placeholder.com/40x40/333333/ffffff?text=U' }}
-                  style={styles.profileImage}
+                  style={[styles.profileImage, desktopMode && styles.profileImageDesktop]}
                 />
               </View>
-              <View>
-                <Text style={styles.userName}>
+              <View style={desktopMode && styles.userInfoDesktop}>
+                <Text style={[styles.userName, desktopMode && styles.userNameDesktop]}>
                   {post.profiles.first_name} {post.profiles.last_name}
                 </Text>
-                <Text style={styles.userTitle}>{post.profiles.selected_title}</Text>
+                <Text style={[styles.userTitle, desktopMode && styles.userTitleDesktop]}>{post.profiles.selected_title}</Text>
               </View>
             </Pressable>
-            <Text style={styles.postTime}>{formatTimeAgo(post.created_at)}</Text>
+            <Text style={[styles.postTime, desktopMode && styles.postTimeDesktop]}>{formatTimeAgo(post.created_at)}</Text>
           </View>
 
-          <Text style={styles.postContent}>{post.content}</Text>
+          <Text style={[styles.postContent, desktopMode && styles.postContentDesktop]}>{post.content}</Text>
 
-          <View style={styles.postActions}>
+          <View style={[styles.postActions, desktopMode && styles.postActionsDesktop]}>
             <TouchableOpacity
-              style={[styles.actionItem, disabled && styles.disabledAction]}
+              style={[styles.actionItem, desktopMode && styles.actionItemDesktop, disabled && styles.disabledAction]}
               onPress={() => handleReaction('fire')}
               disabled={disabled}
             >
               <Flame 
-                size={18} 
+                size={desktopMode ? 16 : 18} 
                 color={hasUserFired ? '#ff7b25' : '#666'} 
                 fill={hasUserFired ? '#ff7b25' : 'none'} 
               />
               <Text style={[
                 styles.actionCount, 
+                desktopMode && styles.actionCountDesktop,
                 hasUserFired && { color: '#ff7b25' },
                 disabled && styles.disabledText
               ]}>
@@ -172,12 +180,12 @@ const PostCard = forwardRef<View, PostCardProps>((props, ref) => {
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={[styles.actionItem, disabled && styles.disabledAction]}
+              style={[styles.actionItem, desktopMode && styles.actionItemDesktop, disabled && styles.disabledAction]}
               onPress={handlePostPress}
               disabled={disabled}
             >
-              <MessageCircle size={18} color="#666" />
-              <Text style={[styles.actionCount, disabled && styles.disabledText]}>
+              <MessageCircle size={desktopMode ? 16 : 18} color="#666" />
+              <Text style={[styles.actionCount, desktopMode && styles.actionCountDesktop, disabled && styles.disabledText]}>
                 {post.post_comments.length}
               </Text>
             </TouchableOpacity>
@@ -185,29 +193,29 @@ const PostCard = forwardRef<View, PostCardProps>((props, ref) => {
             {/* Only show download button on native platforms */}
             {showDownloadOption && (
               <TouchableOpacity
-                style={[styles.actionItem, disabled && styles.disabledAction]}
+                style={[styles.actionItem, desktopMode && styles.actionItemDesktop, disabled && styles.disabledAction]}
                 onPress={handleDownload}
                 disabled={disabled || sharingPost}
               >
-                <Download size={18} color="#666" />
+                <Download size={desktopMode ? 16 : 18} color="#666" />
               </TouchableOpacity>
             )}
             
             <TouchableOpacity
-              style={[styles.actionItem, disabled && styles.disabledAction]}
+              style={[styles.actionItem, desktopMode && styles.actionItemDesktop, disabled && styles.disabledAction]}
               onPress={handleShare}
               disabled={disabled || sharingPost}
             >
-              <Share size={18} color="#666" />
+              <Share size={desktopMode ? 16 : 18} color="#666" />
             </TouchableOpacity>
           </View>
 
           {latestComment && (
-            <View style={styles.latestComment}>
-              <Text style={styles.commentAuthor}>
+            <View style={[styles.latestComment, desktopMode && styles.latestCommentDesktop]}>
+              <Text style={[styles.commentAuthor, desktopMode && styles.commentAuthorDesktop]}>
                 {latestComment.profiles.first_name}: 
               </Text>
-              <Text style={[styles.commentText, disabled && styles.disabledText]} numberOfLines={1}>
+              <Text style={[styles.commentText, desktopMode && styles.commentTextDesktop, disabled && styles.disabledText]} numberOfLines={1}>
                 {latestComment.content}
               </Text>
             </View>
@@ -215,7 +223,7 @@ const PostCard = forwardRef<View, PostCardProps>((props, ref) => {
 
           {disabled && (
             <View style={styles.overlay}>
-              <Text style={styles.overlayText}>Follow to interact</Text>
+              <Text style={[styles.overlayText, desktopMode && styles.overlayTextDesktop]}>Follow to interact</Text>
             </View>
           )}
         </View>
@@ -231,6 +239,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  containerDesktop: {
+    marginHorizontal: 0,
+    marginVertical: 6,
+  },
   postCard: {
     backgroundColor: '#1a1a1a',
     padding: 16,
@@ -238,6 +250,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
     position: 'relative',
+  },
+  postCardDesktop: {
+    padding: 12,
+    borderRadius: 10,
   },
   disabledCard: {
     opacity: 0.7,
@@ -247,6 +263,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
+  },
+  postHeaderDesktop: {
+    marginBottom: 8,
   },
   userInfoContainer: {
     flexDirection: 'row',
@@ -263,24 +282,47 @@ const styles = StyleSheet.create({
     marginRight: 12,
     overflow: 'hidden',
   },
+  profilePictureDesktop: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
+  },
   profileImage: {
     width: 40,
     height: 40,
     borderRadius: 20,
+  },
+  profileImageDesktop: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  userInfoDesktop: {
+    flex: 1,
   },
   userName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1ea2b1',
   },
+  userNameDesktop: {
+    fontSize: 15,
+  },
   userTitle: {
     fontSize: 12,
     color: '#666666',
     marginTop: 2,
   },
+  userTitleDesktop: {
+    fontSize: 11,
+  },
   postTime: {
     fontSize: 12,
     color: '#666666',
+  },
+  postTimeDesktop: {
+    fontSize: 11,
   },
   postContent: {
     fontSize: 16,
@@ -288,12 +330,20 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginBottom: 12,
   },
+  postContentDesktop: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 10,
+  },
   postActions: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#333333',
+  },
+  postActionsDesktop: {
+    paddingTop: 10,
   },
   actionItem: {
     flexDirection: 'row',
@@ -303,6 +353,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 16,
   },
+  actionItemDesktop: {
+    marginRight: 20,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+  },
   disabledAction: {
     opacity: 0.5,
   },
@@ -311,6 +366,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666666',
     fontWeight: '500',
+  },
+  actionCountDesktop: {
+    marginLeft: 4,
+    fontSize: 13,
   },
   disabledText: {
     color: '#444444',
@@ -322,16 +381,26 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#333333',
   },
+  latestCommentDesktop: {
+    marginTop: 6,
+    paddingTop: 6,
+  },
   commentAuthor: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1ea2b1',
+  },
+  commentAuthorDesktop: {
+    fontSize: 13,
   },
   commentText: {
     fontSize: 14,
     color: '#cccccc',
     flex: 1,
     marginLeft: 4,
+  },
+  commentTextDesktop: {
+    fontSize: 13,
   },
   overlay: {
     position: 'absolute',
@@ -352,6 +421,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
+  },
+  overlayTextDesktop: {
+    fontSize: 13,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
 });
 

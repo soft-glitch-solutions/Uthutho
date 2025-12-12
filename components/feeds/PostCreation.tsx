@@ -8,15 +8,29 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { PostCreationProps } from '@/types';
 
-const PostCreation: React.FC<PostCreationProps> = ({
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
+
+interface ExtendedPostCreationProps extends Omit<PostCreationProps, 'createPost'> {
+  createPost: () => Promise<void>;
+  maxLength?: number;
+  isDesktop?: boolean;
+  selectedCommunity?: any;
+}
+
+const PostCreation: React.FC<ExtendedPostCreationProps> = ({
   newPost,
   setNewPost,
   createPost,
   maxLength = 500,
+  isDesktop: propIsDesktop = false,
+  selectedCommunity,
 }) => {
+  const desktopMode = isDesktop || propIsDesktop;
   const [uploading, setUploading] = useState(false);
 
   const characterCount = newPost.length;
@@ -29,11 +43,7 @@ const PostCreation: React.FC<PostCreationProps> = ({
     setUploading(true);
     
     try {
-      // Create post without images
-      await createPost(newPost, []);
-      
-      // Reset form
-      setNewPost('');
+      await createPost();
     } catch (error) {
       console.error('Error creating post:', error);
       Alert.alert('Error', 'Failed to create post');
@@ -45,13 +55,22 @@ const PostCreation: React.FC<PostCreationProps> = ({
   const canPost = newPost.trim() && !isOverLimit && !uploading;
 
   return (
-    <View style={styles.postCreationContainer}>
+    <View style={[styles.postCreationContainer, desktopMode && styles.postCreationContainerDesktop]}>
+      {selectedCommunity && (
+        <View style={[styles.communityHeader, desktopMode && styles.communityHeaderDesktop]}>
+          <Text style={[styles.communityHeaderText, desktopMode && styles.communityHeaderTextDesktop]}>
+            Posting in <Text style={styles.communityName}>{selectedCommunity.name}</Text>
+          </Text>
+        </View>
+      )}
+      
       <TextInput
         style={[
           styles.postInput,
+          desktopMode && styles.postInputDesktop,
           isOverLimit && styles.postInputError,
         ]}
-        placeholder="What's happening?"
+        placeholder="What's happening in the community?"
         placeholderTextColor="#777"
         value={newPost}
         onChangeText={setNewPost}
@@ -60,10 +79,11 @@ const PostCreation: React.FC<PostCreationProps> = ({
         textAlignVertical="top"
       />
       
-      <View style={styles.postFooter}>
-        <View style={styles.footerLeft}>
+      <View style={[styles.postFooter, desktopMode && styles.postFooterDesktop]}>
+        <View style={[styles.footerLeft, desktopMode && styles.footerLeftDesktop]}>
           <Text style={[
             styles.characterCount,
+            desktopMode && styles.characterCountDesktop,
             isNearLimit && styles.characterCountWarning,
             isOverLimit && styles.characterCountError,
           ]}>
@@ -74,6 +94,7 @@ const PostCreation: React.FC<PostCreationProps> = ({
         <TouchableOpacity
           style={[
             styles.postButton,
+            desktopMode && styles.postButtonDesktop,
             !canPost && styles.postButtonDisabled,
           ]}
           onPress={handleCreatePost}
@@ -82,7 +103,9 @@ const PostCreation: React.FC<PostCreationProps> = ({
           {uploading ? (
             <ActivityIndicator size="small" color="#ffffff" />
           ) : (
-            <Text style={styles.postButtonText}>Post</Text>
+            <Text style={[styles.postButtonText, desktopMode && styles.postButtonTextDesktop]}>
+              Post
+            </Text>
           )}
         </TouchableOpacity>
       </View>
@@ -91,6 +114,7 @@ const PostCreation: React.FC<PostCreationProps> = ({
 };
 
 const styles = StyleSheet.create({
+  // Base styles
   postCreationContainer: {
     backgroundColor: '#1a1a1a',
     padding: 16,
@@ -99,6 +123,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
   },
+  postCreationContainerDesktop: {
+    padding: 12,
+    margin: 0,
+    marginBottom: 16,
+    borderRadius: 12,
+  },
+  
+  communityHeader: {
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  communityHeaderDesktop: {
+    marginBottom: 8,
+    paddingBottom: 6,
+  },
+  communityHeaderText: {
+    fontSize: 14,
+    color: '#cccccc',
+  },
+  communityHeaderTextDesktop: {
+    fontSize: 13,
+  },
+  communityName: {
+    color: '#1ea2b1',
+    fontWeight: '600',
+  },
+  
   postInput: {
     borderWidth: 1,
     borderColor: '#333333',
@@ -110,23 +163,41 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0a',
     color: '#ffffff',
   },
+  postInputDesktop: {
+    padding: 12,
+    fontSize: 15,
+    minHeight: 80,
+    borderRadius: 10,
+  },
   postInputError: {
     borderColor: '#ef4444',
   },
+  
   postFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 12,
   },
+  postFooterDesktop: {
+    marginTop: 10,
+  },
+  
   footerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
   },
+  footerLeftDesktop: {
+    gap: 12,
+  },
+  
   characterCount: {
     fontSize: 14,
     color: '#666666',
+  },
+  characterCountDesktop: {
+    fontSize: 13,
   },
   characterCountWarning: {
     color: '#f59e0b',
@@ -134,6 +205,7 @@ const styles = StyleSheet.create({
   characterCountError: {
     color: '#ef4444',
   },
+  
   postButton: {
     backgroundColor: '#1ea2b1',
     paddingVertical: 8,
@@ -142,13 +214,23 @@ const styles = StyleSheet.create({
     minWidth: 80,
     alignItems: 'center',
   },
+  postButtonDesktop: {
+    paddingVertical: 7,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    minWidth: 70,
+  },
   postButtonDisabled: {
     backgroundColor: '#333333',
   },
+  
   postButtonText: {
     color: '#ffffff',
     fontWeight: '600',
     fontSize: 14,
+  },
+  postButtonTextDesktop: {
+    fontSize: 13,
   },
 });
 
