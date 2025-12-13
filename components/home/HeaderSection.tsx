@@ -56,7 +56,7 @@ const HeaderSection = ({ isProfileLoading, userProfile, colors }: HeaderSectionP
 const styles = {
   header: {
     marginBottom: 20,
-    paddingTop: 60,
+    paddingTop: 30,
   },
   headerDesktop: {
     marginBottom: 16,
