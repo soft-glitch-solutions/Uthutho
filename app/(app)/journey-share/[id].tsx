@@ -120,9 +120,30 @@ const InteractiveMap = ({
   useEffect(() => {
     const generateMapHtml = () => {
       const allLocations = [
-        ...usersWithGPS.map(u => ({ lat: u.latitude!, lng: u.longitude!, type: 'user', data: u })),
-        ...(nextStop ? [{ lat: nextStop.latitude, lng: nextStop.longitude, type: 'next_stop', data: nextStop }] : []),
-        ...(usersWithGPS.length === 0 ? [{ lat: userStop.latitude, lng: userStop.longitude, type: 'current_stop', data: userStop }] : [])
+        ...usersWithGPS.map(u => ({ 
+          lat: u.latitude!, 
+          lng: u.longitude!, 
+          type: 'user', 
+          data: u,
+          avatarUrl: u.profiles.avatar_url,
+          firstName: u.profiles.first_name,
+          lastName: u.profiles.last_name,
+          status: u.status
+        })),
+        ...(nextStop ? [{ 
+          lat: nextStop.latitude, 
+          lng: nextStop.longitude, 
+          type: 'next_stop', 
+          data: nextStop,
+          name: nextStop.name
+        }] : []),
+        ...(usersWithGPS.length === 0 ? [{ 
+          lat: userStop.latitude, 
+          lng: userStop.longitude, 
+          type: 'current_stop', 
+          data: userStop,
+          name: userStop.name
+        }] : [])
       ];
 
       if (allLocations.length === 0) return '';
@@ -198,6 +219,20 @@ const InteractiveMap = ({
                     z-index: -1;
                 }
                 
+                /* Stop Markers */
+                .stop-marker {
+                    border-radius: 50%;
+                    border: 3px solid white;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 40px;
+                    height: 40px;
+                    font-weight: bold;
+                    font-size: 16px;
+                }
+                
                 @keyframes pulse {
                     0% {
                         transform: scale(1);
@@ -224,20 +259,6 @@ const InteractiveMap = ({
                     }
                 }
                 
-                /* Stop Markers */
-                .stop-marker {
-                    border-radius: 50%;
-                    border: 3px solid white;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    width: 40px;
-                    height: 40px;
-                    font-weight: bold;
-                    font-size: 16px;
-                }
-                
                 .next-stop-marker { 
                     background-color: #fbbf24; 
                     color: white;
@@ -260,9 +281,17 @@ const InteractiveMap = ({
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 }).addTo(map);
                 
-                // Create custom icons
-                function createUserIcon(avatarUrl, firstName, lastName, status) {
-                    const initials = (firstName?.[0] || '') + (lastName?.[0] || '');
+                // Default avatar fallback
+                const defaultAvatar = 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop';
+                
+                // Create custom icons function
+                function createCustomIcon(location) {
+                  if (location.type === 'user') {
+                    // User profile icon
+                    const avatarUrl = location.avatarUrl || defaultAvatar;
+                    const firstName = location.firstName || '';
+                    const lastName = location.lastName || '';
+                    const initials = (firstName?.[0] || '') + (lastName?.[0] || '') || 'U';
                     
                     // Status-based border colors
                     const statusColors = {
@@ -270,51 +299,29 @@ const InteractiveMap = ({
                         'picked_up': '#10b981',
                         'arrived': '#6b7280'
                     };
-                    const borderColor = statusColors[status] || '#1ea2b1';
+                    const borderColor = statusColors[location.status] || '#1ea2b1';
                     
-                    if (avatarUrl) {
-                        return L.divIcon({
-                            html: \`
-                                <div class="user-profile-marker" style="border-color: \${borderColor};">
-                                    <img src="\${avatarUrl}" 
-                                         alt="\${firstName} \${lastName}"
-                                         class="user-profile-image"
-                                         onerror="this.onerror=null; 
-                                                  this.style.display='none'; 
-                                                  this.parentNode.innerHTML='<div class=\"user-profile-fallback\" style=\"background-color: \${borderColor};\">\${initials.toUpperCase()}</div>';" />
-                                </div>
-                            \`,
-                            className: '',
-                            iconSize: [50, 50],
-                            iconAnchor: [25, 50]
-                        });
-                    } else {
-                        return L.divIcon({
-                            html: \`
-                                <div class="user-profile-marker" style="border-color: \${borderColor}; background-color: \${borderColor};">
-                                    <div class="user-profile-fallback">\${initials.toUpperCase()}</div>
-                                </div>
-                            \`,
-                            className: '',
-                            iconSize: [50, 50],
-                            iconAnchor: [25, 50]
-                        });
-                    }
-                }
-                
-                function createStopIcon(color, type) {
-                    const emoji = type === 'next_stop' ? '➡️' : '🟢';
-                    const label = type === 'next_stop' ? 'Next Stop' : 'Current Stop';
                     return L.divIcon({
-                        html: \`
-                            <div class="stop-marker \${type}-marker" style="background-color: \${color};">
-                                <span>\${emoji}</span>
+                      html: \`<div class="user-profile-marker" style="border-color: \${borderColor};">
+                                <img src="\${avatarUrl}" 
+                                     alt="\${firstName} \${lastName}" 
+                                     class="user-profile-image" 
+                                     onerror="this.onerror=null; this.style.display='none'; this.parentNode.innerHTML='<div class=\\"user-profile-fallback\\" style=\\"background-color: \${borderColor};\\">\${initials.toUpperCase()}</div>';" />
+                              </div>\`,
+                      className: '',
+                      iconSize: [50, 50],
+                      iconAnchor: [25, 50]
+                    });
+                  } else if (location.type === 'next_stop') {
+                    return L.divIcon({
+                      html: \`<div class="stop-marker next-stop-marker">
+                                <span>➡️</span>
                                 <div style="
                                     position: absolute;
                                     bottom: -8px;
                                     left: 50%;
                                     transform: translateX(-50%);
-                                    background: \${color};
+                                    background: #fbbf24;
                                     color: white;
                                     font-size: 9px;
                                     padding: 1px 6px;
@@ -322,13 +329,36 @@ const InteractiveMap = ({
                                     font-weight: 600;
                                     white-space: nowrap;
                                     border: 2px solid white;
-                                ">\${label}</div>
-                            </div>
-                        \`,
-                        className: '',
-                        iconSize: [40, 40],
-                        iconAnchor: [20, 40]
+                                ">Next Stop</div>
+                              </div>\`,
+                      className: '',
+                      iconSize: [40, 40],
+                      iconAnchor: [20, 40]
                     });
+                  } else if (location.type === 'current_stop') {
+                    return L.divIcon({
+                      html: \`<div class="stop-marker current-stop-marker">
+                                <span>🟢</span>
+                                <div style="
+                                    position: absolute;
+                                    bottom: -8px;
+                                    left: 50%;
+                                    transform: translateX(-50%);
+                                    background: #10b981;
+                                    color: white;
+                                    font-size: 9px;
+                                    padding: 1px 6px;
+                                    border-radius: 10px;
+                                    font-weight: 600;
+                                    white-space: nowrap;
+                                    border: 2px solid white;
+                                ">Current Stop</div>
+                              </div>\`,
+                      className: '',
+                      iconSize: [40, 40],
+                      iconAnchor: [20, 40]
+                    });
+                  }
                 }
                 
                 // Add markers
@@ -336,124 +366,104 @@ const InteractiveMap = ({
                 const bounds = L.latLngBounds();
                 
                 locations.forEach(location => {
-                    let marker;
+                  const marker = L.marker([location.lat, location.lng], {
+                    icon: createCustomIcon(location)
+                  });
+                  
+                  // Create popup content based on location type
+                  if (location.type === 'user') {
+                    const statusText = location.status === 'waiting' ? 'Waiting for pickup' :
+                                      location.status === 'picked_up' ? 'On the way' :
+                                      location.status === 'arrived' ? 'Arrived at destination' : location.status;
                     
-                    if (location.type === 'user') {
-                        marker = L.marker([location.lat, location.lng], {
-                            icon: createUserIcon(
-                                location.data.profiles.avatar_url,
-                                location.data.profiles.first_name,
-                                location.data.profiles.last_name,
-                                location.data.status
-                            )
-                        });
-                        
-                        // Enhanced popup with better styling
-                        const statusText = location.data.status === 'waiting' ? 'Waiting for pickup' :
-                                          location.data.status === 'picked_up' ? 'On the way' :
-                                          location.data.status === 'arrived' ? 'Arrived at destination' : location.data.status;
-                        
-                        const statusColors = {
-                            'waiting': '#fbbf24',
-                            'picked_up': '#10b981',
-                            'arrived': '#6b7280'
-                        };
-                        const statusColor = statusColors[location.data.status] || '#666';
-                        
-                        const initials = (location.data.profiles.first_name?.[0] || '') + 
-                                       (location.data.profiles.last_name?.[0] || '');
-                        
-                        marker.bindPopup(
-                            '<div style="padding: 12px; min-width: 200px;">' +
-                                '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
-                                    (location.data.profiles.avatar_url ? 
-                                        '<img src="' + location.data.profiles.avatar_url + '" style="width: 32px; height: 32px; border-radius: 16px; object-fit: cover;" />' : 
-                                        '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: ' + statusColor + '; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">' + 
-                                        initials.toUpperCase() + '</div>'
-                                    ) +
-                                    '<div style="flex: 1;">' +
-                                        '<div style="font-weight: 600; font-size: 14px; color: #1f2937;">' + 
-                                        location.data.profiles.first_name + ' ' + location.data.profiles.last_name + '</div>' +
-                                        '<div style="display: flex; align-items: center; gap: 4px; margin-top: 2px;">' +
-                                            '<div style="width: 8px; height: 8px; border-radius: 4px; background-color: ' + statusColor + ';"></div>' +
-                                            '<span style="font-size: 12px; color: #6b7280;">' + statusText + '</span>' +
-                                        '</div>' +
-                                    '</div>' +
-                                '</div>' +
-                                (location.data.last_location_update ? 
-                                    '<div style="font-size: 11px; color: #9ca3af; margin-top: 8px;">' +
-                                        '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) + '<br>' +
-                                        'Updated ' + new Date(location.data.last_location_update).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) +
-                                    '</div>' : 
-                                    '<div style="font-size: 11px; color: #9ca3af; margin-top: 8px;">' +
-                                        '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
-                                    '</div>'
-                                ) +
-                            '</div>'
-                        );
-                        
-                    } else if (location.type === 'next_stop') {
-                        marker = L.marker([location.lat, location.lng], {
-                            icon: createStopIcon('#fbbf24', 'next_stop')
-                        });
-                        
-                        marker.bindPopup(
-                            '<div style="padding: 12px; min-width: 200px;">' +
-                                '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
-                                    '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #fbbf24; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">➡️</div>' +
-                                    '<div style="flex: 1;">' +
-                                        '<div style="font-weight: 600; font-size: 14px; color: #1f2937;">Next Stop</div>' +
-                                        '<div style="font-size: 13px; color: #6b7280;">' + location.data.name + '</div>' +
-                                    '</div>' +
-                                '</div>' +
-                                '<div style="font-size: 11px; color: #9ca3af; margin-top: 8px;">' +
-                                    '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
-                                '</div>' +
-                            '</div>'
-                        );
-                        
-                    } else if (location.type === 'current_stop') {
-                        marker = L.marker([location.lat, location.lng], {
-                            icon: createStopIcon('#10b981', 'current_stop')
-                        });
-                        
-                        marker.bindPopup(
-                            '<div style="padding: 12px; min-width: 200px;">' +
-                                '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
-                                    '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">🟢</div>' +
-                                    '<div style="flex: 1;">' +
-                                        '<div style="font-weight: 600; font-size: 14px; color: #1f2937;">Current Stop</div>' +
-                                        '<div style="font-size: 13px; color: #6b7280;">' + location.data.name + '</div>' +
-                                    '</div>' +
-                                '</div>' +
-                                '<div style="font-size: 11px; color: #9ca3af; margin-top: 8px;">' +
-                                    '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
-                                '</div>' +
-                            '</div>'
-                        );
-                    }
+                    const statusColors = {
+                        'waiting': '#fbbf24',
+                        'picked_up': '#10b981',
+                        'arrived': '#6b7280'
+                    };
+                    const statusColor = statusColors[location.status] || '#666';
                     
-                    if (marker) {
-                        marker.addTo(map);
-                        bounds.extend([location.lat, location.lng]);
-                    }
+                    const initials = (location.firstName?.[0] || '') + (location.lastName?.[0] || '') || 'U';
+                    
+                    marker.bindPopup(
+                      '<div style="padding: 12px; min-width: 200px;">' +
+                          '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
+                              (location.avatarUrl ? 
+                                  '<img src="' + location.avatarUrl + '" style="width: 32px; height: 32px; border-radius: 16px; object-fit: cover;" />' : 
+                                  '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: ' + statusColor + '; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">' + 
+                                  initials.toUpperCase() + '</div>'
+                              ) +
+                              '<div style="flex: 1;">' +
+                                  '<div style="font-weight: 600; font-size: 14px; color: #1f2937;">' + 
+                                  location.firstName + ' ' + location.lastName + '</div>' +
+                                  '<div style="display: flex; align-items: center; gap: 4px; margin-top: 2px;">' +
+                                      '<div style="width: 8px; height: 8px; border-radius: 4px; background-color: ' + statusColor + ';"></div>' +
+                                      '<span style="font-size: 12px; color: #6b7280;">' + statusText + '</span>' +
+                                  '</div>' +
+                              '</div>' +
+                          '</div>' +
+                          (location.data.last_location_update ? 
+                              '<div style="font-size: 11px; color: #9ca3af; margin-top: 8px;">' +
+                                  '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) + '<br>' +
+                                  'Updated ' + new Date(location.data.last_location_update).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) +
+                              '</div>' : 
+                              '<div style="font-size: 11px; color: #9ca3af; margin-top: 8px;">' +
+                                  '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
+                              '</div>'
+                          ) +
+                      '</div>'
+                    );
+                  } else if (location.type === 'next_stop') {
+                    marker.bindPopup(
+                      '<div style="padding: 12px; min-width: 200px;">' +
+                          '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
+                              '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #fbbf24; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">➡️</div>' +
+                              '<div style="flex: 1;">' +
+                                  '<div style="font-weight: 600; font-size: 14px; color: #1f2937;">Next Stop</div>' +
+                                  '<div style="font-size: 13px; color: #6b7280;">' + location.name + '</div>' +
+                              '</div>' +
+                          '</div>' +
+                          '<div style="font-size: 11px; color: #9ca3af; margin-top: 8px;">' +
+                              '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
+                          '</div>' +
+                      '</div>'
+                    );
+                  } else if (location.type === 'current_stop') {
+                    marker.bindPopup(
+                      '<div style="padding: 12px; min-width: 200px;">' +
+                          '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
+                              '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">🟢</div>' +
+                              '<div style="flex: 1;">' +
+                                  '<div style="font-weight: 600; font-size: 14px; color: #1f2937;">Current Stop</div>' +
+                                  '<div style="font-size: 13px; color: #6b7280;">' + location.name + '</div>' +
+                              '</div>' +
+                          '</div>' +
+                          '<div style="font-size: 11px; color: #9ca3af; margin-top: 8px;">' +
+                              '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
+                          '</div>' +
+                      '</div>'
+                    );
+                  }
+                  
+                  marker.addTo(map);
+                  bounds.extend([location.lat, location.lng]);
                 });
                 
                 // Fit map to bounds
                 if (bounds.isValid()) {
-                    map.fitBounds(bounds, { padding: [20, 20] });
+                  map.fitBounds(bounds, { padding: [20, 20] });
                 }
                 
                 // Auto-open popups for user markers if there are only a few
                 if (locations.filter(l => l.type === 'user').length <= 3) {
-                    setTimeout(() => {
-                        locations.forEach(location => {
-                            if (location.type === 'user') {
-                                const marker = L.marker([location.lat, location.lng]).getPopup();
-                                if (marker) marker.openPopup();
-                            }
-                        });
-                    }, 1000);
+                  setTimeout(() => {
+                    locations.forEach(location => {
+                      if (location.type === 'user') {
+                        const marker = L.marker([location.lat, location.lng]).getPopup();
+                        if (marker) marker.openPopup();
+                      }
+                    });
+                  }, 1000);
                 }
             </script>
         </body>
