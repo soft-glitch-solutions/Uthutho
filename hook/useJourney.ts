@@ -69,6 +69,116 @@ export function useJourney() {
     }
   }, [user]);
 
+  // Add this function to save completed journey to history
+const saveJourneyToHistory = async (
+  userId: string,
+  journey: any,
+  rideDuration: number
+) => {
+  console.log('📝 Starting saveJourneyToHistory', { userId, journeyId: journey?.id, rideDuration });
+  
+  try {
+    // First, check if we have journey data with routes
+    if (!journey || !journey.id) {
+      console.error('❌ Invalid journey object:', journey);
+      return false;
+    }
+
+    // Use the journey data we already have from activeJourney
+    // journey already contains routes info from your useJourney hook
+    const routeName = journey.routes?.name || 'Unknown Route';
+    const transportType = journey.routes?.transport_type || 'Unknown';
+    const startPoint = journey.routes?.start_point;
+    const endPoint = journey.routes?.end_point;
+
+    console.log('✅ Using existing journey data:', {
+      routeName,
+      transportType,
+      startPoint,
+      endPoint
+    });
+
+    // Fetch journey participants separately to avoid nested query issues
+    const { data: participants, error: participantsError } = await supabase
+      .from('journey_participants')
+      .select('user_id, status, is_driver')
+      .eq('journey_id', journey.id)
+      .eq('is_active', true);
+
+    if (participantsError) {
+      console.warn('⚠️ Could not fetch participants:', participantsError);
+    }
+
+    const participant = participants?.find(p => p.user_id === userId);
+    const isDriver = participant?.is_driver || false;
+    const passengerCount = participants?.length || 1;
+
+    // Calculate metrics
+    const pointsEarned = isDriver ? 10 : 5; // Drivers get more points
+    const co2Saved = rideDuration > 0 ? (rideDuration / 60) * 2.5 : 0; // 2.5kg CO2 per hour saved
+
+    console.log('📊 Saving with data:', {
+      pointsEarned,
+      co2Saved,
+      passengerCount,
+      isDriver
+    });
+
+    // Save to completed_journeys
+    const { error: saveError } = await supabase
+      .from('completed_journeys')
+      .insert({
+        user_id: userId,
+        journey_id: journey.id,
+        route_name: routeName,
+        transport_type: transportType,
+        start_point: startPoint,
+        end_point: endPoint,
+        started_at: journey.created_at,
+        completed_at: new Date().toISOString(),
+        duration_seconds: rideDuration,
+        points_earned: pointsEarned,
+        co2_saved_kg: parseFloat(co2Saved.toFixed(2)),
+        passenger_count: passengerCount,
+        was_driving: isDriver,
+      });
+
+    if (saveError) {
+      console.error('❌ Error saving journey to history:', saveError);
+      console.error('Full error details:', JSON.stringify(saveError, null, 2));
+      return false;
+    }
+
+    console.log('✅ Journey saved to completed_journeys table');
+
+    // Update user's total trips count in profiles
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('total_trips')
+        .eq('id', userId)
+        .single();
+
+      if (profile) {
+        await supabase
+          .from('profiles')
+          .update({ 
+            total_trips: (profile.total_trips || 0) + 1 
+          })
+          .eq('id', userId);
+        console.log('✅ Updated user total_trips');
+      }
+    } catch (profileError) {
+      console.warn('⚠️ Could not update user total_trips:', profileError);
+      // Don't fail the whole operation if this fails
+    }
+
+    return true;
+  } catch (error) {
+    console.error('❌ Unexpected error in saveJourneyToHistory:', error);
+    return false;
+  }
+};
   // Driver assignment function using driver_journeys table
   const checkAndAssignJourneyDriver = async (journeyId: string) => {
     try {
@@ -629,152 +739,156 @@ const loadActiveJourney = async () => {
     }
   };
 
-  const completeJourney = async () => {
-    console.log('Starting completeJourney', { activeJourneyId: activeJourney?.id, userId: user?.id });
+const completeJourney = async () => {
+  console.log('Starting completeJourney', { activeJourneyId: activeJourney?.id, userId: user?.id });
 
-    if (!activeJourney?.id || !user?.id) {
-      console.log('Missing activeJourney or user');
-      return { success: false, error: 'Missing activeJourney or user' };
+  if (!activeJourney?.id || !user?.id) {
+    console.log('Missing activeJourney or user');
+    return { success: false, error: 'Missing activeJourney or user' };
+  }
+
+  try {
+    const { data: driverData } = await supabase
+      .from('drivers')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('is_verified', true)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (driverData && activeJourney.driver_id === driverData.id) {
+      await completeDriverJourney(driverData.id, activeJourney.id);
     }
 
+    const { data: waitingRow, error: waitingError } = await supabase
+      .from('stop_waiting')
+      .select('created_at')
+      .eq('user_id', user.id)
+      .eq('journey_id', activeJourney.id)
+      .single();
+
+    if (waitingError && waitingError.code !== 'PGRST116') {
+      console.warn('Warning fetching stop_waiting:', waitingError);
+    }
+
+    let rideDuration = 0;
+    if (waitingRow?.created_at) {
+      const started = new Date(waitingRow.created_at).getTime();
+      const now = Date.now();
+      rideDuration = Math.max(0, Math.floor((now - started) / 1000));
+    }
+
+    // 🔥 ADD THIS: Save journey to history BEFORE making any changes
+    console.log('📝 Saving journey to history...');
+    const savedToHistory = await saveJourneyToHistory(user.id, activeJourney, rideDuration);
+    console.log('✅ Journey saved to history:', savedToHistory);
+
+    const { error: deleteError } = await supabase
+      .from('stop_waiting')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('journey_id', activeJourney.id);
+    if (deleteError) throw deleteError;
+    console.log('Removed user from stop_waiting');
+
+    const { error: deactivateError } = await supabase
+      .from('journey_participants')
+      .update({ 
+        is_active: false,
+        left_at: new Date().toISOString(),
+        status: 'arrived'
+      })
+      .eq('journey_id', activeJourney.id)
+      .eq('user_id', user.id)
+      .eq('is_active', true);
+
+    if (deactivateError) {
+      console.error('Error deactivating journey participant:', deactivateError);
+    } else {
+      console.log('Deactivated user from journey participants');
+    }
+
+    let newTrips: number | null = null;
     try {
-      const { data: driverData } = await supabase
-        .from('drivers')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('is_verified', true)
-        .eq('is_active', true)
-        .maybeSingle();
+      const { data: rpcData, error: rpcErr } = await supabase
+        .rpc('increment_trip', { user_id: user.id, ride_time: rideDuration });
 
-      if (driverData && activeJourney.driver_id === driverData.id) {
-        await completeDriverJourney(driverData.id, activeJourney.id);
+      if (rpcErr) throw rpcErr;
+
+      if (Array.isArray(rpcData) && rpcData.length > 0) {
+        newTrips = rpcData[0].new_trips ?? rpcData[0].cur_trips ?? null;
+      } else if (rpcData && typeof rpcData === 'object') {
+        newTrips = (rpcData as any).new_trips ?? null;
       }
 
-      const { data: waitingRow, error: waitingError } = await supabase
-        .from('stop_waiting')
-        .select('created_at')
-        .eq('user_id', user.id)
-        .eq('journey_id', activeJourney.id)
+      await supabase
+        .from('profiles')
+        .update({ points: supabase.raw('points + 10') })
+        .eq('id', user.id);
+      console.log('Added 10 points to user');
+    } catch (rpcFallbackErr) {
+      console.warn('RPC increment_trip failed, falling back to inline update:', rpcFallbackErr);
+
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('trips, total_ride_time, points')
+        .eq('id', user.id)
         .single();
+      if (profileErr) throw profileErr;
 
-      if (waitingError && waitingError.code !== 'PGRST116') {
-        console.warn('Warning fetching stop_waiting:', waitingError);
-      }
+      const nextTrips = (profile?.trips ?? 0) + 1;
+      const nextTotal = (profile?.total_ride_time ?? 0) + rideDuration;
+      const nextPoints = (profile?.points ?? 0) + 10;
 
-      let rideDuration = 0;
-      if (waitingRow?.created_at) {
-        const started = new Date(waitingRow.created_at).getTime();
-        const now = Date.now();
-        rideDuration = Math.max(0, Math.floor((now - started) / 1000));
-      }
+      const { error: updateErr } = await supabase
+        .from('profiles')
+        .update({ trips: nextTrips, total_ride_time: nextTotal, points: nextPoints })
+        .eq('id', user.id);
+      if (updateErr) throw updateErr;
 
-      const { error: deleteError } = await supabase
-        .from('stop_waiting')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('journey_id', activeJourney.id);
-      if (deleteError) throw deleteError;
-      console.log('Removed user from stop_waiting');
-
-      const { error: deactivateError } = await supabase
-        .from('journey_participants')
-        .update({ 
-          is_active: false,
-          left_at: new Date().toISOString(),
-          status: 'arrived'
-        })
-        .eq('journey_id', activeJourney.id)
-        .eq('user_id', user.id)
-        .eq('is_active', true);
-
-      if (deactivateError) {
-        console.error('Error deactivating journey participant:', deactivateError);
-      } else {
-        console.log('Deactivated user from journey participants');
-      }
-
-      let newTrips: number | null = null;
-      try {
-        const { data: rpcData, error: rpcErr } = await supabase
-          .rpc('increment_trip', { user_id: user.id, ride_time: rideDuration });
-
-        if (rpcErr) throw rpcErr;
-
-        if (Array.isArray(rpcData) && rpcData.length > 0) {
-          newTrips = rpcData[0].new_trips ?? rpcData[0].cur_trips ?? null;
-        } else if (rpcData && typeof rpcData === 'object') {
-          newTrips = (rpcData as any).new_trips ?? null;
-        }
-
-        await supabase
-          .from('profiles')
-          .update({ points: supabase.raw('points + 10') })
-          .eq('id', user.id);
-        console.log('Added 10 points to user');
-      } catch (rpcFallbackErr) {
-        console.warn('RPC increment_trip failed, falling back to inline update:', rpcFallbackErr);
-
-        const { data: profile, error: profileErr } = await supabase
-          .from('profiles')
-          .select('trips, total_ride_time, points')
-          .eq('id', user.id)
-          .single();
-        if (profileErr) throw profileErr;
-
-        const nextTrips = (profile?.trips ?? 0) + 1;
-        const nextTotal = (profile?.total_ride_time ?? 0) + rideDuration;
-        const nextPoints = (profile?.points ?? 0) + 10;
-
-        const { error: updateErr } = await supabase
-          .from('profiles')
-          .update({ trips: nextTrips, total_ride_time: nextTotal, points: nextPoints })
-          .eq('id', user.id);
-        if (updateErr) throw updateErr;
-
-        newTrips = nextTrips;
-        console.log('Updated trips, total_ride_time, and points inline');
-      }
-
-      const { data: remainingUsers, error: remainingError } = await supabase
-        .from('stop_waiting')
-        .select('id')
-        .eq('journey_id', activeJourney.id);
-      if (remainingError) throw remainingError;
-
-      // FIXED: Removed the extra single quote from 'true'
-      const { data: activeParticipants, error: participantsError } = await supabase
-        .from('journey_participants')
-        .select('id')
-        .eq('journey_id', activeJourney.id)
-        .eq('is_active', true);
-
-      if (participantsError) {
-        console.error('Error checking active participants:', participantsError);
-      }
-
-      const hasActiveUsers = (remainingUsers && remainingUsers.length > 0) || 
-                            (activeParticipants && activeParticipants.length > 0);
-
-      if (!hasActiveUsers) {
-        const { error: deleteJourneyError } = await supabase
-          .from('journeys')
-          .delete()
-          .eq('id', activeJourney.id);
-        if (deleteJourneyError) throw deleteJourneyError;
-
-        console.log(`Journey ${activeJourney.id} deleted (all users completed)`);
-      } else {
-        console.log('Journey still has waiting users; not deleting');
-      }
-
-      setActiveJourney(null);
-
-      return { success: true, rideDuration, newTrips };
-    } catch (err: any) {
-      console.error('Error completing journey:', err);
-      return { success: false, error: err?.message ?? String(err) };
+      newTrips = nextTrips;
+      console.log('Updated trips, total_ride_time, and points inline');
     }
-  };
+
+    const { data: remainingUsers, error: remainingError } = await supabase
+      .from('stop_waiting')
+      .select('id')
+      .eq('journey_id', activeJourney.id);
+    if (remainingError) throw remainingError;
+
+    const { data: activeParticipants, error: participantsError } = await supabase
+      .from('journey_participants')
+      .select('id')
+      .eq('journey_id', activeJourney.id)
+      .eq('is_active', true);
+
+    if (participantsError) {
+      console.error('Error checking active participants:', participantsError);
+    }
+
+    const hasActiveUsers = (remainingUsers && remainingUsers.length > 0) || 
+                          (activeParticipants && activeParticipants.length > 0);
+
+    if (!hasActiveUsers) {
+      const { error: deleteJourneyError } = await supabase
+        .from('journeys')
+        .delete()
+        .eq('id', activeJourney.id);
+      if (deleteJourneyError) throw deleteJourneyError;
+
+      console.log(`Journey ${activeJourney.id} deleted (all users completed)`);
+    } else {
+      console.log('Journey still has waiting users; not deleting');
+    }
+
+    setActiveJourney(null);
+
+    return { success: true, rideDuration, newTrips, savedToHistory };
+  } catch (err: any) {
+    console.error('Error completing journey:', err);
+    return { success: false, error: err?.message ?? String(err) };
+  }
+};
 
   return {
     activeJourney,
