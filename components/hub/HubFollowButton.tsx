@@ -159,12 +159,7 @@ const HubFollowButton = ({ hubId, hubName, colors }: HubFollowButtonProps) => {
           {isFollowing ? 'Following' : 'Follow'}
         </Text>
         
-        <View style={styles.followerBadge}>
-          <Users size={12} color="white" />
-          <Text style={styles.followerText}>
-            {followerCount}
-          </Text>
-        </View>
+
       </TouchableOpacity>
     </View>
   );

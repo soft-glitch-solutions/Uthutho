@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Animated } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
 import { useWaiting } from '@/context/WaitingContext';
@@ -16,6 +16,7 @@ interface StopBlockProps {
   colors: {
     text: string;
     background: string;
+    primary: string;
   };
   radius?: number;
 }
@@ -35,17 +36,57 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
   const [showDrawer, setShowDrawer] = useState(false);
   const [hasActiveJourney, setHasActiveJourney] = useState(false);
   const [isCheckingJourney, setIsCheckingJourney] = useState(true);
+  const [locationLoading, setLocationLoading] = useState(true);
+  
+  // Shimmer animation ref
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Start shimmer animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  const shimmerTranslate = shimmerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-100, 100],
+  });
+
+  const shimmerOpacity = shimmerAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.3, 0.7, 0.3],
+  });
 
   useEffect(() => {
     (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission to access location was denied');
-        return;
-      }
+      setLocationLoading(true);
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission to access location was denied');
+          setLocationLoading(false);
+          return;
+        }
 
-      let location = await Location.getCurrentPositionAsync({});
-      setUserLocation(location.coords);
+        let location = await Location.getCurrentPositionAsync({});
+        setUserLocation(location.coords);
+      } catch (error) {
+        console.error('Error getting location:', error);
+      } finally {
+        setLocationLoading(false);
+      }
     })();
   }, []);
 
@@ -62,6 +103,7 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
       
       if (!userId) {
         setHasActiveJourney(false);
+        setIsCheckingJourney(false);
         return;
       }
 
@@ -234,22 +276,40 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
     return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
   };
 
+  // Show skeleton loading state while checking location or journey status
+  if (locationLoading || isCheckingJourney) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.skeletonContainer, { opacity: 0.8 }]}>
+          <View style={[styles.skeletonButton, { backgroundColor: colors.primary }]}>
+            <View style={styles.skeletonContent}>
+              <View style={[styles.skeletonIcon, { backgroundColor: colors.text }]} />
+              <View style={[styles.skeletonText, { backgroundColor: colors.text, width: 100 }]} />
+            </View>
+            <Animated.View
+              style={[
+                styles.shimmer,
+                {
+                  backgroundColor: colors.text,
+                  opacity: shimmerOpacity,
+                  transform: [{ translateX: shimmerTranslate }, { skewX: '-20deg' }],
+                },
+              ]}
+            />
+          </View>
+          <View style={styles.skeletonHint}>
+            <View style={[styles.skeletonHintLine, { backgroundColor: colors.text, width: '60%' }]} />
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   if (!isClose) {
     return null;
   }
 
   const isWaiting = waitingStatus?.stopId === stopId;
-
-  // Show loading state while checking for active journey
-  if (isCheckingJourney) {
-    return (
-      <View style={styles.container}>
-        <Text style={[styles.countdownText, { color: colors.text }]}>
-          Checking journey status...
-        </Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -289,6 +349,14 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
               />
             </>
           )}
+          
+          {hasActiveJourney && !isWaiting && (
+            <View style={[styles.activeJourneyNote, { backgroundColor: colors.primary + '20' }]}>
+              <Text style={[styles.activeJourneyText, { color: colors.text }]}>
+                You're currently on an active journey
+              </Text>
+            </View>
+          )}
         </>
       )}
     </View>
@@ -298,6 +366,47 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
 const styles = StyleSheet.create({
   container: {
     marginTop: 10,
+  },
+  skeletonContainer: {
+    gap: 8,
+  },
+  skeletonButton: {
+    borderRadius: 8,
+    padding: 12,
+    minHeight: 50,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  skeletonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  skeletonIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    opacity: 0.7,
+  },
+  skeletonText: {
+    height: 16,
+    borderRadius: 4,
+    opacity: 0.7,
+  },
+  skeletonHint: {
+    alignItems: 'center',
+  },
+  skeletonHintLine: {
+    height: 12,
+    borderRadius: 4,
+    opacity: 0.5,
+  },
+  shimmer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   countdownText: {
     fontSize: 14,
@@ -316,6 +425,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 10,
+  },
+  activeJourneyNote: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeJourneyText: {
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    opacity: 0.8,
   },
 });
 
