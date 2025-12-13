@@ -407,51 +407,57 @@ export default function JourneyScreen() {
     }
   };
 
-  const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
-    if (!activeJourney || !currentUserId) return;
+const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
+  if (!activeJourney || !currentUserId) return;
 
-    try {
-      const { error } = await supabase
-        .from('journey_participants')
-        .update({ 
-          status: newStatus,
-          ...(newStatus === 'picked_up' && {
-            stop_waiting_id: null
-          })
-        })
-        .eq('journey_id', activeJourney.id)
-        .eq('user_id', currentUserId)
-        .eq('is_active', true);
+  try {
+    // Only update the status column since stop_waiting_id doesn't exist
+    const { error } = await supabase
+      .from('journey_participants')
+      .update({ 
+        status: newStatus
+      })
+      .eq('journey_id', activeJourney.id)
+      .eq('user_id', currentUserId)
+      .eq('is_active', true);
 
-      if (error) {
-        console.error('Error updating participant status:', error);
-        Alert.alert('Error', 'Failed to update status');
-        return;
-      }
-
-      setParticipantStatus(newStatus);
-      
-      if (newStatus === 'picked_up') {
-        await awardPoints(2);
-        
-        await supabase
-          .from('stop_waiting')
-          .delete()
-          .eq('user_id', currentUserId)
-          .eq('journey_id', activeJourney.id);
-        
-        await loadOtherPassengers();
-        
-      } else if (newStatus === 'arrived') {
-        await awardPoints(5);
-        await handleCompleteJourney();
-      }
-    } catch (error) {
+    if (error) {
       console.error('Error updating participant status:', error);
       Alert.alert('Error', 'Failed to update status');
+      return;
     }
-  };
 
+    setParticipantStatus(newStatus);
+    
+    if (newStatus === 'picked_up') {
+      await awardPoints(2);
+      
+      // Remove from stop_waiting table when picked up
+      await supabase
+        .from('stop_waiting')
+        .delete()
+        .eq('user_id', currentUserId)
+        .eq('journey_id', activeJourney.id);
+      
+      await loadOtherPassengers();
+      
+    } else if (newStatus === 'arrived') {
+      await awardPoints(5);
+      
+      // Also remove from stop_waiting when arrived (in case user arrived without being picked up)
+      await supabase
+        .from('stop_waiting')
+        .delete()
+        .eq('user_id', currentUserId)
+        .eq('journey_id', activeJourney.id);
+        
+      await handleCompleteJourney();
+    }
+  } catch (error) {
+    console.error('Error updating participant status:', error);
+    Alert.alert('Error', 'Failed to update status');
+  }
+};
   const awardPoints = async (points: number) => {
     try {
       const { data: profile } = await supabase
