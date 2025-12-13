@@ -7,7 +7,7 @@ import {
   Settings,
   CircleHelp as HelpCircle,
   User,
-  Bot,
+  Clock,
   ChevronRight,
   Linkedin,
   Facebook,
@@ -36,7 +36,7 @@ const FallbackIcon = ({ color, size }) => (
 const VISIBLE_DRAWER_SCREENS = [
   '(tabs)',
   'Leaderboard',
-  'ai',
+  'trips', // Changed from 'ai' to 'trips'
   'profile',
   'settings',
   'help'
@@ -205,12 +205,48 @@ export default function AppLayout() {
       }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
-      <Drawer.Screen name="(tabs)" options={{ title: 'Home', drawerIcon: House }} />
-      <Drawer.Screen name="Leaderboard" options={{ title: 'Leaderboard', drawerIcon: Trophy }} />
-      <Drawer.Screen name="ai" options={{ title: 'AI Assistant', drawerIcon: Bot }} />
-      <Drawer.Screen name="profile" options={{ title: 'Profile', drawerIcon: User }} />
-      <Drawer.Screen name="settings" options={{ title: 'Settings', drawerIcon: Settings }} />
-      <Drawer.Screen name="help" options={{ title: 'Help', drawerIcon: HelpCircle }} />
+      <Drawer.Screen 
+        name="(tabs)" 
+        options={{ 
+          title: 'Home', 
+          drawerIcon: House 
+        }} 
+      />
+      <Drawer.Screen 
+        name="Leaderboard" 
+        options={{ 
+          title: 'Leaderboard', 
+          drawerIcon: Trophy 
+        }} 
+      />
+      <Drawer.Screen 
+        name="trips" 
+        options={{ 
+          title: 'Trip History', 
+          drawerIcon: Clock 
+        }} 
+      />
+      <Drawer.Screen 
+        name="profile" 
+        options={{ 
+          title: 'Profile', 
+          drawerIcon: User 
+        }} 
+      />
+      <Drawer.Screen 
+        name="settings" 
+        options={{ 
+          title: 'Settings', 
+          drawerIcon: Settings 
+        }} 
+      />
+      <Drawer.Screen 
+        name="help" 
+        options={{ 
+          title: 'Help', 
+          drawerIcon: HelpCircle 
+        }} 
+      />
     </Drawer>
   );
 }

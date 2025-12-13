@@ -575,127 +575,168 @@ const subscribeToChat = () => {
   }
 };
 
-  const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
-    if (!activeJourney || !currentUserId) return;
+const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
+  if (!activeJourney || !currentUserId) return;
 
-    try {
-      let updates: any = { status: newStatus };
+  try {
+    let updates: any = { status: newStatus };
+    
+    if (newStatus === 'picked_up') {
+      const hasPermission = locationPermission || await requestLocationPermission();
       
-      if (newStatus === 'picked_up') {
-        const hasPermission = locationPermission || await requestLocationPermission();
-        
-        if (!hasPermission) {
-          Alert.alert(
-            'Location Permission Required',
-            'To share your live location with others, please enable location services.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Settings', onPress: () => {
-                console.log('Open location settings');
-              }}
-            ]
-          );
-          return;
-        }
-        
-        try {
-          const location = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.BestForNavigation,
-          });
-          
-          updates.latitude = location.coords.latitude;
-          updates.longitude = location.coords.longitude;
-          updates.last_location_update = new Date().toISOString();
-          
-          console.log('Location captured for picked_up:', {
-            lat: location.coords.latitude,
-            lng: location.coords.longitude
-          });
-        } catch (locationError) {
-          console.log('Could not get location:', locationError);
-          Alert.alert(
-            'Location Error',
-            'Unable to get your current location.',
-            [{ text: 'OK' }]
-          );
-        }
-      } else if (newStatus === 'arrived') {
-        updates.latitude = null;
-        updates.longitude = null;
-      }
-
-      const { error } = await supabase
-        .from('journey_participants')
-        .update(updates)
-        .eq('journey_id', activeJourney.id)
-        .eq('user_id', currentUserId)
-        .eq('is_active', true);
-
-      if (error) {
-        console.error('Error updating participant status:', error);
-        Alert.alert('Error', 'Failed to update status');
+      if (!hasPermission) {
+        Alert.alert(
+          'Location Permission Required',
+          'To share your live location with others, please enable location services.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Settings', onPress: () => {
+              console.log('Open location settings');
+            }}
+          ]
+        );
         return;
       }
-
-      setParticipantStatus(newStatus);
       
-      if (newStatus === 'picked_up') {
-        await awardPoints(2);
+      try {
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.BestForNavigation,
+        });
         
-        const { data: userStop } = await supabase
-          .from('stop_waiting')
-          .select('stop_id, stops(order_number)')
-          .eq('user_id', currentUserId)
-          .eq('journey_id', activeJourney.id)
-          .maybeSingle();
-
-        if (userStop && userStop.stops) {
-          const userStopOrder = userStop.stops.order_number;
-          
-          const { error: updateJourneyError } = await supabase
-            .from('journeys')
-            .update({ 
-              current_stop_sequence: userStopOrder
-            })
-            .eq('id', activeJourney.id);
-
-          if (!updateJourneyError) {
-            console.log(`Updated journey stop sequence to ${userStopOrder}`);
-            await refreshActiveJourney();
-          }
-        }
+        updates.latitude = location.coords.latitude;
+        updates.longitude = location.coords.longitude;
+        updates.last_location_update = new Date().toISOString();
         
-        await supabase
-          .from('stop_waiting')
-          .delete()
-          .eq('user_id', currentUserId)
-          .eq('journey_id', activeJourney.id);
-        
-        setUserStopName('');
-        
-        await Promise.all([
-          loadOtherPassengers(),
-          loadJourneyStops()
-        ]);
-        
-        Alert.alert('Success', 'You have been marked as picked up!');
-        
-      } else if (newStatus === 'arrived') {
-        await awardPoints(5);
-        
-        await supabase
-          .from('stop_waiting')
-          .delete()
-          .eq('user_id', currentUserId)
-          .eq('journey_id', activeJourney.id);
-          
-        await handleCompleteJourney();
+        console.log('Location captured for picked_up:', {
+          lat: location.coords.latitude,
+          lng: location.coords.longitude
+        });
+      } catch (locationError) {
+        console.log('Could not get location:', locationError);
+        Alert.alert(
+          'Location Error',
+          'Unable to get your current location.',
+          [{ text: 'OK' }]
+        );
       }
-    } catch (error) {
+    } else if (newStatus === 'arrived') {
+      updates.latitude = null;
+      updates.longitude = null;
+    }
+
+    const { error } = await supabase
+      .from('journey_participants')
+      .update(updates)
+      .eq('journey_id', activeJourney.id)
+      .eq('user_id', currentUserId)
+      .eq('is_active', true);
+
+    if (error) {
       console.error('Error updating participant status:', error);
       Alert.alert('Error', 'Failed to update status');
+      return;
     }
-  };
+
+    setParticipantStatus(newStatus);
+    
+    if (newStatus === 'picked_up') {
+      await awardPoints(2);
+      
+      const { data: userStop } = await supabase
+        .from('stop_waiting')
+        .select('stop_id, stops(order_number)')
+        .eq('user_id', currentUserId)
+        .eq('journey_id', activeJourney.id)
+        .maybeSingle();
+
+      if (userStop && userStop.stops) {
+        const userStopOrder = userStop.stops.order_number;
+        
+        const { error: updateJourneyError } = await supabase
+          .from('journeys')
+          .update({ 
+            current_stop_sequence: userStopOrder
+          })
+          .eq('id', activeJourney.id);
+
+        if (!updateJourneyError) {
+          console.log(`Updated journey stop sequence to ${userStopOrder}`);
+          await refreshActiveJourney();
+        }
+      }
+      
+      await supabase
+        .from('stop_waiting')
+        .delete()
+        .eq('user_id', currentUserId)
+        .eq('journey_id', activeJourney.id);
+      
+      setUserStopName('');
+      
+      await Promise.all([
+        loadOtherPassengers(),
+        loadJourneyStops()
+      ]);
+      
+      Alert.alert('Success', 'You have been marked as picked up!');
+      
+    } else if (newStatus === 'arrived') {
+      await awardPoints(5);
+      
+      await supabase
+        .from('stop_waiting')
+        .delete()
+        .eq('user_id', currentUserId)
+        .eq('journey_id', activeJourney.id);
+        
+      // 🔥 STORE THE JOURNEY DATA BEFORE COMPLETING
+      const currentJourneyData = {
+        id: activeJourney?.id,
+        routeName: activeJourney?.routes?.name,
+        transportType: activeJourney?.routes?.transport_type,
+        startPoint: activeJourney?.routes?.start_point,
+        endPoint: activeJourney?.routes?.end_point,
+        stops: activeJourney?.stops || [],
+        driverName: activeJourney?.driver_journeys?.[0]?.drivers?.profiles 
+          ? `${activeJourney.driver_journeys[0].drivers.profiles.first_name} ${activeJourney.driver_journeys[0].drivers.profiles.last_name}`
+          : null,
+        createdAt: activeJourney?.created_at,
+        currentStopSequence: activeJourney?.current_stop_sequence || 0
+      };
+      
+      // Now complete the journey
+      const result = await completeJourney();
+      console.log('Complete Journey result:', result);
+
+      if (result.success) {
+        router.push({
+          pathname: '/journeyComplete',
+          params: {
+            duration: String(result.rideDuration ?? 0),
+            trips: result.newTrips?.toString(),
+            routeName: currentJourneyData.routeName ?? '',
+            transportMode: currentJourneyData.transportType ?? '',
+            journeyId: result.journeyId ?? currentJourneyData.id,
+            // Pass additional data for display
+            startPoint: currentJourneyData.startPoint ?? '',
+            endPoint: currentJourneyData.endPoint ?? '',
+            stopsCount: String(currentJourneyData.stops.length),
+            driverName: currentJourneyData.driverName ?? '',
+            startedAt: currentJourneyData.createdAt ?? '',
+            currentStop: String(currentJourneyData.currentStopSequence),
+            // For rating
+            ratingJourneyId: result.journeyId ?? currentJourneyData.id
+          },
+        });
+      } else {
+        Alert.alert('Error', result.error || 'Could not complete journey');
+      }
+    }
+  } catch (error) {
+    console.error('Error updating participant status:', error);
+    Alert.alert('Error', 'Failed to update status');
+  }
+};
 
   const awardPoints = async (points: number) => {
     try {
@@ -810,31 +851,55 @@ Shared via Uthutho`;
     }
   };
 
-  const handleCompleteJourney = async () => {
-    try {
-      console.log('Completing journey...');
-      const result = await completeJourney();
-      console.log('Complete Journey result:', result);
+const handleCompleteJourney = async () => {
+  try {
+    console.log('Completing journey...');
+    
+    // 🔥 STORE THE JOURNEY DATA BEFORE COMPLETING
+    const currentJourneyData = {
+      id: activeJourney?.id,
+      routeName: activeJourney?.routes?.name,
+      transportType: activeJourney?.routes?.transport_type,
+      startPoint: activeJourney?.routes?.start_point,
+      endPoint: activeJourney?.routes?.end_point,
+      stops: activeJourney?.stops || [],
+      driverName: activeJourney?.driver_journeys?.[0]?.drivers?.profiles 
+        ? `${activeJourney.driver_journeys[0].drivers.profiles.first_name} ${activeJourney.driver_journeys[0].drivers.profiles.last_name}`
+        : null,
+      createdAt: activeJourney?.created_at
+    };
+    
+    // Now complete the journey
+    const result = await completeJourney();
+    console.log('Complete Journey result:', result);
 
-      if (result.success) {
-        router.push({
-          pathname: '/journeyComplete',
-          params: {
-            duration: String(result.rideDuration ?? 0),
-            trips: result.newTrips?.toString(),
-            routeName: activeJourney?.routes?.name ?? '',
-            transportMode: activeJourney?.routes?.transport_type ?? '',
-          },
-        });
-      } else {
-        Alert.alert('Error', result.error || 'Could not complete journey');
-      }
-    } catch (err) {
-      console.error('Unexpected error completing journey:', err);
-      Alert.alert('Error', 'Something went wrong.');
+    if (result.success) {
+      router.push({
+        pathname: '/journeyComplete',
+        params: {
+          duration: String(result.rideDuration ?? 0),
+          trips: result.newTrips?.toString(),
+          routeName: currentJourneyData.routeName ?? '', // Use stored data
+          transportMode: currentJourneyData.transportType ?? '',
+          journeyId: result.journeyId ?? currentJourneyData.id,
+          // Pass additional data for display
+          startPoint: currentJourneyData.startPoint ?? '',
+          endPoint: currentJourneyData.endPoint ?? '',
+          stopsCount: String(currentJourneyData.stops.length),
+          driverName: currentJourneyData.driverName ?? '',
+          startedAt: currentJourneyData.createdAt ?? '',
+          // For rating
+          ratingJourneyId: result.journeyId ?? currentJourneyData.id
+        },
+      });
+    } else {
+      Alert.alert('Error', result.error || 'Could not complete journey');
     }
-  };
-
+  } catch (err) {
+    console.error('Unexpected error completing journey:', err);
+    Alert.alert('Error', 'Something went wrong.');
+  }
+};
   const loadJourneyStops = async () => {
     if (!activeJourney) return;
 
@@ -968,7 +1033,6 @@ const sendChatMessage = async (messageText: string) => { // Accept message param
                   {activeJourney.routes.name}
                 </Text>
                 <View style={styles.transportBadge}>
-                  <Car size={12} color="#1ea2b1" />
                   <Text style={styles.transportText}>
                     {activeJourney.routes.transport_type}
                   </Text>
@@ -986,73 +1050,9 @@ const sendChatMessage = async (messageText: string) => { // Accept message param
               </View>
             </View>
 
-            {/* Your Status Section */}
-            <View style={styles.yourStopRow}>
-              <View style={styles.profileContainer}>
-                {userProfile?.avatar_url ? (
-                  <Image 
-                    source={{ uri: userProfile.avatar_url }}
-                    style={styles.profileImage}
-                  />
-                ) : (
-                  <View style={styles.profilePlaceholder}>
-                    <Text style={styles.profileInitial}>{getProfileInitial()}</Text>
-                  </View>
-                )}
-              </View>
-              
-              <View style={styles.yourStopInfo}>
-                <Text style={styles.yourStopName} numberOfLines={1}>
-                  {participantStatus === 'waiting' ? userStopName : 'On Board'}
-                </Text>
-                <View style={styles.statusRow}>
-                  <View style={[
-                    styles.statusDot,
-                    participantStatus === 'waiting' ? styles.waitingDot : 
-                    participantStatus === 'picked_up' ? styles.pickedUpDot :
-                    styles.arrivedDot
-                  ]} />
-                  <Text style={styles.yourStopStatus} numberOfLines={1}>
-                    {participantStatus === 'waiting' ? 'Waiting for pickup' : 
-                     participantStatus === 'picked_up' ? 'On board - Picked up' : 
-                     'Arrived'}
-                  </Text>
-                  {isUpdatingLocation && participantStatus === 'picked_up' && (
-                    <View style={styles.locationUpdating}>
-                      <Text style={styles.locationUpdatingText}>🔄 Live</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.yourStopTime} numberOfLines={1}>
-                  {participantStatus === 'waiting' ? `Waiting: ${formatWaitingTime(waitingTime)}` : 
-                   participantStatus === 'picked_up' ? 'On the way to destination' :
-                   'Journey completed'}
-                </Text>
-              </View>
-            </View>
 
-            {/* Stats Row */}
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Users size={14} color="#1ea2b1" />
-                <Text style={styles.statNumber}>{otherPassengers.length + 1}</Text>
-                <Text style={styles.statLabel}>People</Text>
-              </View>
-              
-              <View style={styles.statItem}>
-                <Clock size={14} color="#fbbf24" />
-                <Text style={styles.statNumber}>{getEstimatedArrival()}</Text>
-                <Text style={styles.statLabel}>ETA</Text>
-              </View>
-              
-              <View style={styles.statItem}>
-                <MapPin size={14} color="#34d399" />
-                <Text style={styles.statNumber}>
-                  {activeJourney.current_stop_sequence || 0}/{journeyStops.length}
-                </Text>
-                <Text style={styles.statLabel}>Stops</Text>
-              </View>
-            </View>
+
+
 
             {/* Route Slider */}
             <CompactRouteSlider
@@ -1104,24 +1104,51 @@ const sendChatMessage = async (messageText: string) => { // Accept message param
             </View>
 
             {/* Location Status */}
-            {participantStatus === 'picked_up' && (
-              <View style={styles.locationStatus}>
-                <Text style={styles.locationStatusText} numberOfLines={2}>
-                  {locationPermission 
-                    ? '📍 Location shared live'
-                    : '📍 Enable location for sharing'}
-                </Text>
-                {!locationPermission && (
-                  <TouchableOpacity 
-                    style={styles.enableLocationButton}
-                    onPress={requestLocationPermission}
-                  >
-                    <Text style={styles.enableLocationText}>Enable</Text>
-                  </TouchableOpacity>
+            {/* Your Status Section */}
+            <View style={styles.yourStopRow}>
+              <View style={styles.profileContainer}>
+                {userProfile?.avatar_url ? (
+                  <Image 
+                    source={{ uri: userProfile.avatar_url }}
+                    style={styles.profileImage}
+                  />
+                ) : (
+                  <View style={styles.profilePlaceholder}>
+                    <Text style={styles.profileInitial}>{getProfileInitial()}</Text>
+                  </View>
                 )}
               </View>
-            )}
-
+              
+              <View style={styles.yourStopInfo}>
+                <Text style={styles.yourStopName} numberOfLines={1}>
+                  {participantStatus === 'waiting' ? userStopName : 'On Board'}
+                </Text>
+                <View style={styles.statusRow}>
+                  <View style={[
+                    styles.statusDot,
+                    participantStatus === 'waiting' ? styles.waitingDot : 
+                    participantStatus === 'picked_up' ? styles.pickedUpDot :
+                    styles.arrivedDot
+                  ]} />
+                  <Text style={styles.yourStopStatus} numberOfLines={1}>
+                    {participantStatus === 'waiting' ? 'Waiting for pickup' : 
+                     participantStatus === 'picked_up' ? 'On board - Picked up' : 
+                     'Arrived'}
+                  </Text>
+                  {isUpdatingLocation && participantStatus === 'picked_up' && (
+                    <View style={styles.locationUpdating}>
+                      <Text style={styles.locationUpdatingText}>🔄 Live</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.yourStopTime} numberOfLines={1}>
+                  {participantStatus === 'waiting' ? `Waiting: ${formatWaitingTime(waitingTime)}` : 
+                   participantStatus === 'picked_up' ? 'On the way to destination' :
+                   'Journey completed'}
+                </Text>
+              </View>
+            </View>
+            
             {connectionError && (
               <View style={styles.errorContainer}>
                 <ConnectionError />

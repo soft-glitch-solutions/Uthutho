@@ -26,6 +26,7 @@ import GamificationSection from '@/components/home/GamificationSection';
 import ScreenTransition from '@/components/ScreenTransition';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import LottieView from 'lottie-react-native';
+import RateTripModal from '@/components/home/RateTripModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -214,9 +215,12 @@ export default function HomeScreen() {
   const { colors } = useTheme();
   const params = useLocalSearchParams();
   const [userLocation, setUserLocation] = useState<LocationCoords | null>(null);
-  
+  const hasCheckedForRating = useRef(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [journeyRatingId, setJourneyRatingId] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [modalQueue, setModalQueue] = useState<string[]>([]);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [nearestLocations, setNearestLocations] = useState<any>(null);
   const [isNearestLoading, setIsNearestLoading] = useState(false);
@@ -546,6 +550,7 @@ export default function HomeScreen() {
     }
   };
 
+
   const loadUserStats = async () => {
     setIsStatsLoading(true);
     try {
@@ -602,6 +607,134 @@ export default function HomeScreen() {
       }
     }
   }, [params.refresh]);
+
+// Main rating check useEffect - Check URL first, then clear it
+useEffect(() => {
+  const checkForRating = async () => {
+    try {
+      // 1. FIRST: Check URL parameters
+      if (params.showRatingForJourney) {
+        console.log('🎯 Rating triggered from URL parameter:', params.showRatingForJourney);
+        
+        // Set the rating ID and show modal
+        setJourneyRatingId(params.showRatingForJourney as string);
+        setShowRatingModal(true);
+        
+        // 2. THEN: Clear the URL parameter immediately after processing
+        // We'll use AsyncStorage to track that we've handled this
+        await AsyncStorage.setItem(
+          'handled_rating_param',
+          params.showRatingForJourney as string
+        );
+        
+        // Note: We can't directly modify the URL here, but we've marked it as handled
+        // The cleanup useEffect will handle any further cleanup
+        
+        return; // Exit since URL param takes priority
+      }
+      
+      // 3. Fallback: Check AsyncStorage for pending ratings
+      const pendingRating = await AsyncStorage.getItem('pending_journey_rating');
+      if (pendingRating) {
+        console.log('🎯 Found rating in storage:', pendingRating);
+        await AsyncStorage.removeItem('pending_journey_rating');
+        setJourneyRatingId(pendingRating);
+        setShowRatingModal(true);
+      }
+    } catch (error) {
+      console.error('Error checking for rating:', error);
+    }
+  };
+
+  // Run immediately on mount
+  checkForRating();
+}, [params.showRatingForJourney]);
+
+// Cleanup useEffect - Handle URL parameter clearing and prevent double triggers
+useEffect(() => {
+  return () => {
+    const clearParams = async () => {
+      try {
+        // Check if we have any pending URL parameters
+        if (params.showRatingForJourney) {
+          console.log('🗑️ Clearing rating parameter on unmount');
+          
+          // Get the parameter we just handled
+          const handledParam = await AsyncStorage.getItem('handled_rating_param');
+          
+          // If this is the parameter we just showed, remove the flag
+          if (handledParam === params.showRatingForJourney) {
+            await AsyncStorage.removeItem('handled_rating_param');
+            console.log('✅ Successfully cleared handled rating parameter');
+          }
+          
+          // Optional: You could also clear the URL parameter by navigating
+          // This depends on your routing setup
+          // router.replace('/home');
+        }
+      } catch (error) {
+        console.error('Error clearing params on unmount:', error);
+      }
+    };
+    
+    clearParams();
+  };
+}, []);
+
+// Add a check to prevent showing the same rating twice when component re-mounts
+useEffect(() => {
+  const preventDoubleShow = async () => {
+    try {
+      if (params.showRatingForJourney) {
+        const handledParam = await AsyncStorage.getItem('handled_rating_param');
+        
+        // If we already handled this exact parameter, don't show it again
+        if (handledParam === params.showRatingForJourney) {
+          console.log('⏭️ Parameter already handled, preventing double show');
+          return false;
+        }
+      }
+      return true;
+    } catch (error) {
+      console.error('Error checking for double show:', error);
+      return true;
+    }
+  };
+  
+  // This runs before the main check
+  preventDoubleShow();
+}, [params.showRatingForJourney]);
+
+// Update handleCloseModal to clean up properly
+const handleCloseModal = () => {
+  console.log('Closing rating modal');
+  setShowRatingModal(false);
+  setJourneyRatingId(null);
+  
+  // Clear the handled param flag when modal closes
+  AsyncStorage.removeItem('handled_rating_param').catch(console.error);
+};
+
+// Update handleRatingSubmitted to clean up everything
+const handleRatingSubmitted = (journeyId: string, rating: number) => {
+  console.log('Rating submitted for journey:', journeyId, 'Rating:', rating);
+  
+  // Close the modal
+  handleCloseModal();
+  
+  // Clear any pending rating from storage
+  AsyncStorage.removeItem('pending_journey_rating').catch(console.error);
+  
+  // Clear handled param
+  AsyncStorage.removeItem('handled_rating_param').catch(console.error);
+  
+  // Show success message
+  Alert.alert(
+    'Thanks for Your Feedback!',
+    `You rated your trip ${rating} stars!`,
+    [{ text: 'OK' }]
+  );
+};
 
   const openSidebar = () => {
     navigation.toggleDrawer();
@@ -683,6 +816,13 @@ export default function HomeScreen() {
     if (resolved.length) loadFavoriteFollowerCounts(resolved);
     else setFavoritesCountMap({});
   }, [favoriteDetails]);
+
+  useEffect(() => {
+  console.log('🏠 HomeScreen state updated:', {
+    showRatingModal,
+    journeyRatingId: journeyRatingId ? `${journeyRatingId.substring(0, 8)}...` : 'null'
+  });
+}, [showRatingModal, journeyRatingId]);
 
   if (isDesktop) {
     return (
@@ -901,6 +1041,8 @@ export default function HomeScreen() {
             </View>
           </View>
         </ScrollView>
+
+
       </ScreenTransition>
     );
   }
@@ -1109,6 +1251,17 @@ export default function HomeScreen() {
         />
 
       </ScrollView>
+
+    <RateTripModal
+      visible={showRatingModal}
+      onClose={() => {
+        console.log('Closing rating modal');
+        setShowRatingModal(false);
+        setJourneyRatingId(null);
+      }}
+      journeyId={journeyRatingId}
+      onRatingSubmitted={handleRatingSubmitted}
+    />
     </ScreenTransition>
   );
 }
