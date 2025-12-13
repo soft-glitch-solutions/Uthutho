@@ -302,8 +302,9 @@ const InteractiveMap = ({
                     }
                 }
                 
-                function createStopIcon(color, emoji, type) {
-                    const label = type === 'next_stop' ? 'Next' : 'Current';
+                function createStopIcon(color, type) {
+                    const emoji = type === 'next_stop' ? '➡️' : '🟢';
+                    const label = type === 'next_stop' ? 'Next Stop' : 'Current Stop';
                     return L.divIcon({
                         html: \`
                             <div class="stop-marker \${type}-marker" style="background-color: \${color};">
@@ -367,7 +368,7 @@ const InteractiveMap = ({
                                 '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
                                     (location.data.profiles.avatar_url ? 
                                         '<img src="' + location.data.profiles.avatar_url + '" style="width: 32px; height: 32px; border-radius: 16px; object-fit: cover;" />' : 
-                                        '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #1ea2b1; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">' + 
+                                        '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: ' + statusColor + '; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">' + 
                                         initials.toUpperCase() + '</div>'
                                     ) +
                                     '<div style="flex: 1;">' +
@@ -393,7 +394,7 @@ const InteractiveMap = ({
                         
                     } else if (location.type === 'next_stop') {
                         marker = L.marker([location.lat, location.lng], {
-                            icon: createStopIcon('#fbbf24', '➡️', 'next_stop')
+                            icon: createStopIcon('#fbbf24', 'next_stop')
                         });
                         
                         marker.bindPopup(
@@ -413,13 +414,13 @@ const InteractiveMap = ({
                         
                     } else if (location.type === 'current_stop') {
                         marker = L.marker([location.lat, location.lng], {
-                            icon: createStopIcon('#10b981', '📍', 'current_stop')
+                            icon: createStopIcon('#10b981', 'current_stop')
                         });
                         
                         marker.bindPopup(
                             '<div style="padding: 12px; min-width: 200px;">' +
                                 '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
-                                    '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">📍</div>' +
+                                    '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">🟢</div>' +
                                     '<div style="flex: 1;">' +
                                         '<div style="font-weight: 600; font-size: 14px; color: #1f2937;">Current Stop</div>' +
                                         '<div style="font-size: 13px; color: #6b7280;">' + location.data.name + '</div>' +
