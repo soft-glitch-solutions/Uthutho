@@ -170,6 +170,33 @@ export default function JourneyScreen() {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    if (!activeJourney?.id || !currentUserId) return;
+
+    // Subscribe to changes in journey_participants for this user
+    const subscription = supabase
+      .channel(`journey-participant-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'journey_participants',
+          filter: `journey_id=eq.${activeJourney.id} AND user_id=eq.${currentUserId}`
+        },
+        (payload) => {
+          if (payload.new.status !== participantStatus) {
+            setParticipantStatus(payload.new.status || 'waiting');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [activeJourney?.id, currentUserId]);
+
   const checkIfDriver = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -277,15 +304,18 @@ export default function JourneyScreen() {
         .select('*, stops(name, order_number)')
         .eq('user_id', currentUserId)
         .eq('journey_id', activeJourney.id)
-        .single();
+        .maybeSingle();
 
-      if (error) {
+      if (error && error.code !== 'PGRST116') {
         console.error('Error loading current user stop:', error);
         return;
       }
 
       if (userStop && userStop.stops) {
         setUserStopName(userStop.stops.name);
+      } else {
+        // User is not in stop_waiting (could be picked_up or arrived)
+        setUserStopName('');
       }
     } catch (error) {
       console.error('Error loading current user stop:', error);
@@ -407,57 +437,102 @@ export default function JourneyScreen() {
     }
   };
 
-const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
-  if (!activeJourney || !currentUserId) return;
+  const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
+    if (!activeJourney || !currentUserId) return;
 
-  try {
-    // Only update the status column since stop_waiting_id doesn't exist
-    const { error } = await supabase
-      .from('journey_participants')
-      .update({ 
-        status: newStatus
-      })
-      .eq('journey_id', activeJourney.id)
-      .eq('user_id', currentUserId)
-      .eq('is_active', true);
+    try {
+      // Only update the status column since stop_waiting_id doesn't exist
+      const { error } = await supabase
+        .from('journey_participants')
+        .update({ 
+          status: newStatus
+        })
+        .eq('journey_id', activeJourney.id)
+        .eq('user_id', currentUserId)
+        .eq('is_active', true);
 
-    if (error) {
+      if (error) {
+        console.error('Error updating participant status:', error);
+        Alert.alert('Error', 'Failed to update status');
+        return;
+      }
+
+      setParticipantStatus(newStatus);
+      
+      if (newStatus === 'picked_up') {
+        await awardPoints(2);
+        
+        // Get the user's current stop to update the journey's current stop sequence
+        const { data: userStop, error: userStopError } = await supabase
+          .from('stop_waiting')
+          .select('stop_id, stops(order_number)')
+          .eq('user_id', currentUserId)
+          .eq('journey_id', activeJourney.id)
+          .maybeSingle();
+
+        if (userStopError && userStopError.code !== 'PGRST116') {
+          console.error('Error getting user stop:', userStopError);
+        }
+
+        // Update the journey's current stop sequence to the user's stop
+        // This marks that the taxi has reached this stop
+        if (userStop && userStop.stops) {
+          const userStopOrder = userStop.stops.order_number;
+          
+          // Update the journey's current stop sequence
+          const { error: updateJourneyError } = await supabase
+            .from('journeys')
+            .update({ 
+              current_stop_sequence: userStopOrder
+            })
+            .eq('id', activeJourney.id);
+
+          if (updateJourneyError) {
+            console.error('Error updating journey stop sequence:', updateJourneyError);
+          } else {
+            console.log(`Updated journey stop sequence to ${userStopOrder}`);
+            
+            // Refresh the active journey to get updated stop sequence
+            await refreshActiveJourney();
+          }
+        }
+        
+        // Remove current user from stop_waiting (they're no longer waiting)
+        await supabase
+          .from('stop_waiting')
+          .delete()
+          .eq('user_id', currentUserId)
+          .eq('journey_id', activeJourney.id);
+        
+        // Clear user stop name since they're no longer waiting at a stop
+        setUserStopName('');
+        
+        // Reload passengers and stops to reflect changes
+        await Promise.all([
+          loadOtherPassengers(),
+          loadJourneyStops()
+        ]);
+        
+        Alert.alert('Success', 'You have been marked as picked up!');
+        
+      } else if (newStatus === 'arrived') {
+        await awardPoints(5);
+        
+        // Remove from stop_waiting if still there
+        await supabase
+          .from('stop_waiting')
+          .delete()
+          .eq('user_id', currentUserId)
+          .eq('journey_id', activeJourney.id);
+          
+        await handleCompleteJourney();
+      }
+    } catch (error) {
       console.error('Error updating participant status:', error);
       Alert.alert('Error', 'Failed to update status');
-      return;
     }
+  };
 
-    setParticipantStatus(newStatus);
-    
-    if (newStatus === 'picked_up') {
-      await awardPoints(2);
-      
-      // Remove from stop_waiting table when picked up
-      await supabase
-        .from('stop_waiting')
-        .delete()
-        .eq('user_id', currentUserId)
-        .eq('journey_id', activeJourney.id);
-      
-      await loadOtherPassengers();
-      
-    } else if (newStatus === 'arrived') {
-      await awardPoints(5);
-      
-      // Also remove from stop_waiting when arrived (in case user arrived without being picked up)
-      await supabase
-        .from('stop_waiting')
-        .delete()
-        .eq('user_id', currentUserId)
-        .eq('journey_id', activeJourney.id);
-        
-      await handleCompleteJourney();
-    }
-  } catch (error) {
-    console.error('Error updating participant status:', error);
-    Alert.alert('Error', 'Failed to update status');
-  }
-};
   const awardPoints = async (points: number) => {
     try {
       const { data: profile } = await supabase
@@ -519,7 +594,7 @@ Shared via Uthutho`;
         .eq('journey_id', activeJourney.id)
         .single();
 
-      if (error || !currentUserWaiting) {
+      if (error) {
         Alert.alert('Error', 'Could not find your waiting stop');
         return;
       }
@@ -600,6 +675,7 @@ Shared via Uthutho`;
     if (!activeJourney) return;
 
     try {
+      // Load route stops
       const { data: routeStopsData, error: routeStopsError } = await supabase
         .from('route_stops')
         .select(`
@@ -616,12 +692,23 @@ Shared via Uthutho`;
 
       if (routeStopsError) throw routeStopsError;
 
-      const processedStops = (routeStopsData || []).map((routeStop, index) => {
+      // Get all active waiting stops
+      const { data: activeWaitingStops } = await supabase
+        .from('stop_waiting')
+        .select('stop_id')
+        .eq('journey_id', activeJourney.id);
+
+      const activeStopIds = new Set(activeWaitingStops?.map(w => w.stop_id) || []);
+
+      const processedStops = (routeStopsData || []).map((routeStop) => {
         const stop = routeStop.stops;
         if (!stop) return null;
 
-        const currentStopSequence = activeJourney.current_stop_sequence || 0;
         const stopOrder = routeStop.order_number;
+        const currentStopSequence = activeJourney.current_stop_sequence || 0;
+        
+        // Check if this stop has any waiting passengers
+        const hasWaitingPassengers = activeStopIds.has(stop.id);
         
         return {
           id: stop.id,
@@ -630,6 +717,7 @@ Shared via Uthutho`;
           passed: stopOrder < currentStopSequence,
           current: stopOrder === currentStopSequence,
           upcoming: stopOrder > currentStopSequence,
+          hasWaitingPassengers: hasWaitingPassengers,
           latitude: stop.latitude,
           longitude: stop.longitude
         };
@@ -708,7 +796,7 @@ Shared via Uthutho`;
             </View>
           </View>
 
-          {/* Your Stop Section */}
+          {/* Your Status Section - Updated for picked_up state */}
           <View style={styles.yourStopRow}>
             <View style={styles.profileContainer}>
               {userProfile?.avatar_url ? (
@@ -725,7 +813,7 @@ Shared via Uthutho`;
             
             <View style={styles.yourStopInfo}>
               <Text style={styles.yourStopName} numberOfLines={1}>
-                {userStopName}
+                {participantStatus === 'waiting' ? userStopName : 'On Board'}
               </Text>
               <View style={styles.statusRow}>
                 <View style={[
@@ -736,12 +824,14 @@ Shared via Uthutho`;
                 ]} />
                 <Text style={styles.yourStopStatus}>
                   {participantStatus === 'waiting' ? 'Waiting for pickup' : 
-                   participantStatus === 'picked_up' ? 'Picked up' : 
+                   participantStatus === 'picked_up' ? 'On board - Picked up' : 
                    'Arrived'}
                 </Text>
               </View>
               <Text style={styles.yourStopTime}>
-                Waiting: {formatWaitingTime(waitingTime)}
+                {participantStatus === 'waiting' ? `Waiting: ${formatWaitingTime(waitingTime)}` : 
+                 participantStatus === 'picked_up' ? 'On the way to destination' :
+                 'Journey completed'}
               </Text>
             </View>
             
@@ -800,8 +890,14 @@ Shared via Uthutho`;
             <TouchableOpacity
               style={styles.secondaryActionButton}
               onPress={pingPassengersAhead}
+              disabled={participantStatus !== 'waiting'}
             >
-              <Text style={styles.secondaryActionText}>Notify Ahead</Text>
+              <Text style={[
+                styles.secondaryActionText,
+                participantStatus !== 'waiting' && styles.disabledActionText
+              ]}>
+                Notify Ahead
+              </Text>
             </TouchableOpacity>
             
             <TouchableOpacity
@@ -1063,6 +1159,9 @@ const styles = StyleSheet.create({
     color: '#1ea2b1',
     fontSize: 14,
     fontWeight: '600',
+  },
+  disabledActionText: {
+    color: '#666666',
   },
   iconButton: {
     backgroundColor: 'transparent',

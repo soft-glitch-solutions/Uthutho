@@ -26,14 +26,14 @@ export interface CreateJourneyParams {
 }
 
 // Add these missing interfaces:
-export interface JourneyStop {
+interface JourneyStop {
   id: string;
   name: string;
   order_number: number;
   passed: boolean;
   current: boolean;
   upcoming: boolean;
-  route_id?: string;
+  cancelled?: boolean;
   latitude?: number;
   longitude?: number;
 }

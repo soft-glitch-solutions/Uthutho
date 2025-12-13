@@ -298,86 +298,154 @@ export function useJourney() {
     }
   };
 
-  const loadActiveJourney = async () => {
-    if (!user) {
+// In useJourney.ts, update the loadActiveJourney function:
+const loadActiveJourney = async () => {
+  if (!user) {
+    setLoading(false);
+    return;
+  }
+
+  try {
+    // First check if user is in an active journey via journey_participants
+    const { data: participantData, error: participantError } = await supabase
+      .from('journey_participants')
+      .select(`
+        *,
+        journey:journeys (
+          *,
+          routes (
+            name,
+            transport_type,
+            start_point,
+            end_point
+          ),
+          driver_journeys (
+            driver_id,
+            status,
+            drivers (
+              user_id,
+              profiles (
+                first_name,
+                last_name
+              )
+            )
+          )
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .eq('journey.status', 'in_progress')
+      .maybeSingle();
+
+    if (participantError && participantError.code !== 'PGRST116') {
+      console.error('Error loading active journey participant:', participantError);
+    }
+
+    if (participantData?.journey) {
+      // User is in an active journey (could be waiting, picked_up, or arrived but still active)
+      const { data: routeStops, error: stopsError } = await supabase
+        .from('route_stops')
+        .select(`
+          stops (*),
+          order_number
+        `)
+        .eq('route_id', participantData.journey.route_id)
+        .order('order_number', { ascending: true });
+
+      if (stopsError) {
+        console.error('Error loading route stops:', stopsError);
+      }
+
+      const processedStops = (routeStops || []).map(routeStop => ({
+        ...routeStop.stops,
+        order_number: routeStop.order_number
+      }));
+
+      const journeyWithStops = {
+        ...participantData.journey,
+        stops: processedStops,
+      };
+
+      setActiveJourney(journeyWithStops);
+      await checkAndAssignJourneyDriver(participantData.journey.id);
       setLoading(false);
       return;
     }
 
-    try {
-      const { data: waitingData, error: waitingError } = await supabase
-        .from('stop_waiting')
-        .select(`
+    // Fallback: check stop_waiting (for backwards compatibility)
+    const { data: waitingData, error: waitingError } = await supabase
+      .from('stop_waiting')
+      .select(`
+        *,
+        journeys (
           *,
-          journeys (
-            *,
-            routes (
-              name,
-              transport_type,
-              start_point,
-              end_point
-            ),
-            driver_journeys (
-              driver_id,
-              status,
-              drivers (
-                user_id,
-                profiles (
-                  first_name,
-                  last_name
-                )
+          routes (
+            name,
+            transport_type,
+            start_point,
+            end_point
+          ),
+          driver_journeys (
+            driver_id,
+            status,
+            drivers (
+              user_id,
+              profiles (
+                first_name,
+                last_name
               )
             )
           )
+        )
+      `)
+      .eq('user_id', user.id)
+      .not('journey_id', 'is', null)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+
+    if (waitingError && waitingError.code !== 'PGRST116') {
+      console.error('Error loading active journey:', waitingError);
+      setActiveJourney(null);
+      setLoading(false);
+      return;
+    }
+
+    if (waitingData?.journeys) {
+      const { data: routeStops, error: stopsError } = await supabase
+        .from('route_stops')
+        .select(`
+          stops (*),
+          order_number
         `)
-        .eq('user_id', user.id)
-        .not('journey_id', 'is', null)
-        .gt('expires_at', new Date().toISOString())
-        .maybeSingle();
+        .eq('route_id', waitingData.journeys.route_id)
+        .order('order_number', { ascending: true });
 
-      if (waitingError) {
-        console.error('Error loading active journey:', waitingError);
-        setActiveJourney(null);
-        setLoading(false);
-        return;
+      if (stopsError) {
+        console.error('Error loading route stops:', stopsError);
       }
 
-      if (waitingData?.journeys) {
-        const { data: routeStops, error: stopsError } = await supabase
-          .from('route_stops')
-          .select(`
-            stops (*),
-            order_number
-          `)
-          .eq('route_id', waitingData.journeys.route_id)
-          .order('order_number', { ascending: true });
+      const processedStops = (routeStops || []).map(routeStop => ({
+        ...routeStop.stops,
+        order_number: routeStop.order_number
+      }));
 
-        if (stopsError) {
-          console.error('Error loading route stops:', stopsError);
-        }
+      const journeyWithStops = {
+        ...waitingData.journeys,
+        stops: processedStops,
+      };
 
-        const processedStops = (routeStops || []).map(routeStop => ({
-          ...routeStop.stops,
-          order_number: routeStop.order_number
-        }));
-
-        const journeyWithStops = {
-          ...waitingData.journeys,
-          stops: processedStops,
-        };
-
-        setActiveJourney(journeyWithStops);
-        await checkAndAssignJourneyDriver(waitingData.journeys.id);
-      } else {
-        setActiveJourney(null);
-      }
-    } catch (error) {
-      console.error('Error loading active journey:', error);
+      setActiveJourney(journeyWithStops);
+      await checkAndAssignJourneyDriver(waitingData.journeys.id);
+    } else {
       setActiveJourney(null);
     }
-    
-    setLoading(false);
-  };
+  } catch (error) {
+    console.error('Error loading active journey:', error);
+    setActiveJourney(null);
+  }
+  
+  setLoading(false);
+};
 
   // UPDATED: Modified to accept specific journey ID
   const createOrJoinJourney = async (stopId: string, routeId: string, transportType: string, specificJourneyId?: string) => {
