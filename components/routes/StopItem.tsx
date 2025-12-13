@@ -8,7 +8,7 @@ import {
   Image 
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Flag } from 'lucide-react-native';
+import { Flag, Users, MapPin, Navigation } from 'lucide-react-native';
 import { Stop } from './RoutesScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -18,12 +18,18 @@ interface StopItemProps {
   stop: Stop;
   followerCount?: number;
   isDesktop?: boolean;
+  showDistance?: boolean;
+  distance?: string;
+  showRoutes?: boolean;
 }
 
 export default function StopItem({ 
   stop, 
   followerCount = 0, 
-  isDesktop: propIsDesktop = false 
+  isDesktop: propIsDesktop = false,
+  showDistance = false,
+  distance = '0 km',
+  showRoutes = true
 }: StopItemProps) {
   const router = useRouter();
   const desktopMode = isDesktop || propIsDesktop;
@@ -39,47 +45,74 @@ export default function StopItem({
     <TouchableOpacity
       style={[styles.stopCard, desktopMode && styles.stopCardDesktop]}
       onPress={() => navigateToStop(stop.id)}
+      activeOpacity={0.8}
     >
-      {/* Image Section */}
-      <View style={styles.imageContainer}>
+      {/* Side Image */}
+      <View style={styles.imageContainerSide}>
         <Image 
           source={{ uri: imageUrl }} 
-          style={styles.stopImage}
+          style={styles.stopImageSide}
           resizeMode="cover"
         />
+
       </View>
 
       {/* Content Section */}
-      <View style={styles.contentContainer}>
+      <View style={styles.contentContainerSide}>
         <View style={styles.stopHeader}>
-          <Flag size={desktopMode ? 18 : 20} color="#1ea2b1" />
-          <View style={[styles.stopInfo, desktopMode && styles.stopInfoDesktop]}>
-            <Text style={[styles.stopName, desktopMode && styles.stopNameDesktop]} numberOfLines={2}>
+          <Flag size={16} color="#1ea2b1" />
+          <View style={styles.stopInfo}>
+            <Text style={styles.stopName} numberOfLines={2}>
               {stop.name}
             </Text>
             {stop.address && (
-              <Text 
-                style={[styles.stopAddress, desktopMode && styles.stopAddressDesktop]} 
-                numberOfLines={1}
-              >
-                {stop.address}
-              </Text>
+              <View style={styles.addressContainer}>
+                <MapPin size={12} color="#666666" />
+                <Text style={styles.stopAddress} numberOfLines={1}>
+                  {stop.address}
+                </Text>
+              </View>
             )}
           </View>
         </View>
         
-        <View style={[styles.stopFooter, desktopMode && styles.stopFooterDesktop]}>
-          <View style={styles.followersContainer}>
-            <Text style={[styles.coordinatesText, { color: '#1ea2b1' }]}>
-              Followers: {followerCount}
-            </Text>
+        {/* Stop Details */}
+        <View style={styles.stopDetails}>
+          {/* Followers */}
+          <View style={styles.detailItem}>
+            <Users size={12} color="#1ea2b1" />
+            <Text style={styles.detailText}>{followerCount} followers</Text>
           </View>
-          {stop.routes_count && (
-            <Text style={[styles.routesCount, desktopMode && styles.routesCountDesktop]}>
-              {stop.routes_count} routes
-            </Text>
+          
+          {/* Routes Count */}
+          {showRoutes && stop.routes_count && stop.routes_count > 0 && (
+            <View style={styles.detailItem}>
+              <Text style={[styles.detailText, styles.routesText]}>
+                {stop.routes_count} route{stop.routes_count !== 1 ? 's' : ''}
+              </Text>
+            </View>
+          )}
+          
+          {/* Distance (if provided) */}
+          {showDistance && (
+            <View style={styles.detailItem}>
+              <Navigation size={12} color="#fbbf24" />
+              <Text style={[styles.detailText, styles.distanceText]}>{distance}</Text>
+            </View>
+          )}
+          
+          {/* Cost (if available) */}
+          {stop.cost && (
+            <View style={styles.detailItem}>
+              <Text style={[styles.detailText, styles.costText]}>
+                R{stop.cost.toFixed(2)}
+              </Text>
+            </View>
           )}
         </View>
+        
+        {/* Coordinates */}
+
       </View>
     </TouchableOpacity>
   );
@@ -88,86 +121,129 @@ export default function StopItem({
 const styles = StyleSheet.create({
   stopCard: {
     backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    marginBottom: 12,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#333333',
-    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   stopCardDesktop: {
     flex: 1,
     minWidth: '48%',
     maxWidth: '48%',
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  imageContainer: {
-    height: 120,
-    width: '100%',
+  imageContainerSide: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginRight: 12,
+    position: 'relative',
   },
-  stopImage: {
+  stopImageSide: {
     width: '100%',
     height: '100%',
   },
-  contentContainer: {
-    padding: 16,
+  stopNumberBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    backgroundColor: '#1ea2b1',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  stopNumberText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  contentContainerSide: {
+    flex: 1,
   },
   stopHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   stopInfo: {
-    marginLeft: 12,
+    marginLeft: 10,
     flex: 1,
   },
-  stopInfoDesktop: {
-    marginLeft: 10,
-  },
   stopName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#ffffff',
     marginBottom: 4,
-    flexShrink: 1,
+    lineHeight: 18,
   },
-  stopNameDesktop: {
-    fontSize: 15,
+  addressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   stopAddress: {
-    fontSize: 14,
-    color: '#cccccc',
-    marginBottom: 4,
-  },
-  stopAddressDesktop: {
-    fontSize: 13,
-  },
-  stopFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#333333',
-  },
-  stopFooterDesktop: {
-    paddingTop: 6,
-  },
-  followersContainer: {
-    backgroundColor: '#1ea2b110',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  routesCount: {
     fontSize: 12,
+    color: '#999999',
+    flex: 1,
+  },
+  stopDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 6,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  detailText: {
+    fontSize: 11,
+    color: '#666666',
+  },
+  routesText: {
     color: '#1ea2b1',
+    backgroundColor: '#1ea2b110',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
     fontWeight: '500',
   },
-  routesCountDesktop: {
-    fontSize: 11,
+  distanceText: {
+    color: '#fbbf24',
+  },
+  costText: {
+    color: '#34d399',
+    backgroundColor: '#065f4620',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    fontWeight: '500',
+  },
+  coordinatesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
   },
   coordinatesText: {
-    fontSize: 12,
+    fontSize: 10,
+    color: '#444444',
     fontFamily: 'monospace',
+    backgroundColor: '#2a2a2a',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
 });
