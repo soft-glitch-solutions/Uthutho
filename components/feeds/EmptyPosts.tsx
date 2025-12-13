@@ -49,9 +49,6 @@ const EmptyPosts: React.FC<EmptyPostsProps> = ({
 }) => {
   return (
     <View style={styles.emptyPosts}>
-      {showAnimation && (
-        <FlyboxAnimation style={styles.lottieAnimation} />
-      )}
       
       <Text style={styles.emptyPostsText}>{title}</Text>
       <Text style={styles.emptyPostsSubtext}>{subtitle}</Text>

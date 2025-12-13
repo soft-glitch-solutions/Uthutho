@@ -1,41 +1,54 @@
+// components/journey/JourneySkeleton.tsx
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 
-export const JourneySkeleton = () => (
-  <View style={styles.container}>
-    <View style={styles.header}>
-      <View style={[styles.skeleton, { width: 44, height: 44, borderRadius: 22 }]} />
-      <View style={[styles.skeleton, { width: 120, height: 24 }]} />
-      <View style={{ width: 44 }} />
-    </View>
-    
-    <View style={[styles.journeyCard, { backgroundColor: '#1a1a1a' }]}>
-      <View style={[styles.skeleton, { width: '60%', height: 20, marginBottom: 12 }]} />
-      <View style={[styles.skeleton, { width: '80%', height: 16, marginBottom: 20 }]} />
-      <View style={[styles.skeleton, { width: '100%', height: 8, marginBottom: 20 }]} />
-      
-      <View style={styles.statsContainer}>
-        {[1, 2, 3, 4].map(i => (
-          <View key={i} style={styles.statItem}>
-            <View style={[styles.skeleton, { width: 16, height: 16, marginBottom: 4 }]} />
-            <View style={[styles.skeleton, { width: 40, height: 12, marginBottom: 2 }]} />
-            <View style={[styles.skeleton, { width: 30, height: 16 }]} />
-          </View>
-        ))}
+export const JourneySkeleton = () => {
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={[styles.skeleton, styles.headerSkeleton]} />
       </View>
-    </View>
-    
-    {[1, 2, 3].map(i => (
-      <View key={i} style={[styles.stopItem, { marginHorizontal: 20, marginBottom: 8 }]}>
-        <View style={[styles.skeleton, { width: 32, height: 32, borderRadius: 16, marginRight: 16 }]} />
-        <View style={{ flex: 1 }}>
-          <View style={[styles.skeleton, { width: '70%', height: 16, marginBottom: 4 }]} />
-          <View style={[styles.skeleton, { width: '40%', height: 12 }]} />
+      
+      {/* Tabs */}
+      <View style={styles.tabs}>
+        <View style={[styles.skeleton, styles.tabSkeleton]} />
+        <View style={[styles.skeleton, styles.tabSkeleton]} />
+      </View>
+      
+      {/* Content */}
+      <View style={styles.content}>
+        {/* Route Header */}
+        <View style={[styles.skeleton, styles.routeHeader]} />
+        
+        {/* Your Stop */}
+        <View style={styles.yourStop}>
+          <View style={[styles.skeleton, styles.profile]} />
+          <View style={styles.stopInfo}>
+            <View style={[styles.skeleton, styles.stopName]} />
+            <View style={[styles.skeleton, styles.stopStatus]} />
+          </View>
+        </View>
+        
+        {/* Stats */}
+        <View style={styles.stats}>
+          <View style={[styles.skeleton, styles.stat]} />
+          <View style={[styles.skeleton, styles.stat]} />
+          <View style={[styles.skeleton, styles.stat]} />
+        </View>
+        
+        {/* Route Slider */}
+        <View style={[styles.skeleton, styles.routeSlider]} />
+        
+        {/* Buttons */}
+        <View style={styles.buttons}>
+          <View style={[styles.skeleton, styles.button]} />
+          <View style={[styles.skeleton, styles.button]} />
         </View>
       </View>
-    ))}
-  </View>
-);
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -43,41 +56,83 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   header: {
+    paddingTop: 50,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  headerSkeleton: {
+    height: 32,
+    borderRadius: 8,
+  },
+  tabs: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    gap: 8,
+  },
+  tabSkeleton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 8,
+  },
+  content: {
+    paddingHorizontal: 16,
+  },
+  routeHeader: {
+    height: 72,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  yourStop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  profile: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 12,
+  },
+  stopInfo: {
+    flex: 1,
+  },
+  stopName: {
+    height: 16,
+    width: '60%',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  stopStatus: {
+    height: 12,
+    width: '40%',
+    borderRadius: 4,
+  },
+  stats: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
+    marginBottom: 12,
   },
-  journeyCard: {
-    backgroundColor: '#1a1a1a',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#333333',
+  stat: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
   },
-  statsContainer: {
+  routeSlider: {
+    height: 120,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  buttons: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    gap: 8,
   },
-  statItem: {
-    alignItems: 'center',
-  },
-  stopItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#333333',
+  button: {
+    flex: 1,
+    height: 48,
+    borderRadius: 8,
   },
   skeleton: {
     backgroundColor: '#333333',
-    borderRadius: 4,
   },
 });
