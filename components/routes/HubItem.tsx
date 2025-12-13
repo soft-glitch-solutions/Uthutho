@@ -81,11 +81,7 @@ export default function HubItem({
         </View>
 
         {/* Quick Stats */}
-        <View style={styles.quickStats}>
-          <Text style={styles.coordinates}>
-            {hub.latitude.toFixed(3)}, {hub.longitude.toFixed(3)}
-          </Text>
-        </View>
+
       </View>
     </TouchableOpacity>
   );
