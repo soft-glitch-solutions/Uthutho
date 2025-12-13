@@ -802,13 +802,6 @@ export default function HomeScreen() {
                 <Text style={[styles.sectionTitle, styles.sectionTitleDesktop, { color: colors.text }]}>
                   Explore Map
                 </Text>
-                <TouchableOpacity 
-                  style={[styles.mapActionButton, { backgroundColor: colors.primary }]}
-                  onPress={() => router.push('/map?fullscreen=true')}
-                >
-                  <Map size={18} color="#ffffff" />
-                  <Text style={styles.mapActionText}>Full Map</Text>
-                </TouchableOpacity>
               </View>
               
               {/* Map Container */}
