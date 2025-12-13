@@ -1,4 +1,3 @@
-// components/journey/CompactRouteSlider.tsx
 import React, { useRef, useEffect } from 'react';
 import {
   View,
@@ -56,8 +55,8 @@ interface CompactRouteSliderProps {
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const STOP_CARD_WIDTH = 140;
-const STOP_CARD_MARGIN = 12;
+const STOP_CARD_WIDTH = 120; // Reduced from 140
+const STOP_CARD_MARGIN = 8; // Reduced from 12
 
 export const CompactRouteSlider: React.FC<CompactRouteSliderProps> = ({
   stops,
@@ -103,13 +102,13 @@ export const CompactRouteSlider: React.FC<CompactRouteSliderProps> = ({
     
     switch (status) {
       case 'passed':
-        return <CheckCircle size={14} color="#34d399" />;
+        return <CheckCircle size={12} color="#34d399" />;
       case 'current':
-        return <Circle size={16} color="#1ea2b1" fill="#1ea2b1" />;
+        return <Circle size={14} color="#1ea2b1" fill="#1ea2b1" />;
       case 'upcoming':
-        return <Clock size={14} color="#fbbf24" />;
+        return <Clock size={12} color="#fbbf24" />;
       default:
-        return <Circle size={12} color="#666666" />;
+        return <Circle size={10} color="#666666" />;
     }
   };
 
@@ -174,33 +173,21 @@ export const CompactRouteSlider: React.FC<CompactRouteSliderProps> = ({
     return transport?.label || transportType;
   };
 
+  // Truncate stop name for small screen
+  const truncateStopName = (name: string) => {
+    if (name.length > 25) {
+      return name.substring(0, 22) + '...';
+    }
+    return name;
+  };
+
   return (
     <View style={styles.container}>
       {/* Header with transport info and navigation */}
       <View style={styles.header}>
         <View style={styles.titleContainer}>
-          <MapPin size={16} color="#1ea2b1" />
+          <MapPin size={14} color="#1ea2b1" />
           <Text style={styles.title}>Route Stops</Text>
-          
-          {/* Transport Type Badge */}
-          <View style={styles.transportBadge}>
-            {transportIcon ? (
-              <Image 
-                source={transportIcon} 
-                style={styles.transportIcon}
-                resizeMode="contain"
-              />
-            ) : (
-              <View style={styles.transportIconPlaceholder}>
-                <Text style={styles.transportIconText}>
-                  {transportType.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )}
-            <Text style={styles.transportLabel}>
-              {getTransportLabel()}
-            </Text>
-          </View>
         </View>
         
         <View style={styles.navigationControls}>
@@ -209,11 +196,11 @@ export const CompactRouteSlider: React.FC<CompactRouteSliderProps> = ({
             onPress={scrollToPrevious}
             disabled={currentStopIndex <= 0}
           >
-            <ChevronLeft size={18} color={currentStopIndex <= 0 ? "#444" : "#1ea2b1"} />
+            <ChevronLeft size={16} color={currentStopIndex <= 0 ? "#444" : "#1ea2b1"} />
           </TouchableOpacity>
           
           <Text style={styles.stopsCount}>
-            {currentStopSequence || 0} of {stops.length}
+            {currentStopSequence || 0}/{stops.length}
           </Text>
           
           <TouchableOpacity
@@ -221,49 +208,51 @@ export const CompactRouteSlider: React.FC<CompactRouteSliderProps> = ({
             onPress={scrollToNext}
             disabled={currentStopIndex >= stops.length - 1}
           >
-            <ChevronRight size={18} color={currentStopIndex >= stops.length - 1 ? "#444" : "#1ea2b1"} />
+            <ChevronRight size={16} color={currentStopIndex >= stops.length - 1 ? "#444" : "#1ea2b1"} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Current Stop Highlight */}
+      {/* Transport Info Badge */}
+      <View style={styles.transportBadgeContainer}>
+        <View style={styles.transportBadge}>
+          {transportIcon ? (
+            <Image 
+              source={transportIcon} 
+              style={styles.transportIcon}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={styles.transportIconPlaceholder}>
+              <Text style={styles.transportIconText}>
+                {transportType.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.transportLabel} numberOfLines={1}>
+            {getTransportLabel()}
+          </Text>
+        </View>
+        <Text style={styles.progressText}>
+          {getProgressPercentage().toFixed(0)}% complete
+        </Text>
+      </View>
+
+      {/* Current Stop Highlight - Simplified */}
       {currentStopIndex > -1 && stops[currentStopIndex] && (
         <View style={styles.currentStopHighlight}>
           <View style={styles.currentStopBadge}>
-            <View style={styles.currentStopHeader}>
-              <View>
-                <Text style={styles.currentStopLabel}>
-                  {participantStatus === 'picked_up' ? '🚕 Picked Up' : '📍 You are here'}
-                </Text>
-                <Text style={styles.currentStopName} numberOfLines={1}>
-                  {stops[currentStopIndex].name}
-                </Text>
-              </View>
-              
-              {/* Transport Icon Animation */}
-              <View style={styles.transportAnimationContainer}>
-                <View style={styles.movingTransport}>
-                  {transportIcon ? (
-                    <Image 
-                      source={transportIcon} 
-                      style={styles.movingTransportIcon}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <View style={styles.movingTransportPlaceholder}>
-                      <Text style={styles.movingTransportText}>
-                        {transportType.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            </View>
+            <Text style={styles.currentStopLabel}>
+              {participantStatus === 'picked_up' ? '🚕 Picked Up' : '📍 You are here'}
+            </Text>
+            <Text style={styles.currentStopName} numberOfLines={2}>
+              {truncateStopName(stops[currentStopIndex].name)}
+            </Text>
           </View>
         </View>
       )}
 
-      {/* Visual Progress Timeline with Moving Transport */}
+      {/* Visual Progress Timeline - Simplified */}
       <View style={styles.progressTimeline}>
         <View style={styles.timelineLine} />
         <View 
@@ -295,19 +284,16 @@ export const CompactRouteSlider: React.FC<CompactRouteSliderProps> = ({
               </View>
             )}
           </View>
-          
-          {/* Connecting line to timeline */}
-          <View style={styles.transportConnector} />
         </View>
         
-        {/* Stop markers along the timeline */}
+        {/* Stop markers along the timeline - Show fewer markers on small screen */}
         <View style={styles.stopMarkers}>
-          {stops.map((stop, index) => (
+          {stops.filter((_, index) => index === 0 || index === stops.length - 1 || index === currentStopIndex).map((stop) => (
             <View 
               key={stop.id}
               style={[
                 styles.stopMarker,
-                { left: `${(index / Math.max(stops.length - 1, 1)) * 100}%` },
+                { left: `${(stop.order_number - 1) / Math.max(stops.length - 1, 1) * 100}%` },
                 stop.passed && styles.passedStopMarker,
                 stop.current && styles.currentStopMarker,
                 stop.upcoming && styles.upcomingStopMarker,
@@ -321,6 +307,9 @@ export const CompactRouteSlider: React.FC<CompactRouteSliderProps> = ({
                   stop.upcoming && styles.upcomingMarkerDot,
                 ]} 
               />
+              {stop.current && (
+                <Text style={styles.stopMarkerText}>#{stop.order_number}</Text>
+              )}
             </View>
           ))}
         </View>
@@ -354,8 +343,8 @@ export const CompactRouteSlider: React.FC<CompactRouteSliderProps> = ({
                   isCurrent && styles.activeStopCard,
                   status === 'current' && styles.currentStopCard,
                   status === 'passed' && styles.passedStopCard,
-                  isPassed && styles.passedCard, // Only passed stops get disabled style
-                  !available && !isPassed && styles.disabledCard, // Other unavailable stops (not passed)
+                  isPassed && styles.passedCard,
+                  !available && !isPassed && styles.disabledCard,
                 ]}
                 onPress={() => onStopPress(stop)}
                 disabled={!available}
@@ -369,28 +358,9 @@ export const CompactRouteSlider: React.FC<CompactRouteSliderProps> = ({
                       styles.stopNumber,
                       { color: getStopColor(stop) }
                     ]}>
-                      {stop.order_number}
+                      #{stop.order_number}
                     </Text>
                   </View>
-                  
-                  {/* Transport Indicator */}
-                  {isCurrent && participantStatus === 'waiting' && (
-                    <View style={styles.transportAtStop}>
-                      {transportIcon ? (
-                        <Image 
-                          source={transportIcon} 
-                          style={styles.stopTransportIcon}
-                          resizeMode="contain"
-                        />
-                      ) : (
-                        <View style={styles.stopTransportPlaceholder}>
-                          <Text style={styles.stopTransportText}>
-                            {transportType.charAt(0)}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
                   
                   {/* Current Stop Indicator */}
                   {isCurrent && (
@@ -411,14 +381,11 @@ export const CompactRouteSlider: React.FC<CompactRouteSliderProps> = ({
                     isPassed && styles.passedStopName,
                     !available && !isPassed && styles.disabledText
                   ]}
-                  numberOfLines={2}
+                  numberOfLines={3}
                 >
-                  {stop.name}
+                  {truncateStopName(stop.name)}
                   {isYou && participantStatus === 'waiting' && (
                     <Text style={styles.youIndicator}> • You</Text>
-                  )}
-                  {isYou && participantStatus === 'picked_up' && (
-                    <Text style={styles.pickedUpIndicator}> • Picked Up</Text>
                   )}
                 </Text>
 
@@ -434,24 +401,24 @@ export const CompactRouteSlider: React.FC<CompactRouteSliderProps> = ({
                   <Text style={styles.statusText}>
                     {status === 'passed' ? 'Passed' : 
                      status === 'current' ? 'Current' : 
-                     status === 'upcoming' ? 'Next' : 'Upcoming'}
+                     status === 'upcoming' ? 'Upcoming' : 'Future'}
                   </Text>
                 </View>
 
-                {/* Passengers Indicator - Only show for active stops */}
-                {stopPassengers.length > 0 && !isPassed && available && (
+                {/* Passengers Indicator */}
+                {stopPassengers.length > 0 && !isPassed && (
                   <View style={styles.passengersIndicator}>
-                    <Users size={12} color="#ffffff" />
+                    <Users size={10} color="#ffffff" />
                     <Text style={styles.passengersCount}>
                       {stopPassengers.length} waiting
                     </Text>
                   </View>
                 )}
                 
-                {/* Direction Arrow */}
-                {index < stops.length - 1 && !isPassed && (
-                  <View style={styles.arrowContainer}>
-                    <ChevronRight size={14} color="#444" style={styles.directionArrow} />
+                {/* Your indicator for picked up */}
+                {isYou && participantStatus === 'picked_up' && (
+                  <View style={styles.pickedUpIndicator}>
+                    <Text style={styles.pickedUpText}>Picked Up</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -460,39 +427,21 @@ export const CompactRouteSlider: React.FC<CompactRouteSliderProps> = ({
         </ScrollView>
       </View>
 
-      {/* Transport Progress Indicator */}
-      <View style={styles.progressIndicator}>
-        <View style={styles.progressDots}>
-          {stops.map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.progressDot,
-                index === currentStopIndex && styles.progressDotActive,
-                index < currentStopSequence && styles.progressDotPassed,
-              ]}
-            />
-          ))}
-        </View>
-        
-        <View style={styles.transportProgressInfo}>
-          <View style={styles.transportInfoRow}>
-            {transportIcon && (
-              <Image 
-                source={transportIcon} 
-                style={styles.smallTransportIcon}
-                resizeMode="contain"
-              />
-            )}
-            <Text style={styles.transportProgressText}>
-              {getTransportLabel()} moving to stop {currentStopSequence + 1}
-              {participantStatus === 'picked_up' && ' (You are on board)'}
-            </Text>
-          </View>
-          <Text style={styles.progressHint}>
-            Scroll to view all stops →
-          </Text>
-        </View>
+      {/* Progress Dots - Simplified */}
+      <View style={styles.progressDotsContainer}>
+        {stops.slice(0, 5).map((_, index) => ( // Show only first 5 dots on small screen
+          <View
+            key={index}
+            style={[
+              styles.progressDot,
+              index === currentStopIndex && styles.progressDotActive,
+              index < currentStopSequence && styles.progressDotPassed,
+            ]}
+          />
+        ))}
+        {stops.length > 5 && (
+          <Text style={styles.moreDotsText}>+{stops.length - 5}</Text>
+        )}
       </View>
     </View>
   );
@@ -501,191 +450,51 @@ export const CompactRouteSlider: React.FC<CompactRouteSliderProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#2a2a2a',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 6,
     flex: 1,
   },
   title: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  transportBadgeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   transportBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1ea2b120',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+    flex: 1,
+    marginRight: 8,
   },
   transportIcon: {
-    width: 16,
-    height: 16,
-  },
-  transportIconPlaceholder: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#1ea2b1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  transportIconText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  transportLabel: {
-    color: '#1ea2b1',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  navigationControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  navButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#222222',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  navButtonDisabled: {
-    opacity: 0.5,
-  },
-  stopsCount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1ea2b1',
-    minWidth: 50,
-    textAlign: 'center',
-  },
-  currentStopHighlight: {
-    marginBottom: 16,
-  },
-  currentStopBadge: {
-    backgroundColor: '#1e40af20',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#1ea2b1',
-  },
-  currentStopHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  currentStopLabel: {
-    color: '#1ea2b1',
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  currentStopName: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  transportAnimationContainer: {
-    alignItems: 'center',
-  },
-  movingTransport: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1a1a1a',
-    borderWidth: 2,
-    borderColor: '#1ea2b1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  movingTransportIcon: {
-    width: 24,
-    height: 24,
-  },
-  movingTransportPlaceholder: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#1ea2b1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  movingTransportText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  progressTimeline: {
-    height: 24,
-    marginBottom: 24,
-    position: 'relative',
-  },
-  timelineLine: {
-    position: 'absolute',
-    top: 11,
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 1.5,
-  },
-  progressLine: {
-    position: 'absolute',
-    top: 11,
-    left: 0,
-    height: 3,
-    backgroundColor: '#1ea2b1',
-    borderRadius: 1.5,
-    zIndex: 1,
-  },
-  movingTransportContainer: {
-    position: 'absolute',
-    top: 0,
-    transform: [{ translateX: -12 }],
-    zIndex: 3,
-    alignItems: 'center',
-  },
-  transportBubble: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#1a1a1a',
-    borderWidth: 2,
-    borderColor: '#1ea2b1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#1ea2b1',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  timelineTransportIcon: {
     width: 14,
     height: 14,
   },
-  timelineTransportPlaceholder: {
+  transportIconPlaceholder: {
     width: 14,
     height: 14,
     borderRadius: 7,
@@ -693,20 +502,134 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  timelineTransportText: {
+  transportIconText: {
     color: '#ffffff',
     fontSize: 8,
     fontWeight: 'bold',
   },
-  transportConnector: {
-    width: 2,
-    height: 8,
+  transportLabel: {
+    color: '#1ea2b1',
+    fontSize: 11,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  progressText: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#666666',
+  },
+  navigationControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  navButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#222222',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  navButtonDisabled: {
+    opacity: 0.3,
+  },
+  stopsCount: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1ea2b1',
+    minWidth: 40,
+    textAlign: 'center',
+  },
+  currentStopHighlight: {
+    marginBottom: 10,
+  },
+  currentStopBadge: {
+    backgroundColor: '#1e40af20',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#1ea2b1',
+  },
+  currentStopLabel: {
+    color: '#1ea2b1',
+    fontSize: 10,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  currentStopName: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  progressTimeline: {
+    height: 20,
+    marginBottom: 16,
+    position: 'relative',
+  },
+  timelineLine: {
+    position: 'absolute',
+    top: 9,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 1,
+  },
+  progressLine: {
+    position: 'absolute',
+    top: 9,
+    left: 0,
+    height: 2,
     backgroundColor: '#1ea2b1',
-    marginTop: 1,
+    borderRadius: 1,
+    zIndex: 1,
+  },
+  movingTransportContainer: {
+    position: 'absolute',
+    top: 0,
+    transform: [{ translateX: -10 }],
+    zIndex: 3,
+    alignItems: 'center',
+  },
+  transportBubble: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 2,
+    borderColor: '#1ea2b1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#1ea2b1',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  timelineTransportIcon: {
+    width: 12,
+    height: 12,
+  },
+  timelineTransportPlaceholder: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#1ea2b1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timelineTransportText: {
+    color: '#ffffff',
+    fontSize: 7,
+    fontWeight: 'bold',
   },
   stopMarkers: {
     position: 'absolute',
-    top: 8,
+    top: 6,
     left: 0,
     right: 0,
     height: 16,
@@ -714,14 +637,24 @@ const styles = StyleSheet.create({
   stopMarker: {
     position: 'absolute',
     top: 0,
-    transform: [{ translateX: -3 }],
+    transform: [{ translateX: -2 }],
     alignItems: 'center',
   },
   stopMarkerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: '#666666',
+  },
+  stopMarkerText: {
+    position: 'absolute',
+    top: 6,
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#1ea2b1',
+    backgroundColor: '#1a1a1a',
+    paddingHorizontal: 2,
+    borderRadius: 2,
   },
   passedStopMarker: {
     opacity: 0.7,
@@ -734,14 +667,14 @@ const styles = StyleSheet.create({
   },
   currentMarkerDot: {
     backgroundColor: '#1ea2b1',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     shadowColor: '#1ea2b1',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOpacity: 0.6,
+    shadowRadius: 3,
+    elevation: 3,
   },
   upcomingStopMarker: {
     opacity: 0.8,
@@ -750,20 +683,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#fbbf24',
   },
   stopsWrapper: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   stopsContainer: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   stopsContent: {
-    paddingRight: 16,
-    paddingLeft: 8,
+    paddingRight: 8,
+    paddingLeft: 4,
   },
   stopCard: {
     width: STOP_CARD_WIDTH,
     marginRight: STOP_CARD_MARGIN,
-    padding: 16,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 10,
     backgroundColor: '#222222',
     borderWidth: 1,
     borderColor: '#333333',
@@ -774,10 +707,10 @@ const styles = StyleSheet.create({
     borderColor: '#1ea2b1',
     transform: [{ scale: 1.02 }],
     shadowColor: '#1ea2b1',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
   },
   currentStopCard: {
     backgroundColor: '#1e40af15',
@@ -786,69 +719,44 @@ const styles = StyleSheet.create({
     backgroundColor: '#065f4610',
   },
   passedCard: {
-    opacity: 0.5, // Only passed stops get opacity reduction
+    opacity: 0.5,
   },
   disabledCard: {
-    // Current and upcoming stops don't get disabled styling
     borderColor: '#444444',
   },
   stopHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-    position: 'relative',
+    marginBottom: 8,
   },
   stopIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   stopNumber: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-  },
-  transportAtStop: {
-    position: 'absolute',
-    left: '50%',
-    top: -8,
-    transform: [{ translateX: -10 }],
-  },
-  stopTransportIcon: {
-    width: 20,
-    height: 20,
-  },
-  stopTransportPlaceholder: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#1ea2b1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stopTransportText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: 'bold',
   },
   currentIndicator: {
     backgroundColor: '#1ea2b1',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 8,
   },
   currentIndicatorText: {
     color: '#ffffff',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
   },
   stopName: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
-    lineHeight: 18,
-    marginBottom: 12,
-    minHeight: 36,
+    lineHeight: 16,
+    marginBottom: 8,
+    minHeight: 32,
   },
   activeStopName: {
     color: '#1ea2b1',
@@ -863,20 +771,17 @@ const styles = StyleSheet.create({
   youIndicator: {
     color: '#8b5cf6',
     fontWeight: '600',
-  },
-  pickedUpIndicator: {
-    color: '#1ea2b1',
-    fontWeight: '600',
+    fontSize: 11,
   },
   disabledText: {
     color: '#666666',
   },
   statusBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginBottom: 6,
   },
   passedBadge: {
     backgroundColor: '#065f46',
@@ -892,7 +797,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     color: '#ffffff',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
   },
   passengersIndicator: {
@@ -901,72 +806,57 @@ const styles = StyleSheet.create({
     gap: 4,
     alignSelf: 'flex-start',
     backgroundColor: '#1ea2b1',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 8,
   },
   passengersCount: {
     color: '#ffffff',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
   },
-  arrowContainer: {
-    position: 'absolute',
-    right: -8,
-    top: '50%',
-    marginTop: -7,
+  pickedUpIndicator: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#1ea2b130',
+    borderWidth: 1,
+    borderColor: '#1ea2b1',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginTop: 4,
   },
-  directionArrow: {
-    opacity: 0.5,
+  pickedUpText: {
+    color: '#1ea2b1',
+    fontSize: 9,
+    fontWeight: '600',
   },
-  progressIndicator: {
+  progressDotsContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 16,
+    justifyContent: 'center',
+    gap: 4,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#2a2a2a',
   },
-  progressDots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
-    marginBottom: 8,
-  },
   progressDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     backgroundColor: '#333333',
   },
   progressDotActive: {
     backgroundColor: '#1ea2b1',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   progressDotPassed: {
     backgroundColor: '#34d399',
   },
-  transportProgressInfo: {
-    alignItems: 'center',
-  },
-  transportInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  smallTransportIcon: {
-    width: 16,
-    height: 16,
-  },
-  transportProgressText: {
-    color: '#1ea2b1',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  progressHint: {
+  moreDotsText: {
+    fontSize: 10,
     color: '#666666',
-    fontSize: 11,
-    fontWeight: '500',
+    marginLeft: 2,
   },
 });

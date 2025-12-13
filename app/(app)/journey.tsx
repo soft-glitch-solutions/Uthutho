@@ -10,12 +10,13 @@ import {
   Share,
   Image,
   Animated,
-  Modal
+  Modal,
+  ScrollView
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Share2, Users, Clock, MapPin, Car, User, ChevronRight } from 'lucide-react-native';
+import { Share2, Users, Clock, MapPin, Car, User, ChevronRight, MessageCircle } from 'lucide-react-native';
 import * as Location from 'expo-location';
 
 import { useJourney } from '@/hook/useJourney';
@@ -26,6 +27,7 @@ import { JourneyTabs } from '@/components/journey/JourneyTabs';
 import { ConnectionError } from '@/components/journey/ConnectionError';
 import { JourneySkeleton } from '@/components/journey/JourneySkeleton';
 import { NoActiveJourney } from '@/components/journey/NoActiveJourney';
+import { JourneyChat } from '@/components/journey/JourneyChat';
 
 import type { JourneyStop, Passenger, ChatMessage } from '@/types/journey';
 
@@ -44,73 +46,75 @@ const StopDetailsModal = ({ stop, visible, onClose, passengers }) => {
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{stop.name}</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.stopInfo}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Stop Number:</Text>
-              <Text style={styles.infoValue}>{stop.order_number}</Text>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle} numberOfLines={2}>{stop.name}</Text>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
             </View>
             
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Status:</Text>
-              <View style={[
-                styles.statusBadge,
-                stop.passed && styles.passedBadge,
-                stop.current && styles.currentBadge,
-                stop.upcoming && styles.upcomingBadge
-              ]}>
-                <Text style={styles.statusBadgeText}>
-                  {stop.passed ? 'Passed' : 
-                   stop.current ? 'Current' : 
-                   stop.upcoming ? 'Upcoming' : 'Future'}
-                </Text>
+            <View style={styles.stopInfo}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Stop:</Text>
+                <Text style={styles.infoValue}>#{stop.order_number}</Text>
               </View>
+              
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Status:</Text>
+                <View style={[
+                  styles.statusBadge,
+                  stop.passed && styles.passedBadge,
+                  stop.current && styles.currentBadge,
+                  stop.upcoming && styles.upcomingBadge
+                ]}>
+                  <Text style={styles.statusBadgeText}>
+                    {stop.passed ? 'Passed' : 
+                     stop.current ? 'Current' : 
+                     stop.upcoming ? 'Upcoming' : 'Future'}
+                  </Text>
+                </View>
+              </View>
+              
+              {passengersAtStop.length > 0 ? (
+                <View style={styles.passengersSection}>
+                  <Text style={styles.sectionTitle}>
+                    Waiting: {passengersAtStop.length}
+                  </Text>
+                  {passengersAtStop.map(passenger => (
+                    <View key={passenger.id} style={styles.passengerItem}>
+                      <View style={styles.passengerAvatar}>
+                        {passenger.profiles?.avatar_url ? (
+                          <Image 
+                            source={{ uri: passenger.profiles.avatar_url }}
+                            style={styles.avatarImage}
+                          />
+                        ) : (
+                          <View style={styles.avatarPlaceholder}>
+                            <Text style={styles.avatarInitial}>
+                              {passenger.profiles?.first_name?.[0] || 'U'}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.passengerInfo}>
+                        <Text style={styles.passengerName} numberOfLines={1}>
+                          {passenger.profiles?.first_name} {passenger.profiles?.last_name}
+                        </Text>
+                        <Text style={styles.waitingText}>
+                          Waiting
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.noPassengers}>
+                  <Text style={styles.noPassengersText}>No passengers waiting</Text>
+                </View>
+              )}
             </View>
-            
-            {passengersAtStop.length > 0 ? (
-              <View style={styles.passengersSection}>
-                <Text style={styles.sectionTitle}>
-                  Passengers Waiting ({passengersAtStop.length})
-                </Text>
-                {passengersAtStop.map(passenger => (
-                  <View key={passenger.id} style={styles.passengerItem}>
-                    <View style={styles.passengerAvatar}>
-                      {passenger.profiles?.avatar_url ? (
-                        <Image 
-                          source={{ uri: passenger.profiles.avatar_url }}
-                          style={styles.avatarImage}
-                        />
-                      ) : (
-                        <View style={styles.avatarPlaceholder}>
-                          <Text style={styles.avatarInitial}>
-                            {passenger.profiles?.first_name?.[0] || 'U'}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.passengerInfo}>
-                      <Text style={styles.passengerName}>
-                        {passenger.profiles?.first_name} {passenger.profiles?.last_name}
-                      </Text>
-                      <Text style={styles.waitingText}>
-                        Waiting at this stop
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <View style={styles.noPassengers}>
-                <Text style={styles.noPassengersText}>No passengers waiting at this stop</Text>
-              </View>
-            )}
-          </View>
+          </ScrollView>
           
           <TouchableOpacity style={styles.dismissButton} onPress={onClose}>
             <Text style={styles.dismissButtonText}>Close</Text>
@@ -143,6 +147,7 @@ export default function JourneyScreen() {
   const [showStopDetails, setShowStopDetails] = useState(false);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [isUpdatingLocation, setIsUpdatingLocation] = useState<boolean>(false);
+  const [onlineCount, setOnlineCount] = useState(1);
   
   // Simple animation
   const fadeAnim = useState(new Animated.Value(0))[0];
@@ -163,6 +168,7 @@ export default function JourneyScreen() {
     if (activeJourney) {
       loadJourneyData();
       subscribeToDriverChanges();
+      subscribeToOnlineCount();
     } else {
       setJourneyStops([]);
     }
@@ -283,6 +289,22 @@ export default function JourneyScreen() {
     }
   };
 
+  const subscribeToOnlineCount = () => {
+    if (!activeJourney?.id) return;
+
+    const estimateOnlineCount = async () => {
+      const { count } = await supabase
+        .from('journey_participants')
+        .select('*', { count: 'exact', head: true })
+        .eq('journey_id', activeJourney.id)
+        .eq('is_active', true);
+
+      setOnlineCount(count || 1);
+    };
+
+    estimateOnlineCount();
+  };
+
   const checkIfDriver = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -360,6 +382,7 @@ export default function JourneyScreen() {
         loadCurrentUserStop(),
         loadParticipantStatus(),
         getUserProfile(),
+        loadChatMessages(),
       ]);
       startWaitingTimer();
       subscribeToChat();
@@ -400,7 +423,6 @@ export default function JourneyScreen() {
       if (userStop && userStop.stops) {
         setUserStopName(userStop.stops.name);
       } else {
-        // User is not in stop_waiting (could be picked_up or arrived)
         setUserStopName('');
       }
     } catch (error) {
@@ -425,6 +447,32 @@ export default function JourneyScreen() {
       }
     } catch (error) {
       console.error('Error loading participant status:', error);
+    }
+  };
+
+  const loadChatMessages = async () => {
+    if (!activeJourney?.id) return;
+
+    try {
+      const { data: messages, error } = await supabase
+        .from('journey_messages')
+        .select(`
+          *,
+          profiles (
+            first_name,
+            last_name,
+            selected_title,
+            avatar_url
+          )
+        `)
+        .eq('journey_id', activeJourney.id)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      setChatMessages(messages || []);
+    } catch (error) {
+      console.error('Error loading chat messages:', error);
     }
   };
 
@@ -497,7 +545,7 @@ export default function JourneyScreen() {
           async (payload) => {
             const { data: profile } = await supabase
               .from('profiles')
-              .select('first_name, last_name, avatar_url')
+              .select('first_name, last_name, avatar_url, selected_title')
               .eq('id', payload.new.user_id)
               .single();
               
@@ -527,21 +575,18 @@ export default function JourneyScreen() {
     if (!activeJourney || !currentUserId) return;
 
     try {
-      // Get current user location when marking as picked up
       let updates: any = { status: newStatus };
       
       if (newStatus === 'picked_up') {
-        // Check and request location permission
         const hasPermission = locationPermission || await requestLocationPermission();
         
         if (!hasPermission) {
           Alert.alert(
             'Location Permission Required',
-            'To share your live location with others, please enable location services in your device settings.',
+            'To share your live location with others, please enable location services.',
             [
               { text: 'Cancel', style: 'cancel' },
-              { text: 'Open Settings', onPress: () => {
-                // For iOS/Android, you might need platform-specific code here
+              { text: 'Settings', onPress: () => {
                 console.log('Open location settings');
               }}
             ]
@@ -549,7 +594,6 @@ export default function JourneyScreen() {
           return;
         }
         
-        // Get current location to update coordinates
         try {
           const location = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.BestForNavigation,
@@ -567,12 +611,11 @@ export default function JourneyScreen() {
           console.log('Could not get location:', locationError);
           Alert.alert(
             'Location Error',
-            'Unable to get your current location. Your status was updated but location sharing may not work.',
+            'Unable to get your current location.',
             [{ text: 'OK' }]
           );
         }
       } else if (newStatus === 'arrived') {
-        // Clear location when arriving at destination
         updates.latitude = null;
         updates.longitude = null;
       }
@@ -595,24 +638,16 @@ export default function JourneyScreen() {
       if (newStatus === 'picked_up') {
         await awardPoints(2);
         
-        // Get the user's current stop to update the journey's current stop sequence
-        const { data: userStop, error: userStopError } = await supabase
+        const { data: userStop } = await supabase
           .from('stop_waiting')
           .select('stop_id, stops(order_number)')
           .eq('user_id', currentUserId)
           .eq('journey_id', activeJourney.id)
           .maybeSingle();
 
-        if (userStopError && userStopError.code !== 'PGRST116') {
-          console.error('Error getting user stop:', userStopError);
-        }
-
-        // Update the journey's current stop sequence to the user's stop
-        // This marks that the taxi has reached this stop
         if (userStop && userStop.stops) {
           const userStopOrder = userStop.stops.order_number;
           
-          // Update the journey's current stop sequence
           const { error: updateJourneyError } = await supabase
             .from('journeys')
             .update({ 
@@ -620,38 +655,30 @@ export default function JourneyScreen() {
             })
             .eq('id', activeJourney.id);
 
-          if (updateJourneyError) {
-            console.error('Error updating journey stop sequence:', updateJourneyError);
-          } else {
+          if (!updateJourneyError) {
             console.log(`Updated journey stop sequence to ${userStopOrder}`);
-            
-            // Refresh the active journey to get updated stop sequence
             await refreshActiveJourney();
           }
         }
         
-        // Remove current user from stop_waiting (they're no longer waiting)
         await supabase
           .from('stop_waiting')
           .delete()
           .eq('user_id', currentUserId)
           .eq('journey_id', activeJourney.id);
         
-        // Clear user stop name since they're no longer waiting at a stop
         setUserStopName('');
         
-        // Reload passengers and stops to reflect changes
         await Promise.all([
           loadOtherPassengers(),
           loadJourneyStops()
         ]);
         
-        Alert.alert('Success', 'You have been marked as picked up! Your location will now be shared live with others.');
+        Alert.alert('Success', 'You have been marked as picked up!');
         
       } else if (newStatus === 'arrived') {
         await awardPoints(5);
         
-        // Remove from stop_waiting if still there
         await supabase
           .from('stop_waiting')
           .delete()
@@ -712,7 +739,7 @@ Shared via Uthutho`;
 
     } catch (error) {
       console.error('Error sharing journey:', error);
-      Alert.alert('Error', 'Failed to share journey. Please try again.');
+      Alert.alert('Error', 'Failed to share journey.');
     }
   };
 
@@ -775,7 +802,7 @@ Shared via Uthutho`;
       }
     } catch (error) {
       console.error('Error pinging passengers ahead:', error);
-      Alert.alert('Error', 'Failed to notify passengers. Please check your connection.');
+      Alert.alert('Error', 'Failed to notify passengers.');
     }
   };
 
@@ -800,7 +827,7 @@ Shared via Uthutho`;
       }
     } catch (err) {
       console.error('Unexpected error completing journey:', err);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      Alert.alert('Error', 'Something went wrong.');
     }
   };
 
@@ -808,7 +835,6 @@ Shared via Uthutho`;
     if (!activeJourney) return;
 
     try {
-      // Load route stops
       const { data: routeStopsData, error: routeStopsError } = await supabase
         .from('route_stops')
         .select(`
@@ -825,7 +851,6 @@ Shared via Uthutho`;
 
       if (routeStopsError) throw routeStopsError;
 
-      // Get all active waiting stops
       const { data: activeWaitingStops } = await supabase
         .from('stop_waiting')
         .select('stop_id')
@@ -840,7 +865,6 @@ Shared via Uthutho`;
         const stopOrder = routeStop.order_number;
         const currentStopSequence = activeJourney.current_stop_sequence || 0;
         
-        // Check if this stop has any waiting passengers
         const hasWaitingPassengers = activeStopIds.has(stop.id);
         
         return {
@@ -861,6 +885,28 @@ Shared via Uthutho`;
 
     } catch (error) {
       console.error('Error loading journey stops:', error);
+    }
+  };
+
+  const sendChatMessage = async () => {
+    if (!activeJourney?.id || !currentUserId || !newMessage.trim()) return;
+
+    try {
+      const { error } = await supabase
+        .from('journey_messages')
+        .insert({
+          journey_id: activeJourney.id,
+          user_id: currentUserId,
+          message: newMessage.trim(),
+          is_anonymous: true
+        });
+
+      if (error) throw error;
+
+      setNewMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      Alert.alert('Error', 'Failed to send message');
     }
   };
 
@@ -904,179 +950,184 @@ Shared via Uthutho`;
     if (activeTab === 'info') {
       return (
         <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-          {/* Compact Journey Header */}
-          <View style={styles.compactHeader}>
-            <View style={styles.routeRow}>
-              <Text style={styles.routeName} numberOfLines={1}>
-                {activeJourney.routes.name}
-              </Text>
-              <View style={styles.transportBadge}>
-                <Car size={14} color="#1ea2b1" />
-                <Text style={styles.transportText}>
-                  {activeJourney.routes.transport_type}
+          <ScrollView 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* Compact Journey Header */}
+            <View style={styles.compactHeader}>
+              <View style={styles.routeRow}>
+                <Text style={styles.routeName} numberOfLines={1}>
+                  {activeJourney.routes.name}
+                </Text>
+                <View style={styles.transportBadge}>
+                  <Car size={12} color="#1ea2b1" />
+                  <Text style={styles.transportText}>
+                    {activeJourney.routes.transport_type}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.routeEndpoints}>
+                <Text style={styles.startPoint} numberOfLines={1}>
+                  {activeJourney.routes.start_point}
+                </Text>
+                <ChevronRight size={12} color="#666666" style={styles.chevron} />
+                <Text style={styles.endPoint} numberOfLines={1}>
+                  {activeJourney.routes.end_point}
                 </Text>
               </View>
             </View>
-            
-            <View style={styles.routeEndpoints}>
-              <Text style={styles.startPoint} numberOfLines={1}>
-                {activeJourney.routes.start_point}
-              </Text>
-              <ChevronRight size={16} color="#666666" />
-              <Text style={styles.endPoint} numberOfLines={1}>
-                {activeJourney.routes.end_point}
-              </Text>
-            </View>
-          </View>
 
-          {/* Your Status Section - Updated for picked_up state */}
-          <View style={styles.yourStopRow}>
-            <View style={styles.profileContainer}>
-              {userProfile?.avatar_url ? (
-                <Image 
-                  source={{ uri: userProfile.avatar_url }}
-                  style={styles.profileImage}
-                />
-              ) : (
-                <View style={styles.profilePlaceholder}>
-                  <Text style={styles.profileInitial}>{getProfileInitial()}</Text>
-                </View>
-              )}
-            </View>
-            
-            <View style={styles.yourStopInfo}>
-              <Text style={styles.yourStopName} numberOfLines={1}>
-                {participantStatus === 'waiting' ? userStopName : 'On Board'}
-              </Text>
-              <View style={styles.statusRow}>
-                <View style={[
-                  styles.statusDot,
-                  participantStatus === 'waiting' ? styles.waitingDot : 
-                  participantStatus === 'picked_up' ? styles.pickedUpDot :
-                  styles.arrivedDot
-                ]} />
-                <Text style={styles.yourStopStatus}>
-                  {participantStatus === 'waiting' ? 'Waiting for pickup' : 
-                   participantStatus === 'picked_up' ? 'On board - Picked up' : 
-                   'Arrived'}
-                </Text>
-                {isUpdatingLocation && participantStatus === 'picked_up' && (
-                  <View style={styles.locationUpdating}>
-                    <Text style={styles.locationUpdatingText}>🔄 Live</Text>
+            {/* Your Status Section */}
+            <View style={styles.yourStopRow}>
+              <View style={styles.profileContainer}>
+                {userProfile?.avatar_url ? (
+                  <Image 
+                    source={{ uri: userProfile.avatar_url }}
+                    style={styles.profileImage}
+                  />
+                ) : (
+                  <View style={styles.profilePlaceholder}>
+                    <Text style={styles.profileInitial}>{getProfileInitial()}</Text>
                   </View>
                 )}
               </View>
-              <Text style={styles.yourStopTime}>
-                {participantStatus === 'waiting' ? `Waiting: ${formatWaitingTime(waitingTime)}` : 
-                 participantStatus === 'picked_up' ? 'On the way to destination' :
-                 'Journey completed'}
-              </Text>
-            </View>
-            
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Users size={16} color="#1ea2b1" />
-                <Text style={styles.statNumber}>{otherPassengers.length + 1}</Text>
-              </View>
               
-              <View style={styles.statItem}>
-                <Clock size={16} color="#fbbf24" />
-                <Text style={styles.statNumber}>{getEstimatedArrival()}</Text>
-              </View>
-              
-              <View style={styles.statItem}>
-                <MapPin size={16} color="#34d399" />
-                <Text style={styles.statNumber}>
-                  {activeJourney.current_stop_sequence || 0}/{journeyStops.length}
+              <View style={styles.yourStopInfo}>
+                <Text style={styles.yourStopName} numberOfLines={1}>
+                  {participantStatus === 'waiting' ? userStopName : 'On Board'}
+                </Text>
+                <View style={styles.statusRow}>
+                  <View style={[
+                    styles.statusDot,
+                    participantStatus === 'waiting' ? styles.waitingDot : 
+                    participantStatus === 'picked_up' ? styles.pickedUpDot :
+                    styles.arrivedDot
+                  ]} />
+                  <Text style={styles.yourStopStatus} numberOfLines={1}>
+                    {participantStatus === 'waiting' ? 'Waiting for pickup' : 
+                     participantStatus === 'picked_up' ? 'On board - Picked up' : 
+                     'Arrived'}
+                  </Text>
+                  {isUpdatingLocation && participantStatus === 'picked_up' && (
+                    <View style={styles.locationUpdating}>
+                      <Text style={styles.locationUpdatingText}>🔄 Live</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.yourStopTime} numberOfLines={1}>
+                  {participantStatus === 'waiting' ? `Waiting: ${formatWaitingTime(waitingTime)}` : 
+                   participantStatus === 'picked_up' ? 'On the way to destination' :
+                   'Journey completed'}
                 </Text>
               </View>
             </View>
-          </View>
 
-          {/* Route Slider */}
-          <CompactRouteSlider
-            stops={journeyStops}
-            currentUserStopName={userStopName}
-            currentUserId={currentUserId}
-            passengers={otherPassengers}
-            transportType={activeJourney.routes.transport_type}
-            currentStopSequence={activeJourney.current_stop_sequence || 0}
-            participantStatus={participantStatus}
-            onStopPress={handleStopPress}
-          />
+            {/* Stats Row */}
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Users size={14} color="#1ea2b1" />
+                <Text style={styles.statNumber}>{otherPassengers.length + 1}</Text>
+                <Text style={styles.statLabel}>People</Text>
+              </View>
+              
+              <View style={styles.statItem}>
+                <Clock size={14} color="#fbbf24" />
+                <Text style={styles.statNumber}>{getEstimatedArrival()}</Text>
+                <Text style={styles.statLabel}>ETA</Text>
+              </View>
+              
+              <View style={styles.statItem}>
+                <MapPin size={14} color="#34d399" />
+                <Text style={styles.statNumber}>
+                  {activeJourney.current_stop_sequence || 0}/{journeyStops.length}
+                </Text>
+                <Text style={styles.statLabel}>Stops</Text>
+              </View>
+            </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actionsRow}>
-            {participantStatus === 'waiting' && (
-              <TouchableOpacity
-                style={styles.primaryActionButton}
-                onPress={() => updateParticipantStatus('picked_up')}
-              >
-                <Text style={styles.primaryActionText}>Mark as Picked Up</Text>
-              </TouchableOpacity>
-            )}
-            
-            {participantStatus === 'picked_up' && (
-              <TouchableOpacity
-                style={[styles.primaryActionButton, styles.arrivedButton]}
-                onPress={() => updateParticipantStatus('arrived')}
-              >
-                <Text style={styles.primaryActionText}>I've Arrived</Text>
-              </TouchableOpacity>
-            )}
-            
-            <TouchableOpacity
-              style={styles.secondaryActionButton}
-              onPress={pingPassengersAhead}
-              disabled={participantStatus !== 'waiting'}
-            >
-              <Text style={[
-                styles.secondaryActionText,
-                participantStatus !== 'waiting' && styles.disabledActionText
-              ]}>
-                Notify Ahead
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={shareJourney}
-            >
-              <Share2 size={20} color="#1ea2b1" />
-            </TouchableOpacity>
-          </View>
+            {/* Route Slider */}
+            <CompactRouteSlider
+              stops={journeyStops}
+              currentUserStopName={userStopName}
+              currentUserId={currentUserId}
+              passengers={otherPassengers}
+              transportType={activeJourney.routes.transport_type}
+              currentStopSequence={activeJourney.current_stop_sequence || 0}
+              participantStatus={participantStatus}
+              onStopPress={handleStopPress}
+            />
 
-          {/* Location Status */}
-          {participantStatus === 'picked_up' && (
-            <View style={styles.locationStatus}>
-              <Text style={styles.locationStatusText}>
-                {locationPermission 
-                  ? '📍 Your location is being shared live'
-                  : '📍 Location permission required for live sharing'}
-              </Text>
-              {!locationPermission && (
-                <TouchableOpacity 
-                  style={styles.enableLocationButton}
-                  onPress={requestLocationPermission}
+            {/* Action Buttons */}
+            <View style={styles.actionsRow}>
+              {participantStatus === 'waiting' && (
+                <TouchableOpacity
+                  style={styles.primaryActionButton}
+                  onPress={() => updateParticipantStatus('picked_up')}
                 >
-                  <Text style={styles.enableLocationText}>Enable Location</Text>
+                  <Text style={styles.primaryActionText}>Picked Up</Text>
                 </TouchableOpacity>
               )}
+              
+              {participantStatus === 'picked_up' && (
+                <TouchableOpacity
+                  style={[styles.primaryActionButton, styles.arrivedButton]}
+                  onPress={() => updateParticipantStatus('arrived')}
+                >
+                  <Text style={styles.primaryActionText}>Arrived</Text>
+                </TouchableOpacity>
+              )}
+              
+              {participantStatus === 'waiting' && (
+                <TouchableOpacity
+                  style={styles.secondaryActionButton}
+                  onPress={pingPassengersAhead}
+                >
+                  <Text style={styles.secondaryActionText}>Notify Ahead</Text>
+                </TouchableOpacity>
+              )}
+              
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={shareJourney}
+              >
+                <Share2 size={18} color="#1ea2b1" />
+              </TouchableOpacity>
             </View>
-          )}
 
-          {connectionError && (
-            <View style={styles.errorContainer}>
-              <ConnectionError />
-            </View>
-          )}
+            {/* Location Status */}
+            {participantStatus === 'picked_up' && (
+              <View style={styles.locationStatus}>
+                <Text style={styles.locationStatusText} numberOfLines={2}>
+                  {locationPermission 
+                    ? '📍 Location shared live'
+                    : '📍 Enable location for sharing'}
+                </Text>
+                {!locationPermission && (
+                  <TouchableOpacity 
+                    style={styles.enableLocationButton}
+                    onPress={requestLocationPermission}
+                  >
+                    <Text style={styles.enableLocationText}>Enable</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
 
-          {/* No Driver Indicator */}
-          {!hasDriverInJourney && !isDriver && (
-            <TouchableOpacity style={styles.noDriverCard}>
-              <Text style={styles.noDriverText}>No driver assigned</Text>
-            </TouchableOpacity>
-          )}
+            {connectionError && (
+              <View style={styles.errorContainer}>
+                <ConnectionError />
+              </View>
+            )}
+
+            {/* No Driver Indicator */}
+            {!hasDriverInJourney && !isDriver && (
+              <TouchableOpacity style={styles.noDriverCard}>
+                <Text style={styles.noDriverText}>No driver assigned</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
 
           {/* Stop Details Modal */}
           <StopDetailsModal
@@ -1088,10 +1139,16 @@ Shared via Uthutho`;
         </Animated.View>
       );
     } else {
+      // Chat Tab
       return (
-        <View style={styles.chatContainer}>
-          <Text style={styles.chatPlaceholder}>Chat would appear here</Text>
-        </View>
+        <JourneyChat
+          messages={chatMessages}
+          newMessage={newMessage}
+          setNewMessage={setNewMessage}
+          onSendMessage={sendChatMessage}
+          currentUserId={currentUserId}
+          onlineCount={onlineCount}
+        />
       );
     }
   };
@@ -1108,7 +1165,7 @@ Shared via Uthutho`;
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
     >
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" />
@@ -1120,6 +1177,7 @@ Shared via Uthutho`;
           activeTab={activeTab}
           onTabChange={setActiveTab}
           unreadMessages={unreadMessages}
+          onlineCount={onlineCount} 
         />
         
         {renderContent()}
@@ -1138,85 +1196,90 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
+  },
+  scrollContent: {
+    paddingHorizontal: 12,
     paddingTop: 8,
+    paddingBottom: 20,
   },
   compactHeader: {
     backgroundColor: '#1a1a1a',
-    padding: 16,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#333333',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   routeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   routeName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
     flex: 1,
-    marginRight: 12,
+    marginRight: 8,
   },
   transportBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1ea2b120',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 16,
-    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 3,
   },
   transportText: {
     color: '#1ea2b1',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   routeEndpoints: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
   startPoint: {
     color: '#4ade80',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     flex: 1,
   },
   endPoint: {
     color: '#ef4444',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     flex: 1,
     textAlign: 'right',
   },
+  chevron: {
+    marginHorizontal: 4,
+  },
   yourStopRow: {
     flexDirection: 'row',
     backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 10,
+    padding: 10,
     borderWidth: 1,
     borderColor: '#8b5cf6',
-    marginBottom: 12,
+    marginBottom: 10,
     alignItems: 'center',
   },
   profileContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     overflow: 'hidden',
-    marginRight: 12,
+    marginRight: 10,
     borderWidth: 2,
     borderColor: '#8b5cf6',
   },
   profileImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 24,
+    borderRadius: 20,
   },
   profilePlaceholder: {
     width: '100%',
@@ -1227,28 +1290,30 @@ const styles = StyleSheet.create({
   },
   profileInitial: {
     color: '#ffffff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   yourStopInfo: {
     flex: 1,
+    minWidth: 0,
   },
   yourStopName: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 2,
+    flexWrap: 'wrap',
   },
   statusDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginRight: 6,
+    marginRight: 5,
   },
   waitingDot: {
     backgroundColor: '#fbbf24',
@@ -1260,51 +1325,62 @@ const styles = StyleSheet.create({
     backgroundColor: '#4ade80',
   },
   yourStopStatus: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#cccccc',
     fontWeight: '500',
-    marginRight: 8,
+    marginRight: 6,
+    flexShrink: 1,
   },
   locationUpdating: {
     backgroundColor: '#1ea2b130',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: 6,
   },
   locationUpdatingText: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#1ea2b1',
     fontWeight: '600',
   },
   yourStopTime: {
     color: '#666666',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
   },
   statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
   },
   statItem: {
     alignItems: 'center',
+    flex: 1,
   },
   statNumber: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginTop: 2,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 10,
+    color: '#666666',
+    fontWeight: '500',
   },
   actionsRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   primaryActionButton: {
     flex: 1,
     backgroundColor: '#1ea2b1',
     borderRadius: 8,
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
   },
   arrivedButton: {
@@ -1312,7 +1388,7 @@ const styles = StyleSheet.create({
   },
   primaryActionText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   secondaryActionButton: {
@@ -1320,135 +1396,126 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1ea2b1',
     borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     alignItems: 'center',
+    minWidth: 100,
   },
   secondaryActionText: {
     color: '#1ea2b1',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-  },
-  disabledActionText: {
-    color: '#666666',
   },
   iconButton: {
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: '#333333',
     borderRadius: 8,
-    padding: 12,
+    padding: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    width: 44,
   },
   locationStatus: {
     backgroundColor: '#1a1a1a',
     borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+    padding: 10,
+    marginBottom: 10,
     alignItems: 'center',
   },
   locationStatusText: {
     color: '#1ea2b1',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   enableLocationButton: {
     backgroundColor: '#1ea2b1',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 6,
   },
   enableLocationText: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   errorContainer: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   noDriverCard: {
     backgroundColor: '#7f1d1d',
     borderRadius: 8,
-    padding: 12,
+    padding: 10,
     alignItems: 'center',
   },
   noDriverText: {
     color: '#fca5a5',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
-  },
-  chatContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chatPlaceholder: {
-    color: '#666666',
-    fontSize: 16,
   },
   // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '80%',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    maxHeight: '70%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-    paddingBottom: 16,
+    marginBottom: 16,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
     flex: 1,
+    marginRight: 12,
   },
   closeButton: {
-    padding: 4,
+    padding: 2,
   },
   closeButtonText: {
     color: '#666666',
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '300',
   },
   stopInfo: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   infoLabel: {
     color: '#666666',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
-    width: 100,
+    width: 70,
   },
   infoValue: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     flex: 1,
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
   },
   passedBadge: {
     backgroundColor: '#065f46',
@@ -1461,32 +1528,32 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   passengersSection: {
-    marginTop: 20,
+    marginTop: 16,
   },
   sectionTitle: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   passengerItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#222222',
     borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
+    padding: 10,
+    marginBottom: 6,
   },
   passengerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     overflow: 'hidden',
-    marginRight: 12,
+    marginRight: 10,
   },
   avatarImage: {
     width: '100%',
@@ -1501,39 +1568,41 @@ const styles = StyleSheet.create({
   },
   avatarInitial: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   passengerInfo: {
     flex: 1,
+    minWidth: 0,
   },
   passengerName: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     marginBottom: 2,
   },
   waitingText: {
     color: '#666666',
-    fontSize: 12,
+    fontSize: 11,
   },
   noPassengers: {
-    padding: 20,
+    padding: 16,
     alignItems: 'center',
   },
   noPassengersText: {
     color: '#666666',
-    fontSize: 14,
+    fontSize: 13,
   },
   dismissButton: {
     backgroundColor: '#1ea2b1',
     borderRadius: 8,
-    paddingVertical: 16,
+    paddingVertical: 14,
     alignItems: 'center',
+    marginTop: 8,
   },
   dismissButtonText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
 });

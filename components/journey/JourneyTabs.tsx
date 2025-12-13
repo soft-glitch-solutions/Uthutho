@@ -6,9 +6,18 @@ interface JourneyTabsProps {
   activeTab: 'info' | 'chat';
   onTabChange: (tab: 'info' | 'chat') => void;
   unreadMessages?: number;
+  onlineCount?: number;
 }
 
-export const JourneyTabs = ({ activeTab, onTabChange, unreadMessages = 0 }: JourneyTabsProps) => {
+export const JourneyTabs = ({ 
+  activeTab, 
+  onTabChange, 
+  unreadMessages = 0, 
+  onlineCount = 0 
+}: JourneyTabsProps) => {
+  const hasOnlineIndicator = onlineCount > 0;
+  const hasUnreadMessages = unreadMessages > 0;
+  
   return (
     <View style={styles.tabsContainer}>
       <TouchableOpacity
@@ -26,14 +35,38 @@ export const JourneyTabs = ({ activeTab, onTabChange, unreadMessages = 0 }: Jour
         onPress={() => onTabChange('chat')}
       >
         <MessageCircle size={20} color={activeTab === 'chat' ? '#1ea2b1' : '#666666'} />
-        <Text style={[styles.tabText, activeTab === 'chat' && styles.activeTabText]}>
-          Group Chat
-        </Text>
-        {unreadMessages > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{unreadMessages}</Text>
-          </View>
-        )}
+        <View style={styles.chatTabText}>
+          <Text style={[styles.tabText, activeTab === 'chat' && styles.activeTabText]}>
+            Group Chat
+          </Text>
+          
+          {/* Combined Badge */}
+          {(hasOnlineIndicator || hasUnreadMessages) && (
+            <View style={styles.combinedBadge}>
+              {/* Online Indicator */}
+              {hasOnlineIndicator && (
+                <View style={styles.onlineIndicator}>
+                  <View style={styles.onlineDot} />
+                  <Text style={styles.onlineCountText}>{onlineCount}</Text>
+                </View>
+              )}
+              
+              {/* Separator if both indicators exist */}
+              {hasOnlineIndicator && hasUnreadMessages && (
+                <View style={styles.separator} />
+              )}
+              
+              {/* Unread Messages */}
+              {hasUnreadMessages && (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadBadgeText}>
+                    {unreadMessages > 99 ? '99+' : unreadMessages}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -56,9 +89,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: 8,
     gap: 8,
+  },
+  chatTabText: {
+    alignItems: 'center',
   },
   activeTab: {
     backgroundColor: '#0a0a0a',
@@ -71,18 +107,57 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: '#1ea2b1',
   },
-  badge: {
+  // Combined Badge Container
+  combinedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+    backgroundColor: '#2a2a2a',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  // Online Indicator
+  onlineIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  onlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#22c55e',
+    shadowColor: '#22c55e',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 2,
+  },
+  onlineCountText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#cccccc',
+  },
+  // Separator
+  separator: {
+    width: 1,
+    height: 12,
+    backgroundColor: '#444444',
+  },
+  // Unread Messages Badge
+  unreadBadge: {
     backgroundColor: '#ef4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 4,
   },
-  badgeText: {
+  unreadBadgeText: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold',
   },
 });
