@@ -17,7 +17,7 @@ import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useTheme } from '@/context/ThemeContext';
-import { MapPin, Bus, Brain as Train, Navigation, Users, Clock, Flag, Route, BookmarkCheck, Plus } from 'lucide-react-native';
+import { MapPin, Bus, Brain as Train, Navigation, Users, Clock, Flag, Route, BookmarkCheck, Plus, Menu, Map, User, Target } from 'lucide-react-native';
 import { useJourney } from '@/hook/useJourney';
 import HeaderSection from '@/components/home/HeaderSection';
 import NearbySection from '@/components/home/NearbySection';
@@ -67,16 +67,16 @@ const calculateWalkingTime = (lat1, lng1, lat2, lng2) => {
   return walkingTimeMinutes;
 };
 
-const getIconForType = (type: string) => {
+const getIconForType = (type: string, size: number = 20) => {
   switch (type) {
     case 'stop':
-      return <MapPin size={isDesktop ? 14 : 16} color="#1ea2b1" />;
+      return <MapPin size={size} color="#1ea2b1" />;
     case 'hub':
-      return <Navigation size={isDesktop ? 14 : 16} color="#1ea2b1" />;
+      return <Navigation size={size} color="#1ea2b1" />;
     case 'route':
-      return <Bus size={isDesktop ? 14 : 16} color="#1ea2b1" />;
+      return <Bus size={size} color="#1ea2b1" />;
     default:
-      return <MapPin size={isDesktop ? 14 : 16} color="#1ea2b1" />;
+      return <MapPin size={size} color="#1ea2b1" />;
   }
 };
 
@@ -93,24 +93,116 @@ const getTypeLabel = (type: string) => {
   }
 };
 
-// Skeleton Loader Component for Community Items
-const CommunitySkeletonLoader = ({ colors }) => {
+// Desktop Grid Layout Component
+const CommunityGrid = ({ 
+  favorites, 
+  favoriteDetails, 
+  colors, 
+  router, 
+  toggleFavorite, 
+  favoritesCountMap 
+}) => {
+  if (favorites.length === 0) {
+    return (
+      <View style={styles.emptyGridContainer}>
+        <View style={styles.emptyGridIllustration}>
+          <Map size={48} color={colors.primary} />
+        </View>
+        <Text style={[styles.emptyGridText, { color: colors.text }]}>
+          Your community grid is empty
+        </Text>
+        <Text style={[styles.emptyGridSubtext, { color: colors.text, opacity: 0.7 }]}>
+          Add locations to see them here
+        </Text>
+        <TouchableOpacity 
+          style={[styles.emptyGridButton, { backgroundColor: colors.primary }]}
+          onPress={() => router.push('/favorites')}
+        >
+          <Plus size={20} color="#ffffff" />
+          <Text style={styles.emptyGridButtonText}>Explore Locations</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.communityList}>
-      {[1, 2, 3].map((item) => (
+    <View style={styles.gridContainer}>
+      {favorites.map((favorite, index) => {
+        const details = favoriteDetails.find(detail => detail.id === favorite.id);
+        const type = details?.type || favorite.type;
+        const followerCount = favoritesCountMap[details?.id] || 0;
+        
+        return (
+          <Pressable
+            key={favorite.id}
+            style={[styles.gridItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => {
+              if (type === 'stop') {
+                router.push(`/stop-details?stopId=${favorite.id}`);
+              } else if (type === 'hub') {
+                router.push(`/hub/${favorite.id}`);
+              } else if (type === 'route') {
+                router.push(`/route-details?routeId=${favorite.id}`);
+              }
+            }}
+          >
+            <View style={styles.gridItemHeader}>
+              <View style={[styles.gridItemIcon, { backgroundColor: `${colors.primary}15` }]}>
+                {getIconForType(type, 18)}
+              </View>
+              <View style={styles.gridItemActions}>
+                <TouchableOpacity
+                  onPress={() => toggleFavorite(favorite)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <BookmarkCheck size={16} color={colors.primary} fill={colors.primary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            <Text style={[styles.gridItemName, { color: colors.text }]} numberOfLines={2}>
+              {favorite.name}
+            </Text>
+            
+            <View style={styles.gridItemMeta}>
+              <View style={[styles.typeBadge, { backgroundColor: `${colors.primary}20` }]}>
+                <Text style={[styles.typeBadgeText, { color: colors.primary }]}>
+                  {getTypeLabel(type)}
+                </Text>
+              </View>
+              
+              {followerCount > 0 && (
+                <View style={styles.followerBadge}>
+                  <Users size={12} color="#1ea2b1" />
+                  <Text style={styles.followerBadgeText}>{followerCount}</Text>
+                </View>
+              )}
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+};
+
+// Desktop Skeleton Grid
+const GridSkeletonLoader = ({ colors }) => {
+  return (
+    <View style={styles.gridContainer}>
+      {[1, 2, 3, 4].map((item) => (
         <View 
           key={item} 
-          style={[styles.communityItemSkeleton, { backgroundColor: colors.card, borderColor: colors.border }]}
+          style={[styles.gridItemSkeleton, { backgroundColor: colors.card, borderColor: colors.border }]}
         >
-          <View style={styles.communityItemContent}>
-            <View style={[styles.communityIconSkeleton, { backgroundColor: colors.border }]} />
-            <View style={styles.communityInfoSkeleton}>
-              <View style={[styles.skeletonTextLarge, { backgroundColor: colors.border }]} />
-              <View style={[styles.skeletonTextSmall, { backgroundColor: colors.border }]} />
-              <View style={[styles.skeletonTextMedium, { backgroundColor: colors.border }]} />
-            </View>
+          <View style={styles.gridItemHeaderSkeleton}>
+            <View style={[styles.gridItemIconSkeleton, { backgroundColor: colors.border }]} />
+            <View style={[styles.gridItemActionSkeleton, { backgroundColor: colors.border }]} />
           </View>
-          <View style={[styles.removeButtonSkeleton, { backgroundColor: colors.border }]} />
+          <View style={[styles.gridItemNameSkeleton, { backgroundColor: colors.border }]} />
+          <View style={styles.gridItemMetaSkeleton}>
+            <View style={[styles.typeBadgeSkeleton, { backgroundColor: colors.border }]} />
+            <View style={[styles.followerBadgeSkeleton, { backgroundColor: colors.border }]} />
+          </View>
         </View>
       ))}
     </View>
@@ -167,38 +259,6 @@ export default function HomeScreen() {
       setIsNearestLoading(false);
     }
   }, [userLocation]);
-
-  const FlyboxAnimation = ({ style }) => {
-    const animationRef = useRef(null);
-    const isMobile = Platform.OS !== 'web';
-  
-    useEffect(() => {
-      if (animationRef.current) {
-        animationRef.current.play();
-      }
-    }, []);
-  
-    if (isMobile) {
-      return (
-        <LottieView
-          ref={animationRef}
-          source={require('../../../assets/animations/flybox.json')}
-          autoPlay
-          loop
-          style={style}
-        />
-      );
-    } else {
-      return (
-        <DotLottieReact
-          src="https://lottie.host/b3c284ec-320e-4f2d-8cf4-3f95eea57111/x4PxKADBXK.lottie"
-          loop
-          autoplay
-          style={style}
-        />
-      );
-    }
-  };
 
   const findNearestLocation = useCallback((userLocation: LocationCoords, locations: any[]) => {
     let nearestLocation = null;
@@ -375,90 +435,6 @@ export default function HomeScreen() {
     fetchNearestLocations();
   }, [userLocation, fetchNearestLocations]);
 
-
-  const loadUserStats = async () => {
-    setIsStatsLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('points, selected_title')
-          .eq('id', user.id)
-          .single();
-        
-        let streak = 0;
-        let streakData = null;
-        
-        try {
-          const { data: streakResult } = await supabase
-            .from('login_streaks')
-            .select('current_streak')
-            .eq('user_id', user.id)
-            .single();
-          streakData = streakResult;
-          streak = streakData?.current_streak || 0;
-        } catch (streakError) {
-          console.log('Streak table not available, using default');
-        }
-        
-        if (profile) {
-          setUserStats({
-            points: profile.points || 0,
-            level: Math.floor((profile.points || 0) / 100) + 1,
-            streak: streak,
-            title: profile.selected_title || 'Newbie Explorer'
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error loading user stats:', error);
-    } finally {
-      setIsStatsLoading(false);
-    }
-  };
-  
-useEffect(() => {
-  if (userProfile) {
-    loadUserStats();
-  }
-}, [userProfile]);
-
-useEffect(() => {
-  if (params.refresh) {
-    loadUserStats();
-    if (userLocation) {
-      fetchNearestLocations();
-    }
-  }
-}, [params.refresh]);
-
-  const openSidebar = () => {
-    navigation.toggleDrawer();
-  };
-
-  const handleFavoritePress = async (favoriteName: string) => {
-    try {
-      const [hubResult, stopResult] = await Promise.allSettled([
-        supabase.from('hubs').select('id').eq('name', favoriteName).maybeSingle(),
-        supabase.from('stops').select('id').eq('name', favoriteName).maybeSingle()
-      ]);
-
-      if (hubResult.status === 'fulfilled' && hubResult.value.data) {
-        return { type: 'hub', id: hubResult.value.data.id };
-      }
-
-      if (stopResult.status === 'fulfilled' && stopResult.value.data) {
-        return { type: 'stop', id: stopResult.value.data.id };
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Error fetching favorite details:', error);
-      return null;
-    }
-  };
-
   const handleNearestStopPress = (stopId: string) => {
     router.push(`/stop-details?stopId=${stopId}`);
   };
@@ -570,6 +546,89 @@ useEffect(() => {
     }
   };
 
+  const loadUserStats = async () => {
+    setIsStatsLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('points, selected_title')
+          .eq('id', user.id)
+          .single();
+        
+        let streak = 0;
+        let streakData = null;
+        
+        try {
+          const { data: streakResult } = await supabase
+            .from('login_streaks')
+            .select('current_streak')
+            .eq('user_id', user.id)
+            .single();
+          streakData = streakResult;
+          streak = streakData?.current_streak || 0;
+        } catch (streakError) {
+          console.log('Streak table not available, using default');
+        }
+        
+        if (profile) {
+          setUserStats({
+            points: profile.points || 0,
+            level: Math.floor((profile.points || 0) / 100) + 1,
+            streak: streak,
+            title: profile.selected_title || 'Newbie Explorer'
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user stats:', error);
+    } finally {
+      setIsStatsLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    if (userProfile) {
+      loadUserStats();
+    }
+  }, [userProfile]);
+
+  useEffect(() => {
+    if (params.refresh) {
+      loadUserStats();
+      if (userLocation) {
+        fetchNearestLocations();
+      }
+    }
+  }, [params.refresh]);
+
+  const openSidebar = () => {
+    navigation.toggleDrawer();
+  };
+
+  const handleFavoritePress = async (favoriteName: string) => {
+    try {
+      const [hubResult, stopResult] = await Promise.allSettled([
+        supabase.from('hubs').select('id').eq('name', favoriteName).maybeSingle(),
+        supabase.from('stops').select('id').eq('name', favoriteName).maybeSingle()
+      ]);
+
+      if (hubResult.status === 'fulfilled' && hubResult.value.data) {
+        return { type: 'hub', id: hubResult.value.data.id };
+      }
+
+      if (stopResult.status === 'fulfilled' && stopResult.value.data) {
+        return { type: 'stop', id: stopResult.value.data.id };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error fetching favorite details:', error);
+      return null;
+    }
+  };
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -625,22 +684,23 @@ useEffect(() => {
     else setFavoritesCountMap({});
   }, [favoriteDetails]);
 
-  return (
-    <ScreenTransition>
-      <ScrollView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[colors.primary || '#1ea2b1']}
-            tintColor={colors.primary || '#1ea2b1'}
-          />
-        }
-      >
-        {/* Only show top header on mobile */}
-        {!isDesktop && (
-          <View style={styles.topHeader}>
+  if (isDesktop) {
+    return (
+      <ScreenTransition>
+        <ScrollView
+          style={[styles.container, styles.containerDesktop, { backgroundColor: colors.background }]}
+          contentContainerStyle={styles.desktopContentContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary || '#1ea2b1']}
+              tintColor={colors.primary || '#1ea2b1'}
+            />
+          }
+        >
+          {/* Desktop Header */}
+          <View style={styles.desktopHeader}>
             <Pressable onPress={openSidebar} style={styles.logoContainer}>
               <Image
                 source={require('../../../assets/uthutho-logo.png')}
@@ -661,7 +721,233 @@ useEffect(() => {
               </View>
             )}
           </View>
-        )}
+
+          {/* Desktop Layout - Three Column Grid */}
+          <View style={styles.desktopLayout}>
+            {/* Left Column - User Profile & Stats */}
+            <View style={styles.leftColumn}>
+              {/* User Profile Card */}
+              <View style={[styles.profileCard, { backgroundColor: colors.card }]}>
+                <View style={styles.profileHeader}>
+                  <View style={[styles.profileAvatar, { backgroundColor: colors.primary }]}>
+                    <User size={24} color="#ffffff" />
+                  </View>
+                  <View style={styles.profileInfo}>
+                    <Text style={[styles.profileWelcome, { color: colors.text }]}>
+                      Welcome back,
+                    </Text>
+                    <Text style={[styles.profileName, { color: colors.text }]}>
+                      {userProfile?.first_name || 'Explorer'}
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={styles.profileStats}>
+                  <View style={styles.statItem}>
+                    <Target size={20} color={colors.primary} />
+                    <Text style={[styles.statValue, { color: colors.text }]}>
+                      {userStats.points}
+                    </Text>
+                    <Text style={[styles.statLabel, { color: colors.text, opacity: 0.7 }]}>
+                      Points
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.statDivider} />
+                  
+                  <View style={styles.statItem}>
+                    <Map size={20} color={colors.primary} />
+                    <Text style={[styles.statValue, { color: colors.text }]}>
+                      Level {userStats.level}
+                    </Text>
+                    <Text style={[styles.statLabel, { color: colors.text, opacity: 0.7 }]}>
+                      {userStats.title}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Journey Banner */}
+              {!journeyLoading && activeJourney && (
+                <Pressable 
+                  style={[styles.journeyCard, { backgroundColor: colors.primary }]}
+                  onPress={() => router.push('/journey')}
+                >
+                  <View style={styles.journeyContent}>
+                    <Navigation size={24} color="#ffffff" />
+                    <View style={styles.journeyInfo}>
+                      <Text style={styles.journeyTitle}>Active Journey</Text>
+                      <Text style={styles.journeyRoute} numberOfLines={1}>
+                        {activeJourney.routes.name}
+                      </Text>
+                      <Text style={styles.journeyProgress}>
+                        Stop {activeJourney.current_stop_sequence || 0} of {activeJourney.stops?.length || 0}
+                      </Text>
+                    </View>
+                  </View>
+                </Pressable>
+              )}
+
+              {/* Gamification Section */}
+              <GamificationSection
+                isStatsLoading={isStatsLoading}
+                userStats={userStats}
+                colors={colors}
+              />
+            </View>
+
+            {/* Middle Column - MAP (Main Focus) */}
+            <View style={styles.middleColumn}>
+              <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.sectionTitle, styles.sectionTitleDesktop, { color: colors.text }]}>
+                  Explore Map
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.mapActionButton, { backgroundColor: colors.primary }]}
+                  onPress={() => router.push('/map?fullscreen=true')}
+                >
+                  <Map size={18} color="#ffffff" />
+                  <Text style={styles.mapActionText}>Full Map</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {/* Map Container */}
+
+              
+              {/* Nearby Section below Map */}
+              <NearbySection
+                locationError={locationError}
+                isNearestLoading={isNearestLoading}
+                userLocation={userLocation}
+                nearestLocations={nearestLocations}
+                colors={colors}
+                handleNearestStopPress={handleNearestStopPress}
+                handleNearestHubPress={handleNearestHubPress}
+                calculateWalkingTime={calculateWalkingTime}
+                hasActiveJourney={!!activeJourney}
+                onMarkAsWaiting={handleMarkAsWaiting}
+                compact={true}
+              />
+            </View>
+
+            {/* Right Column - Community Grid */}
+            <View style={styles.rightColumn}>
+              <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.sectionTitle, styles.sectionTitleDesktop, { color: colors.text }]}>
+                  Your Community
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.addCommunityButton, { backgroundColor: colors.primary }]}
+                  onPress={() => router.push('/favorites')}
+                >
+                  <Plus size={18} color="#ffffff" />
+                  <Text style={styles.addCommunityText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {isProfileLoading || isFavoritesLoading ? (
+                <GridSkeletonLoader colors={colors} />
+              ) : (
+                <CommunityGrid
+                  favorites={favorites}
+                  favoriteDetails={favoriteDetails}
+                  colors={colors}
+                  router={router}
+                  toggleFavorite={toggleFavorite}
+                  favoritesCountMap={favoritesCountMap}
+                />
+              )}
+
+              {/* Quick Actions */}
+              <View style={[styles.quickActions, { backgroundColor: colors.card, marginTop: 20 }]}>
+                <Text style={[styles.quickActionsTitle, { color: colors.text }]}>
+                  Quick Actions
+                </Text>
+                <View style={styles.quickActionsGrid}>
+                  <TouchableOpacity 
+                    style={[styles.quickAction, { backgroundColor: colors.background }]}
+                    onPress={() => router.push('/map')}
+                  >
+                    <Map size={20} color={colors.primary} />
+                    <Text style={[styles.quickActionText, { color: colors.text }]}>
+                      Explore Map
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.quickAction, { backgroundColor: colors.background }]}
+                    onPress={() => router.push('/favorites')}
+                  >
+                    <BookmarkCheck size={20} color={colors.primary} />
+                    <Text style={[styles.quickActionText, { color: colors.text }]}>
+                      All Favorites
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.quickAction, { backgroundColor: colors.background }]}
+                    onPress={() => router.push('/leaderboard')}
+                  >
+                    <Users size={20} color={colors.primary} />
+                    <Text style={[styles.quickActionText, { color: colors.text }]}>
+                      Leaderboard
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.quickAction, { backgroundColor: colors.background }]}
+                    onPress={() => router.push('/profile')}
+                  >
+                    <User size={20} color={colors.primary} />
+                    <Text style={[styles.quickActionText, { color: colors.text }]}>
+                      Profile
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      </ScreenTransition>
+    );
+  }
+
+  // Mobile Layout (original)
+  return (
+    <ScreenTransition>
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary || '#1ea2b1']}
+            tintColor={colors.primary || '#1ea2b1'}
+          />
+        }
+      >
+        {/* Only show top header on mobile */}
+        <View style={styles.topHeader}>
+          <Pressable onPress={openSidebar} style={styles.logoContainer}>
+            <Image
+              source={require('../../../assets/uthutho-logo.png')}
+              style={styles.logo}
+            />
+            <Text style={[styles.uthuthoText, { color: colors.text }]}>Uthutho</Text>
+          </Pressable>
+          {isProfileLoading ? (
+            <View style={[styles.pointsContainer, { 
+              backgroundColor: colors.border,
+              width: 80,
+              height: 30,
+              borderRadius: 15
+            }]} />
+          ) : (
+            <View style={styles.pointsContainer}>
+              <Text style={[styles.pointsText, { color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
+            </View>
+          )}
+        </View>
 
         <HeaderSection
           isProfileLoading={isProfileLoading}
@@ -671,33 +957,33 @@ useEffect(() => {
 
         {!journeyLoading && activeJourney && (
           <Pressable 
-            style={[styles.journeyBanner, isDesktop && styles.journeyBannerDesktop]}
+            style={[styles.journeyBanner]}
             onPress={() => router.push('/journey')}
           >
             <View style={styles.journeyBannerContent}>
               <View style={styles.journeyIcon}>
-                <Navigation size={isDesktop ? 18 : 20} color="#ffffff" />
+                <Navigation size={20} color="#ffffff" />
               </View>
               <View style={styles.journeyInfo}>
-                <Text style={[styles.journeyTitle, isDesktop && styles.journeyTitleDesktop]}>Active Journey</Text>
-                <Text style={[styles.journeyRoute, isDesktop && styles.journeyRouteDesktop]}>{activeJourney.routes.name}</Text>
-                <Text style={[styles.journeyProgress, isDesktop && styles.journeyProgressDesktop]}>
+                <Text style={styles.journeyTitle}>Active Journey</Text>
+                <Text style={styles.journeyRoute}>{activeJourney.routes.name}</Text>
+                <Text style={styles.journeyProgress}>
                   Stop {activeJourney.current_stop_sequence || 0} of {activeJourney.stops?.length || 0}
                 </Text>
               </View>
               <View style={styles.journeyStats}>
                 <View style={styles.journeyStatItem}>
-                  <Users size={isDesktop ? 12 : 14} color="#1ea2b1" />
-                  <Text style={[styles.journeyStatText, isDesktop && styles.journeyStatTextDesktop]}>Live</Text>
+                  <Users size={14} color="#1ea2b1" />
+                  <Text style={styles.journeyStatText}>Live</Text>
                 </View>
                 <View style={styles.journeyStatItem}>
-                  <Clock size={isDesktop ? 12 : 14} color="#1ea2b1" />
-                  <Text style={[styles.journeyStatText, isDesktop && styles.journeyStatTextDesktop]}>Active</Text>
+                  <Clock size={14} color="#1ea2b1" />
+                  <Text style={styles.journeyStatText}>Active</Text>
                 </View>
               </View>
             </View>
             <View style={styles.journeyArrow}>
-              <Text style={[styles.journeyArrowText, isDesktop && styles.journeyArrowTextDesktop]}>›</Text>
+              <Text style={styles.journeyArrowText}>›</Text>
             </View>
           </Pressable>
         )}
@@ -721,20 +1007,36 @@ useEffect(() => {
           </Text>
           
           {isProfileLoading || isFavoritesLoading ? (
-            <CommunitySkeletonLoader colors={colors} />
+            <View style={styles.communityList}>
+              {[1, 2, 3].map((item) => (
+                <View 
+                  key={item} 
+                  style={[styles.communityItemSkeleton, { backgroundColor: colors.card, borderColor: colors.border }]}
+                >
+                  <View style={styles.communityItemContent}>
+                    <View style={[styles.communityIconSkeleton, { backgroundColor: colors.border }]} />
+                    <View style={styles.communityInfoSkeleton}>
+                      <View style={[styles.skeletonTextLarge, { backgroundColor: colors.border }]} />
+                      <View style={[styles.skeletonTextSmall, { backgroundColor: colors.border }]} />
+                      <View style={[styles.skeletonTextMedium, { backgroundColor: colors.border }]} />
+                    </View>
+                  </View>
+                  <View style={[styles.removeButtonSkeleton, { backgroundColor: colors.border }]} />
+                </View>
+              ))}
+            </View>
           ) : favorites.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <FlyboxAnimation style={[styles.lottieAnimation, isDesktop && styles.lottieAnimationDesktop]} />
               <Text style={[styles.emptyText, { color: colors.text}]}>
                 You haven't added any locations to your community yet.
               </Text>
-              <TouchableOpacity style={[styles.addButton, isDesktop && styles.addButtonDesktop]} onPress={() => router.push('/favorites')}>
-                <Plus size={isDesktop ? 18 : 20} color="#fff" />
-                <Text style={[styles.addButtonText, isDesktop && styles.addButtonTextDesktop]}>Add Community</Text>
+              <TouchableOpacity style={styles.addButton} onPress={() => router.push('/favorites')}>
+                <Plus size={20} color="#fff" />
+                <Text style={styles.addButtonText}>Add Community</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={[styles.communityList, isDesktop && styles.communityListDesktop]}>
+            <View style={styles.communityList}>
               {favorites.map((favorite, index) => {
                 const details = favoriteDetails.find(detail => detail.id === favorite.id);
                 const type = details?.type || favorite.type;
@@ -778,7 +1080,7 @@ useEffect(() => {
                             paddingHorizontal: 8,
                             paddingVertical: 2,
                           }}>
-                            <Text style={{ color: '#1ea2b1', fontSize: isDesktop ? 11 : 12 }}>
+                            <Text style={{ color: '#1ea2b1', fontSize: 12 }}>
                               Followers: {favoritesCountMap[details.id] || 0}
                             </Text>
                           </View>
@@ -821,8 +1123,431 @@ useEffect(() => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: isDesktop ? 16 : 8,
+    padding: 8,
   },
+  containerDesktop: {
+    width: '100%',
+    padding: 20,
+    paddingTop: 10,
+  },
+  desktopContentContainer: {
+    paddingTop: 0,
+  },
+  
+  // Desktop Header
+  desktopHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+  },
+  
+  // Desktop Three-Column Layout
+  desktopLayout: {
+    flexDirection: 'row',
+    maxWidth: 1400,
+    alignSelf: 'center',
+    width: '100%',
+    gap: 20,
+    minHeight: 'calc(100vh - 80px)',
+  },
+  leftColumn: {
+    width: '25%',
+    minWidth: 0,
+  },
+  middleColumn: {
+    width: '40%',
+    minWidth: 0,
+  },
+  rightColumn: {
+    width: '35%',
+    minWidth: 0,
+  },
+  
+  // Profile Card
+  profileCard: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  profileAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileWelcome: {
+    fontSize: 14,
+    opacity: 0.7,
+    marginBottom: 2,
+  },
+  profileName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  profileStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 12,
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#333333',
+    marginHorizontal: 20,
+  },
+  
+  // Journey Card
+  journeyCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  journeyContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  journeyInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  journeyTitle: {
+    fontSize: 14,
+    color: '#ffffff',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  journeyRoute: {
+    fontSize: 16,
+    color: '#ffffff',
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  journeyProgress: {
+    fontSize: 12,
+    color: '#ffffff',
+    opacity: 0.9,
+  },
+  
+  // Section Header with Add Button
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 16,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  sectionTitleDesktop: {
+    fontSize: 22,
+  },
+  addCommunityButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 6,
+  },
+  addCommunityText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  
+  // Map Container Styles
+  mapContainer: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    alignItems: 'center',
+  },
+  mapPlaceholder: {
+    width: '100%',
+    height: 300,
+    backgroundColor: 'rgba(30, 162, 177, 0.05)',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(30, 162, 177, 0.1)',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  mapPlaceholderText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  mapPlaceholderSubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  mapStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+  },
+  mapStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  mapStatValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  mapStatLabel: {
+    fontSize: 12,
+  },
+  mapActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 6,
+  },
+  mapActionText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  
+  // Grid Layout for Community
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  gridItem: {
+    width: 'calc(50% - 6px)',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  gridItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  gridItemIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gridItemActions: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+  },
+  gridItemName: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  gridItemMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  typeBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  followerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  followerBadgeText: {
+    fontSize: 11,
+    color: '#1ea2b1',
+    fontWeight: '600',
+  },
+  
+  // Empty Grid State
+  emptyGridContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyGridIllustration: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  emptyGridText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyGridSubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  emptyGridButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  emptyGridButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  
+  // Quick Actions
+  quickActions: {
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  quickActionsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  quickAction: {
+    width: 'calc(50% - 6px)',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  quickActionText: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  
+  // Skeleton Grid
+  gridItemSkeleton: {
+    width: 'calc(50% - 6px)',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+  },
+  gridItemHeaderSkeleton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  gridItemIconSkeleton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  gridItemActionSkeleton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  gridItemNameSkeleton: {
+    height: 15,
+    borderRadius: 4,
+    width: '80%',
+    marginBottom: 8,
+  },
+  gridItemMetaSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  typeBadgeSkeleton: {
+    width: 50,
+    height: 20,
+    borderRadius: 6,
+  },
+  followerBadgeSkeleton: {
+    width: 30,
+    height: 20,
+    borderRadius: 10,
+  },
+  
+  // Mobile-only styles
   topHeader: {
     flexDirection: 'row',
     paddingTop: 30,
@@ -853,7 +1578,7 @@ const styles = StyleSheet.create({
   },
   section: {
     borderRadius: 12,
-    padding: isDesktop ? 20 : 16,
+    padding: 16,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -861,42 +1586,14 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  sectionTitle: {
-    fontSize: isDesktop ? 18 : 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  loadingContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-  },
-  emptyContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: isDesktop ? 14 : 16,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    textAlign: 'center',
-  },
   communityList: {
     gap: 12,
-  },
-  communityListDesktop: {
-    gap: 10,
   },
   communityItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: isDesktop ? 10 : 12,
+    padding: 12,
     borderRadius: 8,
     borderWidth: 1,
   },
@@ -906,13 +1603,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   communityIcon: {
-    marginRight: isDesktop ? 10 : 12,
+    marginRight: 12,
   },
   communityInfo: {
     flex: 1,
   },
   communityName: {
-    fontSize: isDesktop ? 14 : 16,
+    fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
   },
@@ -921,7 +1618,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   communityType: {
-    fontSize: isDesktop ? 12 : 14,
+    fontSize: 14,
   },
   addButton: {
     flexDirection: 'row',
@@ -931,26 +1628,19 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
   },
-  addButtonDesktop: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
   addButtonText: {
     color: '#ffffff',
     fontWeight: '600',
     marginLeft: 8,
     fontSize: 16,
   },
-  addButtonTextDesktop: {
-    fontSize: 14,
-  },
   removeButton: {
-    paddingHorizontal: isDesktop ? 10 : 12,
-    paddingVertical: isDesktop ? 5 : 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 6,
   },
   removeButtonText: {
-    fontSize: isDesktop ? 11 : 12,
+    fontSize: 12,
     fontWeight: '600',
   },
   journeyBanner: {
@@ -967,23 +1657,19 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  journeyBannerDesktop: {
-    marginHorizontal: 0,
-    padding: 14,
-  },
   journeyBannerContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
   },
   journeyIcon: {
-    width: isDesktop ? 36 : 40,
-    height: isDesktop ? 36 : 40,
-    borderRadius: isDesktop ? 18 : 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: isDesktop ? 10 : 12,
+    marginRight: 12,
   },
   journeyInfo: {
     flex: 1,
@@ -994,25 +1680,16 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginBottom: 2,
   },
-  journeyTitleDesktop: {
-    fontSize: 14,
-  },
   journeyRoute: {
     fontSize: 14,
     color: '#ffffff',
     opacity: 0.9,
     marginBottom: 2,
   },
-  journeyRouteDesktop: {
-    fontSize: 13,
-  },
   journeyProgress: {
     fontSize: 12,
     color: '#ffffff',
     opacity: 0.8,
-  },
-  journeyProgressDesktop: {
-    fontSize: 11,
   },
   journeyStats: {
     alignItems: 'flex-end',
@@ -1028,9 +1705,6 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     opacity: 0.9,
   },
-  journeyStatTextDesktop: {
-    fontSize: 11,
-  },
   journeyArrow: {
     marginLeft: 12,
   },
@@ -1039,55 +1713,51 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     opacity: 0.7,
   },
-  journeyArrowTextDesktop: {
-    fontSize: 20,
-  },
-  // Skeleton Styles
   communityItemSkeleton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: isDesktop ? 10 : 12,
+    padding: 12,
     borderRadius: 8,
     borderWidth: 1,
   },
   communityIconSkeleton: {
-    width: isDesktop ? 20 : 24,
-    height: isDesktop ? 20 : 24,
-    borderRadius: isDesktop ? 10 : 12,
-    marginRight: isDesktop ? 10 : 12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: 12,
   },
   communityInfoSkeleton: {
     flex: 1,
     gap: 6,
   },
   skeletonTextLarge: {
-    height: isDesktop ? 14 : 16,
+    height: 16,
     borderRadius: 4,
     width: '70%',
   },
   skeletonTextMedium: {
-    height: isDesktop ? 11 : 12,
+    height: 12,
     borderRadius: 4,
     width: '40%',
   },
   skeletonTextSmall: {
-    height: isDesktop ? 9 : 10,
+    height: 10,
     borderRadius: 4,
     width: '30%',
   },
   removeButtonSkeleton: {
-    width: isDesktop ? 50 : 60,
-    height: isDesktop ? 22 : 24,
+    width: 60,
+    height: 24,
     borderRadius: 6,
   },
-  lottieAnimation: {
-    width: 150,
-    height: 150,
-    marginBottom: 16,
+  emptyContainer: {
+    padding: 20,
+    alignItems: 'center',
   },
-  lottieAnimationDesktop: {
-    width: 120,
-    height: 120,
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 8,
   },
 });
