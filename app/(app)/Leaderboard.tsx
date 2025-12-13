@@ -7,11 +7,16 @@ import {
   TouchableOpacity,
   Image,
   RefreshControl,
+  Dimensions,
+  Animated,
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
-import { ArrowLeft, Crown, Trophy, Medal, Star, MapPin, Users, Flame, Car, TrendingUp, Heart } from 'lucide-react-native';
+import { ArrowLeft, Crown, Trophy, Medal, Star, MapPin, Users, Flame, Car, TrendingUp, Heart, TrendingDown, User, Award, ChevronRight } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 interface LeaderboardUser {
   id: string;
@@ -32,8 +37,172 @@ interface LeaderboardUser {
   favorites_count?: number;
 }
 
-// Skeleton Loading Component
-const SkeletonLoader = () => {
+// Desktop Skeleton Loading Component
+const DesktopSkeletonLoader = () => {
+  const shimmerValue = new Animated.Value(0);
+
+  useEffect(() => {
+    const animateShimmer = () => {
+      Animated.sequence([
+        Animated.timing(shimmerValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => animateShimmer());
+    };
+
+    animateShimmer();
+  }, []);
+
+  const shimmerAnimation = shimmerValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['-100%', '100%'],
+  });
+
+  const SkeletonItem = ({ width, height, style = {} }) => (
+    <View style={[styles.skeletonItem, { width, height }, style]}>
+      <Animated.View
+        style={[
+          styles.shimmer,
+          {
+            transform: [{ translateX: shimmerAnimation }],
+          },
+        ]}
+      />
+    </View>
+  );
+
+  return (
+    <View style={styles.containerDesktop}>
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Desktop Header Skeleton */}
+      <View style={styles.desktopHeader}>
+        <SkeletonItem width={100} height={44} style={{ borderRadius: 12 }} />
+        <View style={styles.desktopHeaderTitle}>
+          <SkeletonItem width={32} height={32} style={{ borderRadius: 16 }} />
+          <SkeletonItem width={200} height={28} />
+        </View>
+        <View style={{ width: 100 }} />
+      </View>
+
+      {/* Desktop Layout */}
+      <View style={styles.desktopLayout}>
+        {/* Left Column - Current User & Top 3 */}
+        <View style={styles.leftColumn}>
+          {/* Current User Card Skeleton */}
+          <View style={styles.desktopCurrentUserSection}>
+            <SkeletonItem width={120} height={24} style={{ marginBottom: 16 }} />
+            <View style={styles.desktopCurrentUserCard}>
+              <SkeletonItem width={48} height={48} style={{ borderRadius: 24, marginRight: 16 }} />
+              <View style={{ flex: 1 }}>
+                <SkeletonItem width={150} height={18} style={{ marginBottom: 8 }} />
+                <SkeletonItem width={100} height={14} />
+              </View>
+              <SkeletonItem width={80} height={40} style={{ borderRadius: 20 }} />
+            </View>
+          </View>
+
+          {/* Top 3 Podium Skeleton */}
+          <View style={styles.desktopPodiumSection}>
+            <SkeletonItem width={120} height={24} style={{ marginBottom: 24 }} />
+            <View style={styles.podiumSkeleton}>
+              {/* 2nd Place */}
+              <View style={[styles.podiumItemSkeleton, styles.podiumSecondSkeleton]}>
+                <SkeletonItem width={40} height={40} style={{ borderRadius: 20, marginBottom: 12 }} />
+                <SkeletonItem width={80} height={16} />
+              </View>
+              {/* 1st Place */}
+              <View style={[styles.podiumItemSkeleton, styles.podiumFirstSkeleton]}>
+                <SkeletonItem width={48} height={48} style={{ borderRadius: 24, marginBottom: 12 }} />
+                <SkeletonItem width={100} height={18} />
+              </View>
+              {/* 3rd Place */}
+              <View style={[styles.podiumItemSkeleton, styles.podiumThirdSkeleton]}>
+                <SkeletonItem width={36} height={36} style={{ borderRadius: 18, marginBottom: 12 }} />
+                <SkeletonItem width={70} height={14} />
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Right Column - Leaderboard List */}
+        <ScrollView style={styles.rightColumn} showsVerticalScrollIndicator={false}>
+          {/* Tabs Skeleton */}
+          <View style={styles.desktopTabsContainer}>
+            {[1, 2, 3, 4].map((item) => (
+              <SkeletonItem key={item} width={120} height={44} style={{ borderRadius: 12 }} />
+            ))}
+          </View>
+
+          {/* Leaderboard List Skeleton */}
+          <View style={styles.desktopLeaderboardList}>
+            <SkeletonItem width={150} height={24} style={{ marginBottom: 24 }} />
+            
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((item) => (
+              <View key={item} style={styles.leaderboardItemSkeletonDesktop}>
+                <SkeletonItem width={40} height={40} style={{ borderRadius: 20, marginRight: 16 }} />
+                <View style={{ flex: 1 }}>
+                  <SkeletonItem width={120} height={16} style={{ marginBottom: 4 }} />
+                  <SkeletonItem width={80} height={12} />
+                </View>
+                <SkeletonItem width={60} height={24} style={{ borderRadius: 12 }} />
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
+    </View>
+  );
+};
+
+// Mobile Skeleton Loading Component
+const MobileSkeletonLoader = () => {
+  const shimmerValue = new Animated.Value(0);
+
+  useEffect(() => {
+    const animateShimmer = () => {
+      Animated.sequence([
+        Animated.timing(shimmerValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => animateShimmer());
+    };
+
+    animateShimmer();
+  }, []);
+
+  const shimmerAnimation = shimmerValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['-100%', '100%'],
+  });
+
+  const SkeletonItem = ({ width, height, style = {} }) => (
+    <View style={[styles.skeletonItem, { width, height }, style]}>
+      <Animated.View
+        style={[
+          styles.shimmer,
+          {
+            transform: [{ translateX: shimmerAnimation }],
+          },
+        ]}
+      />
+    </View>
+  );
+
   return (
     <ScrollView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -65,6 +234,363 @@ const SkeletonLoader = () => {
         ))}
       </View>
     </ScrollView>
+  );
+};
+
+// Desktop Layout Component
+const DesktopLeaderboard = ({ 
+  activeTab, 
+  users, 
+  currentUser, 
+  handleTabChange, 
+  getRankBadge, 
+  getTabConfig, 
+  getDisplayMetric, 
+  displayUsers, 
+  router,
+  onRefresh,
+  refreshing
+}) => {
+  const tabConfig = getTabConfig();
+  
+  // Get top 3 users for podium
+  const topThree = displayUsers.slice(0, 3);
+  
+  return (
+    <View style={styles.containerDesktop}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* Desktop Header */}
+      <View style={styles.desktopHeader}>
+        <TouchableOpacity style={styles.desktopBackButton} onPress={() => router.back()}>
+          <ArrowLeft size={24} color="#ffffff" />
+          <Text style={styles.desktopBackButtonText}>Back</Text>
+        </TouchableOpacity>
+        <View style={styles.desktopHeaderTitle}>
+          <Trophy size={32} color="#FFD700" />
+          <Text style={styles.desktopHeaderTitleText}>Community Leaderboard</Text>
+        </View>
+        <View style={styles.desktopHeaderRight} />
+      </View>
+
+      {/* Desktop Layout */}
+      <View style={styles.desktopLayout}>
+        {/* Left Column - Current User & Top 3 Podium */}
+        <View style={styles.leftColumn}>
+          {/* Current User Card */}
+          {currentUser && (
+            <View style={styles.desktopCurrentUserSection}>
+              <Text style={styles.desktopSectionTitle}>Your Position</Text>
+              <TouchableOpacity 
+                style={[
+                  styles.desktopCurrentUserCard,
+                  { borderColor: tabConfig.color }
+                ]}
+                onPress={() => router.push(`/user/${currentUser.id}`)}
+              >
+                <View style={styles.currentUserAvatarContainer}>
+                  {currentUser.avatar_url ? (
+                    <Image 
+                      source={{ uri: currentUser.avatar_url }}
+                      style={styles.desktopUserAvatar}
+                    />
+                  ) : (
+                    <View style={[styles.desktopUserAvatar, styles.desktopAvatarPlaceholder]}>
+                      <Text style={styles.desktopAvatarText}>
+                        {currentUser.first_name?.[0]}{currentUser.last_name?.[0]}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={[styles.rankBadgeDesktop, { backgroundColor: tabConfig.color }]}>
+                    <Text style={styles.rankBadgeTextDesktop}>
+                      #{currentUser.rank}
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={styles.currentUserInfo}>
+                  <Text style={styles.desktopUserName}>
+                    {currentUser.first_name} {currentUser.last_name}
+                  </Text>
+                  <Text style={styles.desktopUserTitle}>
+                    {currentUser.selected_title || 'Newbie Explorer'}
+                  </Text>
+                </View>
+                
+                <View style={[styles.currentUserMetric, { backgroundColor: `${tabConfig.color}15` }]}>
+                  <Text style={[styles.metricValue, { color: tabConfig.color }]}>
+                    {getDisplayMetric(currentUser)}
+                  </Text>
+                  <Text style={styles.metricLabel}>
+                    {tabConfig.metric}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Top 3 Podium */}
+          {topThree.length > 0 && (
+            <View style={styles.desktopPodiumSection}>
+              <Text style={styles.desktopSectionTitle}>Top Performers</Text>
+              <View style={styles.desktopPodium}>
+                {/* 2nd Place */}
+                {topThree[1] && (
+                  <TouchableOpacity 
+                    style={[styles.podiumItem, styles.podiumSecond]}
+                    onPress={() => router.push(`/user/${topThree[1].id}`)}
+                  >
+                    <View style={styles.podiumRankBadge}>
+                      <Medal size={20} color="#C0C0C0" />
+                      <Text style={[styles.podiumRankText, { color: '#C0C0C0' }]}>2</Text>
+                    </View>
+                    <View style={styles.podiumAvatar}>
+                      {topThree[1].avatar_url ? (
+                        <Image 
+                          source={{ uri: topThree[1].avatar_url }}
+                          style={styles.podiumAvatarImage}
+                        />
+                      ) : (
+                        <View style={[styles.podiumAvatarImage, styles.podiumAvatarPlaceholder]}>
+                          <Text style={styles.podiumAvatarText}>
+                            {topThree[1].first_name?.[0]}{topThree[1].last_name?.[0]}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.podiumName} numberOfLines={1}>
+                      {topThree[1].first_name}
+                    </Text>
+                    <Text style={[styles.podiumScore, { color: '#C0C0C0' }]}>
+                      {getDisplayMetric(topThree[1])}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                
+                {/* 1st Place */}
+                {topThree[0] && (
+                  <TouchableOpacity 
+                    style={[styles.podiumItem, styles.podiumFirst]}
+                    onPress={() => router.push(`/user/${topThree[0].id}`)}
+                  >
+                    <View style={styles.podiumRankBadge}>
+                      <Crown size={24} color="#FFD700" />
+                      <Text style={[styles.podiumRankText, { color: '#FFD700' }]}>1</Text>
+                    </View>
+                    <View style={styles.podiumAvatar}>
+                      {topThree[0].avatar_url ? (
+                        <Image 
+                          source={{ uri: topThree[0].avatar_url }}
+                          style={styles.podiumAvatarImage}
+                        />
+                      ) : (
+                        <View style={[styles.podiumAvatarImage, styles.podiumAvatarPlaceholder]}>
+                          <Text style={styles.podiumAvatarText}>
+                            {topThree[0].first_name?.[0]}{topThree[0].last_name?.[0]}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.podiumName} numberOfLines={1}>
+                      {topThree[0].first_name}
+                    </Text>
+                    <Text style={[styles.podiumScore, { color: '#FFD700' }]}>
+                      {getDisplayMetric(topThree[0])}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                
+                {/* 3rd Place */}
+                {topThree[2] && (
+                  <TouchableOpacity 
+                    style={[styles.podiumItem, styles.podiumThird]}
+                    onPress={() => router.push(`/user/${topThree[2].id}`)}
+                  >
+                    <View style={styles.podiumRankBadge}>
+                      <Award size={20} color="#CD7F32" />
+                      <Text style={[styles.podiumRankText, { color: '#CD7F32' }]}>3</Text>
+                    </View>
+                    <View style={styles.podiumAvatar}>
+                      {topThree[2].avatar_url ? (
+                        <Image 
+                          source={{ uri: topThree[2].avatar_url }}
+                          style={styles.podiumAvatarImage}
+                        />
+                      ) : (
+                        <View style={[styles.podiumAvatarImage, styles.podiumAvatarPlaceholder]}>
+                          <Text style={styles.podiumAvatarText}>
+                            {topThree[2].first_name?.[0]}{topThree[2].last_name?.[0]}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.podiumName} numberOfLines={1}>
+                      {topThree[2].first_name}
+                    </Text>
+                    <Text style={[styles.podiumScore, { color: '#CD7F32' }]}>
+                      {getDisplayMetric(topThree[2])}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* Right Column - Tabs & Leaderboard List */}
+        <ScrollView 
+          style={styles.rightColumn} 
+          showsVerticalScrollIndicator={true}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#1ea2b1"
+              colors={['#1ea2b1']}
+            />
+          }
+        >
+          {/* Desktop Tabs */}
+          <View style={styles.desktopTabsContainer}>
+            <TouchableOpacity 
+              style={[
+                styles.desktopTab,
+                activeTab === 'popular' && { backgroundColor: `${getTabConfig('popular').color}15`, borderColor: getTabConfig('popular').color }
+              ]}
+              onPress={() => handleTabChange('popular')}
+            >
+              <Flame size={20} color={activeTab === 'popular' ? getTabConfig('popular').color : '#666'} />
+              <Text style={[styles.desktopTabText, activeTab === 'popular' && { color: getTabConfig('popular').color }]}>
+                Popular
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[
+                styles.desktopTab,
+                activeTab === 'points' && { backgroundColor: `${getTabConfig('points').color}15`, borderColor: getTabConfig('points').color }
+              ]}
+              onPress={() => handleTabChange('points')}
+            >
+              <Trophy size={20} color={activeTab === 'points' ? getTabConfig('points').color : '#666'} />
+              <Text style={[styles.desktopTabText, activeTab === 'points' && { color: getTabConfig('points').color }]}>
+                Points
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[
+                styles.desktopTab,
+                activeTab === 'drivers' && { backgroundColor: `${getTabConfig('drivers').color}15`, borderColor: getTabConfig('drivers').color }
+              ]}
+              onPress={() => handleTabChange('drivers')}
+            >
+              <Car size={20} color={activeTab === 'drivers' ? getTabConfig('drivers').color : '#666'} />
+              <Text style={[styles.desktopTabText, activeTab === 'drivers' && { color: getTabConfig('drivers').color }]}>
+                Drivers
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[
+                styles.desktopTab,
+                activeTab === 'movers' && { backgroundColor: `${getTabConfig('movers').color}15`, borderColor: getTabConfig('movers').color }
+              ]}
+              onPress={() => handleTabChange('movers')}
+            >
+              <Heart size={20} color={activeTab === 'movers' ? getTabConfig('movers').color : '#666'} />
+              <Text style={[styles.desktopTabText, activeTab === 'movers' && { color: getTabConfig('movers').color }]}>
+                Movers
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Leaderboard List */}
+          <View style={styles.desktopLeaderboardList}>
+            <View style={styles.listHeader}>
+              <Text style={styles.listHeaderText}>
+                Top {tabConfig.title} • {displayUsers.length} Users
+              </Text>
+              <View style={styles.listHeaderRank}>
+                <Text style={styles.listHeaderRankText}>Rank</Text>
+              </View>
+            </View>
+            
+            {displayUsers.length === 0 ? (
+              <View style={styles.desktopEmptyState}>
+                <Trophy size={64} color="#666" />
+                <Text style={styles.desktopEmptyStateText}>No users yet</Text>
+                <Text style={styles.desktopEmptyStateSubtext}>
+                  Be the first to earn {tabConfig.metric} and climb the leaderboard!
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.desktopLeaderboardGrid}>
+                {displayUsers.map((user) => (
+                  <TouchableOpacity
+                    key={user.id}
+                    style={[
+                      styles.desktopLeaderboardItem,
+                      user.isCurrentUser && styles.desktopCurrentUserItem
+                    ]}
+                    onPress={() => router.push(`/user/${user.id}`)}
+                  >
+                    <View style={styles.desktopItemRank}>
+                      <View style={[
+                        styles.desktopRankBadge,
+                        { backgroundColor: getRankBadge(user.rank).color + '20' }
+                      ]}>
+                        {getRankBadge(user.rank).icon}
+                        <Text style={[
+                          styles.desktopRankText,
+                          { color: getRankBadge(user.rank).color }
+                        ]}>
+                          {getRankBadge(user.rank).label}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.desktopItemUser}>
+                      {user.avatar_url ? (
+                        <Image 
+                          source={{ uri: user.avatar_url }}
+                          style={styles.desktopItemAvatar}
+                        />
+                      ) : (
+                        <View style={[styles.desktopItemAvatar, styles.desktopItemAvatarPlaceholder]}>
+                          <Text style={styles.desktopItemAvatarText}>
+                            {user.first_name?.[0]}{user.last_name?.[0]}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.desktopItemInfo}>
+                        <Text style={styles.desktopItemName}>
+                          {user.first_name} {user.last_name}
+                        </Text>
+                        <Text style={styles.desktopItemTitle}>
+                          {user.selected_title || 'Newbie Explorer'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.desktopItemMetric}>
+                      <Text style={styles.desktopItemMetricValue}>
+                        {getDisplayMetric(user)}
+                      </Text>
+                      <Text style={styles.desktopItemMetricLabel}>
+                        {tabConfig.metric}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.desktopBottomSpace} />
+        </ScrollView>
+      </View>
+    </View>
   );
 };
 
@@ -273,7 +799,7 @@ export default function LeaderboardScreen() {
     }
   };
 
-  const getTabConfig = () => {
+  const getTabConfig = (tab?: 'popular' | 'points' | 'drivers' | 'movers') => {
     const config = {
       popular: { 
         icon: <Flame size={20} color="#FF6B35" />, 
@@ -300,7 +826,7 @@ export default function LeaderboardScreen() {
         color: '#10B981'
       },
     };
-    return config[activeTab];
+    return tab ? config[tab] : config[activeTab];
   };
 
   const getDisplayMetric = (user: LeaderboardUser) => {
@@ -322,7 +848,7 @@ export default function LeaderboardScreen() {
     if (!users.length) return [];
     
     const currentUser = users.find(u => u.isCurrentUser);
-    const topUsers = users.slice(0, 10);
+    const topUsers = users.slice(0, isDesktop ? 20 : 10);
     
     if (currentUser && !topUsers.find(u => u.isCurrentUser)) {
       return [...topUsers, currentUser];
@@ -332,13 +858,31 @@ export default function LeaderboardScreen() {
   };
 
   if (loading) {
-    return <SkeletonLoader />;
+    return isDesktop ? <DesktopSkeletonLoader /> : <MobileSkeletonLoader />;
   }
 
   const displayUsers = getDisplayUsers();
   const currentUser = users.find(u => u.isCurrentUser);
-  const tabConfig = getTabConfig();
 
+  if (isDesktop) {
+    return (
+      <DesktopLeaderboard
+        activeTab={activeTab}
+        users={users}
+        currentUser={currentUser}
+        handleTabChange={handleTabChange}
+        getRankBadge={getRankBadge}
+        getTabConfig={getTabConfig}
+        getDisplayMetric={getDisplayMetric}
+        displayUsers={displayUsers}
+        router={router}
+        onRefresh={onRefresh}
+        refreshing={refreshing}
+      />
+    );
+  }
+
+  // Mobile Layout (original)
   return (
     <ScrollView 
       style={styles.container}
@@ -420,7 +964,7 @@ export default function LeaderboardScreen() {
           <View style={[
             styles.leaderboardItem, 
             styles.currentUserHighlight,
-            { borderColor: tabConfig.color }
+            { borderColor: getTabConfig().color }
           ]}>
             <View style={styles.rankContainer}>
               <View style={[
@@ -462,7 +1006,7 @@ export default function LeaderboardScreen() {
 
             <View style={styles.pointsContainer}>
               <Text style={styles.pointsNumber}>{getDisplayMetric(currentUser)}</Text>
-              <Text style={styles.pointsLabel}>{tabConfig.metric}</Text>
+              <Text style={styles.pointsLabel}>{getTabConfig().metric}</Text>
             </View>
           </View>
         </View>
@@ -471,8 +1015,8 @@ export default function LeaderboardScreen() {
       {/* Leaderboard Section */}
       <View style={styles.leaderboardSection}>
         <View style={styles.sectionHeader}>
-          {tabConfig.icon}
-          <Text style={styles.sectionTitle}>{tabConfig.title}</Text>
+          {getTabConfig().icon}
+          <Text style={styles.sectionTitle}>{getTabConfig().title}</Text>
         </View>
         
         {displayUsers.length === 0 ? (
@@ -480,7 +1024,7 @@ export default function LeaderboardScreen() {
             <Trophy size={48} color="#666" />
             <Text style={styles.emptyStateText}>No users yet</Text>
             <Text style={styles.emptyStateSubtext}>
-              Be the first to earn {tabConfig.metric} and climb the leaderboard!
+              Be the first to earn {getTabConfig().metric} and climb the leaderboard!
             </Text>
           </View>
         ) : (
@@ -533,7 +1077,7 @@ export default function LeaderboardScreen() {
 
               <View style={styles.pointsContainer}>
                 <Text style={styles.pointsNumber}>{getDisplayMetric(user)}</Text>
-                <Text style={styles.pointsLabel}>{tabConfig.metric}</Text>
+                <Text style={styles.pointsLabel}>{getTabConfig().metric}</Text>
               </View>
             </View>
           ))
@@ -546,14 +1090,454 @@ export default function LeaderboardScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Common Styles
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  containerDesktop: {
+    flex: 1,
+    backgroundColor: '#000000',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  
+  // Skeleton Styles
+  skeletonItem: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 4,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  shimmer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   skeleton: {
     backgroundColor: '#1a1a1a',
     borderRadius: 12,
   },
+  
+  // Desktop Header
+  desktopHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 24,
+    paddingTop: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  desktopBackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 8,
+  },
+  desktopBackButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  desktopHeaderTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  desktopHeaderTitleText: {
+    color: '#ffffff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  desktopHeaderRight: {
+    width: 100,
+  },
+  
+  // Desktop Layout
+  desktopLayout: {
+    flexDirection: 'row',
+    gap: 20,
+    marginTop: 20,
+    flex: 1,
+  },
+  leftColumn: {
+    width: '35%',
+    minWidth: 0,
+  },
+  rightColumn: {
+    width: '65%',
+    minWidth: 0,
+    flex: 1,
+  },
+  
+  // Desktop Current User Section
+  desktopCurrentUserSection: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  desktopSectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 16,
+  },
+  desktopCurrentUserCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+  },
+  currentUserAvatarContainer: {
+    position: 'relative',
+    marginRight: 16,
+  },
+  desktopUserAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  desktopAvatarPlaceholder: {
+    backgroundColor: '#1ea2b1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  desktopAvatarText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  rankBadgeDesktop: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#1ea2b1',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rankBadgeTextDesktop: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  currentUserInfo: {
+    flex: 1,
+  },
+  desktopUserName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  desktopUserTitle: {
+    fontSize: 13,
+    color: '#666666',
+  },
+  currentUserMetric: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  metricValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  metricLabel: {
+    fontSize: 11,
+    color: '#666666',
+  },
+  
+  // Desktop Podium Section
+  desktopPodiumSection: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  desktopPodium: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    height: 200,
+    gap: 16,
+  },
+  podiumItem: {
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#333333',
+    flex: 1,
+  },
+  podiumFirst: {
+    height: 180,
+    borderColor: '#FFD700',
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+  },
+  podiumSecond: {
+    height: 150,
+    borderColor: '#C0C0C0',
+    backgroundColor: 'rgba(192, 192, 192, 0.1)',
+  },
+  podiumThird: {
+    height: 130,
+    borderColor: '#CD7F32',
+    backgroundColor: 'rgba(205, 127, 50, 0.1)',
+  },
+  podiumRankBadge: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  podiumRankText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  podiumAvatar: {
+    marginBottom: 12,
+  },
+  podiumAvatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  podiumAvatarPlaceholder: {
+    backgroundColor: '#1ea2b1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  podiumAvatarText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 18,
+  },
+  podiumName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  podiumScore: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  
+  // Podium Skeleton
+  podiumSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    height: 180,
+    gap: 16,
+  },
+  podiumItemSkeleton: {
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#333333',
+    flex: 1,
+  },
+  podiumFirstSkeleton: {
+    height: 180,
+  },
+  podiumSecondSkeleton: {
+    height: 150,
+  },
+  podiumThirdSkeleton: {
+    height: 130,
+  },
+  
+  // Desktop Tabs
+  desktopTabsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  desktopTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a1a1a',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#333333',
+    flex: 1,
+  },
+  desktopTabText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  
+  // Desktop Leaderboard List
+  desktopLeaderboardList: {
+    flex: 1,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  listHeaderText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  listHeaderRank: {
+    backgroundColor: '#1a1a1a',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  listHeaderRankText: {
+    fontSize: 12,
+    color: '#666666',
+    fontWeight: '600',
+  },
+  desktopLeaderboardGrid: {
+    gap: 12,
+  },
+  desktopLeaderboardItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  desktopCurrentUserItem: {
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    borderColor: '#1ea2b1',
+  },
+  desktopItemRank: {
+    width: 60,
+  },
+  desktopRankBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 4,
+  },
+  desktopRankText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  desktopItemUser: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  desktopItemAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  desktopItemAvatarPlaceholder: {
+    backgroundColor: '#1ea2b1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  desktopItemAvatarText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  desktopItemInfo: {
+    flex: 1,
+  },
+  desktopItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 2,
+  },
+  desktopItemTitle: {
+    fontSize: 12,
+    color: '#666666',
+  },
+  desktopItemMetric: {
+    alignItems: 'flex-end',
+  },
+  desktopItemMetricValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 2,
+  },
+  desktopItemMetricLabel: {
+    fontSize: 11,
+    color: '#666666',
+  },
+  
+  // Desktop Empty State
+  desktopEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 80,
+  },
+  desktopEmptyStateText: {
+    color: '#666',
+    fontSize: 20,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  desktopEmptyStateSubtext: {
+    color: '#666',
+    fontSize: 16,
+    marginTop: 8,
+    textAlign: 'center',
+    maxWidth: 400,
+  },
+  desktopBottomSpace: {
+    height: 40,
+  },
+  
+  // Leaderboard Item Skeleton
+  leaderboardItemSkeletonDesktop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  
+  // Mobile Header Styles
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -740,5 +1724,9 @@ const styles = StyleSheet.create({
   },
   bottomSpace: {
     height: 20,
+  },
+  transactionInfoSkeleton: {
+    flex: 1,
+    marginLeft: 12,
   },
 });
