@@ -26,6 +26,81 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 }) => {
   const { colors } = useTheme();
 
+  // Function to get user's initial
+  const getUserInitial = () => {
+    if (!profile?.first_name) return 'U';
+    
+    const firstName = profile.first_name.trim();
+    if (firstName.length > 0) {
+      return firstName.charAt(0).toUpperCase();
+    }
+    return 'U';
+  };
+
+  // Function to generate a color based on the user's initial
+  const getInitialColor = (initial: string) => {
+    // Create a consistent color based on the character
+    const colorsList = [
+      '#1ea2b1', // Teal
+      '#10b981', // Green
+      '#f59e0b', // Amber
+      '#ef4444', // Red
+      '#8b5cf6', // Violet
+      '#ec4899', // Pink
+      '#06b6d4', // Cyan
+      '#84cc16', // Lime
+    ];
+    
+    // Use charCode to get a consistent index
+    const index = initial.charCodeAt(0) % colorsList.length;
+    return colorsList[index];
+  };
+
+  // Check if we should show the initial avatar
+  const shouldShowInitial = !profile?.avatar_url || profile.avatar_url === '';
+
+  const renderAvatar = () => {
+    if (shouldShowInitial) {
+      const initial = getUserInitial();
+      const backgroundColor = getInitialColor(initial);
+      
+      return (
+        <View style={[
+          styles.avatar, 
+          isDesktop ? styles.avatarDesktop : {},
+          { backgroundColor }
+        ]}>
+          <Text style={[
+            styles.initialText,
+            isDesktop && styles.initialTextDesktop
+          ]}>
+            {initial}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <Image
+        source={{
+          uri: profile.avatar_url ||
+            'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop',
+        }}
+        style={[styles.avatar, isDesktop && styles.avatarDesktop]}
+      />
+    );
+  };
+
+  const renderLoadingAvatar = () => (
+    <Shimmer colors={colors} isDesktop={isDesktop}>
+      <View style={[
+        styles.avatar, 
+        isDesktop && styles.avatarDesktop, 
+        { backgroundColor: colors.border }
+      ]} />
+    </Shimmer>
+  );
+
   if (isDesktop) {
     return (
       <View style={[styles.header, styles.headerDesktop]}>
@@ -47,18 +122,10 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             disabled={uploading}
           >
             {loading ? (
-              <Shimmer colors={colors} isDesktop={isDesktop}>
-                <View style={[styles.avatar, styles.avatarDesktop, { backgroundColor: colors.border }]} />
-              </Shimmer>
+              renderLoadingAvatar()
             ) : (
               <>
-                <Image
-                  source={{
-                    uri: profile?.avatar_url ||
-                      'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop',
-                  }}
-                  style={[styles.avatar, styles.avatarDesktop]}
-                />
+                {renderAvatar()}
                 <View style={[styles.cameraButton, styles.cameraButtonDesktop, { backgroundColor: colors.primary }]}>
                   <Camera size={16} color="white" />
                 </View>
@@ -98,7 +165,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     );
   }
 
-  // Mobile layout (unchanged)
+  // Mobile layout
   return (
     <View style={[styles.header, { backgroundColor: colors.card }]}>
       <LinkedAccountsBadge 
@@ -114,18 +181,10 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         disabled={uploading}
       >
         {loading ? (
-          <Shimmer colors={colors} isDesktop={isDesktop}>
-            <View style={[styles.avatar, { backgroundColor: colors.border }]} />
-          </Shimmer>
+          renderLoadingAvatar()
         ) : (
           <>
-            <Image
-              source={{
-                uri: profile?.avatar_url ||
-                  'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop',
-              }}
-              style={styles.avatar}
-            />
+            {renderAvatar()}
             <View style={[styles.cameraButton, { backgroundColor: colors.primary }]}>
               <Camera size={16} color="white" />
             </View>
@@ -175,6 +234,20 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     marginBottom: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  initialText: {
+    color: 'white',
+    fontSize: 36,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    lineHeight: 36,
+  },
+  initialTextDesktop: {
+    fontSize: 50,
+    lineHeight: 50,
   },
   cameraButton: {
     position: 'absolute',
@@ -185,6 +258,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#000000',
   },
   uploadingOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -219,7 +294,7 @@ const styles = StyleSheet.create({
 
   // Desktop styles
   headerDesktop: {
-    paddingTop: 40, // Extra space from top for menu
+    paddingTop: 40,
     paddingBottom: 32,
     paddingHorizontal: 32,
     borderRadius: 12,
@@ -246,7 +321,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   avatarDesktop: {
-    width: 140, // Larger for desktop
+    width: 140,
     height: 140,
     borderRadius: 70,
   },
@@ -256,6 +331,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     bottom: 5,
     right: 5,
+    borderWidth: 3,
+    borderColor: '#111111',
   },
   uploadingOverlayDesktop: {
     borderRadius: 70,
@@ -263,7 +340,7 @@ const styles = StyleSheet.create({
   desktopTextContent: {
     flex: 1,
     justifyContent: 'center',
-    minHeight: 140, // Match avatar height
+    minHeight: 140,
   },
   nameDesktop: {
     fontSize: 28,
