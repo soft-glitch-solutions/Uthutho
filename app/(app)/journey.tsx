@@ -528,21 +528,24 @@ export default function JourneyScreen() {
     }
   };
 
-  const subscribeToChat = () => {
-    if (!activeJourney) return;
+const subscribeToChat = () => {
+  if (!activeJourney) return;
 
-    try {
-      const subscription = supabase
-        .channel('journey-chat-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'journey_messages',
-            filter: `journey_id=eq.${activeJourney.id}`
-          },
-          async (payload) => {
+  try {
+    const subscription = supabase
+      .channel('journey-chat-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to ALL events, not just INSERT
+          schema: 'public',
+          table: 'journey_messages',
+          filter: `journey_id=eq.${activeJourney.id}`
+        },
+        async (payload) => {
+          console.log('Chat update:', payload.eventType, payload.new);
+          
+          if (payload.eventType === 'INSERT') {
             const { data: profile } = await supabase
               .from('profiles')
               .select('first_name, last_name, avatar_url, selected_title')
@@ -560,16 +563,17 @@ export default function JourneyScreen() {
               setUnreadMessages(prev => prev + 1);
             }
           }
-        )
-        .subscribe();
+        }
+      )
+      .subscribe();
 
-      return () => {
-        subscription.unsubscribe();
-      };
-    } catch (error) {
-      console.error('Error subscribing to chat:', error);
-    }
-  };
+    return () => {
+      subscription.unsubscribe();
+    };
+  } catch (error) {
+    console.error('Error subscribing to chat:', error);
+  }
+};
 
   const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
     if (!activeJourney || !currentUserId) return;
@@ -888,27 +892,30 @@ Shared via Uthutho`;
     }
   };
 
-  const sendChatMessage = async () => {
-    if (!activeJourney?.id || !currentUserId || !newMessage.trim()) return;
+const sendChatMessage = async (messageText: string) => { // Accept message parameter
+  if (!activeJourney?.id || !currentUserId || !messageText.trim()) {
+    throw new Error('Missing required data');
+  }
 
-    try {
-      const { error } = await supabase
-        .from('journey_messages')
-        .insert({
-          journey_id: activeJourney.id,
-          user_id: currentUserId,
-          message: newMessage.trim(),
-          is_anonymous: true
-        });
+  try {
+    const { error } = await supabase
+      .from('journey_messages')
+      .insert({
+        journey_id: activeJourney.id,
+        user_id: currentUserId,
+        message: messageText.trim(),
+        is_anonymous: true
+      });
 
-      if (error) throw error;
+    if (error) throw error;
 
-      setNewMessage('');
-    } catch (error) {
-      console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message');
-    }
-  };
+    // Don't clear newMessage here - it's handled in JourneyChat
+    return; // Success
+  } catch (error) {
+    console.error('Error sending message:', error);
+    throw error; // Re-throw so JourneyChat can handle it
+  }
+};
 
   const formatWaitingTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);

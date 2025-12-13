@@ -1,6 +1,18 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Image, KeyboardAvoidingView, Platform, SafeAreaView } from 'react-native';
-import { Send, Smile, Check, CheckCheck, Circle } from 'lucide-react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  FlatList, 
+  StyleSheet, 
+  Image, 
+  KeyboardAvoidingView, 
+  Platform, 
+  SafeAreaView,
+  ActivityIndicator
+} from 'react-native';
+import { Send, Smile, CheckCheck, Circle, Check } from 'lucide-react-native';
 
 interface ChatMessage {
   id: string;
@@ -20,7 +32,7 @@ interface JourneyChatProps {
   messages: ChatMessage[];
   newMessage: string;
   setNewMessage: (message: string) => void;
-  onSendMessage: () => void;
+  onSendMessage: (message: string) => Promise<void>;
   currentUserId: string;
   onlineCount?: number;
 }
@@ -34,180 +46,252 @@ export const JourneyChat = ({
   onlineCount = 1
 }: JourneyChatProps) => {
   const flatListRef = useRef<FlatList>(null);
+  const [sending, setSending] = useState(false);
+  const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
+  const [messageStatus, setMessageStatus] = useState<Record<string, 'sending' | 'sent'>>({});
 
-  // Auto-scroll to bottom when new messages arrive
+  // Combine server messages with local messages
+  const allMessages = [...messages, ...localMessages].sort((a, b) => 
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    if (messages.length > 0) {
+    if (allMessages.length > 0) {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-  }, [messages]);
+  }, [allMessages]);
 
-  // Optimized message display - add temporary local message for instant feedback
-  const handleSendOptimized = () => {
-    if (newMessage.trim()) {
-      // Create optimistic update
-      const tempMessage = {
-        id: `temp-${Date.now()}`,
-        message: newMessage.trim(),
-        created_at: new Date().toISOString(),
-        is_anonymous: true,
-        user_id: currentUserId,
-        profiles: {} // Temporary empty profile
-      };
+  // Remove local messages when they appear in server messages
+  useEffect(() => {
+    if (messages.length > 0 && localMessages.length > 0) {
+      messages.forEach(serverMsg => {
+        // Find matching local message by content and user
+        const matchingLocalIndex = localMessages.findIndex(localMsg => 
+          localMsg.message === serverMsg.message &&
+          localMsg.user_id === serverMsg.user_id &&
+          Math.abs(new Date(localMsg.created_at).getTime() - new Date(serverMsg.created_at).getTime()) < 5000
+        );
+
+        if (matchingLocalIndex !== -1) {
+          setLocalMessages(prev => prev.filter((_, idx) => idx !== matchingLocalIndex));
+          setMessageStatus(prev => {
+            const updated = { ...prev };
+            delete updated[localMessages[matchingLocalIndex].id];
+            return updated;
+          });
+        }
+      });
+    }
+  }, [messages, localMessages]);
+
+  const handleSend = async () => {
+    if (!newMessage.trim() || sending) return;
+
+    const messageText = newMessage.trim();
+    const tempId = `temp-${Date.now()}`;
+    const tempMessage: ChatMessage = {
+      id: tempId,
+      message: messageText,
+      created_at: new Date().toISOString(),
+      is_anonymous: true,
+      user_id: currentUserId,
+      profiles: {
+        first_name: 'You',
+        last_name: '',
+        selected_title: 'You'
+      }
+    };
+
+    // Add to local messages immediately
+    setLocalMessages(prev => [...prev, tempMessage]);
+    setMessageStatus(prev => ({ ...prev, [tempId]: 'sending' }));
+    setSending(true);
+    setNewMessage('');
+
+    try {
+      // Send to server
+      await onSendMessage(messageText);
       
-      // Call the send function
-      onSendMessage();
+      // Mark as sent
+      setMessageStatus(prev => ({ ...prev, [tempId]: 'sent' }));
+      
+      // Keep local message for a while (it will be removed when server message arrives)
+      // Auto-remove after 10 seconds if not replaced
+      setTimeout(() => {
+        setLocalMessages(prev => prev.filter(msg => msg.id !== tempId));
+        setMessageStatus(prev => {
+          const updated = { ...prev };
+          delete updated[tempId];
+          return updated;
+        });
+      }, 10000);
+      
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      // Remove failed message after delay
+      setTimeout(() => {
+        setLocalMessages(prev => prev.filter(msg => msg.id !== tempId));
+        setMessageStatus(prev => {
+          const updated = { ...prev };
+          delete updated[tempId];
+          return updated;
+        });
+        // Restore to input
+        setNewMessage(messageText);
+      }, 500);
+    } finally {
+      setSending(false);
     }
   };
 
   const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
     const isOwnMessage = item.user_id === currentUserId;
-    const isTempMessage = item.id.startsWith('temp-');
+    const isLocal = item.id.startsWith('temp-');
+    const status = messageStatus[item.id];
     const showSenderInfo = !isOwnMessage && !item.is_anonymous && item.profiles;
-    const previousMessage = index > 0 ? messages[index - 1] : null;
-    const showTimeSeparator = shouldShowTimeSeparator(item, previousMessage);
+    const previousMessage = index > 0 ? allMessages[index - 1] : null;
     const isConsecutive = isConsecutiveMessage(item, previousMessage, currentUserId);
+    const showAvatar = !isOwnMessage && !isConsecutive;
 
     return (
-      <View>
-        {showTimeSeparator && (
-          <View style={styles.timeSeparator}>
-            <Text style={styles.timeSeparatorText}>
-              {formatTimeSeparator(item.created_at)}
-            </Text>
+      <View style={[
+        styles.messageContainer,
+        isOwnMessage ? styles.ownMessageContainer : styles.otherMessageContainer
+      ]}>
+        {showAvatar && (
+          <View style={styles.avatarContainer}>
+            {item.profiles?.avatar_url ? (
+              <Image 
+                source={{ uri: item.profiles.avatar_url }} 
+                style={styles.avatar}
+              />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarText}>
+                  {item.profiles?.first_name?.[0] || 'U'}
+                </Text>
+              </View>
+            )}
           </View>
         )}
         
-        <View style={[
-          styles.messageRow,
-          isOwnMessage ? styles.ownMessageRow : styles.otherMessageRow
-        ]}>
-          {!isOwnMessage && (
-            <View style={styles.avatarContainer}>
-              {showSenderInfo && !isConsecutive ? (
-                item.profiles?.avatar_url ? (
-                  <Image 
-                    source={{ uri: item.profiles.avatar_url }} 
-                    style={styles.avatar}
-                  />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarText}>
-                      {item.profiles?.first_name?.[0]}{item.profiles?.last_name?.[0]}
-                    </Text>
-                  </View>
-                )
-              ) : (
-                <View style={styles.avatarSpacer} />
-              )}
-            </View>
+        {!showAvatar && !isOwnMessage && <View style={styles.avatarSpacer} />}
+        
+        <View style={styles.messageContent}>
+          {showSenderInfo && (
+            <Text style={styles.senderName}>
+              {item.profiles?.selected_title || `${item.profiles?.first_name} ${item.profiles?.last_name}`}
+            </Text>
           )}
           
-          <View style={styles.messageContent}>
-            {showSenderInfo && !isConsecutive && (
-              <Text style={styles.senderName}>
-                {item.profiles?.selected_title || `${item.profiles?.first_name} ${item.profiles?.last_name}`}
-              </Text>
-            )}
-            
-            <View style={[
-              styles.messageBubble,
-              isOwnMessage ? styles.ownMessageBubble : styles.otherMessageBubble,
-              isConsecutive && styles.consecutiveMessage,
-              isTempMessage && styles.tempMessage
+          <View style={[
+            styles.messageBubble,
+            isOwnMessage ? styles.ownBubble : styles.otherBubble,
+            isLocal && styles.localBubble
+          ]}>
+            <Text style={[
+              styles.messageText,
+              isOwnMessage ? styles.ownText : styles.otherText
             ]}>
-              <Text style={[
-                styles.messageText,
-                isOwnMessage ? styles.ownMessageText : styles.otherMessageText
-              ]}>
-                {item.message}
-              </Text>
-            </View>
-            
-            <View style={[
-              styles.messageMeta,
-              isOwnMessage ? styles.ownMessageMeta : styles.otherMessageMeta
-            ]}>
-              <Text style={styles.messageTime}>
-                {new Date(item.created_at).toLocaleTimeString([], { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                })}
-              </Text>
-              {isOwnMessage && (
-                <View style={styles.readReceipt}>
-                  {isTempMessage ? (
-                    <Check size={12} color="#666666" />
-                  ) : (
-                    <CheckCheck size={12} color="#1ea2b1" />
-                  )}
-                </View>
-              )}
-            </View>
+              {item.message}
+            </Text>
           </View>
           
-          {isOwnMessage && <View style={styles.avatarSpacer} />}
+          <View style={[
+            styles.messageMeta,
+            isOwnMessage && styles.ownMeta
+          ]}>
+            <Text style={styles.messageTime}>
+              {new Date(item.created_at).toLocaleTimeString([], { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}
+            </Text>
+            
+            {isOwnMessage && (
+              <View style={styles.statusContainer}>
+                {isLocal ? (
+                  <>
+                    {status === 'sending' && (
+                      <>
+                        <ActivityIndicator size={10} color="#666" />
+                        <Text style={styles.statusText}>Sending</Text>
+                      </>
+                    )}
+                    {status === 'sent' && (
+                      <>
+                        <Check size={12} color="#1ea2b1" />
+                        <Text style={styles.statusText}>Sent</Text>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <CheckCheck size={12} color="#1ea2b1" />
+                    <Text style={styles.statusText}>Delivered</Text>
+                  </>
+                )}
+              </View>
+            )}
+          </View>
         </View>
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
+    <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView 
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
-        <View style={styles.chatContainer}>
-          <View style={styles.onlineBar}>
-            <View style={styles.onlineIndicatorContainer}>
-              <View style={styles.onlineIndicator}>
-                <Circle size={8} color="#22c55e" fill="#22c55e" />
-              </View>
-              <Text style={styles.onlineText}>{onlineCount} online</Text>
-            </View>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.onlineIndicator}>
+            <Circle size={8} color="#22c55e" fill="#22c55e" />
+            <Text style={styles.onlineText}>{onlineCount} online</Text>
           </View>
-          {messages.length === 0 ? (
-            <View style={styles.emptyChat}>
-              <Text style={styles.emptyChatTitle}>No messages yet</Text>
-              <Text style={styles.emptyChatSubtitle}>
-                Start the conversation with your fellow passengers
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              renderItem={renderMessage}
-              keyExtractor={(item) => item.id}
-              style={styles.messagesList}
-              contentContainerStyle={styles.messagesContainer}
-              showsVerticalScrollIndicator={false}
-              keyboardDismissMode="interactive"
-              keyboardShouldPersistTaps="handled"
-              inverted
-            />
-          )}
         </View>
 
+        {/* Messages */}
+        {allMessages.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>No messages yet</Text>
+            <Text style={styles.emptySubtitle}>
+              Be the first to start the conversation
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={allMessages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.id}
+            style={styles.messagesList}
+            contentContainerStyle={styles.messagesContainer}
+            showsVerticalScrollIndicator={false}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
+            inverted={false}
+            onContentSizeChange={() => {
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }, 50);
+            }}
+          />
+        )}
+
+        {/* Input */}
         <View style={styles.inputContainer}>
           <View style={styles.inputWrapper}>
-            <TouchableOpacity 
-              style={styles.emojiButton}
-              onPress={() => {
-                setNewMessage(prev => prev + '😊');
-              }}
-            >
-              <Smile size={24} color="#666666" />
-            </TouchableOpacity>
-
             <TextInput
-              style={styles.chatInput}
-              placeholder="Message"
-              placeholderTextColor="#999999"
+              style={styles.input}
+              placeholder="Type a message..."
+              placeholderTextColor="#666"
               value={newMessage}
               onChangeText={setNewMessage}
               multiline
@@ -215,15 +299,19 @@ export const JourneyChat = ({
               textAlignVertical="center"
               enablesReturnKeyAutomatically
               returnKeyType="send"
-              onSubmitEditing={handleSendOptimized}
+              onSubmitEditing={handleSend}
             />
-
+            
             <TouchableOpacity 
-              style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
-              onPress={handleSendOptimized}
-              disabled={!newMessage.trim()}
+              style={[styles.sendButton, (!newMessage.trim() || sending) && styles.sendDisabled]}
+              onPress={handleSend}
+              disabled={!newMessage.trim() || sending}
             >
-              <Send size={20} color={newMessage.trim() ? "#1ea2b1" : "#666666"} />
+              {sending ? (
+                <ActivityIndicator size="small" color="#666" />
+              ) : (
+                <Send size={20} color={newMessage.trim() ? "#1ea2b1" : "#666"} />
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -232,84 +320,46 @@ export const JourneyChat = ({
   );
 };
 
-// Helper functions
-const shouldShowTimeSeparator = (current: ChatMessage, previous: ChatMessage | null): boolean => {
-  if (!previous) return true;
-  
-  const currentTime = new Date(current.created_at);
-  const previousTime = new Date(previous.created_at);
-  const timeDiff = currentTime.getTime() - previousTime.getTime();
-  const minutesDiff = timeDiff / (1000 * 60);
-  
-  return minutesDiff > 5;
-};
-
+// Helper function
 const isConsecutiveMessage = (
   current: ChatMessage, 
   previous: ChatMessage | null, 
   currentUserId: string
 ): boolean => {
   if (!previous) return false;
+  if (current.user_id !== previous.user_id) return false;
   
   const currentTime = new Date(current.created_at);
   const previousTime = new Date(previous.created_at);
   const timeDiff = currentTime.getTime() - previousTime.getTime();
-  const minutesDiff = timeDiff / (1000 * 60);
   
-  return previous.user_id === current.user_id && minutesDiff < 2;
-};
-
-const formatTimeSeparator = (timestamp: string): string => {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  
-  if (messageDate.getTime() === today.getTime()) {
-    return 'Today';
-  } else if (messageDate.getTime() === today.getTime() - 86400000) {
-    return 'Yesterday';
-  } else {
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  }
+  return timeDiff < 120000; // 2 minutes
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#0a0a0a',
+  },
   container: {
     flex: 1,
     backgroundColor: '#0a0a0a',
   },
-  chatContainer: {
-    flex: 1,
-  },
-  onlineBar: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
+  header: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#1a1a1a',
     borderBottomWidth: 1,
-    borderBottomColor: '#333333',
-  },
-  onlineIndicatorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderBottomColor: '#333',
   },
   onlineIndicator: {
-    marginRight: 6,
-    shadowColor: '#22c55e',
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   onlineText: {
-    color: '#cccccc',
-    fontSize: 12,
+    color: '#22c55e',
+    fontSize: 13,
     fontWeight: '600',
   },
   messagesList: {
@@ -317,178 +367,149 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    paddingBottom: 80,     // space for input
-    flexGrow: 1,
-    justifyContent: 'flex-end',
+    paddingVertical: 16,
+    paddingBottom: 20,
   },
-  timeSeparator: {
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  timeSeparatorText: {
-    color: '#666666',
-    fontSize: 12,
-    backgroundColor: '#1a1a1a',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  messageRow: {
+  messageContainer: {
     flexDirection: 'row',
-    marginVertical: 2,
+    marginVertical: 4,
     alignItems: 'flex-end',
   },
-  ownMessageRow: {
+  ownMessageContainer: {
     justifyContent: 'flex-end',
   },
-  otherMessageRow: {
+  otherMessageContainer: {
     justifyContent: 'flex-start',
   },
   avatarContainer: {
     width: 32,
-    marginRight: 4,
+    height: 32,
+    marginRight: 8,
   },
   avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   avatarPlaceholder: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#1ea2b1',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   avatarSpacer: {
-    width: 32,
+    width: 40,
   },
   messageContent: {
-    maxWidth: '70%',
+    maxWidth: '75%',
   },
   senderName: {
     color: '#1ea2b1',
     fontSize: 12,
     fontWeight: '500',
-    marginLeft: 8,
     marginBottom: 2,
+    marginLeft: 8,
   },
   messageBubble: {
     borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 4,
   },
-  ownMessageBubble: {
+  ownBubble: {
     backgroundColor: '#1ea2b1',
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 6,
   },
-  otherMessageBubble: {
-    backgroundColor: '#1a1a1a',
-    borderBottomLeftRadius: 4,
+  otherBubble: {
+    backgroundColor: '#2a2a2a',
+    borderBottomLeftRadius: 6,
   },
-  consecutiveMessage: {
-    marginTop: 1,
-  },
-  tempMessage: {
-    opacity: 0.7,
+  localBubble: {
+    opacity: 0.9,
   },
   messageText: {
-    fontSize: 16,
+    fontSize: 15,
     lineHeight: 20,
   },
-  ownMessageText: {
-    color: '#ffffff',
+  ownText: {
+    color: '#fff',
   },
-  otherMessageText: {
-    color: '#ffffff',
+  otherText: {
+    color: '#fff',
   },
   messageMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 8,
+    marginLeft: 8,
   },
-  ownMessageMeta: {
+  ownMeta: {
     justifyContent: 'flex-end',
-  },
-  otherMessageMeta: {
-    justifyContent: 'flex-start',
+    marginRight: 8,
   },
   messageTime: {
     fontSize: 11,
-    color: '#666666',
-    marginRight: 4,
+    color: '#666',
   },
-  readReceipt: {
-    marginLeft: 2,
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 6,
+  },
+  statusText: {
+    fontSize: 11,
+    color: '#666',
   },
   inputContainer: {
     backgroundColor: '#1a1a1a',
-    padding: 8,
+    padding: 12,
     borderTopWidth: 1,
-    borderTopColor: '#333333',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    borderTopColor: '#333',
   },
   inputWrapper: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: '#0a0a0a',
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  emojiButton: {
-    padding: 8,
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#0a0a0a',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#333',
   },
-  chatInput: {
+  input: {
     flex: 1,
-    color: '#ffffff',
-    fontSize: 16,
+    color: '#fff',
+    fontSize: 15,
     maxHeight: 100,
     minHeight: 40,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingVertical: 10,
   },
   sendButton: {
     padding: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20,
   },
-  sendButtonDisabled: {
+  sendDisabled: {
     opacity: 0.5,
   },
-  emptyChat: {
+  emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
-    marginBottom: 80,
+    paddingBottom: 100,
   },
-  emptyChatTitle: {
-    color: '#666666',
-    fontSize: 18,
+  emptyTitle: {
+    color: '#666',
+    fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
     marginBottom: 8,
   },
-  emptyChatSubtitle: {
-    color: '#444444',
+  emptySubtitle: {
+    color: '#444',
     fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
   },
 });
