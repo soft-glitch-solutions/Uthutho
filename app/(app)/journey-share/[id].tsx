@@ -153,31 +153,67 @@ const InteractiveMap = ({
             <style>
                 body { margin: 0; padding: 0; }
                 #map { height: 100vh; width: 100%; }
-                .custom-marker {
+                
+                /* User Marker with Profile Picture */
+                .user-profile-marker {
                     border-radius: 50%;
-                    border: 3px solid white;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                    border: 3px solid #1ea2b1;
+                    box-shadow: 0 4px 12px rgba(30, 162, 177, 0.4), 0 2px 8px rgba(0,0,0,0.3);
+                    width: 50px;
+                    height: 50px;
+                    overflow: hidden;
+                    position: relative;
+                    animation: pulse 2s infinite;
+                    background-color: #1ea2b1;
                     display: flex;
                     align-items: center;
                     justify-content: center;
+                }
+                
+                .user-profile-image {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                }
+                
+                .user-profile-fallback {
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
                     font-weight: bold;
-                    overflow: hidden;
+                    font-size: 18px;
                 }
-                .user-marker { 
-                    background-color: #1ea2b1; 
-                    position: relative;
-                }
+                
                 .pulsing-marker::before {
                     content: '';
                     position: absolute;
                     width: 100%;
                     height: 100%;
                     border-radius: 50%;
-                    background-color: #1ea2b1;
-                    animation: pulse 2s infinite;
+                    background-color: rgba(30, 162, 177, 0.2);
+                    animation: pulse-ring 2s infinite;
                     z-index: -1;
                 }
+                
                 @keyframes pulse {
+                    0% {
+                        transform: scale(1);
+                        box-shadow: 0 4px 12px rgba(30, 162, 177, 0.4), 0 2px 8px rgba(0,0,0,0.3);
+                    }
+                    50% {
+                        transform: scale(1.05);
+                        box-shadow: 0 6px 16px rgba(30, 162, 177, 0.6), 0 3px 10px rgba(0,0,0,0.4);
+                    }
+                    100% {
+                        transform: scale(1);
+                        box-shadow: 0 4px 12px rgba(30, 162, 177, 0.4), 0 2px 8px rgba(0,0,0,0.3);
+                    }
+                }
+                
+                @keyframes pulse-ring {
                     0% {
                         transform: scale(1);
                         opacity: 1;
@@ -187,8 +223,30 @@ const InteractiveMap = ({
                         opacity: 0;
                     }
                 }
-                .next-stop-marker { background-color: #fbbf24; }
-                .current-stop-marker { background-color: #10b981; }
+                
+                /* Stop Markers */
+                .stop-marker {
+                    border-radius: 50%;
+                    border: 3px solid white;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 40px;
+                    height: 40px;
+                    font-weight: bold;
+                    font-size: 16px;
+                }
+                
+                .next-stop-marker { 
+                    background-color: #fbbf24; 
+                    color: white;
+                }
+                
+                .current-stop-marker { 
+                    background-color: #10b981; 
+                    color: white;
+                }
             </style>
         </head>
         <body>
@@ -203,29 +261,70 @@ const InteractiveMap = ({
                 }).addTo(map);
                 
                 // Create custom icons
-                function createUserIcon(avatarUrl, firstName, lastName) {
+                function createUserIcon(avatarUrl, firstName, lastName, status) {
                     const initials = (firstName?.[0] || '') + (lastName?.[0] || '');
+                    
+                    // Status-based border colors
+                    const statusColors = {
+                        'waiting': '#fbbf24',
+                        'picked_up': '#10b981',
+                        'arrived': '#6b7280'
+                    };
+                    const borderColor = statusColors[status] || '#1ea2b1';
+                    
                     if (avatarUrl) {
                         return L.divIcon({
-                            html: '<div class="custom-marker user-marker pulsing-marker" style="width: 48px; height: 48px; border-radius: 24px; background-image: url(\\'' + avatarUrl + '\\'); background-size: cover; background-position: center; border: 3px solid #1ea2b1; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
+                            html: \`
+                                <div class="user-profile-marker" style="border-color: \${borderColor};">
+                                    <img src="\${avatarUrl}" 
+                                         alt="\${firstName} \${lastName}"
+                                         class="user-profile-image"
+                                         onerror="this.onerror=null; 
+                                                  this.style.display='none'; 
+                                                  this.parentNode.innerHTML='<div class=\"user-profile-fallback\" style=\"background-color: \${borderColor};\">\${initials.toUpperCase()}</div>';" />
+                                </div>
+                            \`,
                             className: '',
-                            iconSize: [48, 48],
-                            iconAnchor: [24, 48]
+                            iconSize: [50, 50],
+                            iconAnchor: [25, 50]
                         });
                     } else {
                         return L.divIcon({
-                            html: '<div class="custom-marker user-marker pulsing-marker" style="width: 48px; height: 48px; border-radius: 24px; background-color: #1ea2b1; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">' + initials.toUpperCase() + '</div>',
+                            html: \`
+                                <div class="user-profile-marker" style="border-color: \${borderColor}; background-color: \${borderColor};">
+                                    <div class="user-profile-fallback">\${initials.toUpperCase()}</div>
+                                </div>
+                            \`,
                             className: '',
-                            iconSize: [48, 48],
-                            iconAnchor: [24, 48]
+                            iconSize: [50, 50],
+                            iconAnchor: [25, 50]
                         });
                     }
                 }
                 
-                function createStopIcon(color, emoji) {
+                function createStopIcon(color, emoji, type) {
+                    const label = type === 'next_stop' ? 'Next' : 'Current';
                     return L.divIcon({
-                        html: '<div style="width: 40px; height: 40px; border-radius: 20px; background-color: ' + color + '; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">' + emoji + '</div>',
-                        className: 'custom-marker',
+                        html: \`
+                            <div class="stop-marker \${type}-marker" style="background-color: \${color};">
+                                <span>\${emoji}</span>
+                                <div style="
+                                    position: absolute;
+                                    bottom: -8px;
+                                    left: 50%;
+                                    transform: translateX(-50%);
+                                    background: \${color};
+                                    color: white;
+                                    font-size: 9px;
+                                    padding: 1px 6px;
+                                    border-radius: 10px;
+                                    font-weight: 600;
+                                    white-space: nowrap;
+                                    border: 2px solid white;
+                                ">\${label}</div>
+                            </div>
+                        \`,
+                        className: '',
                         iconSize: [40, 40],
                         iconAnchor: [20, 40]
                     });
@@ -243,66 +342,94 @@ const InteractiveMap = ({
                             icon: createUserIcon(
                                 location.data.profiles.avatar_url,
                                 location.data.profiles.first_name,
-                                location.data.profiles.last_name
+                                location.data.profiles.last_name,
+                                location.data.status
                             )
                         });
                         
-marker.bindPopup(
-    '<div style="padding: 12px; min-width: 200px;">' +
-        '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
-            (location.data.profiles.avatar_url ? 
-                '<img src="' + location.data.profiles.avatar_url + '" style="width: 32px; height: 32px; border-radius: 16px;" />' : 
-                '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #1ea2b1; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">' + 
-                (location.data.profiles.first_name?.[0] || '') + (location.data.profiles.last_name?.[0] || '') + '</div>'
-            ) +
-            '<div>' +
-                '<strong>' + location.data.profiles.first_name + ' ' + location.data.profiles.last_name + '</strong><br>' +
-                '<small>' + location.data.status + '</small>' +
-            '</div>' +
-        '</div>' +
-        '<div style="font-size: 12px; color: #666;">' +
-            '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
-        '</div>' +
-    '</div>'
-);
+                        // Enhanced popup with better styling
+                        const statusText = location.data.status === 'waiting' ? 'Waiting for pickup' :
+                                          location.data.status === 'picked_up' ? 'On the way' :
+                                          location.data.status === 'arrived' ? 'Arrived at destination' : location.data.status;
+                        
+                        const statusColors = {
+                            'waiting': '#fbbf24',
+                            'picked_up': '#10b981',
+                            'arrived': '#6b7280'
+                        };
+                        const statusColor = statusColors[location.data.status] || '#666';
+                        
+                        const initials = (location.data.profiles.first_name?.[0] || '') + 
+                                       (location.data.profiles.last_name?.[0] || '');
+                        
+                        marker.bindPopup(
+                            '<div style="padding: 12px; min-width: 200px;">' +
+                                '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
+                                    (location.data.profiles.avatar_url ? 
+                                        '<img src="' + location.data.profiles.avatar_url + '" style="width: 32px; height: 32px; border-radius: 16px; object-fit: cover;" />' : 
+                                        '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #1ea2b1; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">' + 
+                                        initials.toUpperCase() + '</div>'
+                                    ) +
+                                    '<div style="flex: 1;">' +
+                                        '<div style="font-weight: 600; font-size: 14px; color: #1f2937;">' + 
+                                        location.data.profiles.first_name + ' ' + location.data.profiles.last_name + '</div>' +
+                                        '<div style="display: flex; align-items: center; gap: 4px; margin-top: 2px;">' +
+                                            '<div style="width: 8px; height: 8px; border-radius: 4px; background-color: ' + statusColor + ';"></div>' +
+                                            '<span style="font-size: 12px; color: #6b7280;">' + statusText + '</span>' +
+                                        '</div>' +
+                                    '</div>' +
+                                '</div>' +
+                                (location.data.last_location_update ? 
+                                    '<div style="font-size: 11px; color: #9ca3af; margin-top: 8px;">' +
+                                        '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) + '<br>' +
+                                        'Updated ' + new Date(location.data.last_location_update).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) +
+                                    '</div>' : 
+                                    '<div style="font-size: 11px; color: #9ca3af; margin-top: 8px;">' +
+                                        '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
+                                    '</div>'
+                                ) +
+                            '</div>'
+                        );
+                        
                     } else if (location.type === 'next_stop') {
                         marker = L.marker([location.lat, location.lng], {
-                            icon: createStopIcon('#fbbf24', '➡️')
+                            icon: createStopIcon('#fbbf24', '➡️', 'next_stop')
                         });
                         
-marker.bindPopup(
-    '<div style="padding: 12px; min-width: 200px;">' +
-        '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
-            '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #fbbf24; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">➡️</div>' +
-            '<div>' +
-                '<strong>Next Stop</strong><br>' +
-                '<small>' + location.data.name + '</small>' +
-            '</div>' +
-        '</div>' +
-        '<div style="font-size: 12px; color: #666;">' +
-            '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
-        '</div>' +
-    '</div>'
-);
+                        marker.bindPopup(
+                            '<div style="padding: 12px; min-width: 200px;">' +
+                                '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
+                                    '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #fbbf24; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">➡️</div>' +
+                                    '<div style="flex: 1;">' +
+                                        '<div style="font-weight: 600; font-size: 14px; color: #1f2937;">Next Stop</div>' +
+                                        '<div style="font-size: 13px; color: #6b7280;">' + location.data.name + '</div>' +
+                                    '</div>' +
+                                '</div>' +
+                                '<div style="font-size: 11px; color: #9ca3af; margin-top: 8px;">' +
+                                    '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
+                                '</div>' +
+                            '</div>'
+                        );
+                        
                     } else if (location.type === 'current_stop') {
                         marker = L.marker([location.lat, location.lng], {
-                            icon: createStopIcon('#10b981', '📍')
+                            icon: createStopIcon('#10b981', '📍', 'current_stop')
                         });
                         
-marker.bindPopup(
-    '<div style="padding: 12px; min-width: 200px;">' +
-        '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
-            '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">📍</div>' +
-            '<div>' +
-                '<strong>Current Stop</strong><br>' +
-                '<small>' + location.data.name + '</small>' +
-            '</div>' +
-        '</div>' +
-        '<div style="font-size: 12px; color: #666;">' +
-            '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
-        '</div>' +
-    '</div>'
-);
+                        marker.bindPopup(
+                            '<div style="padding: 12px; min-width: 200px;">' +
+                                '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">' +
+                                    '<div style="width: 32px; height: 32px; border-radius: 16px; background-color: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">📍</div>' +
+                                    '<div style="flex: 1;">' +
+                                        '<div style="font-weight: 600; font-size: 14px; color: #1f2937;">Current Stop</div>' +
+                                        '<div style="font-size: 13px; color: #6b7280;">' + location.data.name + '</div>' +
+                                    '</div>' +
+                                '</div>' +
+                                '<div style="font-size: 11px; color: #9ca3af; margin-top: 8px;">' +
+                                    '📍 ' + location.lat.toFixed(6) + ', ' + location.lng.toFixed(6) +
+                                '</div>' +
+                            '</div>'
+                        );
                     }
                     
                     if (marker) {
@@ -314,6 +441,18 @@ marker.bindPopup(
                 // Fit map to bounds
                 if (bounds.isValid()) {
                     map.fitBounds(bounds, { padding: [20, 20] });
+                }
+                
+                // Auto-open popups for user markers if there are only a few
+                if (locations.filter(l => l.type === 'user').length <= 3) {
+                    setTimeout(() => {
+                        locations.forEach(location => {
+                            if (location.type === 'user') {
+                                const marker = L.marker([location.lat, location.lng]).getPopup();
+                                if (marker) marker.openPopup();
+                            }
+                        });
+                    }, 1000);
                 }
             </script>
         </body>
