@@ -57,7 +57,6 @@ export default function EmptyState({ isSearching, type, searchQuery }: EmptyStat
 
   return (
     <View style={styles.emptyState}>
-      <FlyboxAnimation style={styles.lottieAnimation} />
       
       <Text style={styles.emptyStateTitle}>
         Oh no! We couldn't find what you were looking for
@@ -70,7 +69,7 @@ export default function EmptyState({ isSearching, type, searchQuery }: EmptyStat
         >
           <MessageCircle size={20} color="#ffffff" />
           <Text style={styles.whatsappButtonText}>
-            Send us a message to add your {typeDisplayName}
+            Message us to add your {typeDisplayName}
           </Text>
         </TouchableOpacity>
       </View>
