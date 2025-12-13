@@ -39,10 +39,10 @@ interface WaitingDrawerProps {
 // Transport type filter options
 const TRANSPORT_TYPES = [
   { id: 'all', label: 'All', icon: null },
-  { id: 'minibus', label: 'Minibus', icon: require('/workspaces/Uthutho/assets/icons/minibus-icon.png') },
-  { id: 'bus', label: 'Bus', icon: require('/workspaces/Uthutho/assets/icons/bus-icon.png') },
-  { id: 'train', label: 'Train', icon: require('/workspaces/Uthutho/assets/icons/train-icon.png') },
-  { id: 'taxi', label: 'Taxi', icon: require('/workspaces/Uthutho/assets/icons/taxi-icon.png') },
+  { id: 'minibus', label: 'Minibus', icon: require('../assets/icons/minibus-icon.png') },
+  { id: 'bus', label: 'Bus', icon: require('../assets/icons/bus-icon.png') },
+  { id: 'train', label: 'Train', icon: require('../assets/icons/train-icon.png') },
+  { id: 'taxi', label: 'Taxi', icon: require('../assets/icons/taxi-icon.png') },
 ];
 
 export default function WaitingDrawer({ 
@@ -729,13 +729,13 @@ export default function WaitingDrawer({
     const type = transportType.toLowerCase();
     switch (type) {
       case 'minibus':
-        return require('/workspaces/Uthutho/assets/icons/minibus-icon.png');
+        return require('../assets/icons/minibus-icon.png');
       case 'bus':
-        return require('/workspaces/Uthutho/assets/icons/bus-icon.png');
+        return require('../assets/icons/bus-icon.png');
       case 'train':
-        return require('/workspaces/Uthutho/assets/icons/train-icon.png');
+        return require('../assets/icons/train-icon.png');
       case 'taxi':
-        return require('/workspaces/Uthutho/assets/icons/taxi-icon.png');
+        return require('../assets/icons/taxi-icon.png');
       default:
         return null;
     }
@@ -828,7 +828,7 @@ export default function WaitingDrawer({
       ) : filteredRoutes.length === 0 ? (
         <View style={styles.noResultsContainer}>
           <Image 
-            source={require('/workspaces/Uthutho/assets/icons/minibus-icon.png')}
+            source={require('../assets/icons/minibus-icon.png')}
             style={styles.noResultsIcon}
           />
           <Text style={styles.noResultsTitle}>
