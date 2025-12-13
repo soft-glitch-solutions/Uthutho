@@ -1,6 +1,6 @@
 import { Linking } from 'react-native';
 
-const WHATSAPP_NUMBER = '+1234567890'; // Replace with your actual WhatsApp number
+const WHATSAPP_NUMBER = '+27698826640'; // Replace with your actual WhatsApp number
 
 export const contactUsOnWhatsApp = (searchQuery: string = '', type: string = '') => {
   let message = 'Hi! I need help with the transport app.';
