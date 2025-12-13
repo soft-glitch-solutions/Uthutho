@@ -16,6 +16,7 @@ import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Share2, Users, Clock, MapPin, Car, User, ChevronRight } from 'lucide-react-native';
+import * as Location from 'expo-location';
 
 import { useJourney } from '@/hook/useJourney';
 import { supabase } from '@/lib/supabase';
@@ -140,6 +141,8 @@ export default function JourneyScreen() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [selectedStop, setSelectedStop] = useState<JourneyStop | null>(null);
   const [showStopDetails, setShowStopDetails] = useState(false);
+  const [locationPermission, setLocationPermission] = useState<boolean>(false);
+  const [isUpdatingLocation, setIsUpdatingLocation] = useState<boolean>(false);
   
   // Simple animation
   const fadeAnim = useState(new Animated.Value(0))[0];
@@ -155,6 +158,7 @@ export default function JourneyScreen() {
   useEffect(() => {
     getCurrentUser();
     checkIfDriver();
+    checkLocationPermission();
     
     if (activeJourney) {
       loadJourneyData();
@@ -196,6 +200,88 @@ export default function JourneyScreen() {
       subscription.unsubscribe();
     };
   }, [activeJourney?.id, currentUserId]);
+
+  // Periodic location updates for picked_up users
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+
+    const updateLocationPeriodically = async () => {
+      if (participantStatus === 'picked_up' && activeJourney && currentUserId && locationPermission) {
+        console.log('Starting periodic location updates for user:', currentUserId);
+        
+        // Function to update location
+        const updateLocation = async () => {
+          try {
+            setIsUpdatingLocation(true);
+            const location = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.BestForNavigation,
+            });
+            
+            console.log('Updating location:', {
+              lat: location.coords.latitude,
+              lng: location.coords.longitude
+            });
+            
+            const { error } = await supabase
+              .from('journey_participants')
+              .update({
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+                last_location_update: new Date().toISOString()
+              })
+              .eq('journey_id', activeJourney.id)
+              .eq('user_id', currentUserId)
+              .eq('is_active', true);
+
+            if (error) {
+              console.error('Error updating location in database:', error);
+            } else {
+              console.log('Location updated successfully');
+            }
+          } catch (error) {
+            console.log('Error getting location:', error);
+          } finally {
+            setIsUpdatingLocation(false);
+          }
+        };
+
+        // Update immediately
+        await updateLocation();
+        
+        // Then update every 30 seconds
+        intervalId = setInterval(updateLocation, 30000);
+      }
+    };
+
+    updateLocationPeriodically();
+
+    return () => {
+      if (intervalId) {
+        console.log('Clearing periodic location updates');
+        clearInterval(intervalId);
+      }
+    };
+  }, [participantStatus, activeJourney?.id, currentUserId, locationPermission]);
+
+  const checkLocationPermission = async () => {
+    try {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      setLocationPermission(status === 'granted');
+    } catch (error) {
+      console.error('Error checking location permission:', error);
+    }
+  };
+
+  const requestLocationPermission = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      setLocationPermission(status === 'granted');
+      return status === 'granted';
+    } catch (error) {
+      console.error('Error requesting location permission:', error);
+      return false;
+    }
+  };
 
   const checkIfDriver = async () => {
     try {
@@ -441,12 +527,59 @@ export default function JourneyScreen() {
     if (!activeJourney || !currentUserId) return;
 
     try {
-      // Only update the status column since stop_waiting_id doesn't exist
+      // Get current user location when marking as picked up
+      let updates: any = { status: newStatus };
+      
+      if (newStatus === 'picked_up') {
+        // Check and request location permission
+        const hasPermission = locationPermission || await requestLocationPermission();
+        
+        if (!hasPermission) {
+          Alert.alert(
+            'Location Permission Required',
+            'To share your live location with others, please enable location services in your device settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => {
+                // For iOS/Android, you might need platform-specific code here
+                console.log('Open location settings');
+              }}
+            ]
+          );
+          return;
+        }
+        
+        // Get current location to update coordinates
+        try {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.BestForNavigation,
+          });
+          
+          updates.latitude = location.coords.latitude;
+          updates.longitude = location.coords.longitude;
+          updates.last_location_update = new Date().toISOString();
+          
+          console.log('Location captured for picked_up:', {
+            lat: location.coords.latitude,
+            lng: location.coords.longitude
+          });
+        } catch (locationError) {
+          console.log('Could not get location:', locationError);
+          Alert.alert(
+            'Location Error',
+            'Unable to get your current location. Your status was updated but location sharing may not work.',
+            [{ text: 'OK' }]
+          );
+        }
+      } else if (newStatus === 'arrived') {
+        // Clear location when arriving at destination
+        updates.latitude = null;
+        updates.longitude = null;
+      }
+
       const { error } = await supabase
         .from('journey_participants')
-        .update({ 
-          status: newStatus
-        })
+        .update(updates)
         .eq('journey_id', activeJourney.id)
         .eq('user_id', currentUserId)
         .eq('is_active', true);
@@ -513,7 +646,7 @@ export default function JourneyScreen() {
           loadJourneyStops()
         ]);
         
-        Alert.alert('Success', 'You have been marked as picked up!');
+        Alert.alert('Success', 'You have been marked as picked up! Your location will now be shared live with others.');
         
       } else if (newStatus === 'arrived') {
         await awardPoints(5);
@@ -827,6 +960,11 @@ Shared via Uthutho`;
                    participantStatus === 'picked_up' ? 'On board - Picked up' : 
                    'Arrived'}
                 </Text>
+                {isUpdatingLocation && participantStatus === 'picked_up' && (
+                  <View style={styles.locationUpdating}>
+                    <Text style={styles.locationUpdatingText}>🔄 Live</Text>
+                  </View>
+                )}
               </View>
               <Text style={styles.yourStopTime}>
                 {participantStatus === 'waiting' ? `Waiting: ${formatWaitingTime(waitingTime)}` : 
@@ -907,6 +1045,25 @@ Shared via Uthutho`;
               <Share2 size={20} color="#1ea2b1" />
             </TouchableOpacity>
           </View>
+
+          {/* Location Status */}
+          {participantStatus === 'picked_up' && (
+            <View style={styles.locationStatus}>
+              <Text style={styles.locationStatusText}>
+                {locationPermission 
+                  ? '📍 Your location is being shared live'
+                  : '📍 Location permission required for live sharing'}
+              </Text>
+              {!locationPermission && (
+                <TouchableOpacity 
+                  style={styles.enableLocationButton}
+                  onPress={requestLocationPermission}
+                >
+                  <Text style={styles.enableLocationText}>Enable Location</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           {connectionError && (
             <View style={styles.errorContainer}>
@@ -1106,6 +1263,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#cccccc',
     fontWeight: '500',
+    marginRight: 8,
+  },
+  locationUpdating: {
+    backgroundColor: '#1ea2b130',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  locationUpdatingText: {
+    fontSize: 10,
+    color: '#1ea2b1',
+    fontWeight: '600',
   },
   yourStopTime: {
     color: '#666666',
@@ -1171,6 +1340,31 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  locationStatus: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  locationStatusText: {
+    color: '#1ea2b1',
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  enableLocationButton: {
+    backgroundColor: '#1ea2b1',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  enableLocationText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   errorContainer: {
     marginBottom: 12,
