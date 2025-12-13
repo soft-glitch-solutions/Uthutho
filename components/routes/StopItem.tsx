@@ -1,5 +1,12 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Dimensions, 
+  Image 
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Flag } from 'lucide-react-native';
 import { Stop } from './RoutesScreen';
@@ -13,7 +20,11 @@ interface StopItemProps {
   isDesktop?: boolean;
 }
 
-export default function StopItem({ stop, followerCount = 0, isDesktop: propIsDesktop = false }: StopItemProps) {
+export default function StopItem({ 
+  stop, 
+  followerCount = 0, 
+  isDesktop: propIsDesktop = false 
+}: StopItemProps) {
   const router = useRouter();
   const desktopMode = isDesktop || propIsDesktop;
 
@@ -21,33 +32,54 @@ export default function StopItem({ stop, followerCount = 0, isDesktop: propIsDes
     router.push(`/stop-details?stopId=${stopId}`);
   };
 
+  // Default image if none is provided
+  const imageUrl = stop.image_url || 'https://images.caxton.co.za/wp-content/uploads/sites/10/2023/03/IMG_9281_07602-e1680074626338-780x470.jpg';
+
   return (
     <TouchableOpacity
       style={[styles.stopCard, desktopMode && styles.stopCardDesktop]}
       onPress={() => navigateToStop(stop.id)}
     >
-      <View style={styles.stopHeader}>
-        <Flag size={desktopMode ? 20 : 24} color="#1ea2b1" />
-        <View style={[styles.stopInfo, desktopMode && styles.stopInfoDesktop]}>
-          <Text style={[styles.stopName, desktopMode && styles.stopNameDesktop]}>{stop.name}</Text>
-          {stop.address && (
-            <Text style={[styles.stopAddress, desktopMode && styles.stopAddressDesktop]}>
-              {stop.address}
+      {/* Image Section */}
+      <View style={styles.imageContainer}>
+        <Image 
+          source={{ uri: imageUrl }} 
+          style={styles.stopImage}
+          resizeMode="cover"
+        />
+      </View>
+
+      {/* Content Section */}
+      <View style={styles.contentContainer}>
+        <View style={styles.stopHeader}>
+          <Flag size={desktopMode ? 18 : 20} color="#1ea2b1" />
+          <View style={[styles.stopInfo, desktopMode && styles.stopInfoDesktop]}>
+            <Text style={[styles.stopName, desktopMode && styles.stopNameDesktop]} numberOfLines={2}>
+              {stop.name}
+            </Text>
+            {stop.address && (
+              <Text 
+                style={[styles.stopAddress, desktopMode && styles.stopAddressDesktop]} 
+                numberOfLines={1}
+              >
+                {stop.address}
+              </Text>
+            )}
+          </View>
+        </View>
+        
+        <View style={[styles.stopFooter, desktopMode && styles.stopFooterDesktop]}>
+          <View style={styles.followersContainer}>
+            <Text style={[styles.coordinatesText, { color: '#1ea2b1' }]}>
+              Followers: {followerCount}
+            </Text>
+          </View>
+          {stop.routes_count && (
+            <Text style={[styles.routesCount, desktopMode && styles.routesCountDesktop]}>
+              {stop.routes_count} routes
             </Text>
           )}
         </View>
-      </View>
-      <View style={[styles.stopFooter, desktopMode && styles.stopFooterDesktop]}>
-        <View style={styles.followersContainer}>
-          <Text style={[styles.coordinatesText, { color: '#1ea2b1' }]}>
-            Followers: {followerCount}
-          </Text>
-        </View>
-        {stop.routes_count && (
-          <Text style={[styles.routesCount, desktopMode && styles.routesCountDesktop]}>
-            {stop.routes_count} routes
-          </Text>
-        )}
       </View>
     </TouchableOpacity>
   );
@@ -57,16 +89,27 @@ const styles = StyleSheet.create({
   stopCard: {
     backgroundColor: '#1a1a1a',
     borderRadius: 12,
-    padding: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#333333',
+    overflow: 'hidden',
   },
   stopCardDesktop: {
     flex: 1,
     minWidth: '48%',
     maxWidth: '48%',
     marginBottom: 16,
+  },
+  imageContainer: {
+    height: 120,
+    width: '100%',
+  },
+  stopImage: {
+    width: '100%',
+    height: '100%',
+  },
+  contentContainer: {
+    padding: 16,
   },
   stopHeader: {
     flexDirection: 'row',
@@ -85,6 +128,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
     marginBottom: 4,
+    flexShrink: 1,
   },
   stopNameDesktop: {
     fontSize: 15,
