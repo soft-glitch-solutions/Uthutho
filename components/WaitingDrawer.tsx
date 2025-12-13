@@ -924,27 +924,7 @@ export default function WaitingDrawer({
             )}
           </View>
           
-          <View style={styles.instructions}>
-            <Text style={styles.instructionsTitle}>What happens next:</Text>
-            <View style={styles.instructionStep}>
-              <Text style={styles.instructionNumber}>1</Text>
-              <Text style={styles.instructionText}>
-                We'll search for existing journeys to join
-              </Text>
-            </View>
-            <View style={styles.instructionStep}>
-              <Text style={styles.instructionNumber}>2</Text>
-              <Text style={styles.instructionText}>
-                If none found, we'll create a new journey
-              </Text>
-            </View>
-            <View style={styles.instructionStep}>
-              <Text style={styles.instructionNumber}>3</Text>
-              <Text style={styles.instructionText}>
-                You'll be taken to the journey screen
-              </Text>
-            </View>
-          </View>
+
         </View>
 
         <View style={styles.confirmActions}>
@@ -956,7 +936,7 @@ export default function WaitingDrawer({
             onPress={handleConfirmWaiting}
           >
             <Text style={styles.confirmButtonText}>
-              {isDriver ? '🚗 Start as Driver' : '✅ Confirm Waiting'}
+              {isDriver ? 'Start as Driver' : 'Confirm Waiting'}
             </Text>
             <Text style={styles.confirmButtonSubtext}>
               {isDriver ? 'Begin your driver journey' : 'Join the waiting list'}
@@ -968,6 +948,7 @@ export default function WaitingDrawer({
   );
 
   const getSearchPhaseText = () => {
+    
     switch (searchPhase) {
       case 'searching':
         return isDriver 
@@ -1125,15 +1106,15 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   title: {
-    fontSize: IS_SMALL_SCREEN ? 17 : 18,
+    fontSize: IS_SMALL_SCREEN ? 18 : 20, // Increased from 17:18
     fontWeight: 'bold',
     color: '#ffffff',
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: IS_SMALL_SCREEN ? 12 : 13,
+    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
     color: '#cccccc',
-    lineHeight: 18,
+    lineHeight: 20, // Increased from 18
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -1148,9 +1129,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepCircle: {
-    width: IS_SMALL_SCREEN ? 22 : 24,
-    height: IS_SMALL_SCREEN ? 22 : 24,
-    borderRadius: IS_SMALL_SCREEN ? 11 : 12,
+    width: IS_SMALL_SCREEN ? 24 : 26, // Increased from 22:24
+    height: IS_SMALL_SCREEN ? 24 : 26, // Increased from 22:24
+    borderRadius: IS_SMALL_SCREEN ? 12 : 13, // Increased from 11:12
     backgroundColor: '#333333',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1161,7 +1142,7 @@ const styles = StyleSheet.create({
   },
   stepNumber: {
     color: '#666666',
-    fontSize: IS_SMALL_SCREEN ? 10 : 11,
+    fontSize: IS_SMALL_SCREEN ? 12 : 13, // Increased from 10:11
     fontWeight: 'bold',
   },
   stepNumberActive: {
@@ -1169,7 +1150,7 @@ const styles = StyleSheet.create({
   },
   stepLabel: {
     color: '#666666',
-    fontSize: IS_SMALL_SCREEN ? 9 : 10,
+    fontSize: IS_SMALL_SCREEN ? 11 : 12, // Increased from 9:10
     textAlign: 'center',
   },
   stepLabelActive: {
@@ -1191,7 +1172,7 @@ const styles = StyleSheet.create({
   },
   totalWaitingText: {
     color: '#1ea2b1',
-    fontSize: IS_SMALL_SCREEN ? 10 : 11,
+    fontSize: IS_SMALL_SCREEN ? 12 : 13, // Increased from 10:11
     fontWeight: '600',
     marginLeft: 4,
   },
@@ -1255,7 +1236,7 @@ const styles = StyleSheet.create({
   },
   driverBadgeText: {
     color: '#000000',
-    fontSize: 8,
+    fontSize: 9, // Increased from 8
     fontWeight: 'bold',
   },
   searchIconContainer: {
@@ -1270,14 +1251,14 @@ const styles = StyleSheet.create({
   },
   searchingText: {
     color: '#1ea2b1',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15,
+    fontSize: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
     fontWeight: '600',
     marginBottom: 6,
     textAlign: 'center',
   },
   searchingSubtext: {
     color: '#666666',
-    fontSize: IS_SMALL_SCREEN ? 10 : 11,
+    fontSize: IS_SMALL_SCREEN ? 12 : 13, // Increased from 10:11
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -1291,7 +1272,7 @@ const styles = StyleSheet.create({
   helpTip: {
     backgroundColor: '#1ea2b110',
     marginHorizontal: 16,
-    marginBottom: 12,
+    margin: 12,
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
@@ -1304,8 +1285,8 @@ const styles = StyleSheet.create({
   },
   helpText: {
     color: '#cccccc',
-    fontSize: IS_SMALL_SCREEN ? 11 : 12,
-    lineHeight: 16,
+    fontSize: IS_SMALL_SCREEN ? 13 : 14, // Increased from 11:12
+    lineHeight: 18, // Increased from 16
     flex: 1,
     marginLeft: 8,
   },
@@ -1322,12 +1303,12 @@ const styles = StyleSheet.create({
   },
   dismissText: {
     color: '#ffffff',
-    fontSize: IS_SMALL_SCREEN ? 10 : 11,
+    fontSize: IS_SMALL_SCREEN ? 12 : 13, // Increased from 10:11
     fontWeight: '600',
   },
   filterContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    padding: 12,
   },
   filterHeader: {
     flexDirection: 'row',
@@ -1336,7 +1317,7 @@ const styles = StyleSheet.create({
   },
   filterTitle: {
     color: '#cccccc',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13,
+    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
     fontWeight: '500',
     marginLeft: 6,
     flex: 1,
@@ -1364,13 +1345,13 @@ const styles = StyleSheet.create({
     borderColor: '#1ea2b1',
   },
   filterIcon: {
-    width: IS_SMALL_SCREEN ? 14 : 15,
-    height: IS_SMALL_SCREEN ? 14 : 15,
+    width: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
+    height: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
     marginRight: 5,
   },
   filterText: {
     color: '#cccccc',
-    fontSize: IS_SMALL_SCREEN ? 10 : 11,
+    fontSize: IS_SMALL_SCREEN ? 12 : 13, // Increased from 10:11
     fontWeight: '500',
   },
   filterTextActive: {
@@ -1386,12 +1367,12 @@ const styles = StyleSheet.create({
   },
   resultsTitle: {
     color: '#ffffff',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15,
+    fontSize: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
     fontWeight: '600',
   },
   resultsCount: {
     color: '#666666',
-    fontSize: IS_SMALL_SCREEN ? 10 : 11,
+    fontSize: IS_SMALL_SCREEN ? 12 : 13, // Increased from 10:11
   },
   routesScroll: {
     flex: 1,
@@ -1420,7 +1401,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: '#666666',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13,
+    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
     textAlign: 'center',
   },
   noResultsContainer: {
@@ -1438,17 +1419,17 @@ const styles = StyleSheet.create({
   },
   noResultsTitle: {
     color: '#ffffff',
-    fontSize: IS_SMALL_SCREEN ? 15 : 16,
+    fontSize: IS_SMALL_SCREEN ? 17 : 18, // Increased from 15:16
     fontWeight: '600',
     marginBottom: 6,
     textAlign: 'center',
   },
   noResultsText: {
     color: '#666666',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13,
+    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
     textAlign: 'center',
     marginBottom: 16,
-    lineHeight: 18,
+    lineHeight: 20, // Increased from 18
   },
   clearFilterButton: {
     backgroundColor: '#1a1a1a',
@@ -1460,7 +1441,7 @@ const styles = StyleSheet.create({
   },
   clearFilterText: {
     color: '#1ea2b1',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13,
+    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
     fontWeight: '500',
   },
   routeCard: {
@@ -1483,31 +1464,31 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   transportIcon: {
-    width: IS_SMALL_SCREEN ? 26 : 28,
-    height: IS_SMALL_SCREEN ? 26 : 28,
+    width: IS_SMALL_SCREEN ? 28 : 30, // Increased from 26:28
+    height: IS_SMALL_SCREEN ? 28 : 30, // Increased from 26:28
   },
   routeInfo: {
     justifyContent: 'center',
   },
   transportType: {
     color: '#1ea2b1',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13,
+    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
     fontWeight: '600',
   },
   routeCost: {
     color: '#10b981',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13,
+    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
     fontWeight: 'bold',
     marginTop: 2,
   },
   routeName: {
-    fontSize: IS_SMALL_SCREEN ? 14 : 15,
+    fontSize: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
     fontWeight: '600',
     color: '#ffffff',
     marginBottom: 4,
   },
   routeDestination: {
-    fontSize: IS_SMALL_SCREEN ? 12 : 13,
+    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
     color: '#cccccc',
     marginBottom: 10,
   },
@@ -1534,7 +1515,7 @@ const styles = StyleSheet.create({
   },
   waitingCount: {
     color: '#666666',
-    fontSize: IS_SMALL_SCREEN ? 9 : 10,
+    fontSize: IS_SMALL_SCREEN ? 11 : 12, // Increased from 9:10
     fontWeight: '500',
   },
   waitingCountActive: {
@@ -1556,7 +1537,7 @@ const styles = StyleSheet.create({
   },
   driverTagText: {
     color: '#fbbf24',
-    fontSize: IS_SMALL_SCREEN ? 9 : 10,
+    fontSize: IS_SMALL_SCREEN ? 11 : 12, // Increased from 9:10
     fontWeight: '600',
   },
   confirmContainer: {
@@ -1578,7 +1559,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     color: '#1ea2b1',
-    fontSize: IS_SMALL_SCREEN ? 13 : 14,
+    fontSize: IS_SMALL_SCREEN ? 15 : 16, // Increased from 13:14
     fontWeight: '500',
     marginLeft: 6,
   },
@@ -1587,13 +1568,13 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   confirmationTitle: {
-    fontSize: IS_SMALL_SCREEN ? 17 : 18,
+    fontSize: IS_SMALL_SCREEN ? 19 : 20, // Increased from 17:18
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 6,
   },
   confirmationSubtitle: {
-    fontSize: IS_SMALL_SCREEN ? 12 : 13,
+    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
     color: '#cccccc',
     marginBottom: 16,
   },
@@ -1606,33 +1587,33 @@ const styles = StyleSheet.create({
     borderColor: '#1ea2b1',
   },
   transportIconLarge: {
-    width: IS_SMALL_SCREEN ? 36 : 38,
-    height: IS_SMALL_SCREEN ? 36 : 38,
+    width: IS_SMALL_SCREEN ? 38 : 40, // Increased from 36:38
+    height: IS_SMALL_SCREEN ? 38 : 40, // Increased from 36:38
   },
   transportTypeLarge: {
     color: '#1ea2b1',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15,
+    fontSize: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
     fontWeight: '600',
   },
   routeCostLarge: {
     color: '#10b981',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15,
+    fontSize: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
     fontWeight: 'bold',
     marginTop: 2,
   },
   selectedRouteName: {
-    fontSize: IS_SMALL_SCREEN ? 15 : 16,
+    fontSize: IS_SMALL_SCREEN ? 17 : 18, // Increased from 15:16
     fontWeight: 'bold',
     color: '#ffffff',
     marginTop: 12,
     marginBottom: 4,
-    lineHeight: 20,
+    lineHeight: 22, // Increased from 20
   },
   selectedRouteDestination: {
-    fontSize: IS_SMALL_SCREEN ? 13 : 14,
+    fontSize: IS_SMALL_SCREEN ? 15 : 16, // Increased from 13:14
     color: '#cccccc',
     marginBottom: 16,
-    lineHeight: 18,
+    lineHeight: 20, // Increased from 18
   },
   waitingInfoLarge: {
     flexDirection: 'row',
@@ -1646,7 +1627,7 @@ const styles = StyleSheet.create({
   },
   waitingCountLarge: {
     color: '#1ea2b1',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13,
+    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
     fontWeight: '600',
   },
   driverNotice: {
@@ -1659,7 +1640,7 @@ const styles = StyleSheet.create({
   },
   driverNoticeText: {
     color: '#fbbf24',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13,
+    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
     fontWeight: '500',
   },
   instructions: {
@@ -1670,7 +1651,7 @@ const styles = StyleSheet.create({
   },
   instructionsTitle: {
     color: '#ffffff',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15,
+    fontSize: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
     fontWeight: '600',
     marginBottom: 10,
   },
@@ -1680,22 +1661,22 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   instructionNumber: {
-    width: IS_SMALL_SCREEN ? 20 : 22,
-    height: IS_SMALL_SCREEN ? 20 : 22,
-    borderRadius: IS_SMALL_SCREEN ? 10 : 11,
+    width: IS_SMALL_SCREEN ? 22 : 24, // Increased from 20:22
+    height: IS_SMALL_SCREEN ? 22 : 24, // Increased from 20:22
+    borderRadius: IS_SMALL_SCREEN ? 11 : 12, // Increased from 10:11
     backgroundColor: '#1ea2b1',
     color: '#ffffff',
-    fontSize: IS_SMALL_SCREEN ? 10 : 11,
+    fontSize: IS_SMALL_SCREEN ? 12 : 13, // Increased from 10:11
     fontWeight: 'bold',
     textAlign: 'center',
-    lineHeight: IS_SMALL_SCREEN ? 20 : 22,
+    lineHeight: IS_SMALL_SCREEN ? 22 : 24, // Increased from 20:22
     marginRight: 10,
   },
   instructionText: {
     color: '#cccccc',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13,
+    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
     flex: 1,
-    lineHeight: 18,
+    lineHeight: 20, // Increased from 18
   },
   confirmActions: {
     paddingHorizontal: 16,
@@ -1712,14 +1693,14 @@ const styles = StyleSheet.create({
   },
   confirmButtonText: {
     color: 'white',
-    fontSize: IS_SMALL_SCREEN ? 15 : 16,
+    fontSize: IS_SMALL_SCREEN ? 17 : 18, // Increased from 15:16
     fontWeight: 'bold',
     marginBottom: 4,
     textAlign: 'center',
   },
   confirmButtonSubtext: {
     color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: IS_SMALL_SCREEN ? 11 : 12,
+    fontSize: IS_SMALL_SCREEN ? 13 : 14, // Increased from 11:12
     textAlign: 'center',
   },
   cancelButton: {
@@ -1730,7 +1711,7 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: '#ffffff',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13,
+    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
     fontWeight: '600',
   },
 });

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, Platform } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Platform, Image } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import MapLegend from './MapLegend';
@@ -27,11 +27,11 @@ interface LocationData {
   id: string;
   distance?: number;
   isNearest?: boolean;
+  avatarUrl?: string;
 }
 
-// SVG paths for lucide-react-native icons
+// SVG paths for lucide-react-native icons (excluding user since we'll use profile picture)
 const SVG_ICONS = {
-  user: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
   flag: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>`,
   mapPin: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`,
   route: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M12 19h4.5a3.5 3.5 0 0 0 0-7h-8a3.5 3.5 0 0 1 0-7H12"/></svg>`
@@ -50,6 +50,30 @@ const InteractiveNearbyMap: React.FC<InteractiveNearbyMapProps> = ({
   const [allStops, setAllStops] = useState<any[]>([]);
   const [allHubs, setAllHubs] = useState<any[]>([]);
   const [loadingAdditionalData, setLoadingAdditionalData] = useState<boolean>(true);
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('avatar_url, first_name, last_name')
+          .eq('id', user.id)
+          .single();
+
+        if (profile) {
+          setUserProfile(profile);
+        }
+      } catch (error) {
+        console.error('Error loading user profile:', error);
+      }
+    };
+
+    loadUserProfile();
+  }, []);
 
   useEffect(() => {
     const loadAdditionalLocations = async () => {
@@ -120,6 +144,9 @@ const InteractiveNearbyMap: React.FC<InteractiveNearbyMapProps> = ({
     const generateMapHtml = () => {
       if (!userLocation) return '';
 
+      // Get user's profile picture or use default
+      const userAvatar = userProfile?.avatar_url || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop';
+
       const locations: LocationData[] = [
         {
           lat: userLocation.lat,
@@ -127,7 +154,8 @@ const InteractiveNearbyMap: React.FC<InteractiveNearbyMapProps> = ({
           type: 'user',
           name: 'Your Location',
           color: '#1ea2b1',
-          id: 'user_location'
+          id: 'user_location',
+          avatarUrl: userAvatar
         },
         ...allStops.map(stop => ({
           lat: stop.latitude,
@@ -188,11 +216,11 @@ const InteractiveNearbyMap: React.FC<InteractiveNearbyMapProps> = ({
       });
     };
 
-    if (!loadingAdditionalData) {
+    if (!loadingAdditionalData && userProfile !== null) {
       setMapHtml(generateMapHtml());
       setMapLoading(true);
     }
-  }, [userLocation, allStops, allHubs, colors, loadingAdditionalData]);
+  }, [userLocation, allStops, allHubs, colors, loadingAdditionalData, userProfile]);
 
   const handleMapMessage = (event: any) => {
     try {
@@ -319,6 +347,9 @@ const generateErrorHtml = (backgroundColor: string): string => `
 `;
 
 const generateMapHtmlContent = (locations: LocationData[], colors: any, mapData: any): string => {
+  // Default profile image
+  const defaultAvatar = 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop';
+
   return `
     <!DOCTYPE html>
     <html>
@@ -340,7 +371,42 @@ const generateMapHtmlContent = (locations: LocationData[], colors: any, mapData:
               border-radius: 12px;
               box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             }
-            .custom-marker {
+            
+            /* User profile marker */
+            .user-profile-marker {
+              border-radius: 50%;
+              border: 3px solid white;
+              box-shadow: 0 4px 12px rgba(30, 162, 177, 0.4), 0 2px 8px rgba(0,0,0,0.3);
+              width: 50px;
+              height: 50px;
+              overflow: hidden;
+              position: relative;
+              animation: pulse 2s infinite;
+              background-color: #1ea2b1;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+            
+            .user-profile-image {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+            }
+            
+            .user-profile-fallback {
+              width: 100%;
+              height: 100%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: white;
+              font-weight: bold;
+              font-size: 20px;
+            }
+            
+            /* Regular markers */
+            .regular-marker {
               border-radius: 50%;
               border: 3px solid white;
               box-shadow: 0 2px 8px rgba(0,0,0,0.3);
@@ -349,10 +415,6 @@ const generateMapHtmlContent = (locations: LocationData[], colors: any, mapData:
               justify-content: center;
               width: 40px;
               height: 40px;
-            }
-            .user-marker { 
-              background-color: #1ea2b1;
-              animation: pulse 2s infinite;
             }
             .stop-marker { 
               background-color: #1ea2b1; 
@@ -374,15 +436,15 @@ const generateMapHtmlContent = (locations: LocationData[], colors: any, mapData:
             @keyframes pulse {
               0% {
                 transform: scale(1);
-                opacity: 1;
+                box-shadow: 0 4px 12px rgba(30, 162, 177, 0.4), 0 2px 8px rgba(0,0,0,0.3);
               }
               50% {
-                transform: scale(1.1);
-                opacity: 0.8;
+                transform: scale(1.05);
+                box-shadow: 0 6px 16px rgba(30, 162, 177, 0.6), 0 3px 10px rgba(0,0,0,0.4);
               }
               100% {
                 transform: scale(1);
-                opacity: 1;
+                box-shadow: 0 4px 12px rgba(30, 162, 177, 0.4), 0 2px 8px rgba(0,0,0,0.3);
               }
             }
             
@@ -454,10 +516,30 @@ const generateMapHtmlContent = (locations: LocationData[], colors: any, mapData:
             
             .type-label {
               font-size: 10px;
-              color: #666;
+              color: white;
               margin-top: 2px;
               text-align: center;
               text-transform: uppercase;
+              font-weight: 600;
+              background-color: rgba(0, 0, 0, 0.3);
+              padding: 1px 4px;
+              border-radius: 4px;
+            }
+            
+            .user-label {
+              position: absolute;
+              bottom: -6px;
+              left: 50%;
+              transform: translateX(-50%);
+              background-color: #1ea2b1;
+              color: white;
+              font-size: 9px;
+              padding: 2px 6px;
+              border-radius: 10px;
+              font-weight: 600;
+              white-space: nowrap;
+              z-index: 1000;
+              border: 2px solid white;
             }
         </style>
     </head>
@@ -465,7 +547,7 @@ const generateMapHtmlContent = (locations: LocationData[], colors: any, mapData:
         <div id="map"></div>
         <script>
             // Initialize map
-            const map = L.map('map').setView([${mapData.center.split(',')[0]}, ${mapData.center.split(',')[1]}], 13);
+            const map = L.map('map').setView([${mapData.center.split(',')[0]}, ${mapData.center.split(',')[1]}], 19);
             
             // Add OpenStreetMap tiles
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -487,31 +569,48 @@ const generateMapHtmlContent = (locations: LocationData[], colors: any, mapData:
               }
             }
             
-            // SVG icons
+            // SVG icons for stops and hubs
             const SVG_ICONS = {
-              user: \`${SVG_ICONS.user}\`,
               flag: \`${SVG_ICONS.flag}\`,
               mapPin: \`${SVG_ICONS.mapPin}\`,
               route: \`${SVG_ICONS.route}\`
             };
             
-            // Create custom icons with SVG
-            function createCustomIcon(color, iconType, isNearest = false, label = '') {
-              const className = isNearest ? 'custom-marker nearest-marker' : 'custom-marker';
-              const typeClass = iconType === 'user' ? 'user-marker' : 
-                               iconType === 'stop' ? 'stop-marker' : 
-                               iconType === 'hub' ? 'hub-marker' : '';
-              const iconSvg = SVG_ICONS[iconType] || SVG_ICONS.user;
-              
-              return L.divIcon({
-                  html: \`<div class="\${className} \${typeClass}" style="background-color: \${color}; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            // Create custom icons
+            function createCustomIcon(location) {
+              if (location.type === 'user') {
+                // User profile icon
+                const avatarUrl = location.avatarUrl || '${defaultAvatar}';
+                const initials = location.name ? location.name.charAt(0).toUpperCase() : 'Y';
+                
+                return L.divIcon({
+                  html: \`<div class="user-profile-marker">
+                            <img src="\${avatarUrl}" alt="\${location.name}" class="user-profile-image" 
+                                 onerror="this.onerror=null; this.src='${defaultAvatar}';">
+                            <div class="user-label">You</div>
+                          </div>\`,
+                  className: '',
+                  iconSize: [50, 50],
+                  iconAnchor: [25, 50]
+                });
+              } else {
+                // Regular stop/hub icon
+                const iconType = location.type === 'stop' ? 'flag' : 'mapPin';
+                const label = location.type === 'stop' ? 'Stop' : 'Hub';
+                const isNearest = location.isNearest || false;
+                const iconSvg = SVG_ICONS[iconType];
+                
+                return L.divIcon({
+                  html: \`<div class="regular-marker \${location.type}-marker\${isNearest ? '-nearest' : ''}" 
+                                 style="background-color: \${location.color};">
                             <div class="marker-svg">\${iconSvg}</div>
-                            \${label ? '<div class="type-label">' + label + '</div>' : ''}
+                            <div class="type-label">\${label}</div>
                           </div>\`,
                   className: '',
                   iconSize: [40, 40],
                   iconAnchor: [20, 40]
-              });
+                });
+              }
             }
             
             // Add markers
@@ -520,57 +619,42 @@ const generateMapHtmlContent = (locations: LocationData[], colors: any, mapData:
             
             locations.forEach(location => {
               let marker;
-              let iconType = 'user';
-              let label = '';
-              
-              if (location.type === 'user') {
-                iconType = 'user';
-                label = 'You';
-              } else if (location.type === 'stop') {
-                iconType = 'flag';
-                label = 'Stop';
-              } else if (location.type === 'hub') {
-                iconType = 'mapPin';
-                label = 'Hub';
-              }
               
               marker = L.marker([location.lat, location.lng], {
-                icon: createCustomIcon(location.color, iconType, location.isNearest, label)
+                icon: createCustomIcon(location)
               });
               
-              // Popup content
-              const nearestBadge = location.isNearest ? '<span class="nearest-badge">NEAREST</span>' : '';
-              const typeLabel = location.type === 'stop' ? 'Bus Stop' : 
-                               location.type === 'hub' ? 'Transportation Hub' : 
-                               'Your Location';
-              const buttonAction = location.type === 'stop' ? 'stop' : 
-                                  location.type === 'hub' ? 'hub' : null;
-              
-              let popupContent = '<div class="popup-content">' +
-                    '<div class="popup-title">' + location.name + nearestBadge + '</div>' +
-                    '<div class="popup-subtitle">' + typeLabel + '</div>';
-              
-              if (location.distance) {
-                popupContent += '<div class="popup-distance">' + location.distance + ' min walk</div>';
-              }
-              
-              if (buttonAction) {
+              // Popup content (don't show for user location)
+              if (location.type !== 'user') {
+                const nearestBadge = location.isNearest ? '<span class="nearest-badge">NEAREST</span>' : '';
+                const typeLabel = location.type === 'stop' ? 'Bus Stop' : 'Transportation Hub';
+                const buttonAction = location.type === 'stop' ? 'stop' : 'hub';
+                
+                let popupContent = '<div class="popup-content">' +
+                      '<div class="popup-title">' + location.name + nearestBadge + '</div>' +
+                      '<div class="popup-subtitle">' + typeLabel + '</div>';
+                
+                if (location.distance) {
+                  popupContent += '<div class="popup-distance">' + location.distance + ' min walk</div>';
+                }
+                
                 popupContent += '<button class="popup-button" onclick="navigateToLocation(\\'' + buttonAction + '\\', \\'' + location.id + '\\')">' +
                                 'View Details ↗' +
                               '</button>';
+                
+                popupContent += '</div>';
+                
+                marker.bindPopup(popupContent);
               }
-              
-              popupContent += '</div>';
-              
-              marker.bindPopup(popupContent);
               
               if (marker) {
                 marker.addTo(map);
                 bounds.extend([location.lat, location.lng]);
                 
-                // Auto-open popup for user location
+                // Auto-open popup for user location (if we decide to add one)
                 if (location.type === 'user') {
-                  marker.openPopup();
+                  // Optionally add a tooltip instead of popup
+                  // marker.bindTooltip('Your Location', {permanent: false, direction: 'top'});
                 }
               }
             });
