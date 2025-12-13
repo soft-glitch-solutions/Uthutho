@@ -859,7 +859,7 @@ export default function HomeScreen() {
                 <View style={styles.quickActionsGrid}>
                   <TouchableOpacity 
                     style={[styles.quickAction, { backgroundColor: colors.background }]}
-                    onPress={() => router.push('/map')}
+                    onPress={() => router.push('/Map')}
                   >
                     <Map size={20} color={colors.primary} />
                     <Text style={[styles.quickActionText, { color: colors.text }]}>
@@ -879,7 +879,7 @@ export default function HomeScreen() {
                   
                   <TouchableOpacity 
                     style={[styles.quickAction, { backgroundColor: colors.background }]}
-                    onPress={() => router.push('/leaderboard')}
+                    onPress={() => router.push('/Leaderboard')}
                   >
                     <Users size={20} color={colors.primary} />
                     <Text style={[styles.quickActionText, { color: colors.text }]}>
