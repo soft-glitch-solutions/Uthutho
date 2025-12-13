@@ -1,6 +1,8 @@
 import React from 'react';
-import { View } from 'react-native';
+import { View, Dimensions } from 'react-native';
 import Shimmer from './Shimmer';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface NearestLocationsSkeletonProps {
   colors: any;
@@ -9,29 +11,31 @@ interface NearestLocationsSkeletonProps {
 const NearestLocationsSkeleton = ({ colors }: NearestLocationsSkeletonProps) => (
   <View style={styles.grid}>
     {[1, 2].map((i) => (
-      <Shimmer key={i} colors={colors}>
-        <View style={[styles.card, { backgroundColor: colors.primary }]}>
-          <View style={styles.favoriteItemSkeleton}>
-            <View style={[styles.skeletonIcon, { backgroundColor: colors.text }]} />
-            <View style={[styles.skeletonTitle, { 
+      <View key={i} style={styles.cardContainer}>
+        <Shimmer colors={colors}>
+          <View style={[styles.card, { backgroundColor: colors.primary }]}>
+            <View style={styles.favoriteItemSkeleton}>
+              <View style={[styles.skeletonIcon, { backgroundColor: colors.text }]} />
+              <View style={[styles.skeletonTitle, { 
+                backgroundColor: colors.text,
+                width: 100,
+                marginLeft: 8
+              }]} />
+            </View>
+            <View style={[styles.skeletonText, { 
               backgroundColor: colors.text,
-              width: 100,
-              marginLeft: 8
+              width: '80%',
+              marginTop: 8
             }]} />
+            <View style={[styles.skeletonText, { 
+              backgroundColor: colors.text,
+              width: '60%',
+              marginTop: 8
+            }]} />
+            <View style={{ height: 40, marginTop: 12 }} />
           </View>
-          <View style={[styles.skeletonText, { 
-            backgroundColor: colors.text,
-            width: '80%',
-            marginTop: 8
-          }]} />
-          <View style={[styles.skeletonText, { 
-            backgroundColor: colors.text,
-            width: '60%',
-            marginTop: 8
-          }]} />
-          <View style={{ height: 40, marginTop: 12 }} />
-        </View>
-      </Shimmer>
+        </Shimmer>
+      </View>
     ))}
   </View>
 );
@@ -40,10 +44,15 @@ const styles = {
   grid: {
     flexDirection: 'row' as 'row',
     flexWrap: 'wrap' as 'wrap',
-    gap: 12,
+    justifyContent: 'space-between' as 'space-between',
+    width: '100%',
+  },
+  cardContainer: {
+    width: '48%', // Fixed width approach
+    marginBottom: 12,
   },
   card: {
-    flex: 1,
+    width: '100%',
     borderRadius: 8,
     padding: 16,
     shadowColor: '#000',
@@ -51,12 +60,11 @@ const styles = {
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    minWidth: '48%',
+    aspectRatio: 1.2, // Maintain aspect ratio
   },
   favoriteItemSkeleton: {
     flexDirection: 'row' as 'row',
     alignItems: 'center' as 'center',
-    gap: 8,
   },
   skeletonIcon: {
     width: 24,
