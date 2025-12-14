@@ -14,25 +14,37 @@ const NearestLocationsSkeleton = ({ colors }: NearestLocationsSkeletonProps) => 
       <View key={i} style={styles.cardContainer}>
         <Shimmer colors={colors}>
           <View style={[styles.card, { backgroundColor: colors.primary }]}>
-            <View style={styles.favoriteItemSkeleton}>
-              <View style={[styles.skeletonIcon, { backgroundColor: colors.text }]} />
-              <View style={[styles.skeletonTitle, { 
-                backgroundColor: colors.text,
-                width: 100,
-                marginLeft: 8
-              }]} />
+            <View style={styles.headerContainer}>
+              <View style={styles.favoriteItemSkeleton}>
+                <View style={[styles.skeletonIcon, { backgroundColor: colors.text }]} />
+                <View style={[styles.skeletonTitle, { 
+                  backgroundColor: colors.text,
+                  width: 100,
+                  marginLeft: 8
+                }]} />
+              </View>
             </View>
-            <View style={[styles.skeletonText, { 
-              backgroundColor: colors.text,
-              width: '80%',
-              marginTop: 8
-            }]} />
-            <View style={[styles.skeletonText, { 
-              backgroundColor: colors.text,
-              width: '60%',
-              marginTop: 8
-            }]} />
-            <View style={{ height: 40, marginTop: 12 }} />
+            
+            <View style={styles.contentContainer}>
+              <View style={styles.textContainer}>
+                <View style={[styles.skeletonText, { 
+                  backgroundColor: colors.text,
+                  width: '80%',
+                  marginBottom: 4
+                }]} />
+                <View style={[styles.skeletonText, { 
+                  backgroundColor: colors.text,
+                  width: '60%'
+                }]} />
+              </View>
+              
+              <View style={styles.actionContainer}>
+                <View style={[styles.skeletonButton, { 
+                  backgroundColor: colors.text,
+                  height: 40
+                }]} />
+              </View>
+            </View>
           </View>
         </Shimmer>
       </View>
@@ -44,12 +56,12 @@ const styles = {
   grid: {
     flexDirection: 'row' as 'row',
     flexWrap: 'wrap' as 'wrap',
-    justifyContent: 'space-between' as 'space-between',
+    gap: 12,
     width: '100%',
   },
   cardContainer: {
-    width: '48%', // Fixed width approach
-    marginBottom: 12,
+    flex: 1,
+    minWidth: '48%',
   },
   card: {
     width: '100%',
@@ -60,7 +72,10 @@ const styles = {
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    aspectRatio: 1.2, // Maintain aspect ratio
+    minHeight: 160, // Same as actual component
+  },
+  headerContainer: {
+    marginBottom: 12,
   },
   favoriteItemSkeleton: {
     flexDirection: 'row' as 'row',
@@ -70,16 +85,32 @@ const styles = {
     width: 24,
     height: 24,
     borderRadius: 12,
+    opacity: 0.3,
   },
   skeletonTitle: {
     height: 18,
     borderRadius: 4,
-    marginBottom: 8,
+    opacity: 0.3,
+  },
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'space-between' as 'space-between',
+  },
+  textContainer: {
+    marginBottom: 12,
   },
   skeletonText: {
     height: 14,
     borderRadius: 4,
-    marginVertical: 4,
+    opacity: 0.3,
+  },
+  actionContainer: {
+    marginTop: 'auto' as 'auto',
+  },
+  skeletonButton: {
+    width: '100%',
+    borderRadius: 4,
+    opacity: 0.3,
   },
 };
 
