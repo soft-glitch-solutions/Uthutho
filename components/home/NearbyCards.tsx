@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Animated, Dimensions } from 'react-native';
 import { Flag, MapPin } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import StopBlock from '@/components/stop/StopBlock';
@@ -132,59 +132,74 @@ const LocationCard: React.FC<LocationCardProps> = ({
             { 
               backgroundColor: colors.primary,
               transform: [{ scale: scaleAnim }],
-              opacity: opacityAnim
+              opacity: opacityAnim,
+              minHeight: 160, // Fixed minimum height
             }
           ]}
         >
-          <View style={styles.favoriteItem}>
-            {isStop ? (
-              <Flag size={24} color={colors.text} />
-            ) : (
-              <MapPin size={24} color={colors.text} />
-            )}
-            <Text style={[styles.cardTitle, { color: colors.text, marginLeft: 8 }]}>
-              Nearest {isStop ? 'Stop' : 'Hub'}
-            </Text>
+          <View style={styles.headerContainer}>
+            <View style={styles.favoriteItem}>
+              {isStop ? (
+                <Flag size={24} color={colors.text} />
+              ) : (
+                <MapPin size={24} color={colors.text} />
+              )}
+              <Text style={[styles.cardTitle, { color: colors.text, marginLeft: 8 }]}>
+                Nearest {isStop ? 'Stop' : 'Hub'}
+              </Text>
+            </View>
           </View>
           
-          {location ? (
-            <>
-              <Text style={[styles.cardText, { color: colors.text }]}>
-                {location.name}
-              </Text>
-              <Text style={[styles.distanceText, { color: colors.text }]}>
-                {calculateWalkingTime(
-                  userLocation.lat,
-                  userLocation.lng,
-                  location.latitude,
-                  location.longitude
-                )} min walk
-              </Text>
-              
-              {isStop ? (
-                <StopBlock
-                  stopId={location.id}
-                  stopName={location.name}
-                  stopLocation={{
-                    latitude: location.latitude,
-                    longitude: location.longitude,
-                  }}
-                  colors={colors}
-                  radius={0.5}
-                />
-              ) : (
-                <HubFollowButton
-                  hubId={location.id}
-                  hubName={location.name}
-                  colors={colors}
-                />
-              )}
-            </>
-          ) : (
-            <Text style={[styles.emptyText, { color: colors.text }]}>
-              No {isStop ? 'stops' : 'hubs'} found.
-            </Text>
-          )}
+          <View style={styles.contentContainer}>
+            {location ? (
+              <>
+                <View style={styles.textContainer}>
+                  <Text 
+                    style={[styles.cardText, { color: colors.text }]}
+                    numberOfLines={2} // Limit to 2 lines
+                    ellipsizeMode="tail"
+                  >
+                    {location.name}
+                  </Text>
+                  <Text style={[styles.distanceText, { color: colors.text }]}>
+                    {calculateWalkingTime(
+                      userLocation.lat,
+                      userLocation.lng,
+                      location.latitude,
+                      location.longitude
+                    )} min walk
+                  </Text>
+                </View>
+                
+                <View style={styles.actionContainer}>
+                  {isStop ? (
+                    <StopBlock
+                      stopId={location.id}
+                      stopName={location.name}
+                      stopLocation={{
+                        latitude: location.latitude,
+                        longitude: location.longitude,
+                      }}
+                      colors={colors}
+                      radius={0.5}
+                    />
+                  ) : (
+                    <HubFollowButton
+                      hubId={location.id}
+                      hubName={location.name}
+                      colors={colors}
+                    />
+                  )}
+                </View>
+              </>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={[styles.emptyText, { color: colors.text }]}>
+                  No {isStop ? 'stops' : 'hubs'} found.
+                </Text>
+              </View>
+            )}
+          </View>
         </Animated.View>
       )}
     </Pressable>
@@ -204,6 +219,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden', // Important for ripple effect
   },
   card: {
+    flex: 1, // Make card fill the Pressable
     borderRadius: 8,
     padding: 16,
     shadowColor: '#000',
@@ -212,23 +228,44 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  cardText: {
-    fontSize: 14,
-  },
-  distanceText: {
-    fontSize: 12,
-  },
-  emptyText: {
-    fontSize: 14,
+  headerContainer: {
+    marginBottom: 12,
   },
   favoriteItem: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  textContainer: {
+    marginBottom: 12,
+  },
+  actionContainer: {
+    marginTop: 'auto', // Push to bottom
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  cardText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  distanceText: {
+    fontSize: 12,
+    opacity: 0.8,
+  },
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
   },
   pressed: {
     opacity: 0.8, // Fallback for iOS when animated driver fails
