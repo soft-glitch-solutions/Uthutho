@@ -27,6 +27,9 @@ import ScreenTransition from '@/components/ScreenTransition';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import LottieView from 'lottie-react-native';
 import RateTripModal from '@/components/home/RateTripModal';
+import SimpleDebugPanel from '@/components/debug/SimpleDebugPanel';
+import WelcomeOverlay from '@/components/home/WelcomeOverlay';
+
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -239,6 +242,60 @@ export default function HomeScreen() {
   const { activeJourney, loading: journeyLoading, refreshActiveJourney } = useJourney();
   const [refreshing, setRefreshing] = useState(false);
   const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
+
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(false);
+const hasCheckedWelcome = useRef(false);
+
+const handleWelcomeClose = () => {
+  setShowWelcomeOverlay(false);
+};
+
+
+const handleGetStarted = () => {
+  setShowWelcomeOverlay(false);
+  // Optional: You can trigger any onboarding actions here
+};
+
+// Add these functions:
+const handleShowWelcomeOverlay = () => {
+  setShowWelcomeOverlay(true);
+};
+
+const handleHideWelcomeOverlay = () => {
+  setShowWelcomeOverlay(false);
+};
+
+// Update your existing welcome effect to track count:
+useEffect(() => {
+  const checkFirstTimeUser = async () => {
+    if (hasCheckedWelcome.current) return;
+    hasCheckedWelcome.current = true;
+
+    try {
+      const session = await supabase.auth.getSession();
+      if (!session.data.session?.user.id) return;
+
+      const hasSeenWelcome = await AsyncStorage.getItem('hasSeenWelcome');
+      
+      if (!hasSeenWelcome) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setShowWelcomeOverlay(true);
+        await AsyncStorage.setItem('hasSeenWelcome', 'true');
+        
+        // Track how many times we've shown it
+        const count = await AsyncStorage.getItem('welcomeShownCount') || '0';
+        await AsyncStorage.setItem('welcomeShownCount', (parseInt(count) + 1).toString());
+      }
+    } catch (error) {
+      console.error('Error checking welcome overlay:', error);
+    }
+  };
+
+  if (!isProfileLoading && userProfile) {
+    checkFirstTimeUser();
+  }
+}, [isProfileLoading, userProfile]);
 
   const fetchNearestLocations = useCallback(async () => {
     if (!userLocation) return;
@@ -841,7 +898,8 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
         >
           {/* Desktop Header */}
           <View style={styles.desktopHeader}>
-            <Pressable onPress={openSidebar} style={styles.logoContainer}>
+            <Pressable onPress={openSidebar}    onLongPress={() => setShowDebugPanel(true)}
+  delayLongPress={2000} style={styles.logoContainer}>
               <Image
                 source={require('../../../assets/uthutho-logo.png')}
                 style={styles.logo}
@@ -1063,7 +1121,8 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
       >
         {/* Only show top header on mobile */}
         <View style={styles.topHeader}>
-          <Pressable onPress={openSidebar} style={styles.logoContainer}>
+          <Pressable onPress={openSidebar}  onLongPress={() => setShowDebugPanel(true)}
+  delayLongPress={2000} style={styles.logoContainer}>
             <Image
               source={require('../../../assets/uthutho-logo.png')}
               style={styles.logo}
@@ -1251,6 +1310,18 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
         />
 
       </ScrollView>
+
+      <WelcomeOverlay
+  visible={showWelcomeOverlay}
+  onClose={handleWelcomeClose}
+  onGetStarted={handleGetStarted}
+/>
+      <SimpleDebugPanel
+  visible={showDebugPanel}
+  onClose={() => setShowDebugPanel(false)}
+  onShowWelcomeOverlay={handleShowWelcomeOverlay}
+  onHideWelcomeOverlay={handleHideWelcomeOverlay}
+/>
 
     <RateTripModal
       visible={showRatingModal}

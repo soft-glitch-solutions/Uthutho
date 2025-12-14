@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,11 @@ import {
   ScrollView,
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import * as Location from 'expo-location';
 import { useWaiting } from '@/context/WaitingContext';
 import { Square, Hand, X, AlertTriangle, Trash2 } from "lucide-react-native";
 import WaitingDrawer from '@/components/WaitingDrawer';
 import { useJourney } from '@/hook/useJourney';
+import { getCurrentLocation, isWithinRadius } from '@/utils/location';
 
 interface StopBlockProps {
   stopId: string;
@@ -42,7 +42,6 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
   } = useWaiting();
 
   const [isClose, setIsClose] = useState(false);
-  const [userLocation, setUserLocation] = useState<Location.LocationObjectCoords | null>(null);
   const [showDrawer, setShowDrawer] = useState(false);
   const [hasActiveJourney, setHasActiveJourney] = useState(false);
   const [isCheckingJourney, setIsCheckingJourney] = useState(true);
@@ -51,15 +50,15 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
   const [journeyToCancel, setJourneyToCancel] = useState<any>(null);
   const [cancelling, setCancelling] = useState(false);
   
-  // Use the useJourney hook to get real-time active journey status
   const { activeJourney, loading: journeyLoading, refreshActiveJourney } = useJourney();
   
-  // Shimmer animation ref
   const shimmerAnim = useRef(new Animated.Value(0)).current;
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoDeleteTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Start shimmer animation
-    Animated.loop(
+    const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(shimmerAnim, {
           toValue: 1,
@@ -72,8 +71,14 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
           useNativeDriver: true,
         }),
       ])
-    ).start();
-  }, []);
+    );
+    
+    animation.start();
+    
+    return () => {
+      animation.stop();
+    };
+  }, [shimmerAnim]);
 
   const shimmerTranslate = shimmerAnim.interpolate({
     inputRange: [0, 1],
@@ -85,38 +90,58 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
     outputRange: [0.3, 0.7, 0.3],
   });
 
+  // Get user location only once
   useEffect(() => {
-    (async () => {
+    let mounted = true;
+    
+    const checkLocation = async () => {
+      if (!mounted) return;
+      
       setLocationLoading(true);
       try {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission to access location was denied');
-          setLocationLoading(false);
-          return;
+        const location = await getCurrentLocation();
+        if (mounted && location) {
+          const close = isWithinRadius(
+            location.latitude,
+            location.longitude,
+            stopLocation.latitude,
+            stopLocation.longitude,
+            radius
+          );
+          setIsClose(close);
         }
-
-        let location = await Location.getCurrentPositionAsync({});
-        setUserLocation(location.coords);
       } catch (error) {
-        console.error('Error getting location:', error);
+        console.error('Error checking location:', error);
       } finally {
-        setLocationLoading(false);
+        if (mounted) {
+          setLocationLoading(false);
+        }
       }
-    })();
-  }, []);
+    };
 
-  // Check for active journey using the useJourney hook
+    checkLocation();
+    
+    // Check location periodically instead of watching
+    const locationInterval = setInterval(checkLocation, 30000);
+    
+    return () => {
+      mounted = false;
+      clearInterval(locationInterval);
+    };
+  }, [stopLocation, radius]);
+
   useEffect(() => {
     if (!journeyLoading) {
-      // Update hasActiveJourney based on the activeJourney from useJourney hook
-      setHasActiveJourney(!!activeJourney);
+      const hasJourney = !!activeJourney;
+      setHasActiveJourney(hasJourney);
       setIsCheckingJourney(false);
+      if (hasJourney) {
+        setJourneyToCancel(activeJourney);
+      }
     }
   }, [journeyLoading, activeJourney]);
 
-  // Also check for journey_participants to be safe
-  const checkActiveJourneyParticipation = async () => {
+  const checkActiveJourneyParticipation = useCallback(async () => {
     try {
       setIsCheckingJourney(true);
       const session = await supabase.auth.getSession();
@@ -128,87 +153,76 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
         return;
       }
 
-      // Check if user is an active participant in any in-progress journey
-      const { data, error } = await supabase
-        .from('journey_participants')
-        .select(`
-          id,
-          journeys!inner(
+      if (!activeJourney) {
+        const { data, error } = await supabase
+          .from('journey_participants')
+          .select(`
             id,
-            status,
-            last_ping_time,
-            routes!inner(
-              name,
-              start_point,
-              end_point
+            journeys!inner(
+              id,
+              status,
+              last_ping_time,
+              routes!inner(
+                name,
+                start_point,
+                end_point
+              )
             )
-          )
-        `)
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .eq('journeys.status', 'in_progress')
-        .gte('journeys.last_ping_time', new Date(Date.now() - 30 * 60 * 1000).toISOString()) // Last 30 minutes
-        .maybeSingle();
+          `)
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .eq('journeys.status', 'in_progress')
+          .gte('journeys.last_ping_time', new Date(Date.now() - 30 * 60 * 1000).toISOString())
+          .maybeSingle();
 
-      if (error) {
-        console.error('Error checking active journey participation:', error);
-        // Fall back to useJourney hook result
-        setHasActiveJourney(!!activeJourney);
-        setJourneyToCancel(activeJourney);
-      } else {
-        setHasActiveJourney(!!data || !!activeJourney);
-        setJourneyToCancel(data?.journeys || activeJourney);
+        if (error) {
+          console.error('Error checking active journey participation:', error);
+        } else if (data) {
+          setHasActiveJourney(true);
+          setJourneyToCancel(data.journeys);
+        }
       }
     } catch (error) {
       console.error('Error checking journey participation:', error);
-      setHasActiveJourney(!!activeJourney);
-      setJourneyToCancel(activeJourney);
     } finally {
       setIsCheckingJourney(false);
     }
-  };
+  }, [activeJourney]);
 
-  // Add a periodic check (every 5 seconds) as a fallback
   useEffect(() => {
-    // Initial check
     checkActiveJourneyParticipation();
     
-    // Set up interval for periodic checking
-    const interval = setInterval(() => {
+    checkIntervalRef.current = setInterval(() => {
       checkActiveJourneyParticipation();
-    }, 5000); // Check every 5 seconds
+    }, 30000);
     
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+        checkIntervalRef.current = null;
+      }
+    };
+  }, [checkActiveJourneyParticipation]);
 
   useEffect(() => {
-    if (userLocation && stopLocation) {
-      const distance = calculateDistance(
-        userLocation.latitude,
-        userLocation.longitude,
-        stopLocation.latitude,
-        stopLocation.longitude
-      );
-      setIsClose(distance <= radius);
-    }
-  }, [userLocation, stopLocation, radius]);
+    return () => {
+      // Clean up all intervals and timers
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+        checkIntervalRef.current = null;
+      }
+      if (autoDeleteTimerRef.current) {
+        clearTimeout(autoDeleteTimerRef.current);
+        autoDeleteTimerRef.current = null;
+      }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    };
+  }, []);
 
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLon = (lon2 - lon1) * (Math.PI / 180);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * (Math.PI / 180)) *
-        Math.cos(lat2 * (Math.PI / 180)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
-  const handleMarkAsWaiting = () => {
-    // Don't allow marking as waiting if user is participating in an active journey
+  const handleMarkAsWaiting = useCallback(() => {
     if (hasActiveJourney) {
       Alert.alert(
         "Active Journey",
@@ -225,141 +239,131 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
       return;
     }
     setShowDrawer(true);
-  };
+  }, [hasActiveJourney]);
 
-const handleCancelJourney = async () => {
-  if (!journeyToCancel) return;
-  
-  setCancelling(true);
-  try {
-    const session = await supabase.auth.getSession();
-    const userId = session.data.session?.user.id;
+  const handleCancelJourney = useCallback(async () => {
+    if (!journeyToCancel) return;
     
-    if (!userId) {
-      Alert.alert('Error', 'User not found');
-      return;
-    }
-
-    console.log('Deleting journey participant entry:', journeyToCancel.id);
-
-    // 1. Remove user from stop_waiting
-    const { error: waitingError } = await supabase
-      .from('stop_waiting')
-      .delete()
-      .eq('user_id', userId)
-      .eq('journey_id', journeyToCancel.id);
-
-    if (waitingError) {
-      console.error('Error removing from stop_waiting:', waitingError);
-    }
-
-    // 2. DELETE the journey participant entry completely (not just deactivate)
-    const { error: deleteError } = await supabase
-      .from('journey_participants')
-      .delete()
-      .eq('user_id', userId)
-      .eq('journey_id', journeyToCancel.id);
-
-    if (deleteError) {
-      console.error('Error deleting journey participant:', deleteError);
-    } else {
-      console.log('✅ Journey participant entry deleted');
-    }
-
-    // 3. Check if there are any other active participants left
-    const { data: remainingParticipants, error: checkError } = await supabase
-      .from('journey_participants')
-      .select('id')
-      .eq('journey_id', journeyToCancel.id)
-      .eq('is_active', true);
-
-    if (checkError) {
-      console.error('Error checking remaining participants:', checkError);
-    }
-
-    // 4. If no active participants left, mark journey as cancelled
-    if (!remainingParticipants || remainingParticipants.length === 0) {
-      console.log('No active participants left, marking journey as cancelled');
+    setCancelling(true);
+    try {
+      const session = await supabase.auth.getSession();
+      const userId = session.data.session?.user.id;
       
-      const { error: updateError } = await supabase
-        .from('journeys')
-        .update({
-          status: 'cancelled',
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', journeyToCancel.id);
-
-      if (updateError) {
-        console.error('Error updating journey status:', updateError);
-      } else {
-        console.log('✅ Journey marked as cancelled');
+      if (!userId) {
+        Alert.alert('Error', 'User not found');
+        return;
       }
-    }
 
-    // 5. If user was a driver, update driver_journeys
-    const { data: driverData } = await supabase
-      .from('drivers')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('is_verified', true)
-      .eq('is_active', true)
-      .maybeSingle();
+      console.log('Deleting journey participant entry:', journeyToCancel.id);
 
-    if (driverData && journeyToCancel.driver_id === driverData.id) {
-      console.log('User is a driver, updating driver_journeys');
-      
-      await supabase
-        .from('driver_journeys')
-        .update({
-          status: 'cancelled',
-          completed_at: new Date().toISOString()
-        })
-        .eq('driver_id', driverData.id)
+      const { error: waitingError } = await supabase
+        .from('stop_waiting')
+        .delete()
+        .eq('user_id', userId)
         .eq('journey_id', journeyToCancel.id);
+
+      if (waitingError) {
+        console.error('Error removing from stop_waiting:', waitingError);
+      }
+
+      const { error: deleteError } = await supabase
+        .from('journey_participants')
+        .delete()
+        .eq('user_id', userId)
+        .eq('journey_id', journeyToCancel.id);
+
+      if (deleteError) {
+        console.error('Error deleting journey participant:', deleteError);
+      } else {
+        console.log('✅ Journey participant entry deleted');
+      }
+
+      const { data: remainingParticipants, error: checkError } = await supabase
+        .from('journey_participants')
+        .select('id')
+        .eq('journey_id', journeyToCancel.id)
+        .eq('is_active', true);
+
+      if (checkError) {
+        console.error('Error checking remaining participants:', checkError);
+      }
+
+      if (!remainingParticipants || remainingParticipants.length === 0) {
+        console.log('No active participants left, marking journey as cancelled');
+        
+        const { error: updateError } = await supabase
+          .from('journeys')
+          .update({
+            status: 'cancelled',
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', journeyToCancel.id);
+
+        if (updateError) {
+          console.error('Error updating journey status:', updateError);
+        } else {
+          console.log('✅ Journey marked as cancelled');
+        }
+      }
+
+      const { data: driverData } = await supabase
+        .from('drivers')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('is_verified', true)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (driverData && journeyToCancel.driver_id === driverData.id) {
+        console.log('User is a driver, updating driver_journeys');
+        
+        await supabase
+          .from('driver_journeys')
+          .update({
+            status: 'cancelled',
+            completed_at: new Date().toISOString()
+          })
+          .eq('driver_id', driverData.id)
+          .eq('journey_id', journeyToCancel.id);
+      }
+
+      const { error: completedDeleteError } = await supabase
+        .from('completed_journeys')
+        .delete()
+        .eq('user_id', userId)
+        .eq('journey_id', journeyToCancel.id);
+
+      if (completedDeleteError && completedDeleteError.code !== 'PGRST116') {
+        console.error('Error deleting from completed_journeys:', completedDeleteError);
+      }
+
+      if (refreshActiveJourney) {
+        await refreshActiveJourney();
+      }
+
+      setHasActiveJourney(false);
+      setJourneyToCancel(null);
+      setShowCancelModal(false);
+      
+      Alert.alert(
+        'Journey Cancelled',
+        'Your active journey has been cancelled and removed successfully.',
+        [{ text: 'OK' }]
+      );
+
+      setTimeout(() => {
+        checkActiveJourneyParticipation();
+      }, 500);
+
+    } catch (error) {
+      console.error('Error cancelling journey:', error);
+      Alert.alert('Error', 'Failed to cancel journey. Please try again.');
+    } finally {
+      setCancelling(false);
     }
+  }, [journeyToCancel, refreshActiveJourney, checkActiveJourneyParticipation]);
 
-    // 6. Also check and delete any completed_journeys entries for this user and journey
-    const { error: completedDeleteError } = await supabase
-      .from('completed_journeys')
-      .delete()
-      .eq('user_id', userId)
-      .eq('journey_id', journeyToCancel.id);
-
-    if (completedDeleteError && completedDeleteError.code !== 'PGRST116') {
-      console.error('Error deleting from completed_journeys:', completedDeleteError);
-    }
-
-    // 7. Refresh the active journey status
-    if (refreshActiveJourney) {
-      await refreshActiveJourney();
-    }
-
-    // 8. Reset local state
-    setHasActiveJourney(false);
-    setJourneyToCancel(null);
-    setShowCancelModal(false);
-    
-    Alert.alert(
-      'Journey Cancelled',
-      'Your active journey has been cancelled and removed successfully.',
-      [{ text: 'OK' }]
-    );
-
-    // 9. Force re-check journey status after a short delay
-    setTimeout(() => {
-      checkActiveJourneyParticipation();
-    }, 500);
-
-  } catch (error) {
-    console.error('Error cancelling journey:', error);
-    Alert.alert('Error', 'Failed to cancel journey. Please try again.');
-  } finally {
-    setCancelling(false);
-  }
-};
-
-  const handleWaitingSet = async (routeId: string, transportType: string) => {
-    // Double check before setting waiting status
+  const handleWaitingSet = useCallback(async (routeId: string, transportType: string) => {
     await checkActiveJourneyParticipation();
     
     if (hasActiveJourney) {
@@ -403,9 +407,18 @@ const handleCancelJourney = async () => {
       });
       startAutoDeleteTimer(data.created_at);
     }
-  };
+  }, [hasActiveJourney, checkActiveJourneyParticipation, stopId, setWaitingStatus]);
 
-  const startAutoDeleteTimer = (createdAt: string) => {
+  const startAutoDeleteTimer = useCallback((createdAt: string) => {
+    if (autoDeleteTimerRef.current) {
+      clearTimeout(autoDeleteTimerRef.current);
+      autoDeleteTimerRef.current = null;
+    }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+
     const creationTime = new Date(createdAt).getTime();
     const currentTime = new Date().getTime();
     const elapsedTime = (currentTime - creationTime) / 1000;
@@ -413,24 +426,19 @@ const handleCancelJourney = async () => {
 
     if (remainingTime > 0) {
       setAutoDeleteCountdown(Math.floor(remainingTime));
-      const timer = setTimeout(() => {
+      autoDeleteTimerRef.current = setTimeout(() => {
         deleteWaitingStatus();
       }, remainingTime * 1000);
 
-      const countdownInterval = setInterval(() => {
+      countdownIntervalRef.current = setInterval(() => {
         setAutoDeleteCountdown((prev) => prev - 1);
       }, 1000);
-
-      return () => {
-        clearTimeout(timer);
-        clearInterval(countdownInterval);
-      };
     } else {
       deleteWaitingStatus();
     }
-  };
+  }, [setAutoDeleteCountdown]);
 
-  const deleteWaitingStatus = async () => {
+  const deleteWaitingStatus = useCallback(async () => {
     const userId = (await supabase.auth.getSession()).data.session?.user.id;
     if (!userId) return;
 
@@ -445,45 +453,52 @@ const handleCancelJourney = async () => {
       setCountdown(5);
       setAutoDeleteCountdown(300);
     }
-  };
+  }, [stopId, setWaitingStatus, setCountdown, setAutoDeleteCountdown]);
 
-  const handlePickedUp = () => {
+  const handlePickedUp = useCallback(() => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+
     let timer = 5;
     setCountdown(timer);
-    const interval = setInterval(() => {
+    countdownIntervalRef.current = setInterval(() => {
       setCountdown((prev) => prev - 1);
       timer -= 1;
       if (timer === 0) {
-        clearInterval(interval);
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
         deleteWaitingStatus();
       }
     }, 1000);
-  };
+  }, [setCountdown, deleteWaitingStatus]);
 
-  const formatCountdown = (seconds: number) => {
+  const formatCountdown = useCallback((seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
-  };
+  }, []);
 
-  // Cancel Journey Modal
-  const renderCancelModal = () => (
+  const renderCancelModal = useCallback(() => (
     <Modal
       visible={showCancelModal}
       transparent
       animationType="fade"
-      onRequestClose={() => setShowCancelModal(false)}
+      onRequestClose={() => !cancelling && setShowCancelModal(false)}
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <View style={styles.warningIcon}>
-              <AlertTriangle size={32} color="#f59e0b" />
+              <AlertTriangle size={32} color="#f50b0bff" />
             </View>
             <Text style={styles.modalTitle}>Cancel Journey</Text>
             <TouchableOpacity 
               style={styles.closeButton}
-              onPress={() => setShowCancelModal(false)}
+              onPress={() => !cancelling && setShowCancelModal(false)}
               disabled={cancelling}
             >
               <X size={24} color="#666666" />
@@ -536,7 +551,7 @@ const handleCancelJourney = async () => {
           <View style={styles.modalFooter}>
             <TouchableOpacity 
               style={[styles.cancelButton, cancelling && styles.buttonDisabled]}
-              onPress={() => setShowCancelModal(false)}
+              onPress={() => !cancelling && setShowCancelModal(false)}
               disabled={cancelling}
             >
               <Text style={styles.cancelButtonText}>Keep Journey</Text>
@@ -559,9 +574,8 @@ const handleCancelJourney = async () => {
         </View>
       </View>
     </Modal>
-  );
+  ), [showCancelModal, cancelling, journeyToCancel, handleCancelJourney]);
 
-  // Show skeleton loading state while checking location or journey status
   if (locationLoading || isCheckingJourney) {
     return (
       <View style={styles.container}>
@@ -614,10 +628,9 @@ const handleCancelJourney = async () => {
         </TouchableOpacity>
       ) : (
         <>
-          {/* Show different buttons based on journey status */}
           {hasActiveJourney ? (
             <TouchableOpacity
-              style={[styles.button, { backgroundColor: '#f59e0b' }]}
+              style={[styles.button, { backgroundColor: '#f51b0bff' }]}
               onPress={() => setShowCancelModal(true)}
             >
               <Trash2 size={20} color="white" />
@@ -713,7 +726,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -874,4 +886,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default StopBlock;
+export default React.memo(StopBlock);
