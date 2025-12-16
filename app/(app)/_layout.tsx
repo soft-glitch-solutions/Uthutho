@@ -187,7 +187,7 @@ const CustomDrawerContent = (props) => {
         </View>
 
         <Text style={[styles.footerText, { color: `${colors.text}40` }]}>
-          Version 1.5.1
+          Version 1.8.2
         </Text>
       </View>
     </View>

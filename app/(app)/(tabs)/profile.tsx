@@ -395,7 +395,7 @@ export default function ProfileScreen() {
               {/* App Info */}
               <View style={[styles.appInfo, isDesktop && styles.appInfoDesktop]}>
                 <Text style={[styles.appInfoText, isDesktop && styles.appInfoTextDesktop]}>
-                  Uthutho v1.5.1
+                  Uthutho v1.8.2
                 </Text>
                 <Text style={[styles.motto, isDesktop && styles.mottoDesktop]}>
                   "Izindlela zakho ziqinisekisa impumelelo!"
@@ -453,7 +453,7 @@ export default function ProfileScreen() {
             {/* App Info */}
             <View style={styles.appInfo}>
               <Text style={styles.appInfoText}>
-                Uthutho v1.5.1
+                Uthutho v1.8.2
               </Text>
               <Text style={styles.motto}>
                 "Izindlela zakho ziqinisekisa impumelelo!"

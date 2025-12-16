@@ -2,7 +2,7 @@
   "expo": {
     "name": "Uthutho",
     "slug": "uthutho",
-    "version": "1.5.1",
+    "version": "1.8.2",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
     "scheme": "uthutho",
@@ -30,7 +30,7 @@
     },
     "android": {
       "package": "com.softglitchsolutions.uthutho",
-      "versionCode": 21,
+      "versionCode": 25,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#000000"
