@@ -94,6 +94,20 @@ export interface StopWaiting {
   };
 }
 
+// FIXED: Make JourneyStop an export
+export interface JourneyStop {
+  id: string;
+  name: string;
+  order_number: number;
+  passed: boolean;
+  current: boolean;
+  upcoming: boolean;
+  cancelled?: boolean;
+  latitude?: number;
+  longitude?: number;
+  hasWaitingPassengers?: boolean; // Add this if used
+}
+
 export interface JourneyStats {
   total_distance?: number;
   total_duration?: number;

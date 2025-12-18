@@ -1,4 +1,4 @@
-// app/trips.tsx
+// app/trips.tsx - COMPLETE FIXED VERSION
 import React, { useState, useMemo } from 'react';
 import {
   View,
@@ -39,6 +39,7 @@ import { format } from 'date-fns';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
+const isSmallScreen = SCREEN_WIDTH <= 375;
 
 export default function TripHistoryScreen() {
   const router = useRouter();
@@ -57,13 +58,17 @@ export default function TripHistoryScreen() {
   };
 
   const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
+    if (!seconds || seconds <= 0) return '0m 0s';
+    
+    const totalSeconds = Math.max(0, parseInt(seconds.toString(), 10) || 0);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
     
     if (hours > 0) {
-      return `${hours}h ${minutes}m`;
+      return `${hours}h ${minutes}m ${secs}s`;
     }
-    return `${minutes}m`;
+    return `${minutes}m ${secs}s`;
   };
 
   // Group trips by month
@@ -71,8 +76,8 @@ export default function TripHistoryScreen() {
     const groups: { [key: string]: CompletedJourney[] } = {};
     
     trips.forEach(trip => {
-      const monthKey = format(new Date(trip.completed_at), 'yyyy-MM'); // e.g., "2024-01"
-      const monthLabel = format(new Date(trip.completed_at), 'MMMM yyyy'); // e.g., "January 2024"
+      const monthKey = format(new Date(trip.completed_at), 'yyyy-MM');
+      const monthLabel = format(new Date(trip.completed_at), 'MMMM yyyy');
       
       if (!groups[monthLabel]) {
         groups[monthLabel] = [];
@@ -151,7 +156,7 @@ export default function TripHistoryScreen() {
   // Desktop Layout Component
   const DesktopTripHistory = () => {
     return (
-      <View style={styles.containerDesktop}>
+      <View style={styles.container}>
         {/* Desktop Header */}
         <View style={styles.desktopHeader}>
           <TouchableOpacity style={styles.desktopBackButton} onPress={() => router.back()}>
@@ -179,34 +184,11 @@ export default function TripHistoryScreen() {
         <View style={styles.desktopLayout}>
           {/* Left Column - Stats */}
           <View style={styles.leftColumn}>
-            <View style={styles.desktopCardOverview}>
-              <View style={styles.cardBalanceContainer}>
-                <Text style={styles.balanceLabel}>Total Distance</Text>
-                <Text style={styles.balanceValue}>
-                  {Math.floor(stats.totalTrips * 10)}km
-                </Text>
-              </View>
-              <View style={styles.cardInfo}>
-                <View style={styles.infoItem}>
-                  <Calendar size={16} color="#666666" />
-                  <Text style={styles.infoLabel}>
-                    {currentMonthTrips.length} trips this month
-                  </Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <TrendingUp size={16} color="#666666" />
-                  <Text style={styles.infoLabel}>
-                    {stats.totalPoints} total points earned
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Quick Stats - Desktop Version */}
-            <View style={[styles.quickStats, styles.quickStatsDesktop]}>
+            {/* Quick Stats */}
+            <View style={styles.quickStatsDesktop}>
               <View style={styles.quickStatsHeader}>
                 <BarChart3 size={20} color="#1ea2b1" />
-                <Text style={styles.quickStatsTitle}>Trip Statistics</Text>
+                <Text style={styles.quickStatsTitle}>Your Stats</Text>
               </View>
               <View style={styles.quickStatsGrid}>
                 <View style={[styles.statItemDesktop, { borderColor: '#1ea2b1' }]}>
@@ -236,42 +218,55 @@ export default function TripHistoryScreen() {
               </View>
             </View>
 
+            {/* Total Distance Card */}
+            <View style={styles.totalDistanceCard}>
+              <Text style={styles.distanceLabel}>Total Distance</Text>
+              <Text style={styles.distanceValue}>
+                {Math.floor(stats.totalTrips * 10)}km
+              </Text>
+              <Text style={styles.distanceSubtitle}>
+                Estimated from {stats.totalTrips} journeys
+              </Text>
+            </View>
+
             {/* Journey Map Placeholder */}
-            <View style={styles.activityGraphWrapper}>
-              <View style={styles.journeyMapPlaceholder}>
-                <View style={styles.mapPlaceholderContent}>
-                  <RouteIcon size={48} color="#1ea2b1" />
-                  <Text style={styles.mapPlaceholderTitle}>Your Journey Map</Text>
-                  <Text style={styles.mapPlaceholderSubtitle}>
-                    Visualize your travel patterns
-                  </Text>
+            <View style={styles.journeyMapPlaceholder}>
+              <View style={styles.mapPlaceholderContent}>
+                <RouteIcon size={48} color="#1ea2b1" />
+                <Text style={styles.mapPlaceholderTitle}>Your Journey Map</Text>
+                <Text style={styles.mapPlaceholderSubtitle}>
+                  Visualize your travel patterns
+                </Text>
+              </View>
+              <View style={styles.mapStats}>
+                <View style={styles.mapStatItem}>
+                  <Text style={styles.mapStatValue}>{stats.totalTrips}</Text>
+                  <Text style={styles.mapStatLabel}>Trips</Text>
                 </View>
-                <View style={styles.mapStats}>
-                  <View style={styles.mapStatItem}>
-                    <Text style={styles.mapStatValue}>{stats.totalTrips}</Text>
-                    <Text style={styles.mapStatLabel}>Trips</Text>
-                  </View>
-                  <View style={styles.mapStatDivider} />
-                  <View style={styles.mapStatItem}>
-                    <Text style={styles.mapStatValue}>
-                      {Math.floor(stats.totalTrips * 10)}km
-                    </Text>
-                    <Text style={styles.mapStatLabel}>Distance</Text>
-                  </View>
-                  <View style={styles.mapStatDivider} />
-                  <View style={styles.mapStatItem}>
-                    <Text style={styles.mapStatValue}>
-                      {stats.totalCo2Saved.toFixed(0)}kg
-                    </Text>
-                    <Text style={styles.mapStatLabel}>CO₂ Saved</Text>
-                  </View>
+                <View style={styles.mapStatDivider} />
+                <View style={styles.mapStatItem}>
+                  <Text style={styles.mapStatValue}>
+                    {Math.floor(stats.totalTrips * 10)}km
+                  </Text>
+                  <Text style={styles.mapStatLabel}>Distance</Text>
+                </View>
+                <View style={styles.mapStatDivider} />
+                <View style={styles.mapStatItem}>
+                  <Text style={styles.mapStatValue}>
+                    {stats.totalCo2Saved.toFixed(0)}kg
+                  </Text>
+                  <Text style={styles.mapStatLabel}>CO₂ Saved</Text>
                 </View>
               </View>
             </View>
           </View>
 
           {/* Right Column - Trip List */}
-          <ScrollView style={styles.rightColumn} showsVerticalScrollIndicator={true}>
+          <ScrollView 
+            style={styles.rightColumn} 
+            showsVerticalScrollIndicator={true}
+            contentContainerStyle={styles.rightColumnContent}
+          >
             <Text style={styles.sectionTitleDesktop}>Journey History</Text>
             
             {tripsByMonth.length === 0 ? (
@@ -304,89 +299,97 @@ export default function TripHistoryScreen() {
     );
   };
 
-  const renderTripCard = (trip: CompletedJourney, isDesktop: boolean = false) => (
-    <TouchableOpacity
-      key={trip.id}
-      style={[styles.tripCard, isDesktop && styles.tripCardDesktop]}
-      onPress={() => handleRateTrip(trip)}
-      onLongPress={() => confirmDeleteTrip(trip)}
-    >
-      <View style={styles.tripHeader}>
-        <View style={styles.routeInfo}>
-          <Text style={[styles.routeName, isDesktop && styles.routeNameDesktop]} numberOfLines={1}>
-            {trip.route_name}
-          </Text>
-          <View style={[styles.transportBadge, isDesktop && styles.transportBadgeDesktop]}>
-            <Car size={isDesktop ? 14 : 12} color="#ffffff" />
-            <Text style={[styles.transportText, isDesktop && styles.transportTextDesktop]}>
-              {trip.transport_type}
+  const renderTripCard = (trip: CompletedJourney, isDesktop: boolean = false) => {
+    // Fix duration display for each trip
+    const tripDuration = trip.duration_seconds || 0;
+    const durationDisplay = formatDuration(tripDuration);
+    
+    return (
+      <TouchableOpacity
+        key={trip.id}
+        style={[styles.tripCard, isDesktop && styles.tripCardDesktop]}
+        onPress={() => handleRateTrip(trip)}
+        onLongPress={() => confirmDeleteTrip(trip)}
+      >
+        <View style={styles.tripHeader}>
+          <View style={styles.routeInfo}>
+            <Text style={[styles.routeName, isDesktop && styles.routeNameDesktop]} numberOfLines={1}>
+              {trip.route_name || 'Unknown Route'}
+            </Text>
+            {trip.transport_type && (
+              <View style={[styles.transportBadge, isDesktop && styles.transportBadgeDesktop]}>
+                <Car size={isDesktop ? 14 : 12} color="#ffffff" />
+                <Text style={[styles.transportText, isDesktop && styles.transportTextDesktop]}>
+                  {trip.transport_type}
+                </Text>
+              </View>
+            )}
+          </View>
+          
+          <View style={styles.tripDate}>
+            <Calendar size={isDesktop ? 14 : 12} color="#666666" />
+            <Text style={[styles.dateText, isDesktop && styles.dateTextDesktop]}>
+              {format(new Date(trip.completed_at), 'MMM d')}
             </Text>
           </View>
         </View>
         
-        <View style={styles.tripDate}>
-          <Calendar size={isDesktop ? 14 : 12} color="#666666" />
-          <Text style={[styles.dateText, isDesktop && styles.dateTextDesktop]}>
-            {format(new Date(trip.completed_at), 'MMM d')}
+        <View style={[styles.routePoints, isDesktop && styles.routePointsDesktop]}>
+          <Text style={[styles.pointText, isDesktop && styles.pointTextDesktop]} numberOfLines={1}>
+            {trip.start_point || 'Start point'}
           </Text>
-        </View>
-      </View>
-      
-      <View style={[styles.routePoints, isDesktop && styles.routePointsDesktop]}>
-        <Text style={[styles.pointText, isDesktop && styles.pointTextDesktop]} numberOfLines={1}>
-          {trip.start_point}
-        </Text>
-        <ChevronRight size={isDesktop ? 14 : 12} color="#666666" />
-        <Text style={[styles.pointText, isDesktop && styles.pointTextDesktop]} numberOfLines={1}>
-          {trip.end_point}
-        </Text>
-      </View>
-      
-      <View style={[styles.tripStats, isDesktop && styles.tripStatsDesktop]}>
-        <View style={[styles.statBadge, isDesktop && styles.statBadgeDesktop]}>
-          <Clock size={isDesktop ? 14 : 12} color="#1ea2b1" />
-          <Text style={[styles.statBadgeText, isDesktop && styles.statBadgeTextDesktop]}>
-            {formatDuration(trip.duration_seconds)}
+          <ChevronRight size={isDesktop ? 14 : 12} color="#666666" />
+          <Text style={[styles.pointText, isDesktop && styles.pointTextDesktop]} numberOfLines={1}>
+            {trip.end_point || 'End point'}
           </Text>
         </View>
         
-        {trip.co2_saved_kg > 0 && (
+        <View style={[styles.tripStats, isDesktop && styles.tripStatsDesktop]}>
           <View style={[styles.statBadge, isDesktop && styles.statBadgeDesktop]}>
-            <Leaf size={isDesktop ? 14 : 12} color="#10b981" />
+            <Clock size={isDesktop ? 14 : 12} color="#1ea2b1" />
             <Text style={[styles.statBadgeText, isDesktop && styles.statBadgeTextDesktop]}>
-              {trip.co2_saved_kg.toFixed(1)}kg CO₂
+              {durationDisplay}
             </Text>
+          </View>
+          
+          {trip.co2_saved_kg > 0 && (
+            <View style={[styles.statBadge, isDesktop && styles.statBadgeDesktop]}>
+              <Leaf size={isDesktop ? 14 : 12} color="#10b981" />
+              <Text style={[styles.statBadgeText, isDesktop && styles.statBadgeTextDesktop]}>
+                {trip.co2_saved_kg.toFixed(1)}kg CO₂
+              </Text>
+            </View>
+          )}
+          
+          {trip.points_earned > 0 && (
+            <View style={[styles.statBadge, isDesktop && styles.statBadgeDesktop]}>
+              <Award size={isDesktop ? 14 : 12} color="#f59e0b" />
+              <Text style={[styles.statBadgeText, isDesktop && styles.statBadgeTextDesktop]}>
+                +{trip.points_earned} pts
+              </Text>
+            </View>
+          )}
+        </View>
+        
+        {trip.rating && trip.rating > 0 && (
+          <View style={styles.ratingContainer}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Star
+                key={star}
+                size={isDesktop ? 14 : 12}
+                color={star <= trip.rating! ? '#fbbf24' : '#666666'}
+                fill={star <= trip.rating! ? '#fbbf24' : 'transparent'}
+              />
+            ))}
           </View>
         )}
-        
-        {trip.points_earned > 0 && (
-          <View style={[styles.statBadge, isDesktop && styles.statBadgeDesktop]}>
-            <Award size={isDesktop ? 14 : 12} color="#f59e0b" />
-            <Text style={[styles.statBadgeText, isDesktop && styles.statBadgeTextDesktop]}>
-              +{trip.points_earned} pts
-            </Text>
-          </View>
-        )}
-      </View>
-      
-      {trip.rating && (
-        <View style={styles.ratingContainer}>
-          {[1, 2, 3, 4, 5].map((star) => (
-            <Star
-              key={star}
-              size={isDesktop ? 14 : 12}
-              color={star <= trip.rating! ? '#fbbf24' : '#666666'}
-              fill={star <= trip.rating! ? '#fbbf24' : 'transparent'}
-            />
-          ))}
-        </View>
-      )}
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const renderMonthSection = (monthLabel: string, monthTrips: CompletedJourney[], isDesktop: boolean = false) => {
     const isExpanded = isMonthExpanded(monthLabel);
-    const totalDuration = monthTrips.reduce((sum, trip) => sum + trip.duration_seconds, 0);
+    const totalDuration = monthTrips.reduce((sum, trip) => sum + (trip.duration_seconds || 0), 0);
     const totalPoints = monthTrips.reduce((sum, trip) => sum + (trip.points_earned || 0), 0);
     const totalCO2 = monthTrips.reduce((sum, trip) => sum + (trip.co2_saved_kg || 0), 0);
 
@@ -443,11 +446,11 @@ export default function TripHistoryScreen() {
   };
 
   const renderHeader = () => (
-    <View style={styles.header}>
+    <View style={[styles.header, isSmallScreen && styles.smallScreenHeader]}>
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <ArrowLeft size={24} color="#ffffff" />
       </TouchableOpacity>
-      <Text style={styles.headerTitle}>Trip History</Text>
+      <Text style={[styles.headerTitle, isSmallScreen && styles.smallScreenHeaderTitle]}>Trip History</Text>
       <TouchableOpacity style={styles.addButton} onPress={onRefresh}>
         <Text style={styles.refreshText}>Refresh</Text>
       </TouchableOpacity>
@@ -485,7 +488,10 @@ export default function TripHistoryScreen() {
             tintColor="#1ea2b1"
           />
         }
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isSmallScreen && styles.smallScreenScrollContent
+        ]}
       >
         {error ? (
           <View style={styles.errorContainer}>
@@ -496,62 +502,125 @@ export default function TripHistoryScreen() {
           </View>
         ) : (
           <>
-            <View style={styles.statsContainer}>
-              <View style={styles.statCard}>
+            <View style={[
+              styles.statsContainer,
+              isSmallScreen && styles.smallScreenStatsContainer
+            ]}>
+              <View style={[
+                styles.statCard,
+                isSmallScreen && styles.smallScreenStatCard
+              ]}>
                 <View style={styles.statIcon}>
                   <TrendingUp size={20} color="#1ea2b1" />
                 </View>
-                <Text style={styles.statNumber}>{stats.totalTrips}</Text>
-                <Text style={styles.statLabel}>Total Trips</Text>
+                <Text style={[
+                  styles.statNumber,
+                  isSmallScreen && styles.smallScreenStatNumber
+                ]}>{stats.totalTrips}</Text>
+                <Text style={[
+                  styles.statLabel,
+                  isSmallScreen && styles.smallScreenStatLabel
+                ]}>Total Trips</Text>
               </View>
               
-              <View style={styles.statCard}>
+              <View style={[
+                styles.statCard,
+                isSmallScreen && styles.smallScreenStatCard
+              ]}>
                 <View style={styles.statIcon}>
                   <Award size={20} color="#f59e0b" />
                 </View>
-                <Text style={styles.statNumber}>{stats.totalPoints}</Text>
-                <Text style={styles.statLabel}>Points</Text>
+                <Text style={[
+                  styles.statNumber,
+                  isSmallScreen && styles.smallScreenStatNumber
+                ]}>{stats.totalPoints}</Text>
+                <Text style={[
+                  styles.statLabel,
+                  isSmallScreen && styles.smallScreenStatLabel
+                ]}>Points</Text>
               </View>
               
-              <View style={styles.statCard}>
+              <View style={[
+                styles.statCard,
+                isSmallScreen && styles.smallScreenStatCard
+              ]}>
                 <View style={styles.statIcon}>
                   <Leaf size={20} color="#10b981" />
                 </View>
-                <Text style={styles.statNumber}>
+                <Text style={[
+                  styles.statNumber,
+                  isSmallScreen && styles.smallScreenStatNumber
+                ]}>
                   {stats.totalCo2Saved.toFixed(1)}kg
                 </Text>
-                <Text style={styles.statLabel}>CO₂ Saved</Text>
+                <Text style={[
+                  styles.statLabel,
+                  isSmallScreen && styles.smallScreenStatLabel
+                ]}>CO₂ Saved</Text>
               </View>
               
-              <View style={styles.statCard}>
+              <View style={[
+                styles.statCard,
+                isSmallScreen && styles.smallScreenStatCard
+              ]}>
                 <View style={styles.statIcon}>
                   <Calendar size={20} color="#8b5cf6" />
                 </View>
-                <Text style={styles.statNumber}>{currentMonthTrips.length}</Text>
-                <Text style={styles.statLabel}>This Month</Text>
+                <Text style={[
+                  styles.statNumber,
+                  isSmallScreen && styles.smallScreenStatNumber
+                ]}>{currentMonthTrips.length}</Text>
+                <Text style={[
+                  styles.statLabel,
+                  isSmallScreen && styles.smallScreenStatLabel
+                ]}>This Month</Text>
               </View>
             </View>
             
             {tripsByMonth.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <View style={styles.emptyIllustration}>
-                  <Clock size={48} color="#666666" />
+              <View style={[
+                styles.emptyContainer,
+                isSmallScreen && styles.smallScreenEmptyContainer
+              ]}>
+                <View style={[
+                  styles.emptyIllustration,
+                  isSmallScreen && styles.smallScreenEmptyIllustration
+                ]}>
+                  <Clock size={isSmallScreen ? 40 : 48} color="#666666" />
                 </View>
-                <Text style={styles.emptyTitle}>No trips yet</Text>
-                <Text style={styles.emptyText}>
+                <Text style={[
+                  styles.emptyTitle,
+                  isSmallScreen && styles.smallScreenEmptyTitle
+                ]}>No trips yet</Text>
+                <Text style={[
+                  styles.emptyText,
+                  isSmallScreen && styles.smallScreenEmptyText
+                ]}>
                   Complete your first journey to see it here!
                 </Text>
                 <TouchableOpacity
-                  style={styles.findRideButton}
+                  style={[
+                    styles.findRideButton,
+                    isSmallScreen && styles.smallScreenFindRideButton
+                  ]}
                   onPress={() => router.push('/(tabs)')}
                 >
-                  <Plus size={16} color="#ffffff" />
-                  <Text style={styles.findRideText}>Find a Ride</Text>
+                  <Plus size={isSmallScreen ? 14 : 16} color="#ffffff" />
+                  <Text style={[
+                    styles.findRideText,
+                    isSmallScreen && styles.smallScreenFindRideText
+                  ]}>Find a Ride</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <View style={styles.monthsContainer}>
-                <Text style={styles.sectionTitle}>Your Journey History</Text>
+              <View style={[
+                styles.monthsContainer,
+                isSmallScreen && styles.smallScreenMonthsContainer
+              ]}>
+                <Text style={[
+                  styles.sectionTitle,
+                  isSmallScreen && styles.smallScreenSectionTitle
+                ]}>Your Journey History</Text>
                 {tripsByMonth.map(([monthLabel, monthTrips]) => 
                   renderMonthSection(monthLabel, monthTrips)
                 )}
@@ -569,9 +638,15 @@ export default function TripHistoryScreen() {
         onRequestClose={() => setShowRatingModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[
+            styles.modalContent,
+            isSmallScreen && styles.smallScreenModalContent
+          ]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Rate Your Trip</Text>
+              <Text style={[
+                styles.modalTitle,
+                isSmallScreen && styles.smallScreenModalTitle
+              ]}>Rate Your Trip</Text>
               <TouchableOpacity onPress={() => setShowRatingModal(false)}>
                 <X size={24} color="#666666" />
               </TouchableOpacity>
@@ -579,7 +654,10 @@ export default function TripHistoryScreen() {
             
             {selectedTrip && (
               <>
-                <Text style={styles.routeNameModal}>{selectedTrip.route_name}</Text>
+                <Text style={[
+                  styles.routeNameModal,
+                  isSmallScreen && styles.smallScreenRouteNameModal
+                ]}>{selectedTrip.route_name || 'Unknown Route'}</Text>
                 <Text style={styles.dateModal}>
                   {format(new Date(selectedTrip.completed_at), 'PPP')}
                 </Text>
@@ -592,7 +670,7 @@ export default function TripHistoryScreen() {
                       style={styles.starButton}
                     >
                       <Star
-                        size={36}
+                        size={isSmallScreen ? 32 : 36}
                         color={star <= rating ? '#fbbf24' : '#666666'}
                         fill={star <= rating ? '#fbbf24' : 'transparent'}
                       />
@@ -604,7 +682,10 @@ export default function TripHistoryScreen() {
                 </Text>
                 
                 <TextInput
-                  style={styles.notesInput}
+                  style={[
+                    styles.notesInput,
+                    isSmallScreen && styles.smallScreenNotesInput
+                  ]}
                   placeholder="Add notes (optional)"
                   placeholderTextColor="#666666"
                   value={notes}
@@ -614,7 +695,10 @@ export default function TripHistoryScreen() {
                 />
                 
                 <TouchableOpacity
-                  style={styles.submitButton}
+                  style={[
+                    styles.submitButton,
+                    isSmallScreen && styles.smallScreenSubmitButton
+                  ]}
                   onPress={submitRating}
                 >
                   <Text style={styles.submitButtonText}>
@@ -713,63 +797,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   leftColumn: {
-    width: '40%',
+    width: '35%',
     minWidth: 0,
   },
   rightColumn: {
-    width: '60%',
+    width: '65%',
     minWidth: 0,
     flex: 1,
-    paddingRight: 8,
+    paddingRight: 4,
+  },
+  rightColumnContent: {
+    paddingBottom: 40,
   },
   
-  // Desktop Card Overview
-  desktopCardOverview: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  cardBalanceContainer: {
-    marginBottom: 20,
-  },
-  balanceLabel: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 4,
-  },
-  balanceValue: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#1ea2b1',
-  },
-  cardInfo: {
-    gap: 12,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#666666',
-  },
-  
-  // Desktop Quick Stats
+  // Desktop Stats
   quickStatsDesktop: {
     backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 20,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
   },
   quickStatsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   quickStatsTitle: {
     fontSize: 18,
@@ -779,36 +833,62 @@ const styles = StyleSheet.create({
   quickStatsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
+    gap: 12,
   },
   statItemDesktop: {
-    width: 'calc(50% - 8px)',
-    backgroundColor: '#1a1a1a',
+    width: 'calc(50% - 6px)',
+    backgroundColor: '#222222',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
     alignItems: 'center',
   },
   statValueDesktop: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 4,
   },
   statLabelDesktop: {
     fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+  
+  // Desktop Total Distance Card
+  totalDistanceCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    alignItems: 'center',
+  },
+  distanceLabel: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginBottom: 8,
+  },
+  distanceValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#1ea2b1',
+    marginBottom: 4,
+  },
+  distanceSubtitle: {
+    fontSize: 12,
     color: '#666666',
     textAlign: 'center',
   },
   
   // Desktop Journey Map Placeholder
-  activityGraphWrapper: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 20,
-  },
   journeyMapPlaceholder: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
     alignItems: 'center',
   },
   mapPlaceholderContent: {
@@ -816,15 +896,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   mapPlaceholderTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
     marginTop: 12,
     marginBottom: 4,
   },
   mapPlaceholderSubtitle: {
-    fontSize: 14,
-    color: '#666666',
+    fontSize: 13,
+    color: '#9ca3af',
     textAlign: 'center',
   },
   mapStats: {
@@ -840,27 +920,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mapStatValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 4,
   },
   mapStatLabel: {
     fontSize: 12,
-    color: '#666666',
+    color: '#9ca3af',
   },
   mapStatDivider: {
     width: 1,
-    height: 40,
+    height: 32,
     backgroundColor: '#333333',
   },
   
   // Section Title
   sectionTitleDesktop: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   
   // Desktop Empty State
@@ -879,13 +959,13 @@ const styles = StyleSheet.create({
   },
   emptyTitleDesktop: {
     color: '#ffffff',
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 8,
   },
   emptyTextDesktop: {
-    color: '#666666',
-    fontSize: 16,
+    color: '#9ca3af',
+    fontSize: 15,
     textAlign: 'center',
     marginBottom: 32,
     paddingHorizontal: 32,
@@ -911,23 +991,24 @@ const styles = StyleSheet.create({
   },
   monthSectionDesktop: {
     backgroundColor: '#1a1a1a',
-    borderRadius: 20,
+    borderRadius: 16,
     marginBottom: 16,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#2a2a2a',
   },
   monthHeaderDesktop: {
-    padding: 24,
+    padding: 20,
   },
   monthTitleDesktop: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 12,
   },
   monthTripCountDesktop: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
+    color: '#1ea2b1',
   },
   monthSummaryDesktop: {
     gap: 16,
@@ -936,52 +1017,63 @@ const styles = StyleSheet.create({
   monthStatTextDesktop: {
     fontSize: 14,
     fontWeight: '500',
+    color: '#9ca3af',
   },
   
   // Desktop Trip Cards
   tripCardDesktop: {
     backgroundColor: '#222222',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#333333',
   },
   routeNameDesktop: {
-    fontSize: 18,
+    fontSize: 16,
+    fontWeight: 'bold',
     marginBottom: 6,
+    color: '#ffffff',
   },
   transportBadgeDesktop: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: '#1ea2b130',
   },
   transportTextDesktop: {
-    fontSize: 13,
+    fontSize: 12,
     marginLeft: 6,
+    color: '#1ea2b1',
+    fontWeight: '600',
   },
   routePointsDesktop: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   pointTextDesktop: {
-    fontSize: 14,
+    fontSize: 13,
+    color: '#cccccc',
   },
   dateTextDesktop: {
-    fontSize: 14,
-    marginLeft: 6,
-  },
-  tripStatsDesktop: {
-    gap: 12,
-    marginBottom: 12,
-  },
-  statBadgeDesktop: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  statBadgeTextDesktop: {
     fontSize: 13,
     marginLeft: 6,
+    color: '#9ca3af',
+  },
+  tripStatsDesktop: {
+    gap: 10,
+    marginBottom: 10,
+  },
+  statBadgeDesktop: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#333333',
+  },
+  statBadgeTextDesktop: {
+    fontSize: 12,
+    marginLeft: 6,
+    color: '#ffffff',
+    fontWeight: '500',
   },
   
   // Mobile Header Styles
@@ -989,9 +1081,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 20,
+  },
+  smallScreenHeader: {
+    paddingHorizontal: 12,
+    paddingTop: 50,
+    paddingBottom: 16,
   },
   backButton: {
     backgroundColor: '#1a1a1a',
@@ -1002,13 +1099,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#ffffff',
   },
+  smallScreenHeaderTitle: {
+    fontSize: 20,
+  },
   addButton: {
     backgroundColor: '#1a1a1a',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 12,
   },
@@ -1022,13 +1122,16 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
   },
+  smallScreenScrollContent: {
+    padding: 12,
+  },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    color: '#666666',
+    color: '#9ca3af',
     fontSize: 14,
     marginTop: 12,
   },
@@ -1039,6 +1142,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 20,
   },
+  smallScreenStatsContainer: {
+    marginBottom: 16,
+  },
   statCard: {
     flex: 1,
     alignItems: 'center',
@@ -1046,37 +1152,56 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  smallScreenStatCard: {
+    padding: 10,
+    marginHorizontal: 3,
   },
   statIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#222222',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
   statNumber: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 4,
   },
+  smallScreenStatNumber: {
+    fontSize: 15,
+  },
   statLabel: {
     fontSize: 10,
-    color: '#666666',
+    color: '#9ca3af',
     textAlign: 'center',
+  },
+  smallScreenStatLabel: {
+    fontSize: 9,
   },
   
   // Mobile Month Sections
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 16,
   },
+  smallScreenSectionTitle: {
+    fontSize: 16,
+    marginBottom: 12,
+  },
   monthsContainer: {
     marginBottom: 20,
+  },
+  smallScreenMonthsContainer: {
+    marginBottom: 16,
   },
   monthSection: {
     backgroundColor: '#1a1a1a',
@@ -1088,6 +1213,9 @@ const styles = StyleSheet.create({
   },
   monthHeader: {
     padding: 16,
+  },
+  smallScreenMonthHeader: {
+    padding: 12,
   },
   monthHeaderContent: {
     flexDirection: 'row',
@@ -1101,20 +1229,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   monthTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
     marginLeft: 8,
+  },
+  smallScreenMonthTitle: {
+    fontSize: 15,
   },
   monthTripCount: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1ea2b1',
   },
+  smallScreenMonthTripCount: {
+    fontSize: 13,
+  },
   monthSummary: {
     flexDirection: 'row',
     gap: 12,
     marginBottom: 8,
+  },
+  smallScreenMonthSummary: {
+    gap: 10,
   },
   monthStat: {
     flexDirection: 'row',
@@ -1123,14 +1260,20 @@ const styles = StyleSheet.create({
   },
   monthStatText: {
     fontSize: 12,
-    color: '#666666',
+    color: '#9ca3af',
     fontWeight: '500',
+  },
+  smallScreenMonthStatText: {
+    fontSize: 11,
   },
   monthTripsContainer: {
     borderTopWidth: 1,
     borderTopColor: '#2a2a2a',
     paddingTop: 12,
     paddingHorizontal: 12,
+  },
+  smallScreenMonthTripsContainer: {
+    paddingHorizontal: 10,
   },
   
   // Mobile Trip Cards
@@ -1141,6 +1284,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#333333',
+  },
+  smallScreenTripCard: {
+    padding: 12,
+    marginBottom: 8,
   },
   tripHeader: {
     flexDirection: 'row',
@@ -1178,7 +1325,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dateText: {
-    color: '#666666',
+    color: '#9ca3af',
     fontSize: 12,
     marginLeft: 4,
   },
@@ -1187,15 +1334,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+  smallScreenRoutePoints: {
+    marginBottom: 8,
+  },
   pointText: {
     color: '#cccccc',
     fontSize: 12,
     flex: 1,
   },
+  smallScreenPointText: {
+    fontSize: 11,
+  },
   tripStats: {
     flexDirection: 'row',
     gap: 8,
     marginBottom: 8,
+  },
+  smallScreenTripStats: {
+    gap: 6,
   },
   statBadge: {
     flexDirection: 'row',
@@ -1206,10 +1362,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     gap: 4,
   },
+  smallScreenStatBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
   statBadgeText: {
     color: '#ffffff',
     fontSize: 11,
     fontWeight: '500',
+  },
+  smallScreenStatBadgeText: {
+    fontSize: 10,
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -1221,6 +1384,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 40,
   },
+  smallScreenEmptyContainer: {
+    paddingVertical: 30,
+  },
   emptyIllustration: {
     width: 80,
     height: 80,
@@ -1230,18 +1396,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  smallScreenEmptyIllustration: {
+    width: 70,
+    height: 70,
+    marginBottom: 16,
+  },
   emptyTitle: {
     color: '#ffffff',
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 8,
   },
+  smallScreenEmptyTitle: {
+    fontSize: 18,
+  },
   emptyText: {
-    color: '#666666',
+    color: '#9ca3af',
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 24,
     paddingHorizontal: 32,
+  },
+  smallScreenEmptyText: {
+    fontSize: 13,
+    paddingHorizontal: 24,
+    marginBottom: 20,
   },
   findRideButton: {
     flexDirection: 'row',
@@ -1252,10 +1431,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
   },
+  smallScreenFindRideButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
   findRideText: {
     color: '#ffffff',
     fontWeight: '600',
     fontSize: 14,
+  },
+  smallScreenFindRideText: {
+    fontSize: 13,
   },
   
   // Error State
@@ -1295,6 +1481,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     padding: 20,
   },
+  smallScreenModalContent: {
+    padding: 16,
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1306,14 +1495,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
   },
+  smallScreenModalTitle: {
+    fontSize: 18,
+  },
   routeNameModal: {
     fontSize: 18,
     fontWeight: '600',
     color: '#ffffff',
     marginBottom: 4,
   },
+  smallScreenRouteNameModal: {
+    fontSize: 16,
+  },
   dateModal: {
-    color: '#666666',
+    color: '#9ca3af',
     fontSize: 14,
     marginBottom: 24,
   },
@@ -1322,6 +1517,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 12,
     marginBottom: 8,
+  },
+  smallScreenStarsContainer: {
+    gap: 8,
   },
   starButton: {
     padding: 4,
@@ -1333,6 +1531,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 24,
   },
+  smallScreenRatingLabel: {
+    fontSize: 15,
+    marginBottom: 20,
+  },
   notesInput: {
     backgroundColor: '#222222',
     borderRadius: 12,
@@ -1343,15 +1545,26 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: 'top',
   },
+  smallScreenNotesInput: {
+    padding: 10,
+    fontSize: 13,
+    minHeight: 70,
+  },
   submitButton: {
     backgroundColor: '#1ea2b1',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
   },
+  smallScreenSubmitButton: {
+    paddingVertical: 14,
+  },
   submitButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  smallScreenSubmitButtonText: {
+    fontSize: 15,
   },
 });

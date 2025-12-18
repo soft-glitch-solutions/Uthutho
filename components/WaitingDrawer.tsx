@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -48,6 +48,23 @@ const TRANSPORT_TYPES = [
   { id: 'taxi', label: 'Taxi', icon: require('../assets/icons/taxi-icon.png') },
 ];
 
+// Debounce hook
+const useDebounce = (value: any, delay: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+  
+  return debouncedValue;
+};
+
 export default function WaitingDrawer({ 
   visible, 
   onClose, 
@@ -57,7 +74,6 @@ export default function WaitingDrawer({
 }: WaitingDrawerProps) {
   const router = useRouter();
   const [routes, setRoutes] = useState<Route[]>([]);
-  const [filteredRoutes, setFilteredRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
   const [waitingCounts, setWaitingCounts] = useState<Record<string, number>>({});
@@ -68,7 +84,11 @@ export default function WaitingDrawer({
   const [currentStep, setCurrentStep] = useState<'select' | 'confirm'>('select');
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [showHelpTip, setShowHelpTip] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const { createOrJoinJourney } = useJourney();
+
+  // Debounced stopId to prevent rapid updates
+  const debouncedStopId = useDebounce(stopId, 300);
 
   // Animation values
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -80,6 +100,18 @@ export default function WaitingDrawer({
   // ScrollView ref for confirm step
   const confirmScrollViewRef = useRef<ScrollView>(null);
 
+  // Animation cleanup
+  useEffect(() => {
+    return () => {
+      pulseAnim.stopAnimation();
+      rotateAnim.stopAnimation();
+      scaleAnim.stopAnimation();
+      fadeAnim.stopAnimation();
+      slideAnim.stopAnimation();
+    };
+  }, []);
+
+  // Main visible effect
   useEffect(() => {
     if (visible) {
       // Slide up animation
@@ -97,6 +129,7 @@ export default function WaitingDrawer({
       setSelectedRoute(null);
       setActiveFilter('all');
       setShowHelpTip(true);
+      setIsInitialLoad(true);
       
       // Fade in help tip after a delay
       Animated.timing(fadeAnim, {
@@ -105,30 +138,40 @@ export default function WaitingDrawer({
         delay: 1000,
         useNativeDriver: true,
       }).start();
-      
-      const subscription = supabase
-        .channel('stop_waiting_changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'stop_waiting',
-            filter: `stop_id=eq.${stopId}`
-          },
-          () => {
-            loadWaitingCounts();
-          }
-        )
-        .subscribe();
-
-      return () => {
-        subscription.unsubscribe();
-        // Reset animation when modal closes
-        slideAnim.setValue(SCREEN_HEIGHT);
-      };
+    } else {
+      // Reset animation when modal closes
+      Animated.timing(slideAnim, {
+        toValue: SCREEN_HEIGHT,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     }
-  }, [visible, stopId]);
+  }, [visible]);
+
+  // Supabase subscription for waiting counts
+  useEffect(() => {
+    if (!visible || !debouncedStopId) return;
+
+    const channel = supabase
+      .channel(`stop_waiting_changes_${debouncedStopId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'stop_waiting',
+          filter: `stop_id=eq.${debouncedStopId}`
+        },
+        () => {
+          loadWaitingCounts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [visible, debouncedStopId]);
 
   useEffect(() => {
     if (isSearching) {
@@ -137,18 +180,6 @@ export default function WaitingDrawer({
       stopRadarAnimation();
     }
   }, [isSearching]);
-
-  // Filter routes when activeFilter changes
-  useEffect(() => {
-    if (activeFilter === 'all') {
-      setFilteredRoutes(routes);
-    } else {
-      const filtered = routes.filter(route => 
-        route.transport_type.toLowerCase() === activeFilter
-      );
-      setFilteredRoutes(filtered);
-    }
-  }, [activeFilter, routes]);
 
   const checkIfDriver = async () => {
     try {
@@ -259,23 +290,21 @@ export default function WaitingDrawer({
       if (routesData && routesData.length > 0) {
         const formattedRoutes = routesData.map(item => item.route).filter(route => route !== null);
         setRoutes(formattedRoutes);
-        setFilteredRoutes(formattedRoutes);
         return;
       }
 
       setRoutes([]);
-      setFilteredRoutes([]);
     } catch (error) {
       console.error('Error loading routes for stop:', error);
       Alert.alert('Error', 'Failed to load routes. Please try again.');
       setRoutes([]);
-      setFilteredRoutes([]);
     } finally {
       setLoading(false);
+      setIsInitialLoad(false);
     }
   };
 
-  const loadWaitingCounts = async () => {
+  const loadWaitingCounts = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('stop_waiting')
@@ -294,11 +323,16 @@ export default function WaitingDrawer({
         });
       }
 
-      setWaitingCounts(counts);
+      // Only update state if counts actually changed
+      setWaitingCounts(prev => {
+        const prevStr = JSON.stringify(prev);
+        const newStr = JSON.stringify(counts);
+        return prevStr === newStr ? prev : counts;
+      });
     } catch (error) {
       console.error('Error loading waiting counts:', error);
     }
-  };
+  }, [stopId]);
 
   const getWaitingCountForRoute = (routeId: string) => {
     return waitingCounts[routeId] || 0;
@@ -307,6 +341,16 @@ export default function WaitingDrawer({
   const getTotalWaitingCount = () => {
     return Object.values(waitingCounts).reduce((sum, count) => sum + count, 0);
   };
+
+  // Memoize filtered routes
+  const filteredRoutes = useMemo(() => {
+    if (activeFilter === 'all') {
+      return routes;
+    }
+    return routes.filter(route => 
+      route.transport_type.toLowerCase() === activeFilter
+    );
+  }, [activeFilter, routes]);
 
   const handleRouteSelect = (route: Route) => {
     setSelectedRoute(route);
@@ -818,65 +862,69 @@ export default function WaitingDrawer({
     );
   };
 
-const renderSelectStep = () => (
-  <View style={styles.selectStepContainer}>
-    <View style={styles.selectContent}>
-      {showHelpTip && renderHelpTip()}
+  const renderSelectStep = () => (
+    <View style={styles.selectStepContainer}>
+      <View style={styles.selectContent}>
+        {showHelpTip && renderHelpTip()}
+        
+        {renderTransportFilter()}
+        
+        <View style={styles.resultsHeader}>
+          <Text style={styles.resultsTitle}>
+            {activeFilter === 'all' ? 'All Routes' : `${TRANSPORT_TYPES.find(t => t.id === activeFilter)?.label} Routes`}
+          </Text>
+          <Text style={styles.resultsCount}>
+            {filteredRoutes.length} {filteredRoutes.length === 1 ? 'route' : 'routes'}
+          </Text>
+        </View>
+      </View>
       
-      {renderTransportFilter()}
-      
-      <View style={styles.resultsHeader}>
-        <Text style={styles.resultsTitle}>
-          {activeFilter === 'all' ? 'All Routes' : `${TRANSPORT_TYPES.find(t => t.id === activeFilter)?.label} Routes`}
-        </Text>
-        <Text style={styles.resultsCount}>
-          {filteredRoutes.length} {filteredRoutes.length === 1 ? 'route' : 'routes'}
-        </Text>
+      <View style={styles.routesContainer}>
+        {loading && isInitialLoad ? (
+          <View style={styles.loadingContainer}>
+            <View style={styles.loadingSpinner} />
+            <Text style={styles.loadingText}>Finding available routes...</Text>
+          </View>
+        ) : filteredRoutes.length === 0 ? (
+          <View style={styles.noResultsContainer}>
+            <Image 
+              source={require('../assets/icons/minibus-icon.png')}
+              style={styles.noResultsIcon}
+            />
+            <Text style={styles.noResultsTitle}>
+              No routes found
+            </Text>
+            <Text style={styles.noResultsText}>
+              {activeFilter === 'all' 
+                ? 'No transport routes available at this stop.'
+                : `No ${TRANSPORT_TYPES.find(t => t.id === activeFilter)?.label} routes found.`
+              }
+            </Text>
+            {activeFilter !== 'all' && (
+              <TouchableOpacity
+                style={styles.clearFilterButton}
+                onPress={() => setActiveFilter('all')}
+              >
+                <Text style={styles.clearFilterText}>Show all routes</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <FlatList
+            data={filteredRoutes}
+            renderItem={({ item }) => renderRouteCard(item)}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.routesListContent}
+            showsVerticalScrollIndicator={true}
+            initialNumToRender={8}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+          />
+        )}
       </View>
     </View>
-    
-    <View style={styles.routesContainer}>
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <View style={styles.loadingSpinner} />
-          <Text style={styles.loadingText}>Finding available routes...</Text>
-        </View>
-      ) : filteredRoutes.length === 0 ? (
-        <View style={styles.noResultsContainer}>
-          <Image 
-            source={require('../assets/icons/minibus-icon.png')}
-            style={styles.noResultsIcon}
-          />
-          <Text style={styles.noResultsTitle}>
-            No routes found
-          </Text>
-          <Text style={styles.noResultsText}>
-            {activeFilter === 'all' 
-              ? 'No transport routes available at this stop.'
-              : `No ${TRANSPORT_TYPES.find(t => t.id === activeFilter)?.label} routes found.`
-            }
-          </Text>
-          {activeFilter !== 'all' && (
-            <TouchableOpacity
-              style={styles.clearFilterButton}
-              onPress={() => setActiveFilter('all')}
-            >
-              <Text style={styles.clearFilterText}>Show all routes</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : (
-        <FlatList
-          data={filteredRoutes}
-          renderItem={({ item }) => renderRouteCard(item)}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.routesListContent}
-          showsVerticalScrollIndicator={true}
-        />
-      )}
-    </View>
-  </View>
-);
+  );
+
   const renderConfirmStep = () => (
     <View style={styles.confirmContainer}>
       <ScrollView 
@@ -1716,19 +1764,18 @@ const styles = StyleSheet.create({
     fontSize: IS_SMALL_SCREEN ? 14 : 15,
     fontWeight: '600',
   },
-
   selectStepContainer: {
-  flex: 1,
-},
-selectContent: {
-  paddingBottom: 12,
-},
-routesContainer: {
-  flex: 1,
-},
-routesListContent: {
-  paddingHorizontal: 16,
-  paddingTop: 8,
-  paddingBottom: 30,
-},
+    flex: 1,
+  },
+  selectContent: {
+    paddingBottom: 12,
+  },
+  routesContainer: {
+    flex: 1,
+  },
+  routesListContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 30,
+  },
 });
