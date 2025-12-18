@@ -10,16 +10,19 @@ import {
   TextInput,
   TouchableOpacity,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import { Route as RouteIcon, MapPin, Clock, DollarSign, Bookmark, BookmarkCheck, ArrowLeft, Users, TrendingUp, Shield, Trophy } from 'lucide-react-native';
+import { Route as RouteIcon, MapPin, Clock, DollarSign, Bookmark, BookmarkCheck, ArrowLeft, Users, TrendingUp, Shield, Trophy, MessageCircle } from 'lucide-react-native';
 import { useAuth } from '@/hook/useAuth';
 import { useFavorites } from '@/hook/useFavorites';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
+
+const WHATSAPP_NUMBER = '+27698826640'; // WhatsApp number for reporting
 
 interface Route {
   id: string;
@@ -47,7 +50,7 @@ interface RouteStats {
   safety_rating: number;
 }
 
-// Skeleton Loading Component
+// Skeleton Loading Component (unchanged)
 const RouteDetailsSkeleton = ({ colors, isDesktop: propIsDesktop = false }) => {
   const desktopMode = isDesktop || propIsDesktop;
   
@@ -82,6 +85,9 @@ const RouteDetailsSkeleton = ({ colors, isDesktop: propIsDesktop = false }) => {
             </View>
 
             {/* Leaderboard Button Skeleton */}
+            <View style={[styles.skeletonButton, { backgroundColor: colors.card }]} />
+
+            {/* Report Route Button Skeleton */}
             <View style={[styles.skeletonButton, { backgroundColor: colors.card }]} />
 
             {/* Price Change Requests Skeleton */}
@@ -169,6 +175,9 @@ const RouteDetailsSkeleton = ({ colors, isDesktop: propIsDesktop = false }) => {
         {/* Leaderboard Button Skeleton */}
         <View style={[styles.skeletonButton, { backgroundColor: colors.card }]} />
 
+        {/* Report Route Button Skeleton */}
+        <View style={[styles.skeletonButton, { backgroundColor: colors.card }]} />
+
         {/* Route Statistics Skeleton */}
         <View style={styles.skeletonSection}>
           <View style={[styles.skeletonSectionTitle, { backgroundColor: colors.card }]} />
@@ -221,6 +230,16 @@ const RouteDetailsSkeleton = ({ colors, isDesktop: propIsDesktop = false }) => {
       </View>
     </ScrollView>
   );
+};
+
+// WhatsApp reporting function
+export const reportRouteOnWhatsApp = (routeName: string, routeId: string) => {
+  const message = `Hi! I want to report an issue with the route "${routeName} ${en}"`;
+  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+  Linking.openURL(url).catch(err => {
+    console.error('Failed to open WhatsApp:', err);
+    Alert.alert('Error', 'Could not open WhatsApp. Please make sure WhatsApp is installed.');
+  });
 };
 
 export default function RouteDetailsScreen() {
@@ -548,6 +567,11 @@ export default function RouteDetailsScreen() {
     router.push(`/FilteredLeaderboard?entityId=${route.id}&entityType=route&name=${encodeURIComponent(route.name)}`);
   };
 
+  const handleReportRoute = () => {
+    if (!route) return;
+    reportRouteOnWhatsApp(route.name, route.id);
+  };
+
   if (loading) {
     return <RouteDetailsSkeleton colors={colors} isDesktop={isDesktop} />;
   }
@@ -630,6 +654,15 @@ export default function RouteDetailsScreen() {
             >
               <Trophy size={20} color="#ffffff" />
               <Text style={[styles.leaderboardButtonText, styles.leaderboardButtonTextDesktop]}>Leaderboard</Text>
+            </TouchableOpacity>
+
+            {/* Report Route Button */}
+            <TouchableOpacity 
+              style={[styles.reportRouteButton, styles.reportRouteButtonDesktop, { backgroundColor: '#25D366' }]}
+              onPress={handleReportRoute}
+            >
+              <MessageCircle size={20} color="#ffffff" />
+              <Text style={[styles.reportRouteButtonText, styles.reportRouteButtonTextDesktop]}>Report Route</Text>
             </TouchableOpacity>
 
             {/* Price Change Button */}
@@ -873,6 +906,15 @@ export default function RouteDetailsScreen() {
             <Text style={styles.leaderboardButtonText}>Leaderboard</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Report Route Button */}
+        <TouchableOpacity 
+          style={[styles.reportRouteButton, { backgroundColor: '#25D366' }]}
+          onPress={handleReportRoute}
+        >
+          <MessageCircle size={20} color="#ffffff" />
+          <Text style={styles.reportRouteButtonText}>Report Route</Text>
+        </TouchableOpacity>
         
         {/* Route Statistics */}
         <View style={styles.section}>
@@ -1202,9 +1244,34 @@ const styles = StyleSheet.create({
   leaderboardButtonDesktop: {
     paddingVertical: 14,
     borderRadius: 10,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   leaderboardButtonTextDesktop: {
+    fontSize: 15,
+    marginLeft: 10,
+  },
+
+  // Report Route Button
+  reportRouteButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  reportRouteButtonDesktop: {
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginBottom: 24,
+  },
+  reportRouteButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  reportRouteButtonTextDesktop: {
     fontSize: 15,
     marginLeft: 10,
   },
@@ -1487,7 +1554,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   leaderboardButtonText: {
     color: '#ffffff',

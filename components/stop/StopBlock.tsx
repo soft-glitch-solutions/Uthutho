@@ -11,10 +11,11 @@ import {
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useWaiting } from '@/context/WaitingContext';
-import { Square, Hand, X, AlertTriangle, Trash2 } from "lucide-react-native";
+import { Square, Hand, X, AlertTriangle, Trash2, Bug } from "lucide-react-native";
 import WaitingDrawer from '@/components/WaitingDrawer';
 import { useJourney } from '@/hook/useJourney';
 import { getCurrentLocation, isWithinRadius } from '@/utils/location';
+import SimpleDebugPanel from '@/components/debug/SimpleDebugPanel';
 
 interface StopBlockProps {
   stopId: string;
@@ -29,9 +30,20 @@ interface StopBlockProps {
     primary: string;
   };
   radius?: number;
+  // Debug props (optional)
+  debugMode?: boolean;
+  onDebugWaitingDrawerRequest?: () => void;
 }
 
-const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: StopBlockProps) => {
+const StopBlock = ({ 
+  stopId, 
+  stopName, 
+  stopLocation, 
+  colors, 
+  radius = 0.5,
+  debugMode = false,
+  onDebugWaitingDrawerRequest 
+}: StopBlockProps) => {
   const {
     waitingStatus,
     setWaitingStatus,
@@ -49,6 +61,11 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [journeyToCancel, setJourneyToCancel] = useState<any>(null);
   const [cancelling, setCancelling] = useState(false);
+  
+  // Debug state
+  const [debugPanelVisible, setDebugPanelVisible] = useState(false);
+  const [debugWaitingDrawerVisible, setDebugWaitingDrawerVisible] = useState(false);
+  const [debugWelcomeVisible, setDebugWelcomeVisible] = useState(false);
   
   const { activeJourney, loading: journeyLoading, refreshActiveJourney } = useJourney();
   
@@ -345,11 +362,6 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
       setJourneyToCancel(null);
       setShowCancelModal(false);
       
-      Alert.alert(
-        'Journey Cancelled',
-        'Your active journey has been cancelled and removed successfully.',
-        [{ text: 'OK' }]
-      );
 
       setTimeout(() => {
         checkActiveJourneyParticipation();
@@ -397,7 +409,6 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
       .single();
 
     if (error) {
-      Alert.alert('Error', 'Failed to mark as waiting.');
     } else {
       setWaitingStatus({ 
         stopId, 
@@ -481,6 +492,31 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
   }, []);
+
+  // Debug functions
+  const handleShowDebugPanel = useCallback(() => {
+    if (debugMode && onDebugWaitingDrawerRequest) {
+      onDebugWaitingDrawerRequest();
+    } else {
+      setDebugPanelVisible(true);
+    }
+  }, [debugMode, onDebugWaitingDrawerRequest]);
+
+  const handleShowWaitingDrawer = useCallback(() => {
+    if (debugMode) {
+      setDebugWaitingDrawerVisible(true);
+    } else {
+      setShowDrawer(true);
+    }
+  }, [debugMode]);
+
+  const handleCloseWaitingDrawer = useCallback(() => {
+    if (debugMode) {
+      setDebugWaitingDrawerVisible(false);
+    } else {
+      setShowDrawer(false);
+    }
+  }, [debugMode]);
 
   const renderCancelModal = useCallback(() => (
     <Modal
@@ -604,14 +640,25 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
     );
   }
 
-  if (!isClose) {
+  if (!isClose && !debugMode) {
     return null;
   }
 
   const isWaiting = waitingStatus?.stopId === stopId;
+  const shouldShowDrawer = showDrawer || (debugMode && debugWaitingDrawerVisible);
 
   return (
     <View style={styles.container}>
+      {debugMode && (
+        <TouchableOpacity
+          style={styles.debugButton}
+          onPress={handleShowDebugPanel}
+        >
+          <Bug size={16} color="#ffffff" />
+          <Text style={styles.debugButtonText}>Debug</Text>
+        </TouchableOpacity>
+      )}
+
       {isWaiting && (
         <Text style={[styles.countdownText, { color: colors.text }]}>
           Stop will be removed in {formatCountdown(autoDeleteCountdown)}
@@ -640,23 +687,46 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
             <>
               <TouchableOpacity
                 style={[styles.button, { backgroundColor: '#10b981' }]}
-                onPress={handleMarkAsWaiting}
+                onPress={handleShowWaitingDrawer}
               >
                 <Hand size={20} color="white" />
                 <Text style={styles.buttonText}>Waiting</Text>
               </TouchableOpacity>
               
               <WaitingDrawer
-                visible={showDrawer}
-                onClose={() => setShowDrawer(false)}
+                visible={shouldShowDrawer}
+                onClose={handleCloseWaitingDrawer}
                 stopId={stopId}
                 stopName={stopName}
-                onWaitingSet={handleWaitingSet}
+                onWaitingSet={(routeId, transportType) => {
+                  handleWaitingSet(routeId, transportType);
+                  handleCloseWaitingDrawer();
+                }}
               />
             </>
           )}
         </>
       )}
+
+      {/* Debug Panel */}
+      <SimpleDebugPanel
+        visible={debugPanelVisible}
+        onClose={() => setDebugPanelVisible(false)}
+        onShowWelcomeOverlay={() => {
+          setDebugWelcomeVisible(true);
+          console.log('Debug: Show welcome overlay');
+        }}
+        onHideWelcomeOverlay={() => {
+          setDebugWelcomeVisible(false);
+          console.log('Debug: Hide welcome overlay');
+        }}
+        onShowWaitingDrawer={() => {
+          setDebugPanelVisible(false);
+          setTimeout(() => {
+            setDebugWaitingDrawerVisible(true);
+          }, 300);
+        }}
+      />
 
       {renderCancelModal()}
     </View>
@@ -666,6 +736,7 @@ const StopBlock = ({ stopId, stopName, stopLocation, colors, radius = 0.5 }: Sto
 const styles = StyleSheet.create({
   container: {
     marginTop: 10,
+    position: 'relative',
   },
   skeletonContainer: {
     gap: 8,
@@ -724,6 +795,25 @@ const styles = StyleSheet.create({
   buttonText: {
     color: 'white',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  // Debug button styles
+  debugButton: {
+    position: 'absolute',
+    top: -25,
+    right: 0,
+    backgroundColor: '#1ea2b1',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+    zIndex: 10,
+  },
+  debugButtonText: {
+    color: '#ffffff',
+    fontSize: 10,
     fontWeight: '600',
   },
   modalOverlay: {

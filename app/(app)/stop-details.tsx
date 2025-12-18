@@ -31,13 +31,16 @@ import {
   MessageSquare,
   Trophy,
   Route as RouteIcon,
-  Calendar
+  Calendar,
+  MessageCircle
 } from 'lucide-react-native';
 import * as Sharing from 'expo-sharing';
 import { formatTimeAgo } from '../../components/utils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
+
+const WHATSAPP_NUMBER = '+27698826640'; // WhatsApp number for reporting
 
 interface StopInfo {
   last_updated: string;
@@ -96,6 +99,16 @@ interface Stop {
   image_url?: string;
 }
 
+// WhatsApp reporting function
+const reportStopOnWhatsApp = (stopName: string, stopId: string) => {
+  const message = `Hi! I want to report an issue with the stop "${stopName}".`;
+  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+  Linking.openURL(url).catch(err => {
+    console.error('Failed to open WhatsApp:', err);
+    Alert.alert('Error', 'Could not open WhatsApp. Please make sure WhatsApp is installed.');
+  });
+};
+
 // Skeleton Loading Component
 const SkeletonLoader = ({ colors, isDesktop: propIsDesktop = false }) => {
   const desktopMode = isDesktop || propIsDesktop;
@@ -130,6 +143,9 @@ const SkeletonLoader = ({ colors, isDesktop: propIsDesktop = false }) => {
             </View>
 
             {/* Leaderboard Button Skeleton */}
+            <View style={[styles.skeletonButton, { backgroundColor: colors.card }]} />
+
+            {/* Report Stop Button Skeleton */}
             <View style={[styles.skeletonButton, { backgroundColor: colors.card }]} />
 
             {/* Stop Information Card Skeleton */}
@@ -504,6 +520,11 @@ export default function StopDetailsScreen() {
     }
   };
 
+  const handleReportStop = () => {
+    if (!stopDetails) return;
+    reportStopOnWhatsApp(stopDetails.name, stopDetails.id);
+  };
+
   const renderWaitingUser = ({ item }) => (
     <View style={[styles.waitingUser, isDesktop && styles.waitingUserDesktop, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={[styles.userInfo, isDesktop && styles.userInfoDesktop]}>
@@ -766,13 +787,22 @@ export default function StopDetailsScreen() {
             {/* Leaderboard Button */}
             <View style={[styles.section, styles.sectionDesktop]}>
               <TouchableOpacity 
-                style={[styles.actionButton, styles.actionButtonDesktop, { backgroundColor: colors.primary }]}
+                style={[styles.leaderboardButton, styles.leaderboardButtonDesktop, { backgroundColor: colors.primary }]}
                 onPress={() => router.push(`/FilteredLeaderboard?entityId=${stopId}&entityType=stop&name=${encodeURIComponent(stopDetails.name)}`)}
               >
                 <Trophy size={20} color="#ffffff" />
-                <Text style={[styles.actionButtonText, styles.actionButtonTextDesktop]}>Leaderboard</Text>
+                <Text style={[styles.leaderboardButtonText, styles.leaderboardButtonTextDesktop]}>Leaderboard</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Report Stop Button */}
+            <TouchableOpacity 
+              style={[styles.reportStopButton, styles.reportStopButtonDesktop, { backgroundColor: '#25D366' }]}
+              onPress={handleReportStop}
+            >
+              <MessageCircle size={20} color="#ffffff" />
+              <Text style={[styles.reportStopButtonText, styles.reportStopButtonTextDesktop]}>Report Stop</Text>
+            </TouchableOpacity>
 
             {/* Stop Information Card */}
             <View style={[styles.section, styles.sectionDesktop]}>
@@ -958,6 +988,26 @@ export default function StopDetailsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Leaderboard Button */}
+        <View style={styles.section}>
+          <TouchableOpacity 
+            style={[styles.leaderboardButton, { backgroundColor: colors.primary }]}
+            onPress={() => router.push(`/FilteredLeaderboard?entityId=${stopId}&entityType=stop&name=${encodeURIComponent(stopDetails.name)}`)}
+          >
+            <Trophy size={20} color="#ffffff" />
+            <Text style={styles.leaderboardButtonText}>Leaderboard</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Report Stop Button */}
+        <TouchableOpacity 
+          style={[styles.reportStopButton, { backgroundColor: '#25D366' }]}
+          onPress={handleReportStop}
+        >
+          <MessageCircle size={20} color="#ffffff" />
+          <Text style={styles.reportStopButtonText}>Report Stop</Text>
+        </TouchableOpacity>
+
         {/* Stop Information Card */}
         <View style={styles.section}>
           <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -998,16 +1048,6 @@ export default function StopDetailsScreen() {
             </View>
           </View>
         </View>
-
-        <View style={styles.section}>
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: colors.primary }]}
-              onPress={() => router.push(`/FilteredLeaderboard?entityId=${stopId}&entityType=stop&name=${encodeURIComponent(stopDetails.name)}`)}
-            >
-              <Trophy size={20} color="#ffffff" />
-              <Text style={styles.actionButtonText}>Leaderboard</Text>
-            </TouchableOpacity>
-          </View>
 
         {/* Tab Selectors */}
         <View style={styles.tabContainer}>
@@ -1152,6 +1192,56 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   actionButtonTextDesktop: {
+    fontSize: 15,
+    marginLeft: 10,
+  },
+
+  // Leaderboard Button
+  leaderboardButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  leaderboardButtonDesktop: {
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  leaderboardButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  leaderboardButtonTextDesktop: {
+    fontSize: 15,
+    marginLeft: 10,
+  },
+
+  // Report Stop Button
+  reportStopButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  reportStopButtonDesktop: {
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginBottom: 24,
+  },
+  reportStopButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  reportStopButtonTextDesktop: {
     fontSize: 15,
     marginLeft: 10,
   },
@@ -1432,7 +1522,7 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: 'row',
-    marginBottom: 30,
+    marginBottom: 16,
     gap: 12,
   },
   actionButton: {
@@ -1450,7 +1540,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   section: {
-    marginBottom: 30,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 20,

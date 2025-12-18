@@ -30,7 +30,6 @@ import RateTripModal from '@/components/home/RateTripModal';
 import SimpleDebugPanel from '@/components/debug/SimpleDebugPanel';
 import WelcomeOverlay from '@/components/home/WelcomeOverlay';
 
-
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
 
@@ -69,6 +68,30 @@ const calculateWalkingTime = (lat1, lng1, lat2, lng2) => {
   const walkingTimeMinutes = Math.round(distanceKm / 0.0833);
   
   return walkingTimeMinutes;
+};
+
+// MOVED OUTSIDE COMPONENT: findNearestLocation is now a pure function
+const findNearestLocation = (userLocation: LocationCoords, locations: any[]) => {
+  if (!userLocation || !locations || locations.length === 0) return null;
+  
+  let nearestLocation = null;
+  let minDistance = Infinity;
+
+  locations.forEach((location) => {
+    const distance = calculateWalkingTime(
+      userLocation.lat,
+      userLocation.lng,
+      location.latitude,
+      location.longitude
+    );
+
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearestLocation = location;
+    }
+  });
+
+  return nearestLocation;
 };
 
 const getIconForType = (type: string, size: number = 20) => {
@@ -242,64 +265,18 @@ export default function HomeScreen() {
   const { activeJourney, loading: journeyLoading, refreshActiveJourney } = useJourney();
   const [refreshing, setRefreshing] = useState(false);
   const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
-
   const [showDebugPanel, setShowDebugPanel] = useState(false);
-const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(false);
-const hasCheckedWelcome = useRef(false);
+  const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(false);
+  const hasCheckedWelcome = useRef(false);
 
-const handleWelcomeClose = () => {
-  setShowWelcomeOverlay(false);
-};
-
-
-const handleGetStarted = () => {
-  setShowWelcomeOverlay(false);
-  // Optional: You can trigger any onboarding actions here
-};
-
-// Add these functions:
-const handleShowWelcomeOverlay = () => {
-  setShowWelcomeOverlay(true);
-};
-
-const handleHideWelcomeOverlay = () => {
-  setShowWelcomeOverlay(false);
-};
-
-// Update your existing welcome effect to track count:
-useEffect(() => {
-  const checkFirstTimeUser = async () => {
-    if (hasCheckedWelcome.current) return;
-    hasCheckedWelcome.current = true;
-
-    try {
-      const session = await supabase.auth.getSession();
-      if (!session.data.session?.user.id) return;
-
-      const hasSeenWelcome = await AsyncStorage.getItem('hasSeenWelcome');
-      
-      if (!hasSeenWelcome) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setShowWelcomeOverlay(true);
-        await AsyncStorage.setItem('hasSeenWelcome', 'true');
-        
-        // Track how many times we've shown it
-        const count = await AsyncStorage.getItem('welcomeShownCount') || '0';
-        await AsyncStorage.setItem('welcomeShownCount', (parseInt(count) + 1).toString());
-      }
-    } catch (error) {
-      console.error('Error checking welcome overlay:', error);
-    }
-  };
-
-  if (!isProfileLoading && userProfile) {
-    checkFirstTimeUser();
-  }
-}, [isProfileLoading, userProfile]);
-
+  // FIXED: Properly memoized fetchNearestLocations
   const fetchNearestLocations = useCallback(async () => {
-    if (!userLocation) return;
+    if (!userLocation) {
+      console.log('No user location available');
+      return;
+    }
     
+    console.log('Fetching nearest locations...');
     setIsNearestLoading(true);
     try {
       const [stopsResult, hubsResult] = await Promise.allSettled([
@@ -310,37 +287,67 @@ useEffect(() => {
       const stops = stopsResult.status === 'fulfilled' ? stopsResult.value.data : [];
       const hubs = hubsResult.status === 'fulfilled' ? hubsResult.value.data : [];
 
+      console.log(`Found ${stops?.length || 0} stops and ${hubs?.length || 0} hubs`);
+
       const nearestStop = findNearestLocation(userLocation, stops || []);
       const nearestHub = findNearestLocation(userLocation, hubs || []);
+
+      console.log('Nearest stop:', nearestStop?.name);
+      console.log('Nearest hub:', nearestHub?.name);
 
       setNearestLocations({ nearestStop, nearestHub });
     } catch (error) {
       console.error('Error fetching nearest locations:', error);
     } finally {
       setIsNearestLoading(false);
+      console.log('Finished fetching nearest locations');
     }
-  }, [userLocation]);
+  }, [userLocation]); // Only depends on userLocation
 
-  const findNearestLocation = useCallback((userLocation: LocationCoords, locations: any[]) => {
-    let nearestLocation = null;
-    let minDistance = Infinity;
+  const handleWelcomeClose = () => {
+    setShowWelcomeOverlay(false);
+  };
 
-    locations.forEach((location) => {
-      const distance = calculateWalkingTime(
-        userLocation.lat,
-        userLocation.lng,
-        location.latitude,
-        location.longitude
-      );
+  const handleGetStarted = () => {
+    setShowWelcomeOverlay(false);
+  };
 
-      if (distance < minDistance) {
-        minDistance = distance;
-        nearestLocation = location;
+  const handleShowWelcomeOverlay = () => {
+    setShowWelcomeOverlay(true);
+  };
+
+  const handleHideWelcomeOverlay = () => {
+    setShowWelcomeOverlay(false);
+  };
+
+  useEffect(() => {
+    const checkFirstTimeUser = async () => {
+      if (hasCheckedWelcome.current) return;
+      hasCheckedWelcome.current = true;
+
+      try {
+        const session = await supabase.auth.getSession();
+        if (!session.data.session?.user.id) return;
+
+        const hasSeenWelcome = await AsyncStorage.getItem('hasSeenWelcome');
+        
+        if (!hasSeenWelcome) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          setShowWelcomeOverlay(true);
+          await AsyncStorage.setItem('hasSeenWelcome', 'true');
+          
+          const count = await AsyncStorage.getItem('welcomeShownCount') || '0';
+          await AsyncStorage.setItem('welcomeShownCount', (parseInt(count) + 1).toString());
+        }
+      } catch (error) {
+        console.error('Error checking welcome overlay:', error);
       }
-    });
+    };
 
-    return nearestLocation;
-  }, []);
+    if (!isProfileLoading && userProfile) {
+      checkFirstTimeUser();
+    }
+  }, [isProfileLoading, userProfile]);
 
   const toggleFavorite = async (item: FavoriteItem) => {
     setIsFavoritesLoading(true);
@@ -485,15 +492,30 @@ useEffect(() => {
       }
 
       let location = await Location.getCurrentPositionAsync({});
-      setUserLocation({
+      const newLocation = {
         lat: location.coords.latitude,
         lng: location.coords.longitude,
-      });
+      };
+      console.log('User location set:', newLocation);
+      setUserLocation(newLocation);
     })();
   }, []);
 
+  // FIXED: This useEffect now has stable dependencies
   useEffect(() => {
-    fetchNearestLocations();
+    if (!userLocation) {
+      console.log('Waiting for user location...');
+      return;
+    }
+    
+    console.log('Running fetchNearestLocations effect');
+    
+    // Add a small debounce to prevent too frequent calls
+    const timer = setTimeout(() => {
+      fetchNearestLocations();
+    }, 500);
+    
+    return () => clearTimeout(timer);
   }, [userLocation, fetchNearestLocations]);
 
   const handleNearestStopPress = (stopId: string) => {
@@ -607,7 +629,6 @@ useEffect(() => {
     }
   };
 
-
   const loadUserStats = async () => {
     setIsStatsLoading(true);
     try {
@@ -665,133 +686,104 @@ useEffect(() => {
     }
   }, [params.refresh]);
 
-// Main rating check useEffect - Check URL first, then clear it
-useEffect(() => {
-  const checkForRating = async () => {
-    try {
-      // 1. FIRST: Check URL parameters
-      if (params.showRatingForJourney) {
-        console.log('🎯 Rating triggered from URL parameter:', params.showRatingForJourney);
-        
-        // Set the rating ID and show modal
-        setJourneyRatingId(params.showRatingForJourney as string);
-        setShowRatingModal(true);
-        
-        // 2. THEN: Clear the URL parameter immediately after processing
-        // We'll use AsyncStorage to track that we've handled this
-        await AsyncStorage.setItem(
-          'handled_rating_param',
-          params.showRatingForJourney as string
-        );
-        
-        // Note: We can't directly modify the URL here, but we've marked it as handled
-        // The cleanup useEffect will handle any further cleanup
-        
-        return; // Exit since URL param takes priority
-      }
-      
-      // 3. Fallback: Check AsyncStorage for pending ratings
-      const pendingRating = await AsyncStorage.getItem('pending_journey_rating');
-      if (pendingRating) {
-        console.log('🎯 Found rating in storage:', pendingRating);
-        await AsyncStorage.removeItem('pending_journey_rating');
-        setJourneyRatingId(pendingRating);
-        setShowRatingModal(true);
-      }
-    } catch (error) {
-      console.error('Error checking for rating:', error);
-    }
-  };
-
-  // Run immediately on mount
-  checkForRating();
-}, [params.showRatingForJourney]);
-
-// Cleanup useEffect - Handle URL parameter clearing and prevent double triggers
-useEffect(() => {
-  return () => {
-    const clearParams = async () => {
+  useEffect(() => {
+    const checkForRating = async () => {
       try {
-        // Check if we have any pending URL parameters
         if (params.showRatingForJourney) {
-          console.log('🗑️ Clearing rating parameter on unmount');
+          console.log('🎯 Rating triggered from URL parameter:', params.showRatingForJourney);
           
-          // Get the parameter we just handled
-          const handledParam = await AsyncStorage.getItem('handled_rating_param');
+          setJourneyRatingId(params.showRatingForJourney as string);
+          setShowRatingModal(true);
           
-          // If this is the parameter we just showed, remove the flag
-          if (handledParam === params.showRatingForJourney) {
-            await AsyncStorage.removeItem('handled_rating_param');
-            console.log('✅ Successfully cleared handled rating parameter');
-          }
+          await AsyncStorage.setItem(
+            'handled_rating_param',
+            params.showRatingForJourney as string
+          );
           
-          // Optional: You could also clear the URL parameter by navigating
-          // This depends on your routing setup
-          // router.replace('/home');
+          return;
+        }
+        
+        const pendingRating = await AsyncStorage.getItem('pending_journey_rating');
+        if (pendingRating) {
+          console.log('🎯 Found rating in storage:', pendingRating);
+          await AsyncStorage.removeItem('pending_journey_rating');
+          setJourneyRatingId(pendingRating);
+          setShowRatingModal(true);
         }
       } catch (error) {
-        console.error('Error clearing params on unmount:', error);
+        console.error('Error checking for rating:', error);
+      }
+    };
+
+    checkForRating();
+  }, [params.showRatingForJourney]);
+
+  useEffect(() => {
+    return () => {
+      const clearParams = async () => {
+        try {
+          if (params.showRatingForJourney) {
+            console.log('🗑️ Clearing rating parameter on unmount');
+            
+            const handledParam = await AsyncStorage.getItem('handled_rating_param');
+            
+            if (handledParam === params.showRatingForJourney) {
+              await AsyncStorage.removeItem('handled_rating_param');
+              console.log('✅ Successfully cleared handled rating parameter');
+            }
+          }
+        } catch (error) {
+          console.error('Error clearing params on unmount:', error);
+        }
+      };
+      
+      clearParams();
+    };
+  }, []);
+
+  useEffect(() => {
+    const preventDoubleShow = async () => {
+      try {
+        if (params.showRatingForJourney) {
+          const handledParam = await AsyncStorage.getItem('handled_rating_param');
+          
+          if (handledParam === params.showRatingForJourney) {
+            console.log('⏭️ Parameter already handled, preventing double show');
+            return false;
+          }
+        }
+        return true;
+      } catch (error) {
+        console.error('Error checking for double show:', error);
+        return true;
       }
     };
     
-    clearParams();
+    preventDoubleShow();
+  }, [params.showRatingForJourney]);
+
+  const handleCloseModal = () => {
+    console.log('Closing rating modal');
+    setShowRatingModal(false);
+    setJourneyRatingId(null);
+    
+    AsyncStorage.removeItem('handled_rating_param').catch(console.error);
   };
-}, []);
 
-// Add a check to prevent showing the same rating twice when component re-mounts
-useEffect(() => {
-  const preventDoubleShow = async () => {
-    try {
-      if (params.showRatingForJourney) {
-        const handledParam = await AsyncStorage.getItem('handled_rating_param');
-        
-        // If we already handled this exact parameter, don't show it again
-        if (handledParam === params.showRatingForJourney) {
-          console.log('⏭️ Parameter already handled, preventing double show');
-          return false;
-        }
-      }
-      return true;
-    } catch (error) {
-      console.error('Error checking for double show:', error);
-      return true;
-    }
+  const handleRatingSubmitted = (journeyId: string, rating: number) => {
+    console.log('Rating submitted for journey:', journeyId, 'Rating:', rating);
+    
+    handleCloseModal();
+    
+    AsyncStorage.removeItem('pending_journey_rating').catch(console.error);
+    AsyncStorage.removeItem('handled_rating_param').catch(console.error);
+    
+    Alert.alert(
+      'Thanks for Your Feedback!',
+      `You rated your trip ${rating} stars!`,
+      [{ text: 'OK' }]
+    );
   };
-  
-  // This runs before the main check
-  preventDoubleShow();
-}, [params.showRatingForJourney]);
-
-// Update handleCloseModal to clean up properly
-const handleCloseModal = () => {
-  console.log('Closing rating modal');
-  setShowRatingModal(false);
-  setJourneyRatingId(null);
-  
-  // Clear the handled param flag when modal closes
-  AsyncStorage.removeItem('handled_rating_param').catch(console.error);
-};
-
-// Update handleRatingSubmitted to clean up everything
-const handleRatingSubmitted = (journeyId: string, rating: number) => {
-  console.log('Rating submitted for journey:', journeyId, 'Rating:', rating);
-  
-  // Close the modal
-  handleCloseModal();
-  
-  // Clear any pending rating from storage
-  AsyncStorage.removeItem('pending_journey_rating').catch(console.error);
-  
-  // Clear handled param
-  AsyncStorage.removeItem('handled_rating_param').catch(console.error);
-  
-  // Show success message
-  Alert.alert(
-    'Thanks for Your Feedback!',
-    `You rated your trip ${rating} stars!`,
-    [{ text: 'OK' }]
-  );
-};
 
   const openSidebar = () => {
     navigation.toggleDrawer();
@@ -875,11 +867,16 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
   }, [favoriteDetails]);
 
   useEffect(() => {
-  console.log('🏠 HomeScreen state updated:', {
-    showRatingModal,
-    journeyRatingId: journeyRatingId ? `${journeyRatingId.substring(0, 8)}...` : 'null'
+    console.log('🏠 HomeScreen state updated:', {
+      showRatingModal,
+      journeyRatingId: journeyRatingId ? `${journeyRatingId.substring(0, 8)}...` : 'null'
+    });
+  }, [showRatingModal, journeyRatingId]);
+
+  // Debug logging to track re-renders
+  useEffect(() => {
+    console.log('🔄 HomeScreen rendered');
   });
-}, [showRatingModal, journeyRatingId]);
 
   if (isDesktop) {
     return (
@@ -896,7 +893,6 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
             />
           }
         >
-          {/* Desktop Header */}
           <View style={styles.desktopHeader}>
             <Pressable onPress={openSidebar}    onLongPress={() => setShowDebugPanel(true)}
   delayLongPress={2000} style={styles.logoContainer}>
@@ -920,11 +916,8 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
             )}
           </View>
 
-          {/* Desktop Layout - Three Column Grid */}
           <View style={styles.desktopLayout}>
-            {/* Left Column - User Profile & Stats */}
             <View style={styles.leftColumn}>
-              {/* User Profile Card */}
               <View style={[styles.profileCard, { backgroundColor: colors.card }]}>
                 <View style={styles.profileHeader}>
                   <View style={[styles.profileAvatar, { backgroundColor: colors.primary }]}>
@@ -965,7 +958,6 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
                 </View>
               </View>
 
-              {/* Journey Banner */}
               {!journeyLoading && activeJourney && (
                 <Pressable 
                   style={[styles.journeyCard, { backgroundColor: colors.primary }]}
@@ -986,7 +978,6 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
                 </Pressable>
               )}
 
-              {/* Gamification Section */}
               <GamificationSection
                 isStatsLoading={isStatsLoading}
                 userStats={userStats}
@@ -994,7 +985,6 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
               />
             </View>
 
-            {/* Middle Column - MAP (Main Focus) */}
             <View style={styles.middleColumn}>
               <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
                 <Text style={[styles.sectionTitle, styles.sectionTitleDesktop, { color: colors.text }]}>
@@ -1002,10 +992,6 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
                 </Text>
               </View>
               
-              {/* Map Container */}
-
-              
-              {/* Nearby Section below Map */}
               <NearbySection
                 locationError={locationError}
                 isNearestLoading={isNearestLoading}
@@ -1021,7 +1007,6 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
               />
             </View>
 
-            {/* Right Column - Community Grid */}
             <View style={styles.rightColumn}>
               <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
                 <Text style={[styles.sectionTitle, styles.sectionTitleDesktop, { color: colors.text }]}>
@@ -1049,7 +1034,6 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
                 />
               )}
 
-              {/* Quick Actions */}
               <View style={[styles.quickActions, { backgroundColor: colors.card, marginTop: 20 }]}>
                 <Text style={[styles.quickActionsTitle, { color: colors.text }]}>
                   Quick Actions
@@ -1099,13 +1083,10 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
             </View>
           </View>
         </ScrollView>
-
-
       </ScreenTransition>
     );
   }
 
-  // Mobile Layout (original)
   return (
     <ScreenTransition>
       <ScrollView
@@ -1119,7 +1100,6 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
           />
         }
       >
-        {/* Only show top header on mobile */}
         <View style={styles.topHeader}>
           <Pressable onPress={openSidebar}  onLongPress={() => setShowDebugPanel(true)}
   delayLongPress={2000} style={styles.logoContainer}>
@@ -1312,31 +1292,32 @@ const handleRatingSubmitted = (journeyId: string, rating: number) => {
       </ScrollView>
 
       <WelcomeOverlay
-  visible={showWelcomeOverlay}
-  onClose={handleWelcomeClose}
-  onGetStarted={handleGetStarted}
-/>
+        visible={showWelcomeOverlay}
+        onClose={handleWelcomeClose}
+        onGetStarted={handleGetStarted}
+      />
       <SimpleDebugPanel
-  visible={showDebugPanel}
-  onClose={() => setShowDebugPanel(false)}
-  onShowWelcomeOverlay={handleShowWelcomeOverlay}
-  onHideWelcomeOverlay={handleHideWelcomeOverlay}
-/>
+        visible={showDebugPanel}
+        onClose={() => setShowDebugPanel(false)}
+        onShowWelcomeOverlay={handleShowWelcomeOverlay}
+        onHideWelcomeOverlay={handleHideWelcomeOverlay}
+      />
 
-    <RateTripModal
-      visible={showRatingModal}
-      onClose={() => {
-        console.log('Closing rating modal');
-        setShowRatingModal(false);
-        setJourneyRatingId(null);
-      }}
-      journeyId={journeyRatingId}
-      onRatingSubmitted={handleRatingSubmitted}
-    />
+      <RateTripModal
+        visible={showRatingModal}
+        onClose={() => {
+          console.log('Closing rating modal');
+          setShowRatingModal(false);
+          setJourneyRatingId(null);
+        }}
+        journeyId={journeyRatingId}
+        onRatingSubmitted={handleRatingSubmitted}
+      />
     </ScreenTransition>
   );
 }
 
+// Styles remain exactly the same as your original code...
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -18,6 +18,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Share2, Users, Clock, MapPin, Car, User, ChevronRight, MessageCircle } from 'lucide-react-native';
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // ADD THIS
 
 import { useJourney } from '@/hook/useJourney';
 import { supabase } from '@/lib/supabase';
@@ -31,7 +32,22 @@ import { JourneyChat } from '@/components/journey/JourneyChat';
 
 import type { JourneyStop, Passenger, ChatMessage } from '@/types/journey';
 
-// Stop Details Modal Component
+// Add this debugging component
+
+const debugStyles = StyleSheet.create({
+  container: {
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    padding: 8,
+    margin: 8,
+    borderRadius: 4,
+  },
+  text: {
+    color: 'white',
+    fontSize: 10,
+  },
+});
+
+// Stop Details Modal Component (unchanged)
 const StopDetailsModal = ({ stop, visible, onClose, passengers }) => {
   if (!stop) return null;
 
@@ -148,6 +164,7 @@ export default function JourneyScreen() {
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [isUpdatingLocation, setIsUpdatingLocation] = useState<boolean>(false);
   const [onlineCount, setOnlineCount] = useState(1);
+  const [debugInfo, setDebugInfo] = useState<string>(''); // For debugging
   
   // Simple animation
   const fadeAnim = useState(new Animated.Value(0))[0];
@@ -160,19 +177,80 @@ export default function JourneyScreen() {
     }).start();
   }, []);
 
+  // ADD THIS: Check AsyncStorage for active journey
   useEffect(() => {
-    getCurrentUser();
-    checkIfDriver();
-    checkLocationPermission();
+    const checkStoredJourney = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('active_journey_id');
+        console.log('Stored journey ID:', stored);
+        if (stored) {
+          setDebugInfo(`Found stored journey: ${stored}`);
+        }
+      } catch (error) {
+        console.error('Error checking stored journey:', error);
+      }
+    };
+    
+    checkStoredJourney();
+  }, []);
+
+  useEffect(() => {
+    console.log('JourneyScreen - Active Journey:', {
+      hasActiveJourney: !!activeJourney,
+      journeyId: activeJourney?.id,
+      routeName: activeJourney?.routes?.name,
+      loading
+    });
+    
+    setDebugInfo(`Active: ${!!activeJourney}, ID: ${activeJourney?.id}, Loading: ${loading}`);
     
     if (activeJourney) {
+      getCurrentUser();
+      checkIfDriver();
+      checkLocationPermission();
       loadJourneyData();
       subscribeToDriverChanges();
       subscribeToOnlineCount();
     } else {
       setJourneyStops([]);
     }
-  }, [activeJourney]);
+  }, [activeJourney, loading]);
+
+  // ADD THIS: Try to manually fetch active journey if hook returns null
+  useEffect(() => {
+    const fetchActiveJourneyManually = async () => {
+      if (!activeJourney && !loading) {
+        console.log('Hook returned no active journey, trying manual fetch...');
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+
+          // Check for active journey in stop_waiting
+          const { data: waitingData } = await supabase
+            .from('stop_waiting')
+            .select('journey_id')
+            .eq('user_id', user.id)
+            .gt('expires_at', new Date().toISOString())
+            .maybeSingle();
+
+          if (waitingData?.journey_id) {
+            console.log('Found active journey in stop_waiting:', waitingData.journey_id);
+            setDebugInfo(`Found in stop_waiting: ${waitingData.journey_id}`);
+            
+            // Try to refresh the hook
+            if (refreshActiveJourney) {
+              await refreshActiveJourney();
+            }
+          }
+        } catch (error) {
+          console.error('Error in manual fetch:', error);
+        }
+      }
+    };
+
+    const timer = setTimeout(fetchActiveJourneyManually, 1000);
+    return () => clearTimeout(timer);
+  }, [activeJourney, loading]);
 
   useEffect(() => {
     if (activeTab === 'chat') {
@@ -528,215 +606,213 @@ export default function JourneyScreen() {
     }
   };
 
-const subscribeToChat = () => {
-  if (!activeJourney) return;
+  const subscribeToChat = () => {
+    if (!activeJourney) return;
 
-  try {
-    const subscription = supabase
-      .channel('journey-chat-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to ALL events, not just INSERT
-          schema: 'public',
-          table: 'journey_messages',
-          filter: `journey_id=eq.${activeJourney.id}`
-        },
-        async (payload) => {
-          console.log('Chat update:', payload.eventType, payload.new);
-          
-          if (payload.eventType === 'INSERT') {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('first_name, last_name, avatar_url, selected_title')
-              .eq('id', payload.new.user_id)
-              .single();
+    try {
+      const subscription = supabase
+        .channel('journey-chat-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // Listen to ALL events, not just INSERT
+            schema: 'public',
+            table: 'journey_messages',
+            filter: `journey_id=eq.${activeJourney.id}`
+          },
+          async (payload) => {
+            console.log('Chat update:', payload.eventType, payload.new);
+            
+            if (payload.eventType === 'INSERT') {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('first_name, last_name, avatar_url, selected_title')
+                .eq('id', payload.new.user_id)
+                .single();
+                
+              const newMessage = {
+                ...payload.new as ChatMessage,
+                profiles: profile
+              };
               
-            const newMessage = {
-              ...payload.new as ChatMessage,
-              profiles: profile
-            };
-            
-            setChatMessages(prev => [...prev, newMessage]);
-            
-            if (activeTab !== 'chat') {
-              setUnreadMessages(prev => prev + 1);
+              setChatMessages(prev => [...prev, newMessage]);
+              
+              if (activeTab !== 'chat') {
+                setUnreadMessages(prev => prev + 1);
+              }
             }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  } catch (error) {
-    console.error('Error subscribing to chat:', error);
-  }
-};
+      return () => {
+        subscription.unsubscribe();
+      };
+    } catch (error) {
+      console.error('Error subscribing to chat:', error);
+    }
+  };
 
-const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
-  if (!activeJourney || !currentUserId) return;
+  const updateParticipantStatus = async (newStatus: 'waiting' | 'picked_up' | 'arrived') => {
+    if (!activeJourney || !currentUserId) return;
 
-  try {
-    let updates: any = { status: newStatus };
-    
-    if (newStatus === 'picked_up') {
-      const hasPermission = locationPermission || await requestLocationPermission();
+    try {
+      let updates: any = { status: newStatus };
       
-      if (!hasPermission) {
-        Alert.alert(
-          'Location Permission Required',
-          'To share your live location with others, please enable location services.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Settings', onPress: () => {
-              console.log('Open location settings');
-            }}
-          ]
-        );
+      if (newStatus === 'picked_up') {
+        const hasPermission = locationPermission || await requestLocationPermission();
+        
+        if (!hasPermission) {
+          Alert.alert(
+            'Location Permission Required',
+            'To share your live location with others, please enable location services.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Settings', onPress: () => {
+                console.log('Open location settings');
+              }}
+            ]
+          );
+          return;
+        }
+        
+        try {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.BestForNavigation,
+          });
+          
+          updates.latitude = location.coords.latitude;
+          updates.longitude = location.coords.longitude;
+          updates.last_location_update = new Date().toISOString();
+          
+          console.log('Location captured for picked_up:', {
+            lat: location.coords.latitude,
+            lng: location.coords.longitude
+          });
+        } catch (locationError) {
+          console.log('Could not get location:', locationError);
+          Alert.alert(
+            'Location Error',
+            'Unable to get your current location.',
+            [{ text: 'OK' }]
+          );
+        }
+      } else if (newStatus === 'arrived') {
+        updates.latitude = null;
+        updates.longitude = null;
+      }
+
+      const { error } = await supabase
+        .from('journey_participants')
+        .update(updates)
+        .eq('journey_id', activeJourney.id)
+        .eq('user_id', currentUserId)
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('Error updating participant status:', error);
+        Alert.alert('Error', 'Failed to update status');
         return;
       }
+
+      setParticipantStatus(newStatus);
       
-      try {
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.BestForNavigation,
-        });
+      if (newStatus === 'picked_up') {
+        await awardPoints(2);
         
-        updates.latitude = location.coords.latitude;
-        updates.longitude = location.coords.longitude;
-        updates.last_location_update = new Date().toISOString();
+        const { data: userStop } = await supabase
+          .from('stop_waiting')
+          .select('stop_id, stops(order_number)')
+          .eq('user_id', currentUserId)
+          .eq('journey_id', activeJourney.id)
+          .maybeSingle();
+
+        if (userStop && userStop.stops) {
+          const userStopOrder = userStop.stops.order_number;
+          
+          const { error: updateJourneyError } = await supabase
+            .from('journeys')
+            .update({ 
+              current_stop_sequence: userStopOrder
+            })
+            .eq('id', activeJourney.id);
+
+          if (!updateJourneyError) {
+            console.log(`Updated journey stop sequence to ${userStopOrder}`);
+            await refreshActiveJourney();
+          }
+        }
         
-        console.log('Location captured for picked_up:', {
-          lat: location.coords.latitude,
-          lng: location.coords.longitude
-        });
-      } catch (locationError) {
-        console.log('Could not get location:', locationError);
-        Alert.alert(
-          'Location Error',
-          'Unable to get your current location.',
-          [{ text: 'OK' }]
-        );
-      }
-    } else if (newStatus === 'arrived') {
-      updates.latitude = null;
-      updates.longitude = null;
-    }
-
-    const { error } = await supabase
-      .from('journey_participants')
-      .update(updates)
-      .eq('journey_id', activeJourney.id)
-      .eq('user_id', currentUserId)
-      .eq('is_active', true);
-
-    if (error) {
-      console.error('Error updating participant status:', error);
-      Alert.alert('Error', 'Failed to update status');
-      return;
-    }
-
-    setParticipantStatus(newStatus);
-    
-    if (newStatus === 'picked_up') {
-      await awardPoints(2);
-      
-      const { data: userStop } = await supabase
-        .from('stop_waiting')
-        .select('stop_id, stops(order_number)')
-        .eq('user_id', currentUserId)
-        .eq('journey_id', activeJourney.id)
-        .maybeSingle();
-
-      if (userStop && userStop.stops) {
-        const userStopOrder = userStop.stops.order_number;
+        await supabase
+          .from('stop_waiting')
+          .delete()
+          .eq('user_id', currentUserId)
+          .eq('journey_id', activeJourney.id);
         
-        const { error: updateJourneyError } = await supabase
-          .from('journeys')
-          .update({ 
-            current_stop_sequence: userStopOrder
-          })
-          .eq('id', activeJourney.id);
+        setUserStopName('');
+        
+        await Promise.all([
+          loadOtherPassengers(),
+          loadJourneyStops()
+        ]);
+        
+      } else if (newStatus === 'arrived') {
+        await awardPoints(5);
+        
+        await supabase
+          .from('stop_waiting')
+          .delete()
+          .eq('user_id', currentUserId)
+          .eq('journey_id', activeJourney.id);
+          
+        // 🔥 STORE THE JOURNEY DATA BEFORE COMPLETING
+        const currentJourneyData = {
+          id: activeJourney?.id,
+          routeName: activeJourney?.routes?.name,
+          transportType: activeJourney?.routes?.transport_type,
+          startPoint: activeJourney?.routes?.start_point,
+          endPoint: activeJourney?.routes?.end_point,
+          stops: activeJourney?.stops || [],
+          driverName: activeJourney?.driver_journeys?.[0]?.drivers?.profiles 
+            ? `${activeJourney.driver_journeys[0].drivers.profiles.first_name} ${activeJourney.driver_journeys[0].drivers.profiles.last_name}`
+            : null,
+          createdAt: activeJourney?.created_at,
+          currentStopSequence: activeJourney?.current_stop_sequence || 0
+        };
+        
+        // Now complete the journey
+        const result = await completeJourney();
+        console.log('Complete Journey result:', result);
 
-        if (!updateJourneyError) {
-          console.log(`Updated journey stop sequence to ${userStopOrder}`);
-          await refreshActiveJourney();
+        if (result.success) {
+          router.push({
+            pathname: '/journeyComplete',
+            params: {
+              duration: String(result.rideDuration ?? 0),
+              trips: result.newTrips?.toString(),
+              routeName: currentJourneyData.routeName ?? '',
+              transportMode: currentJourneyData.transportType ?? '',
+              journeyId: result.journeyId ?? currentJourneyData.id,
+              // Pass additional data for display
+              startPoint: currentJourneyData.startPoint ?? '',
+              endPoint: currentJourneyData.endPoint ?? '',
+              stopsCount: String(currentJourneyData.stops.length),
+              driverName: currentJourneyData.driverName ?? '',
+              startedAt: currentJourneyData.createdAt ?? '',
+              currentStop: String(currentJourneyData.currentStopSequence),
+              // For rating
+              ratingJourneyId: result.journeyId ?? currentJourneyData.id
+            },
+          });
+        } else {
+          Alert.alert('Error', result.error || 'Could not complete journey');
         }
       }
-      
-      await supabase
-        .from('stop_waiting')
-        .delete()
-        .eq('user_id', currentUserId)
-        .eq('journey_id', activeJourney.id);
-      
-      setUserStopName('');
-      
-      await Promise.all([
-        loadOtherPassengers(),
-        loadJourneyStops()
-      ]);
-      
-      Alert.alert('Success', 'You have been marked as picked up!');
-      
-    } else if (newStatus === 'arrived') {
-      await awardPoints(5);
-      
-      await supabase
-        .from('stop_waiting')
-        .delete()
-        .eq('user_id', currentUserId)
-        .eq('journey_id', activeJourney.id);
-        
-      // 🔥 STORE THE JOURNEY DATA BEFORE COMPLETING
-      const currentJourneyData = {
-        id: activeJourney?.id,
-        routeName: activeJourney?.routes?.name,
-        transportType: activeJourney?.routes?.transport_type,
-        startPoint: activeJourney?.routes?.start_point,
-        endPoint: activeJourney?.routes?.end_point,
-        stops: activeJourney?.stops || [],
-        driverName: activeJourney?.driver_journeys?.[0]?.drivers?.profiles 
-          ? `${activeJourney.driver_journeys[0].drivers.profiles.first_name} ${activeJourney.driver_journeys[0].drivers.profiles.last_name}`
-          : null,
-        createdAt: activeJourney?.created_at,
-        currentStopSequence: activeJourney?.current_stop_sequence || 0
-      };
-      
-      // Now complete the journey
-      const result = await completeJourney();
-      console.log('Complete Journey result:', result);
-
-      if (result.success) {
-        router.push({
-          pathname: '/journeyComplete',
-          params: {
-            duration: String(result.rideDuration ?? 0),
-            trips: result.newTrips?.toString(),
-            routeName: currentJourneyData.routeName ?? '',
-            transportMode: currentJourneyData.transportType ?? '',
-            journeyId: result.journeyId ?? currentJourneyData.id,
-            // Pass additional data for display
-            startPoint: currentJourneyData.startPoint ?? '',
-            endPoint: currentJourneyData.endPoint ?? '',
-            stopsCount: String(currentJourneyData.stops.length),
-            driverName: currentJourneyData.driverName ?? '',
-            startedAt: currentJourneyData.createdAt ?? '',
-            currentStop: String(currentJourneyData.currentStopSequence),
-            // For rating
-            ratingJourneyId: result.journeyId ?? currentJourneyData.id
-          },
-        });
-      } else {
-        Alert.alert('Error', result.error || 'Could not complete journey');
-      }
+    } catch (error) {
+      console.error('Error updating participant status:', error);
+      Alert.alert('Error', 'Failed to update status');
     }
-  } catch (error) {
-    console.error('Error updating participant status:', error);
-    Alert.alert('Error', 'Failed to update status');
-  }
-};
+  };
 
   const awardPoints = async (points: number) => {
     try {
@@ -851,55 +927,56 @@ Shared via Uthutho`;
     }
   };
 
-const handleCompleteJourney = async () => {
-  try {
-    console.log('Completing journey...');
-    
-    // 🔥 STORE THE JOURNEY DATA BEFORE COMPLETING
-    const currentJourneyData = {
-      id: activeJourney?.id,
-      routeName: activeJourney?.routes?.name,
-      transportType: activeJourney?.routes?.transport_type,
-      startPoint: activeJourney?.routes?.start_point,
-      endPoint: activeJourney?.routes?.end_point,
-      stops: activeJourney?.stops || [],
-      driverName: activeJourney?.driver_journeys?.[0]?.drivers?.profiles 
-        ? `${activeJourney.driver_journeys[0].drivers.profiles.first_name} ${activeJourney.driver_journeys[0].drivers.profiles.last_name}`
-        : null,
-      createdAt: activeJourney?.created_at
-    };
-    
-    // Now complete the journey
-    const result = await completeJourney();
-    console.log('Complete Journey result:', result);
+  const handleCompleteJourney = async () => {
+    try {
+      console.log('Completing journey...');
+      
+      // 🔥 STORE THE JOURNEY DATA BEFORE COMPLETING
+      const currentJourneyData = {
+        id: activeJourney?.id,
+        routeName: activeJourney?.routes?.name,
+        transportType: activeJourney?.routes?.transport_type,
+        startPoint: activeJourney?.routes?.start_point,
+        endPoint: activeJourney?.routes?.end_point,
+        stops: activeJourney?.stops || [],
+        driverName: activeJourney?.driver_journeys?.[0]?.drivers?.profiles 
+          ? `${activeJourney.driver_journeys[0].drivers.profiles.first_name} ${activeJourney.driver_journeys[0].drivers.profiles.last_name}`
+          : null,
+        createdAt: activeJourney?.created_at
+      };
+      
+      // Now complete the journey
+      const result = await completeJourney();
+      console.log('Complete Journey result:', result);
 
-    if (result.success) {
-      router.push({
-        pathname: '/journeyComplete',
-        params: {
-          duration: String(result.rideDuration ?? 0),
-          trips: result.newTrips?.toString(),
-          routeName: currentJourneyData.routeName ?? '', // Use stored data
-          transportMode: currentJourneyData.transportType ?? '',
-          journeyId: result.journeyId ?? currentJourneyData.id,
-          // Pass additional data for display
-          startPoint: currentJourneyData.startPoint ?? '',
-          endPoint: currentJourneyData.endPoint ?? '',
-          stopsCount: String(currentJourneyData.stops.length),
-          driverName: currentJourneyData.driverName ?? '',
-          startedAt: currentJourneyData.createdAt ?? '',
-          // For rating
-          ratingJourneyId: result.journeyId ?? currentJourneyData.id
-        },
-      });
-    } else {
-      Alert.alert('Error', result.error || 'Could not complete journey');
+      if (result.success) {
+        router.push({
+          pathname: '/journeyComplete',
+          params: {
+            duration: String(result.rideDuration ?? 0),
+            trips: result.newTrips?.toString(),
+            routeName: currentJourneyData.routeName ?? '', // Use stored data
+            transportMode: currentJourneyData.transportType ?? '',
+            journeyId: result.journeyId ?? currentJourneyData.id,
+            // Pass additional data for display
+            startPoint: currentJourneyData.startPoint ?? '',
+            endPoint: currentJourneyData.endPoint ?? '',
+            stopsCount: String(currentJourneyData.stops.length),
+            driverName: currentJourneyData.driverName ?? '',
+            startedAt: currentJourneyData.createdAt ?? '',
+            // For rating
+            ratingJourneyId: result.journeyId ?? currentJourneyData.id
+          },
+        });
+      } else {
+        Alert.alert('Error', result.error || 'Could not complete journey');
+      }
+    } catch (err) {
+      console.error('Unexpected error completing journey:', err);
+      Alert.alert('Error', 'Something went wrong.');
     }
-  } catch (err) {
-    console.error('Unexpected error completing journey:', err);
-    Alert.alert('Error', 'Something went wrong.');
-  }
-};
+  };
+
   const loadJourneyStops = async () => {
     if (!activeJourney) return;
 
@@ -957,30 +1034,29 @@ const handleCompleteJourney = async () => {
     }
   };
 
-const sendChatMessage = async (messageText: string) => { // Accept message parameter
-  if (!activeJourney?.id || !currentUserId || !messageText.trim()) {
-    throw new Error('Missing required data');
-  }
+  const sendChatMessage = async (messageText: string) => {
+    if (!activeJourney?.id || !currentUserId || !messageText.trim()) {
+      throw new Error('Missing required data');
+    }
 
-  try {
-    const { error } = await supabase
-      .from('journey_messages')
-      .insert({
-        journey_id: activeJourney.id,
-        user_id: currentUserId,
-        message: messageText.trim(),
-        is_anonymous: true
-      });
+    try {
+      const { error } = await supabase
+        .from('journey_messages')
+        .insert({
+          journey_id: activeJourney.id,
+          user_id: currentUserId,
+          message: messageText.trim(),
+          is_anonymous: true
+        });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    // Don't clear newMessage here - it's handled in JourneyChat
-    return; // Success
-  } catch (error) {
-    console.error('Error sending message:', error);
-    throw error; // Re-throw so JourneyChat can handle it
-  }
-};
+      return;
+    } catch (error) {
+      console.error('Error sending message:', error);
+      throw error;
+    }
+  };
 
   const formatWaitingTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -1018,7 +1094,33 @@ const sendChatMessage = async (messageText: string) => { // Accept message param
     return 'Y';
   };
 
+  // MODIFIED: Add a retry mechanism
   const renderContent = () => {
+    if (loading) {
+      return <JourneySkeleton />;
+    }
+
+    if (!activeJourney) {
+      // ADD RETRY BUTTON
+      return (
+        <View style={styles.noJourneyContainer}>
+          <NoActiveJourney />
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={async () => {
+              console.log('Manual retry...');
+              if (refreshActiveJourney) {
+                await refreshActiveJourney();
+              }
+            }}
+          >
+            <Text style={styles.retryButtonText}>Retry Loading</Text>
+          </TouchableOpacity>
+
+        </View>
+      );
+    }
+
     if (activeTab === 'info') {
       return (
         <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
@@ -1026,6 +1128,9 @@ const sendChatMessage = async (messageText: string) => { // Accept message param
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
+            {/* Debug info in development */}
+
+
             {/* Compact Journey Header */}
             <View style={styles.compactHeader}>
               <View style={styles.routeRow}>
@@ -1049,10 +1154,6 @@ const sendChatMessage = async (messageText: string) => { // Accept message param
                 </Text>
               </View>
             </View>
-
-
-
-
 
             {/* Route Slider */}
             <CompactRouteSlider
@@ -1187,12 +1288,9 @@ const sendChatMessage = async (messageText: string) => { // Accept message param
     }
   };
 
-  if (loading) {
+  // MODIFIED: Check if we should show loading or no journey
+  if (loading && !activeJourney) {
     return <JourneySkeleton />;
-  }
-
-  if (!activeJourney) {
-    return <NoActiveJourney />;
   }
 
   return (
@@ -1637,6 +1735,24 @@ const styles = StyleSheet.create({
   dismissButtonText: {
     color: '#ffffff',
     fontSize: 15,
+    fontWeight: '600',
+  },
+  // NEW: Retry button styles
+  noJourneyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#1ea2b1',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

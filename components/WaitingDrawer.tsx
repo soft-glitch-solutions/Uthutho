@@ -9,7 +9,10 @@ import {
   Alert, 
   Animated, 
   Image,
-  Dimensions 
+  Dimensions,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { Clock, Users, CircleCheck as CheckCircle, Search, UserPlus, ChevronRight, Filter, Info, HelpCircle, ArrowLeft } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
@@ -72,12 +75,20 @@ export default function WaitingDrawer({
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
   // ScrollView ref for confirm step
   const confirmScrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     if (visible) {
+      // Slide up animation
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      
       loadRoutesForStop();
       loadWaitingCounts();
       loadUserProfile();
@@ -113,6 +124,8 @@ export default function WaitingDrawer({
 
       return () => {
         subscription.unsubscribe();
+        // Reset animation when modal closes
+        slideAnim.setValue(SCREEN_HEIGHT);
       };
     }
   }, [visible, stopId]);
@@ -805,8 +818,9 @@ export default function WaitingDrawer({
     );
   };
 
-  const renderSelectStep = () => (
-    <View style={styles.selectContainer}>
+const renderSelectStep = () => (
+  <View style={styles.selectStepContainer}>
+    <View style={styles.selectContent}>
       {showHelpTip && renderHelpTip()}
       
       {renderTransportFilter()}
@@ -819,7 +833,9 @@ export default function WaitingDrawer({
           {filteredRoutes.length} {filteredRoutes.length === 1 ? 'route' : 'routes'}
         </Text>
       </View>
-      
+    </View>
+    
+    <View style={styles.routesContainer}>
       {loading ? (
         <View style={styles.loadingContainer}>
           <View style={styles.loadingSpinner} />
@@ -850,18 +866,17 @@ export default function WaitingDrawer({
           )}
         </View>
       ) : (
-        <ScrollView 
-          style={styles.routesScroll}
+        <FlatList
+          data={filteredRoutes}
+          renderItem={({ item }) => renderRouteCard(item)}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.routesListContent}
           showsVerticalScrollIndicator={true}
-          contentContainerStyle={styles.routesContent}
-        >
-          {filteredRoutes.map(renderRouteCard)}
-          <View style={styles.bottomPadding} />
-        </ScrollView>
+        />
       )}
     </View>
-  );
-
+  </View>
+);
   const renderConfirmStep = () => (
     <View style={styles.confirmContainer}>
       <ScrollView 
@@ -924,31 +939,28 @@ export default function WaitingDrawer({
             )}
           </View>
           
-
-        </View>
-
-        <View style={styles.confirmActions}>
-          <TouchableOpacity 
-            style={[
-              styles.confirmButton,
-              isDriver && styles.driverConfirmButton
-            ]}
-            onPress={handleConfirmWaiting}
-          >
-            <Text style={styles.confirmButtonText}>
-              {isDriver ? 'Start as Driver' : 'Confirm Waiting'}
-            </Text>
-            <Text style={styles.confirmButtonSubtext}>
-              {isDriver ? 'Begin your driver journey' : 'Join the waiting list'}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.confirmActions}>
+            <TouchableOpacity 
+              style={[
+                styles.confirmButton,
+                isDriver && styles.driverConfirmButton
+              ]}
+              onPress={handleConfirmWaiting}
+            >
+              <Text style={styles.confirmButtonText}>
+                {isDriver ? 'Start as Driver' : 'Confirm Waiting'}
+              </Text>
+              <Text style={styles.confirmButtonSubtext}>
+                {isDriver ? 'Begin your driver journey' : 'Join the waiting list'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </View>
   );
 
   const getSearchPhaseText = () => {
-    
     switch (searchPhase) {
       case 'searching':
         return isDriver 
@@ -982,7 +994,7 @@ export default function WaitingDrawer({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
     >
       <TouchableOpacity 
@@ -990,78 +1002,93 @@ export default function WaitingDrawer({
         activeOpacity={1} 
         onPressOut={onClose}
       >
-        <TouchableOpacity 
-          style={styles.drawer} 
-          activeOpacity={1} 
-          onPress={(e) => e.stopPropagation()}
+        <Animated.View
+          style={[
+            styles.drawerContainer,
+            {
+              transform: [{ translateY: slideAnim }],
+            }
+          ]}
         >
-          <View style={styles.header}>
-            <View style={styles.handle} />
-            <View style={styles.headerContent}>
-              <Text style={styles.title}>
-                {isSearching 
-                  ? (searchPhase === 'searching' 
-                      ? (isDriver ? 'Starting as Driver...' : 'Finding Journey...')
-                      : searchPhase === 'joining'
-                      ? 'Joining Journey...'
-                      : 'Creating Journey...'
-                    )
-                  : currentStep === 'select' 
-                    ? 'Select Your Route'
-                    : 'Confirm Waiting'
-                }
-              </Text>
-            </View>
-            
-            <Text style={[
-              styles.subtitle,
-              searchPhase === 'joining' && styles.joiningSubtitle
-            ]}>
-              {isSearching 
-                ? getSearchPhaseText()
-                : currentStep === 'select'
-                  ? `Routes available at ${stopName}`
-                  : `Review your selection`
-              }
-            </Text>
-            
-            {renderStepIndicator()}
-            
-            {!isSearching && currentStep === 'select' && getTotalWaitingCount() > 0 && (
-              <View style={styles.totalWaitingContainer}>
-                <Users size={14} color="#1ea2b1" />
-                <Text style={styles.totalWaitingText}>
-                  {getTotalWaitingCount()} {getTotalWaitingCount() === 1 ? 'person is' : 'people are'} waiting at this stop
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ }}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          >
+            <TouchableOpacity 
+              style={styles.drawer} 
+              activeOpacity={1} 
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={styles.header}>
+                <View style={styles.handle} />
+                <View style={styles.headerContent}>
+                  <Text style={styles.title}>
+                    {isSearching 
+                      ? (searchPhase === 'searching' 
+                          ? (isDriver ? 'Starting as Driver...' : 'Finding Journey...')
+                          : searchPhase === 'joining'
+                          ? 'Joining Journey...'
+                          : 'Creating Journey...'
+                        )
+                      : currentStep === 'select' 
+                        ? 'Select Your Route'
+                        : 'Confirm Waiting'
+                    }
+                  </Text>
+                </View>
+                
+                <Text style={[
+                  styles.subtitle,
+                  searchPhase === 'joining' && styles.joiningSubtitle
+                ]}>
+                  {isSearching 
+                    ? getSearchPhaseText()
+                    : currentStep === 'select'
+                      ? `Routes available at ${stopName}`
+                      : `Review your selection`
+                  }
                 </Text>
+                
+                {renderStepIndicator()}
+                
+                {!isSearching && currentStep === 'select' && getTotalWaitingCount() > 0 && (
+                  <View style={styles.totalWaitingContainer}>
+                    <Users size={14} color="#1ea2b1" />
+                    <Text style={styles.totalWaitingText}>
+                      {getTotalWaitingCount()} {getTotalWaitingCount() === 1 ? 'person is' : 'people are'} waiting at this stop
+                    </Text>
+                  </View>
+                )}
               </View>
-            )}
-          </View>
 
-          {isSearching ? (
-            <View style={[
-              styles.searchingContainer,
-              searchPhase === 'joining' && styles.joiningContainer
-            ]}>
-              {renderRadarAnimation()}
-              <Text style={[
-                styles.searchingText,
-                searchPhase === 'joining' && styles.joiningText
-              ]}>
-                {getSearchingText()}
-              </Text>
-              <Text style={styles.searchingSubtext}>
-                This usually takes 10-30 seconds
-              </Text>
-              <TouchableOpacity style={styles.cancelButton} onPress={cancelSearching}>
-                <Text style={styles.cancelButtonText}>Cancel Search</Text>
-              </TouchableOpacity>
-            </View>
-          ) : currentStep === 'select' ? (
-            renderSelectStep()
-          ) : (
-            renderConfirmStep()
-          )}
-        </TouchableOpacity>
+              {isSearching ? (
+                <View style={[
+                  styles.searchingContainer,
+                  searchPhase === 'joining' && styles.joiningContainer
+                ]}>
+                  {renderRadarAnimation()}
+                  <Text style={[
+                    styles.searchingText,
+                    searchPhase === 'joining' && styles.joiningText
+                  ]}>
+                    {getSearchingText()}
+                  </Text>
+                  <Text style={styles.searchingSubtext}>
+                    This usually takes 10-30 seconds
+                  </Text>
+                  <TouchableOpacity style={styles.cancelButton} onPress={cancelSearching}>
+                    <Text style={styles.cancelButtonText}>Cancel Search</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : currentStep === 'select' ? (
+                renderSelectStep()
+              ) : (
+                renderConfirmStep()
+              )}
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </Animated.View>
       </TouchableOpacity>
     </Modal>
   );
@@ -1071,18 +1098,21 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  drawerContainer: {
+    flex: 1,
     justifyContent: 'flex-end',
   },
   drawer: {
     backgroundColor: '#000000',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: IS_SMALL_SCREEN ? '85%' : '80%',
-    minHeight: IS_SMALL_SCREEN ? '70%' : 'auto',
+    height: SCREEN_HEIGHT * 0.85, // Fixed height - 85% of screen
     borderTopWidth: 1,
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderColor: '#333333',
+    width: '100%',
   },
   handle: {
     width: 40,
@@ -1106,15 +1136,15 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   title: {
-    fontSize: IS_SMALL_SCREEN ? 18 : 20, // Increased from 17:18
+    fontSize: IS_SMALL_SCREEN ? 18 : 20,
     fontWeight: 'bold',
     color: '#ffffff',
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
+    fontSize: IS_SMALL_SCREEN ? 14 : 15,
     color: '#cccccc',
-    lineHeight: 20, // Increased from 18
+    lineHeight: 20,
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -1129,9 +1159,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepCircle: {
-    width: IS_SMALL_SCREEN ? 24 : 26, // Increased from 22:24
-    height: IS_SMALL_SCREEN ? 24 : 26, // Increased from 22:24
-    borderRadius: IS_SMALL_SCREEN ? 12 : 13, // Increased from 11:12
+    width: IS_SMALL_SCREEN ? 24 : 26,
+    height: IS_SMALL_SCREEN ? 24 : 26,
+    borderRadius: IS_SMALL_SCREEN ? 12 : 13,
     backgroundColor: '#333333',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1142,7 +1172,7 @@ const styles = StyleSheet.create({
   },
   stepNumber: {
     color: '#666666',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13, // Increased from 10:11
+    fontSize: IS_SMALL_SCREEN ? 12 : 13,
     fontWeight: 'bold',
   },
   stepNumberActive: {
@@ -1150,7 +1180,7 @@ const styles = StyleSheet.create({
   },
   stepLabel: {
     color: '#666666',
-    fontSize: IS_SMALL_SCREEN ? 11 : 12, // Increased from 9:10
+    fontSize: IS_SMALL_SCREEN ? 11 : 12,
     textAlign: 'center',
   },
   stepLabelActive: {
@@ -1172,7 +1202,7 @@ const styles = StyleSheet.create({
   },
   totalWaitingText: {
     color: '#1ea2b1',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13, // Increased from 10:11
+    fontSize: IS_SMALL_SCREEN ? 12 : 13,
     fontWeight: '600',
     marginLeft: 4,
   },
@@ -1236,7 +1266,7 @@ const styles = StyleSheet.create({
   },
   driverBadgeText: {
     color: '#000000',
-    fontSize: 9, // Increased from 8
+    fontSize: 9,
     fontWeight: 'bold',
   },
   searchIconContainer: {
@@ -1251,14 +1281,14 @@ const styles = StyleSheet.create({
   },
   searchingText: {
     color: '#1ea2b1',
-    fontSize: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
+    fontSize: IS_SMALL_SCREEN ? 16 : 17,
     fontWeight: '600',
     marginBottom: 6,
     textAlign: 'center',
   },
   searchingSubtext: {
     color: '#666666',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13, // Increased from 10:11
+    fontSize: IS_SMALL_SCREEN ? 12 : 13,
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -1272,11 +1302,13 @@ const styles = StyleSheet.create({
   helpTip: {
     backgroundColor: '#1ea2b110',
     marginHorizontal: 16,
-    margin: 12,
+    marginTop: 12,
+    marginBottom: 8,
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
     borderColor: '#1ea2b1',
+    alignSelf: 'stretch',
   },
   helpContent: {
     flexDirection: 'row',
@@ -1285,8 +1317,8 @@ const styles = StyleSheet.create({
   },
   helpText: {
     color: '#cccccc',
-    fontSize: IS_SMALL_SCREEN ? 13 : 14, // Increased from 11:12
-    lineHeight: 18, // Increased from 16
+    fontSize: IS_SMALL_SCREEN ? 13 : 14,
+    lineHeight: 18,
     flex: 1,
     marginLeft: 8,
   },
@@ -1303,12 +1335,14 @@ const styles = StyleSheet.create({
   },
   dismissText: {
     color: '#ffffff',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13, // Increased from 10:11
+    fontSize: IS_SMALL_SCREEN ? 12 : 13,
     fontWeight: '600',
   },
   filterContainer: {
     paddingHorizontal: 16,
-    padding: 12,
+    paddingTop: 8,
+    paddingBottom: 12,
+    minHeight: 60,
   },
   filterHeader: {
     flexDirection: 'row',
@@ -1317,7 +1351,7 @@ const styles = StyleSheet.create({
   },
   filterTitle: {
     color: '#cccccc',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
+    fontSize: IS_SMALL_SCREEN ? 14 : 15,
     fontWeight: '500',
     marginLeft: 6,
     flex: 1,
@@ -1345,13 +1379,13 @@ const styles = StyleSheet.create({
     borderColor: '#1ea2b1',
   },
   filterIcon: {
-    width: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
-    height: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
+    width: IS_SMALL_SCREEN ? 16 : 17,
+    height: IS_SMALL_SCREEN ? 16 : 17,
     marginRight: 5,
   },
   filterText: {
     color: '#cccccc',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13, // Increased from 10:11
+    fontSize: IS_SMALL_SCREEN ? 12 : 13,
     fontWeight: '500',
   },
   filterTextActive: {
@@ -1367,21 +1401,24 @@ const styles = StyleSheet.create({
   },
   resultsTitle: {
     color: '#ffffff',
-    fontSize: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
+    fontSize: IS_SMALL_SCREEN ? 16 : 17,
     fontWeight: '600',
   },
   resultsCount: {
     color: '#666666',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13, // Increased from 10:11
+    fontSize: IS_SMALL_SCREEN ? 12 : 13,
   },
-  routesScroll: {
+  routesListContainer: {
     flex: 1,
   },
   routesContent: {
     paddingHorizontal: 16,
     paddingBottom: 20,
   },
-  bottomPadding: {
+  listHeaderSpacing: {
+    height: 8,
+  },
+  listFooterSpacing: {
     height: 20,
   },
   loadingContainer: {
@@ -1401,7 +1438,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: '#666666',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
+    fontSize: IS_SMALL_SCREEN ? 14 : 15,
     textAlign: 'center',
   },
   noResultsContainer: {
@@ -1419,17 +1456,17 @@ const styles = StyleSheet.create({
   },
   noResultsTitle: {
     color: '#ffffff',
-    fontSize: IS_SMALL_SCREEN ? 17 : 18, // Increased from 15:16
+    fontSize: IS_SMALL_SCREEN ? 17 : 18,
     fontWeight: '600',
     marginBottom: 6,
     textAlign: 'center',
   },
   noResultsText: {
     color: '#666666',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
+    fontSize: IS_SMALL_SCREEN ? 14 : 15,
     textAlign: 'center',
     marginBottom: 16,
-    lineHeight: 20, // Increased from 18
+    lineHeight: 20,
   },
   clearFilterButton: {
     backgroundColor: '#1a1a1a',
@@ -1441,7 +1478,7 @@ const styles = StyleSheet.create({
   },
   clearFilterText: {
     color: '#1ea2b1',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
+    fontSize: IS_SMALL_SCREEN ? 14 : 15,
     fontWeight: '500',
   },
   routeCard: {
@@ -1464,31 +1501,31 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   transportIcon: {
-    width: IS_SMALL_SCREEN ? 28 : 30, // Increased from 26:28
-    height: IS_SMALL_SCREEN ? 28 : 30, // Increased from 26:28
+    width: IS_SMALL_SCREEN ? 28 : 30,
+    height: IS_SMALL_SCREEN ? 28 : 30,
   },
   routeInfo: {
     justifyContent: 'center',
   },
   transportType: {
     color: '#1ea2b1',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
+    fontSize: IS_SMALL_SCREEN ? 14 : 15,
     fontWeight: '600',
   },
   routeCost: {
     color: '#10b981',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
+    fontSize: IS_SMALL_SCREEN ? 14 : 15,
     fontWeight: 'bold',
     marginTop: 2,
   },
   routeName: {
-    fontSize: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
+    fontSize: IS_SMALL_SCREEN ? 16 : 17,
     fontWeight: '600',
     color: '#ffffff',
     marginBottom: 4,
   },
   routeDestination: {
-    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
+    fontSize: IS_SMALL_SCREEN ? 14 : 15,
     color: '#cccccc',
     marginBottom: 10,
   },
@@ -1515,7 +1552,7 @@ const styles = StyleSheet.create({
   },
   waitingCount: {
     color: '#666666',
-    fontSize: IS_SMALL_SCREEN ? 11 : 12, // Increased from 9:10
+    fontSize: IS_SMALL_SCREEN ? 11 : 12,
     fontWeight: '500',
   },
   waitingCountActive: {
@@ -1537,7 +1574,7 @@ const styles = StyleSheet.create({
   },
   driverTagText: {
     color: '#fbbf24',
-    fontSize: IS_SMALL_SCREEN ? 11 : 12, // Increased from 9:10
+    fontSize: IS_SMALL_SCREEN ? 11 : 12,
     fontWeight: '600',
   },
   confirmContainer: {
@@ -1559,7 +1596,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     color: '#1ea2b1',
-    fontSize: IS_SMALL_SCREEN ? 15 : 16, // Increased from 13:14
+    fontSize: IS_SMALL_SCREEN ? 15 : 16,
     fontWeight: '500',
     marginLeft: 6,
   },
@@ -1568,13 +1605,13 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   confirmationTitle: {
-    fontSize: IS_SMALL_SCREEN ? 19 : 20, // Increased from 17:18
+    fontSize: IS_SMALL_SCREEN ? 19 : 20,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 6,
   },
   confirmationSubtitle: {
-    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
+    fontSize: IS_SMALL_SCREEN ? 14 : 15,
     color: '#cccccc',
     marginBottom: 16,
   },
@@ -1587,33 +1624,33 @@ const styles = StyleSheet.create({
     borderColor: '#1ea2b1',
   },
   transportIconLarge: {
-    width: IS_SMALL_SCREEN ? 38 : 40, // Increased from 36:38
-    height: IS_SMALL_SCREEN ? 38 : 40, // Increased from 36:38
+    width: IS_SMALL_SCREEN ? 38 : 40,
+    height: IS_SMALL_SCREEN ? 38 : 40,
   },
   transportTypeLarge: {
     color: '#1ea2b1',
-    fontSize: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
+    fontSize: IS_SMALL_SCREEN ? 16 : 17,
     fontWeight: '600',
   },
   routeCostLarge: {
     color: '#10b981',
-    fontSize: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
+    fontSize: IS_SMALL_SCREEN ? 16 : 17,
     fontWeight: 'bold',
     marginTop: 2,
   },
   selectedRouteName: {
-    fontSize: IS_SMALL_SCREEN ? 17 : 18, // Increased from 15:16
+    fontSize: IS_SMALL_SCREEN ? 17 : 18,
     fontWeight: 'bold',
     color: '#ffffff',
     marginTop: 12,
     marginBottom: 4,
-    lineHeight: 22, // Increased from 20
+    lineHeight: 22,
   },
   selectedRouteDestination: {
-    fontSize: IS_SMALL_SCREEN ? 15 : 16, // Increased from 13:14
+    fontSize: IS_SMALL_SCREEN ? 15 : 16,
     color: '#cccccc',
     marginBottom: 16,
-    lineHeight: 20, // Increased from 18
+    lineHeight: 20,
   },
   waitingInfoLarge: {
     flexDirection: 'row',
@@ -1627,7 +1664,7 @@ const styles = StyleSheet.create({
   },
   waitingCountLarge: {
     color: '#1ea2b1',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
+    fontSize: IS_SMALL_SCREEN ? 14 : 15,
     fontWeight: '600',
   },
   driverNotice: {
@@ -1640,43 +1677,8 @@ const styles = StyleSheet.create({
   },
   driverNoticeText: {
     color: '#fbbf24',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
+    fontSize: IS_SMALL_SCREEN ? 14 : 15,
     fontWeight: '500',
-  },
-  instructions: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 10,
-    padding: IS_SMALL_SCREEN ? 12 : 14,
-    marginBottom: 16,
-  },
-  instructionsTitle: {
-    color: '#ffffff',
-    fontSize: IS_SMALL_SCREEN ? 16 : 17, // Increased from 14:15
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  instructionStep: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  instructionNumber: {
-    width: IS_SMALL_SCREEN ? 22 : 24, // Increased from 20:22
-    height: IS_SMALL_SCREEN ? 22 : 24, // Increased from 20:22
-    borderRadius: IS_SMALL_SCREEN ? 11 : 12, // Increased from 10:11
-    backgroundColor: '#1ea2b1',
-    color: '#ffffff',
-    fontSize: IS_SMALL_SCREEN ? 12 : 13, // Increased from 10:11
-    fontWeight: 'bold',
-    textAlign: 'center',
-    lineHeight: IS_SMALL_SCREEN ? 22 : 24, // Increased from 20:22
-    marginRight: 10,
-  },
-  instructionText: {
-    color: '#cccccc',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
-    flex: 1,
-    lineHeight: 20, // Increased from 18
   },
   confirmActions: {
     paddingHorizontal: 16,
@@ -1693,14 +1695,14 @@ const styles = StyleSheet.create({
   },
   confirmButtonText: {
     color: 'white',
-    fontSize: IS_SMALL_SCREEN ? 17 : 18, // Increased from 15:16
+    fontSize: IS_SMALL_SCREEN ? 17 : 18,
     fontWeight: 'bold',
     marginBottom: 4,
     textAlign: 'center',
   },
   confirmButtonSubtext: {
     color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: IS_SMALL_SCREEN ? 13 : 14, // Increased from 11:12
+    fontSize: IS_SMALL_SCREEN ? 13 : 14,
     textAlign: 'center',
   },
   cancelButton: {
@@ -1711,7 +1713,22 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: '#ffffff',
-    fontSize: IS_SMALL_SCREEN ? 14 : 15, // Increased from 12:13
+    fontSize: IS_SMALL_SCREEN ? 14 : 15,
     fontWeight: '600',
   },
+
+  selectStepContainer: {
+  flex: 1,
+},
+selectContent: {
+  paddingBottom: 12,
+},
+routesContainer: {
+  flex: 1,
+},
+routesListContent: {
+  paddingHorizontal: 16,
+  paddingTop: 8,
+  paddingBottom: 30,
+},
 });

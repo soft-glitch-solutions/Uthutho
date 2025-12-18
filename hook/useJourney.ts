@@ -438,54 +438,64 @@ export function useJourney() {
     }
   };
 
-  const cleanupStaleJourneyParticipants = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+const cleanupStaleJourneyParticipants = async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-      const { data: staleParticipants, error } = await supabase
-        .from('journey_participants')
-        .select(`
-          id,
-          journey:journeys (
-            id,
-            status,
-            last_ping_time
-          )
-        `)
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .or('journeys.status.neq.in_progress,journeys.last_ping_time.lt.2024-01-01T00:00:00Z')
-        .limit(10);
+    // Clean up journeys older than 1 day
+    const cutoffDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    
+    // Using a different approach - get all active participants first
+    const { data: activeParticipants, error: fetchError } = await supabase
+      .from('journey_participants')
+      .select('id, journey:journeys(id, status, last_ping_time)')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .limit(10);
 
-      if (error) {
-        console.error('Error finding stale participants:', error);
-        return;
-      }
-
-      if (staleParticipants && staleParticipants.length > 0) {
-        const participantIds = staleParticipants.map(p => p.id);
-        
-        const { error: updateError } = await supabase
-          .from('journey_participants')
-          .update({ 
-            is_active: false,
-            left_at: new Date().toISOString(),
-            status: 'arrived'
-          })
-          .in('id', participantIds);
-
-        if (updateError) {
-          console.error('Error cleaning up stale participants:', updateError);
-        } else {
-          console.log(`Cleaned up ${staleParticipants.length} stale journey participants`);
-        }
-      }
-    } catch (error) {
-      console.error('Error in cleanupStaleJourneyParticipants:', error);
+    if (fetchError) {
+      console.error('Error fetching active participants:', fetchError);
+      return;
     }
-  };
 
+    if (!activeParticipants) return;
+
+    // Filter locally in JavaScript
+    const staleParticipants = activeParticipants.filter(participant => {
+      const journey = participant.journey;
+      if (!journey) return false;
+      
+      // Check if journey is stale
+      const isStale = 
+        journey.status !== 'in_progress' || 
+        (journey.last_ping_time && new Date(journey.last_ping_time) < new Date(cutoffDate));
+      
+      return isStale;
+    });
+
+    if (staleParticipants.length > 0) {
+      const participantIds = staleParticipants.map(p => p.id);
+      
+      const { error: updateError } = await supabase
+        .from('journey_participants')
+        .update({ 
+          is_active: false,
+          left_at: new Date().toISOString(),
+          status: 'arrived'
+        })
+        .in('id', participantIds);
+
+      if (updateError) {
+        console.error('Error cleaning up stale participants:', updateError);
+      } else {
+        console.log(`Cleaned up ${staleParticipants.length} stale journey participants`);
+      }
+    }
+  } catch (error) {
+    console.error('Error in cleanupStaleJourneyParticipants:', error);
+  }
+};
   const loadActiveJourney = async () => {
     if (!user) {
       setLoading(false);
