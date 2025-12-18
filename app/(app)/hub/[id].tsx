@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform, Alert, Image, Dimensions } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { MapPin, Clock, Users, Bookmark, BookmarkCheck, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon, Trophy } from 'lucide-react-native';
+import { MapPin, Clock, Users, Bookmark, BookmarkCheck, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon, Trophy, MessageCircle } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import { useFavorites } from '@/hook/useFavorites';
@@ -10,6 +10,8 @@ import { formatTimeAgo } from '@/components/utils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
+
+const WHATSAPP_NUMBER = '+27698826640'; // WhatsApp number for reporting
 
 interface Hub {
   id: string;
@@ -44,6 +46,16 @@ interface Post {
 }
 
 type TabType = 'routes' | 'activity';
+
+// WhatsApp reporting function
+const reportHubOnWhatsApp = (hubName: string, hubId: string) => {
+  const message = `Hi! I want to report an issue with the hub "${hubName}".`;
+  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+  Linking.openURL(url).catch(err => {
+    console.error('Failed to open WhatsApp:', err);
+    Alert.alert('Error', 'Could not open WhatsApp. Please make sure WhatsApp is installed.');
+  });
+};
 
 // Skeleton Loading Components
 const SkeletonLoader = ({ isDesktop: propIsDesktop = false }) => {
@@ -85,6 +97,9 @@ const SkeletonLoader = ({ isDesktop: propIsDesktop = false }) => {
 
             {/* Leaderboard Button Skeleton */}
             <View style={[styles.leaderboardButton, styles.leaderboardButtonDesktop, styles.skeleton]} />
+
+            {/* Report Hub Button Skeleton */}
+            <View style={[styles.reportHubButton, styles.reportHubButtonDesktop, styles.skeleton]} />
 
             {/* Tab Skeleton */}
             <View style={[styles.tabContainer, styles.tabContainerDesktop]}>
@@ -455,6 +470,11 @@ export default function HubDetailScreen() {
     router.push(`/FilteredLeaderboard?entityId=${hub.id}&entityType=hub&name=${encodeURIComponent(hub.name)}`);
   };
 
+  const handleReportHub = () => {
+    if (!hub) return;
+    reportHubOnWhatsApp(hub.name, hub.id);
+  };
+
   const renderRoutesTab = () => (
     <View style={[styles.tabContent, isDesktop && styles.tabContentDesktop]}>
       <Text style={[styles.sectionTitle, isDesktop && styles.sectionTitleDesktop]}>Routes from this Hub ({routes.length})</Text>
@@ -651,6 +671,15 @@ export default function HubDetailScreen() {
               <Text style={[styles.leaderboardButtonText, styles.leaderboardButtonTextDesktop]}>Leaderboard</Text>
             </TouchableOpacity>
 
+            {/* Report Hub Button */}
+            <TouchableOpacity 
+              style={[styles.reportHubButton, styles.reportHubButtonDesktop, { backgroundColor: '#25D366' }]}
+              onPress={handleReportHub}
+            >
+              <MessageCircle size={20} color="#ffffff" />
+              <Text style={[styles.reportHubButtonText, styles.reportHubButtonTextDesktop]}>Report Hub</Text>
+            </TouchableOpacity>
+
             {/* Tab Selectors - Only show activity tab if there's recent activity */}
             {shouldShowActivityTab && (
               <View style={[styles.tabContainer, styles.tabContainerDesktop]}>
@@ -797,7 +826,18 @@ export default function HubDetailScreen() {
           <Trophy size={20} color="#ffffff" />
           <Text style={styles.leaderboardButtonText}>Leaderboard</Text>
         </TouchableOpacity>
+
+              <TouchableOpacity 
+        style={[styles.leaderboardButton, { backgroundColor: '#25D366' }]}
+        onPress={handleReportHub}
+      >
+        <MessageCircle size={20} color="#ffffff" />
+        <Text style={styles.reportHubButtonText}>Report Hub</Text>
+      </TouchableOpacity>
       </View>
+
+      {/* Report Hub Button */}
+
 
       {/* Tab Selectors - Only show activity tab if there's recent activity */}
       {shouldShowActivityTab && (
@@ -1096,7 +1136,7 @@ const styles = StyleSheet.create({
   leaderboardButtonDesktop: {
     paddingVertical: 14,
     borderRadius: 10,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   leaderboardButtonText: {
     color: '#ffffff',
@@ -1108,6 +1148,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginLeft: 10,
   },
+
+  // Report Hub button
+// Add these to the existing styles object in HubDetailScreen.tsx
+
+// Report Hub Button styles
+reportHubButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+},
+reportHubButtonDesktop: {
+  paddingVertical: 14,
+  borderRadius: 10,
+  marginBottom: 24,
+},
+reportHubButtonText: {
+  color: '#ffffff',
+  fontSize: 16,
+  fontWeight: '600',
+  marginLeft: 8,
+},
+reportHubButtonTextDesktop: {
+  fontSize: 15,
+  marginLeft: 10,
+},
   
   // Tab container
   tabContainer: {
