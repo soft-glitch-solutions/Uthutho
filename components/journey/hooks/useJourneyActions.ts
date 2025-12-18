@@ -185,7 +185,7 @@ export function useJourneyActions(
         if (result.success) {
           // Use router.replace instead of router.push to prevent going back
           router.replace({
-            pathname: '/journey-complete', // Fixed: changed from '/journeyComplete'
+            pathname: '/journeyComplete', // Fixed: changed from '/journeyComplete'
             params: {
               duration: String(result.rideDuration ?? 0),
               trips: result.newTrips?.toString(),

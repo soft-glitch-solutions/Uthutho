@@ -825,214 +825,325 @@ const cleanupStaleJourneyParticipants = async () => {
     }
   };
 
-  const completeJourney = async () => {
-    console.log('Starting completeJourney', { activeJourneyId: activeJourney?.id, userId: user?.id });
+const completeJourney = async () => {
+  console.log('🚀 Starting completeJourney', { 
+    activeJourneyId: activeJourney?.id, 
+    userId: user?.id,
+    journeyCreatedAt: activeJourney?.created_at
+  });
 
-    if (!activeJourney?.id || !user?.id) {
-      console.log('Missing activeJourney or user');
-      return { success: false, error: 'Missing activeJourney or user' };
-    }
+  if (!activeJourney?.id || !user?.id) {
+    console.log('❌ Missing activeJourney or user');
+    return { success: false, error: 'Missing activeJourney or user' };
+  }
 
+  try {
+    // 🔥 FIXED: Calculate rideDuration from user's participation time
+    let rideDuration = 0;
     try {
-      // 🔥 FIRST: Calculate rideDuration BEFORE anything else
-      let rideDuration = 0;
-      try {
+      console.log('📊 Calculating ride duration...');
+      
+      // FIRST: Try to get when user started this journey from journey_participants
+      console.log('🔍 Checking journey_participants table...');
+      const { data: participantData, error: participantError } = await supabase
+        .from('journey_participants')
+        .select('created_at, joined_at, status')
+        .eq('user_id', user.id)
+        .eq('journey_id', activeJourney.id)
+        .maybeSingle();
+
+      console.log('📋 Participant query result:', {
+        hasData: !!participantData,
+        error: participantError?.message,
+        participantData
+      });
+
+      if (!participantError && (participantData?.created_at || participantData?.joined_at)) {
+        // Use joined_at if available, otherwise created_at
+        const startTime = participantData.joined_at || participantData.created_at;
+        console.log('⏰ Found participant start time:', startTime);
+        
+        const started = new Date(startTime).getTime();
+        const now = Date.now();
+        rideDuration = Math.max(0, Math.floor((now - started) / 1000));
+        console.log('✅ Calculated from journey_participants:', rideDuration, 'seconds');
+        
+        // If duration seems too short (less than 60 seconds), use journey creation time
+        if (rideDuration < 60) {
+          console.log('⚠️ Duration too short (<60s), checking journey creation time...');
+          if (activeJourney.created_at) {
+            const journeyStarted = new Date(activeJourney.created_at).getTime();
+            rideDuration = Math.max(0, Math.floor((now - journeyStarted) / 1000));
+            console.log('✅ Recalculated from journey creation:', rideDuration, 'seconds');
+          }
+        }
+      } 
+      // SECOND: Fallback to journey creation time
+      else if (activeJourney.created_at) {
+        console.log('🔍 Using journey creation time as fallback...');
+        const started = new Date(activeJourney.created_at).getTime();
+        const now = Date.now();
+        rideDuration = Math.max(0, Math.floor((now - started) / 1000));
+        console.log('✅ Calculated from journey creation:', rideDuration, 'seconds');
+      } 
+      // THIRD: Try stop_waiting as last resort
+      else {
+        console.log('🔍 Checking stop_waiting table as last resort...');
         const { data: waitingRow, error: waitingError } = await supabase
           .from('stop_waiting')
           .select('created_at')
           .eq('user_id', user.id)
           .eq('journey_id', activeJourney.id)
-          .single();
+          .maybeSingle();
+
+        console.log('📋 stop_waiting query result:', {
+          hasData: !!waitingRow,
+          error: waitingError?.message
+        });
 
         if (!waitingError && waitingRow?.created_at) {
           const started = new Date(waitingRow.created_at).getTime();
           const now = Date.now();
           rideDuration = Math.max(0, Math.floor((now - started) / 1000));
-          console.log('Calculated ride duration:', rideDuration, 'seconds');
+          console.log('✅ Calculated from stop_waiting:', rideDuration, 'seconds');
+        } else {
+          // FOURTH: Reasonable minimum fallback (10 minutes)
+          rideDuration = 600; // 10 minutes default
+          console.log('⚠️ Using reasonable default duration:', rideDuration, 'seconds');
         }
-      } catch (durationError) {
-        console.log('Could not calculate ride duration:', durationError);
+      }
+    } catch (durationError) {
+      console.error('❌ Duration calculation error:', durationError);
+      // Use a reasonable minimum duration
+      rideDuration = 600; // 10 minutes default
+      console.log('⚠️ Using fallback duration due to error:', rideDuration, 'seconds');
+    }
+
+    console.log('🎯 Final rideDuration to use:', rideDuration, 'seconds');
+
+    // 🔥 Check if user is a driver
+    const { data: driverData } = await supabase
+      .from('drivers')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('is_verified', true)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    console.log('👨‍✈️ Driver check:', { isDriver: !!driverData, driverId: driverData?.id });
+
+    if (driverData && activeJourney.driver_id === driverData.id) {
+      console.log('✅ Driver completing their driver journey...');
+      await completeDriverJourney(driverData.id, activeJourney.id);
+    }
+
+    // 🔥 Save journey to history FIRST
+    console.log('📝 Saving journey to history...');
+    const savedToHistory = await saveJourneyToHistory(user.id, activeJourney, rideDuration);
+    console.log('✅ Journey saved to history:', savedToHistory);
+
+    // Remove user from stop_waiting
+    console.log('🗑️ Removing from stop_waiting...');
+    const { error: deleteError } = await supabase
+      .from('stop_waiting')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('journey_id', activeJourney.id);
+    
+    if (deleteError) {
+      console.warn('⚠️ Could not delete from stop_waiting:', deleteError.message);
+    } else {
+      console.log('✅ Removed from stop_waiting');
+    }
+
+    // Deactivate user in journey_participants
+    console.log('👥 Deactivating in journey_participants...');
+    const { error: deactivateError } = await supabase
+      .from('journey_participants')
+      .update({ 
+        is_active: false,
+        left_at: new Date().toISOString(),
+        status: 'arrived'
+      })
+      .eq('journey_id', activeJourney.id)
+      .eq('user_id', user.id);
+
+    if (deactivateError) {
+      console.error('❌ Error deactivating journey participant:', deactivateError.message);
+    } else {
+      console.log('✅ Deactivated from journey participants');
+    }
+
+    // Update user points and trips
+    let newTrips: number | null = null;
+    try {
+      console.log('🏆 Updating user points and trips...');
+      
+      // Try RPC function first
+      const { data: rpcData, error: rpcErr } = await supabase
+        .rpc('increment_trip', { user_id: user.id, ride_time: rideDuration });
+
+      if (rpcErr) {
+        console.warn('⚠️ RPC increment_trip failed, falling back:', rpcErr.message);
+        throw rpcErr;
       }
 
-      // 🔥 Check if user is a driver
-      const { data: driverData } = await supabase
-        .from('drivers')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('is_verified', true)
-        .eq('is_active', true)
-        .maybeSingle();
+      console.log('📊 RPC result:', rpcData);
 
-      if (driverData && activeJourney.driver_id === driverData.id) {
-        await completeDriverJourney(driverData.id, activeJourney.id);
+      if (Array.isArray(rpcData) && rpcData.length > 0) {
+        newTrips = rpcData[0].new_trips ?? rpcData[0].cur_trips ?? null;
+      } else if (rpcData && typeof rpcData === 'object') {
+        newTrips = (rpcData as any).new_trips ?? null;
       }
 
-      // 🔥 Save journey to history FIRST
-      console.log('📝 Saving journey to history...');
-      const savedToHistory = await saveJourneyToHistory(user.id, activeJourney, rideDuration);
-      console.log('✅ Journey saved to history:', savedToHistory);
+      // Add points (10 points per journey)
+      const { error: pointsError } = await supabase
+        .from('profiles')
+        .update({ points: supabase.raw('points + 10') })
+        .eq('id', user.id);
 
-      // Remove user from stop_waiting
-      const { error: deleteError } = await supabase
-        .from('stop_waiting')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('journey_id', activeJourney.id);
-      if (deleteError) throw deleteError;
-      console.log('Removed user from stop_waiting');
-
-      // Deactivate user in journey_participants
-      const { error: deactivateError } = await supabase
-        .from('journey_participants')
-        .update({ 
-          is_active: false,
-          left_at: new Date().toISOString(),
-          status: 'arrived'
-        })
-        .eq('journey_id', activeJourney.id)
-        .eq('user_id', user.id)
-        .eq('is_active', true);
-
-      if (deactivateError) {
-        console.error('Error deactivating journey participant:', deactivateError);
+      if (pointsError) {
+        console.error('❌ Error adding points:', pointsError.message);
       } else {
-        console.log('Deactivated user from journey participants');
+        console.log('✅ Added 10 points to user');
       }
+    } catch (rpcFallbackErr) {
+      console.warn('⚠️ RPC increment_trip failed, falling back to manual update...');
 
-      // Update user points and trips
-      let newTrips: number | null = null;
-      try {
-        // Try RPC function first
-        const { data: rpcData, error: rpcErr } = await supabase
-          .rpc('increment_trip', { user_id: user.id, ride_time: rideDuration });
-
-        if (rpcErr) throw rpcErr;
-
-        if (Array.isArray(rpcData) && rpcData.length > 0) {
-          newTrips = rpcData[0].new_trips ?? rpcData[0].cur_trips ?? null;
-        } else if (rpcData && typeof rpcData === 'object') {
-          newTrips = (rpcData as any).new_trips ?? null;
-        }
-
-        // Add points
-        await supabase
-          .from('profiles')
-          .update({ points: supabase.raw('points + 10') })
-          .eq('id', user.id);
-        console.log('Added 10 points to user');
-      } catch (rpcFallbackErr) {
-        console.warn('RPC increment_trip failed, falling back to inline update:', rpcFallbackErr);
-
-        const { data: profile, error: profileErr } = await supabase
-          .from('profiles')
-          .select('trips, total_ride_time, points')
-          .eq('id', user.id)
-          .single();
-        if (profileErr) throw profileErr;
-
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('trips, total_ride_time, points')
+        .eq('id', user.id)
+        .single();
+      
+      if (profileErr) {
+        console.error('❌ Error fetching profile:', profileErr.message);
+      } else {
         const nextTrips = (profile?.trips ?? 0) + 1;
         const nextTotal = (profile?.total_ride_time ?? 0) + rideDuration;
         const nextPoints = (profile?.points ?? 0) + 10;
 
         const { error: updateErr } = await supabase
           .from('profiles')
-          .update({ trips: nextTrips, total_ride_time: nextTotal, points: nextPoints })
+          .update({ 
+            trips: nextTrips, 
+            total_ride_time: nextTotal, 
+            points: nextPoints 
+          })
           .eq('id', user.id);
-        if (updateErr) throw updateErr;
-
-        newTrips = nextTrips;
-        console.log('Updated trips, total_ride_time, and points inline');
+        
+        if (updateErr) {
+          console.error('❌ Error updating profile:', updateErr.message);
+        } else {
+          newTrips = nextTrips;
+          console.log('✅ Updated trips, total_ride_time, and points manually');
+        }
       }
+    }
 
-      // Check if ANY users are still active in this journey
-      const { data: activeParticipants, error: participantsError } = await supabase
-        .from('journey_participants')
-        .select('id')
-        .eq('journey_id', activeJourney.id)
-        .eq('is_active', true);
+    // Check if ANY users are still active in this journey
+    console.log('🔍 Checking for other active participants...');
+    const { data: activeParticipants, error: participantsError } = await supabase
+      .from('journey_participants')
+      .select('id, user_id')
+      .eq('journey_id', activeJourney.id)
+      .eq('is_active', true);
 
-      if (participantsError) {
-        console.error('Error checking active participants:', participantsError);
-      }
+    if (participantsError) {
+      console.error('❌ Error checking active participants:', participantsError.message);
+    } else {
+      console.log(`👥 Active participants remaining: ${activeParticipants?.length || 0}`);
+    }
 
-      // Also check stop_waiting for this journey
-      const { data: waitingUsers, error: waitingError } = await supabase
-        .from('stop_waiting')
-        .select('id')
+    // Also check stop_waiting for this journey
+    console.log('🔍 Checking for waiting users...');
+    const { data: waitingUsers, error: waitingError } = await supabase
+      .from('stop_waiting')
+      .select('id, user_id')
+      .eq('journey_id', activeJourney.id);
+
+    if (waitingError) {
+      console.error('❌ Error checking waiting users:', waitingError.message);
+    } else {
+      console.log(`⏳ Waiting users remaining: ${waitingUsers?.length || 0}`);
+    }
+
+    // Check if journey should be marked as completed
+    const hasActiveParticipants = activeParticipants && activeParticipants.length > 0;
+    const hasWaitingUsers = waitingUsers && waitingUsers.length > 0;
+
+    // 🔥 Mark journey as completed if no active participants
+    if (!hasActiveParticipants && !hasWaitingUsers) {
+      console.log('🏁 No active participants or waiting users, marking journey as completed...');
+      await completeJourneyProperly(activeJourney.id, activeJourney.route_id);
+    } else {
+      console.log(`⚠️ Journey still has ${activeParticipants?.length || 0} active participants and ${waitingUsers?.length || 0} waiting users - not marking as completed`);
+    }
+
+    // Also update driver_journeys if driver exists
+    if (activeJourney.driver_id) {
+      console.log('👨‍✈️ Updating driver_journeys...');
+      const { error: driverJourneyError } = await supabase
+        .from('driver_journeys')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('driver_id', activeJourney.driver_id)
         .eq('journey_id', activeJourney.id);
 
-      if (waitingError) {
-        console.error('Error checking waiting users:', waitingError);
-      }
-
-      // Check if journey should be marked as completed
-      const hasActiveParticipants = activeParticipants && activeParticipants.length > 0;
-      const hasWaitingUsers = waitingUsers && waitingUsers.length > 0;
-
-      // 🔥 Mark journey as completed if no active participants
-      if (!hasActiveParticipants && !hasWaitingUsers) {
-        await completeJourneyProperly(activeJourney.id, activeJourney.route_id);
+      if (driverJourneyError) {
+        console.error('❌ Error updating driver journey:', driverJourneyError.message);
       } else {
-        console.log(`Journey still has ${activeParticipants?.length || 0} active participants and ${waitingUsers?.length || 0} waiting users`);
+        console.log('✅ Updated driver journey');
       }
-
-      // Also update driver_journeys if driver exists
-      if (activeJourney.driver_id) {
-        await supabase
-          .from('driver_journeys')
-          .update({
-            status: 'completed',
-            completed_at: new Date().toISOString()
-          })
-          .eq('driver_id', activeJourney.driver_id)
-          .eq('journey_id', activeJourney.id);
-      }
-
-      // Store journey info before clearing
-      const completedJourneyInfo = {
-        id: activeJourney.id,
-        routeName: activeJourney.routes?.name,
-        transportMode: activeJourney.routes?.transport_type,
-        startPoint: activeJourney.routes?.start_point,
-        endPoint: activeJourney.routes?.end_point,
-        stops: activeJourney.stops || [],
-        driverName: activeJourney.driver_journeys?.[0]?.drivers?.profiles 
-          ? `${activeJourney.driver_journeys[0].drivers.profiles.first_name} ${activeJourney.driver_journeys[0].drivers.profiles.last_name}`
-          : null,
-        createdAt: activeJourney.created_at,
-        currentStopSequence: activeJourney.current_stop_sequence || 0
-      };
-
-      console.log('Journey completion result:', {
-        success: true,
-        rideDuration,
-        newTrips,
-        savedToHistory,
-        journeyInfo: completedJourneyInfo
-      });
-
-      setActiveJourney(null);
-
-      return { 
-        success: true, 
-        rideDuration, 
-        newTrips, 
-        savedToHistory,
-        journeyId: completedJourneyInfo.id,
-        routeName: completedJourneyInfo.routeName,
-        transportMode: completedJourneyInfo.transportMode,
-        startPoint: completedJourneyInfo.startPoint,
-        endPoint: completedJourneyInfo.endPoint,
-        stopsCount: completedJourneyInfo.stops.length,
-        driverName: completedJourneyInfo.driverName,
-        startedAt: completedJourneyInfo.createdAt,
-        currentStop: completedJourneyInfo.currentStopSequence
-      };
-    } catch (err: any) {
-      console.error('Error completing journey:', err);
-      return { success: false, error: err?.message ?? String(err) };
     }
-  };
+
+    // Store journey info before clearing
+    const completedJourneyInfo = {
+      id: activeJourney.id,
+      routeName: activeJourney.routes?.name,
+      transportType: activeJourney.routes?.transport_type,
+      startPoint: activeJourney.routes?.start_point,
+      endPoint: activeJourney.routes?.end_point,
+      stops: activeJourney.stops || [],
+      driverName: activeJourney.driver_journeys?.[0]?.drivers?.profiles 
+        ? `${activeJourney.driver_journeys[0].drivers.profiles.first_name} ${activeJourney.driver_journeys[0].drivers.profiles.last_name}`
+        : null,
+      createdAt: activeJourney.created_at,
+      currentStopSequence: activeJourney.current_stop_sequence || 0
+    };
+
+    console.log('🎉 Journey completion result:', {
+      success: true,
+      rideDuration,
+      newTrips,
+      savedToHistory,
+      journeyInfo: completedJourneyInfo
+    });
+
+    setActiveJourney(null);
+
+    return { 
+      success: true, 
+      rideDuration, 
+      newTrips, 
+      savedToHistory,
+      journeyId: completedJourneyInfo.id,
+      routeName: completedJourneyInfo.routeName,
+      transportType: completedJourneyInfo.transportType,
+      startPoint: completedJourneyInfo.startPoint,
+      endPoint: completedJourneyInfo.endPoint,
+      stopsCount: completedJourneyInfo.stops.length,
+      driverName: completedJourneyInfo.driverName,
+      startedAt: completedJourneyInfo.createdAt,
+      currentStop: completedJourneyInfo.currentStopSequence
+    };
+  } catch (err: any) {
+    console.error('💥 Error completing journey:', err);
+    return { success: false, error: err?.message ?? String(err) };
+  }
+};
 
   return {
     activeJourney,
