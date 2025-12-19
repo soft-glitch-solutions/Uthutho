@@ -284,7 +284,7 @@ export default function JourneyCompleteScreen() {
               </View>
               <View style={styles.statTextContainer}>
                 <Text style={styles.statHighlightValue}>{formattedDuration}</Text>
-                <Text style={styles.statHighlightLabel}>Journey Time</Text>
+                <Text style={styles.statHighlightLabel}>Time</Text>
               </View>
             </View>
             

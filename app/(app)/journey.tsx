@@ -1,3 +1,4 @@
+// JourneyScreen.tsx (updated)
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
@@ -19,6 +20,7 @@ import { JourneyTabs } from '@/components/journey/JourneyTabs';
 import { JourneySkeleton } from '@/components/journey/JourneySkeleton';
 import { NoActiveJourney } from '@/components/journey/NoActiveJourney';
 import { JourneyContent } from '@/components/journey/JourneyContent';
+import { ArrivedAnimation } from '@/components/journey/ArrivedAnimation';
 import { JourneyStop } from '@/types/journey';
 
 import { useJourneyData } from '@/components/journey/hooks/useJourneyData';
@@ -29,6 +31,10 @@ import { useChat } from '@/components/journey/hooks/useChat';
 export default function JourneyScreen() {
   const router = useRouter();
   const { activeJourney, loading, refreshActiveJourney } = useJourney();
+  
+  // Add state for showing arrived animation
+  const [showArrivedAnimation, setShowArrivedAnimation] = useState(false);
+  const [isProcessingArrival, setIsProcessingArrival] = useState(false);
   
   // Use custom hooks
   const journeyData = useJourneyData();
@@ -56,6 +62,7 @@ export default function JourneyScreen() {
     journeyData.currentUserId
   );
 
+  // Modified useJourneyActions hook to handle animation
   const actions = useJourneyActions(
     journeyData.currentUserId,
     journeyData.participantStatus,
@@ -99,6 +106,35 @@ export default function JourneyScreen() {
     setShowStopDetails(true);
   };
 
+  // Custom handler for arrival that shows animation
+  const handleArrived = async () => {
+    if (isProcessingArrival) return;
+    
+    try {
+      setIsProcessingArrival(true);
+      setShowArrivedAnimation(true);
+      
+      // Update participant status to arrived
+      await actions.updateParticipantStatus('arrived');
+      
+      // Note: The navigation will happen inside updateParticipantStatus
+      // The animation will be on screen while that's processing
+      
+    } catch (error) {
+      console.error('Error in arrival process:', error);
+      setIsProcessingArrival(false);
+      setShowArrivedAnimation(false);
+      Alert.alert('Error', 'Failed to process arrival');
+    }
+  };
+
+  // Handle animation completion (optional)
+  const handleAnimationComplete = () => {
+    // You can keep animation visible until navigation happens
+    // or hide it after a certain time
+    console.log('Animation completed');
+  };
+
   // Add retry mechanism
   const renderContent = () => {
     if (loading) {
@@ -125,35 +161,44 @@ export default function JourneyScreen() {
     }
 
     return (
-      <JourneyContent
-        activeTab={activeTab}
-        fadeAnim={fadeAnim}
-        activeJourney={activeJourney}
-        journeyStops={journeyData.journeyStops}
-        userStopName={journeyData.userStopName}
-        currentUserId={journeyData.currentUserId}
-        otherPassengers={journeyData.otherPassengers}
-        participantStatus={journeyData.participantStatus}
-        onStopPress={handleStopPress}
-        onPickedUp={() => actions.updateParticipantStatus('picked_up')}
-        onArrived={() => actions.updateParticipantStatus('arrived')}
-        onNotifyAhead={actions.pingPassengersAhead}
-        onShare={actions.shareJourney}
-        userProfile={journeyData.userProfile}
-        waitingTime={journeyData.waitingTime}
-        isUpdatingLocation={isUpdatingLocation}
-        connectionError={journeyData.connectionError}
-        hasDriverInJourney={journeyData.hasDriverInJourney}
-        isDriver={journeyData.isDriver}
-        onlineCount={journeyData.onlineCount}
-        chatMessages={chatMessages}
-        newMessage={newMessage}
-        setNewMessage={setNewMessage}
-        onSendMessage={sendChatMessage}
-        selectedStop={selectedStop}
-        showStopDetails={showStopDetails}
-        setShowStopDetails={setShowStopDetails}
-      />
+      <>
+        <JourneyContent
+          activeTab={activeTab}
+          fadeAnim={fadeAnim}
+          activeJourney={activeJourney}
+          journeyStops={journeyData.journeyStops}
+          userStopName={journeyData.userStopName}
+          currentUserId={journeyData.currentUserId}
+          otherPassengers={journeyData.otherPassengers}
+          participantStatus={journeyData.participantStatus}
+          onStopPress={handleStopPress}
+          onPickedUp={() => actions.updateParticipantStatus('picked_up')}
+          onArrived={handleArrived} // Use custom handler
+          onNotifyAhead={actions.pingPassengersAhead}
+          onShare={actions.shareJourney}
+          userProfile={journeyData.userProfile}
+          waitingTime={journeyData.waitingTime}
+          isUpdatingLocation={isUpdatingLocation}
+          connectionError={journeyData.connectionError}
+          hasDriverInJourney={journeyData.hasDriverInJourney}
+          isDriver={journeyData.isDriver}
+          onlineCount={journeyData.onlineCount}
+          chatMessages={chatMessages}
+          newMessage={newMessage}
+          setNewMessage={setNewMessage}
+          onSendMessage={sendChatMessage}
+          selectedStop={selectedStop}
+          showStopDetails={showStopDetails}
+          setShowStopDetails={setShowStopDetails}
+        />
+        
+        <ArrivedAnimation
+          isVisible={showArrivedAnimation}
+          onAnimationComplete={handleAnimationComplete}
+          duration={0} // Set to 0 to not auto-hide, or set a longer duration
+          message="Processing your arrival and awarding points..."
+        />
+      </>
     );
   };
 
