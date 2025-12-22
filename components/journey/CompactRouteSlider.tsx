@@ -52,6 +52,7 @@ interface CompactRouteSliderProps {
   currentStopSequence: number;
   participantStatus: 'waiting' | 'picked_up' | 'arrived';
   onStopPress: (stop: JourneyStop) => void;
+  onNavigateToStopDetails?: (stopId: string) => void; // Add this prop
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
