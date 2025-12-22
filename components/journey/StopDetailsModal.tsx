@@ -15,18 +15,22 @@ interface StopDetailsModalProps {
   visible: boolean;
   onClose: () => void;
   passengers: Passenger[];
+  onNavigateToStopDetails?: (stopId: string) => void;
 }
 
 export const StopDetailsModal: React.FC<StopDetailsModalProps> = ({
   stop,
   visible,
   onClose,
-  passengers
+  passengers,
+  onNavigateToStopDetails,
 }) => {
   if (!stop) return null;
 
-  const passengersAtStop = passengers.filter(p => p.stop_id === stop.id);
-  
+  const passengersAtStop = passengers.filter(
+    p => p.stop_id === stop.id
+  );
+
   return (
     <Modal
       visible={visible}
@@ -37,59 +41,90 @@ export const StopDetailsModal: React.FC<StopDetailsModalProps> = ({
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle} numberOfLines={2}>{stop.name}</Text>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Text
+                style={styles.modalTitle}
+                numberOfLines={2}
+              >
+                {stop.name}
+              </Text>
+              <TouchableOpacity
+                onPress={onClose}
+                style={styles.closeButton}
+              >
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
             </View>
-            
+
+            {/* Stop Info */}
             <View style={styles.stopInfo}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Stop:</Text>
-                <Text style={styles.infoValue}>#{stop.order_number}</Text>
+                <Text style={styles.infoValue}>
+                  #{stop.order_number}
+                </Text>
               </View>
-              
+
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Status:</Text>
-                <View style={[
-                  styles.statusBadge,
-                  stop.passed && styles.passedBadge,
-                  stop.current && styles.currentBadge,
-                  stop.upcoming && styles.upcomingBadge
-                ]}>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    stop.passed && styles.passedBadge,
+                    stop.current && styles.currentBadge,
+                    stop.upcoming && styles.upcomingBadge,
+                  ]}
+                >
                   <Text style={styles.statusBadgeText}>
-                    {stop.passed ? 'Passed' : 
-                     stop.current ? 'Current' : 
-                     stop.upcoming ? 'Upcoming' : 'Future'}
+                    {stop.passed
+                      ? 'Passed'
+                      : stop.current
+                      ? 'Current'
+                      : stop.upcoming
+                      ? 'Upcoming'
+                      : 'Future'}
                   </Text>
                 </View>
               </View>
-              
+
+              {/* Passengers */}
               {passengersAtStop.length > 0 ? (
                 <View style={styles.passengersSection}>
                   <Text style={styles.sectionTitle}>
                     Waiting: {passengersAtStop.length}
                   </Text>
+
                   {passengersAtStop.map(passenger => (
-                    <View key={passenger.id} style={styles.passengerItem}>
+                    <View
+                      key={passenger.id}
+                      style={styles.passengerItem}
+                    >
                       <View style={styles.passengerAvatar}>
                         {passenger.profiles?.avatar_url ? (
-                          <Image 
-                            source={{ uri: passenger.profiles.avatar_url }}
+                          <Image
+                            source={{
+                              uri: passenger.profiles.avatar_url,
+                            }}
                             style={styles.avatarImage}
                           />
                         ) : (
                           <View style={styles.avatarPlaceholder}>
                             <Text style={styles.avatarInitial}>
-                              {passenger.profiles?.first_name?.[0] || 'U'}
+                              {passenger.profiles?.first_name?.[0] ||
+                                'U'}
                             </Text>
                           </View>
                         )}
                       </View>
+
                       <View style={styles.passengerInfo}>
-                        <Text style={styles.passengerName} numberOfLines={1}>
-                          {passenger.profiles?.first_name} {passenger.profiles?.last_name}
+                        <Text
+                          style={styles.passengerName}
+                          numberOfLines={1}
+                        >
+                          {passenger.profiles?.first_name}{' '}
+                          {passenger.profiles?.last_name}
                         </Text>
                         <Text style={styles.waitingText}>
                           Waiting
@@ -100,15 +135,45 @@ export const StopDetailsModal: React.FC<StopDetailsModalProps> = ({
                 </View>
               ) : (
                 <View style={styles.noPassengers}>
-                  <Text style={styles.noPassengersText}>No passengers waiting</Text>
+                  <Text style={styles.noPassengersText}>
+                    No passengers waiting
+                  </Text>
                 </View>
               )}
             </View>
           </ScrollView>
-          
-          <TouchableOpacity style={styles.dismissButton} onPress={onClose}>
-            <Text style={styles.dismissButtonText}>Close</Text>
-          </TouchableOpacity>
+
+          {/* Action Buttons Row */}
+          <View style={styles.buttonRow}>
+            {onNavigateToStopDetails && (
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  styles.viewStopButton,
+                ]}
+                onPress={() => {
+                  onClose();
+                  onNavigateToStopDetails(stop.id);
+                }}
+              >
+                <Text style={styles.viewStopButtonText}>
+                  View Stop
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                styles.dismissButton,
+              ]}
+              onPress={onClose}
+            >
+              <Text style={styles.dismissButtonText}>
+                Close
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -253,12 +318,29 @@ const styles = {
     color: '#666666',
     fontSize: 13,
   },
-  dismissButton: {
-    backgroundColor: '#1ea2b1',
+
+  /* Buttons */
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  actionButton: {
+    flex: 1,
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 8,
+  },
+  viewStopButton: {
+    backgroundColor: '#8b5cf6',
+  },
+  viewStopButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  dismissButton: {
+    backgroundColor: '#1ea2b1',
   },
   dismissButtonText: {
     color: '#ffffff',

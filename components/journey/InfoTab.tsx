@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { CompactRouteSlider } from '@/components/journey/CompactRouteSlider';
 import { ConnectionError } from '@/components/journey/ConnectionError';
 import { JourneyStop, Passenger } from '@/types/journey';
@@ -29,7 +30,7 @@ interface InfoTabProps {
   onArrived: () => void;
   onNotifyAhead: () => void;
   onShare: () => void;
-  onCompleteJourney?: () => void; // NEW: Add this prop
+  onCompleteJourney?: () => void;
   userProfile: any;
   waitingTime: number;
   isUpdatingLocation: boolean;
@@ -52,7 +53,7 @@ export const InfoTab: React.FC<InfoTabProps> = ({
   onArrived,
   onNotifyAhead,
   onShare,
-  onCompleteJourney, // NEW: Destructure this prop
+  onCompleteJourney,
   userProfile,
   waitingTime,
   isUpdatingLocation,
@@ -61,14 +62,21 @@ export const InfoTab: React.FC<InfoTabProps> = ({
   isDriver,
   onlineCount
 }) => {
+  const router = useRouter();
+
   const getEstimatedArrival = () => {
     if (!activeJourney || journeyStops.length === 0) return 'Unknown';
-    
+
     const currentStopSequence = activeJourney.current_stop_sequence || 0;
     const remainingStops = journeyStops.length - currentStopSequence;
     const estimatedMinutes = remainingStops * 3;
     
     return `${estimatedMinutes}m`;
+  };
+
+  const handleNavigateToStopDetails = (stopId: string) => {
+    // Navigate using your router
+    router.push(`/stop-details?stopId=${stopId}`);
   };
 
   return (
@@ -95,6 +103,7 @@ export const InfoTab: React.FC<InfoTabProps> = ({
           currentStopSequence={activeJourney.current_stop_sequence || 0}
           participantStatus={participantStatus}
           onStopPress={onStopPress}
+          onNavigateToStopDetails={handleNavigateToStopDetails}
         />
 
         {/* Action Buttons */}
@@ -135,7 +144,7 @@ export const InfoTab: React.FC<InfoTabProps> = ({
           </TouchableOpacity>
         )}
 
-        {/* NEW: Complete Journey Button for Drivers */}
+        {/* Complete Journey Button for Drivers */}
         {isDriver && participantStatus === 'arrived' && onCompleteJourney && (
           <View style={styles.completeJourneyContainer}>
             <TouchableOpacity
@@ -216,7 +225,7 @@ const styles = {
     fontSize: 11,
     fontWeight: '600',
   },
-  // NEW: Complete Journey Button Styles
+  // Complete Journey Button Styles
   completeJourneyContainer: {
     marginTop: 24,
     marginBottom: 32,

@@ -4,6 +4,7 @@ import { InfoTab } from './InfoTab';
 import { ChatTab } from './ChatTab';
 import { StopDetailsModal } from './StopDetailsModal';
 import { JourneyStop } from '@/types/journey';
+import { useRouter } from 'expo-router'; // Import the router
 
 interface JourneyContentProps {
   activeTab: 'info' | 'chat';
@@ -19,7 +20,7 @@ interface JourneyContentProps {
   onArrived: () => void;
   onNotifyAhead: () => void;
   onShare: () => void;
-  onCompleteJourney?: () => void; // NEW: Add this prop
+  onCompleteJourney?: () => void;
   userProfile: any;
   waitingTime: number;
   isUpdatingLocation: boolean;
@@ -50,7 +51,7 @@ export const JourneyContent: React.FC<JourneyContentProps> = ({
   onArrived,
   onNotifyAhead,
   onShare,
-  onCompleteJourney, // NEW: Destructure this prop
+  onCompleteJourney,
   userProfile,
   waitingTime,
   isUpdatingLocation,
@@ -66,6 +67,14 @@ export const JourneyContent: React.FC<JourneyContentProps> = ({
   showStopDetails,
   setShowStopDetails
 }) => {
+  const router = useRouter(); // Initialize router
+
+  // Navigation function to handle stop details navigation
+  const handleNavigateToStopDetails = (stopId: string) => {
+    // Navigate to stop details page
+    router.push(`/stop-details?stopId=${stopId}`);
+  };
+
   if (activeTab === 'info') {
     return (
       <>
@@ -82,7 +91,7 @@ export const JourneyContent: React.FC<JourneyContentProps> = ({
           onArrived={onArrived}
           onNotifyAhead={onNotifyAhead}
           onShare={onShare}
-          onCompleteJourney={onCompleteJourney} // NEW: Pass to InfoTab
+          onCompleteJourney={onCompleteJourney}
           userProfile={userProfile}
           waitingTime={waitingTime}
           isUpdatingLocation={isUpdatingLocation}
@@ -90,6 +99,7 @@ export const JourneyContent: React.FC<JourneyContentProps> = ({
           hasDriverInJourney={hasDriverInJourney}
           isDriver={isDriver}
           onlineCount={onlineCount}
+          onNavigateToStopDetails={handleNavigateToStopDetails} // Pass navigation function
         />
         
         <StopDetailsModal
@@ -97,6 +107,7 @@ export const JourneyContent: React.FC<JourneyContentProps> = ({
           visible={showStopDetails}
           onClose={() => setShowStopDetails(false)}
           passengers={otherPassengers}
+          onNavigateToStopDetails={handleNavigateToStopDetails} // Pass navigation function to modal
         />
       </>
     );
