@@ -18,7 +18,6 @@ import { Users, MessageSquare } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import * as FileSystem from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
 import { captureRef } from 'react-native-view-shot';
 
 // Import components (Remove AddCommunityScreen import)
@@ -700,73 +699,30 @@ export default function FeedsScreen() {
   const downloadPost = useCallback(async (post: Post) => {
     try {
       setSharingPost(true);
-      
-      // Get the viewShot ref for this post
+  
       const viewShotRef = viewShotRefs.current[post.id];
-      
-      if (!viewShotRef) {
-        throw new Error('Could not capture post for download');
-      }
-
-      // Capture the post as an image
+      if (!viewShotRef) throw new Error('Capture failed');
+  
       const uri = await captureRef(viewShotRef, {
         format: 'png',
-        quality: 1.0,
+        quality: 1,
         result: 'tmpfile',
       });
-
-      // Request permissions for media library (iOS/Android)
-      if (Platform.OS !== 'web') {
-        const { status } = await MediaLibrary.requestPermissionsAsync();
-        
-        if (status !== 'granted') {
-          throw new Error('Media library permissions required to save image');
-        }
-
-        // Save to photo library
-        const asset = await MediaLibrary.createAssetAsync(uri);
-        
-        // Create album if needed (optional)
-        const album = await MediaLibrary.getAlbumAsync('Uthutho');
-        if (album) {
-          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-        } else {
-          await MediaLibrary.createAlbumAsync('Uthutho', asset, false);
-        }
-
-        Alert.alert('Success', 'Post saved to your photo gallery!');
-      } else {
-        // Web fallback - create download link
-        const link = document.createElement('a');
-        link.href = uri;
-        link.download = `uthutho-post-${post.id}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        Alert.alert('Success', 'Post image downloaded!');
-      }
-
+  
+      await Share.share({
+        title: 'Uthutho Post',
+        message: 'Shared from Uthutho',
+        url: uri,
+      });
+  
     } catch (error) {
-      console.error('Error downloading post:', error);
-      
-      if (error.message.includes('permissions')) {
-        Alert.alert(
-          'Permission Required', 
-          'Please grant photo library access to save posts.',
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert(
-          'Download Failed', 
-          'Could not save post image. Please try again.',
-          [{ text: 'OK' }]
-        );
-      }
+      console.error('Error sharing post image:', error);
+      Alert.alert('Error', 'Could not share post');
     } finally {
       setSharingPost(false);
     }
   }, []);
+  
 
   // Load initial data
   useEffect(() => {

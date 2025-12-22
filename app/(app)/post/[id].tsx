@@ -18,7 +18,6 @@ import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, Flame, MessageCircle, Send, MapPin, Download, Share as ShareIcon, User, Smartphone, MoreVertical, Home, Navigation } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import * as FileSystem from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
 import { captureRef } from 'react-native-view-shot';
 import { useAuth } from '@/hook/useAuth';
 import ViewShot from 'react-native-view-shot';
@@ -864,10 +863,7 @@ export default function PostDetailScreen() {
   };
 
   const downloadPost = async () => {
-    if (!post || !viewShotRef.current) return;
-
-    // Don't do anything on web since the button is hidden
-    if (Platform.OS === 'web') {
+    if (!post || !viewShotRef.current || Platform.OS === 'web') {
       return;
     }
 
@@ -881,42 +877,68 @@ export default function PostDetailScreen() {
         result: 'tmpfile',
       });
 
-      // Request permissions for media library (iOS/Android)
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      
-      if (status !== 'granted') {
-        throw new Error('Media library permissions required to save image');
+      if (Platform.OS === 'android') {
+        // For Android, use the Share API instead of MediaLibrary
+        // This avoids the need for READ_MEDIA_IMAGES permission
+        const result = await Share.share({
+          title: 'Save Post to Gallery',
+          message: 'Save this post image to your gallery',
+          url: uri,
+        });
+        
+        if (result.action === Share.sharedAction) {
+          Alert.alert('Success', 'Use the share options to save the post to your gallery!');
+        }
+      } else if (Platform.OS === 'ios') {
+        // For iOS, we can still use MediaLibrary with proper permissions
+        try {
+          // Dynamically import expo-media-library to avoid issues
+          const MediaLibrary = require('expo-media-library');
+          
+          const { status } = await MediaLibrary.requestPermissionsAsync();
+          
+          if (status === 'granted') {
+            const asset = await MediaLibrary.createAssetAsync(uri);
+            const album = await MediaLibrary.getAlbumAsync('Uthutho');
+            
+            if (album) {
+              await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+            } else {
+              await MediaLibrary.createAlbumAsync('Uthutho', asset, false);
+            }
+            
+            Alert.alert('Success', 'Post saved to your photo gallery!');
+          } else {
+            // Fallback to sharing on iOS if permission denied
+            const result = await Share.share({
+              title: 'Save Post to Gallery',
+              message: 'Save this post image to your gallery',
+              url: uri,
+            });
+            
+            if (result.action === Share.sharedAction) {
+              Alert.alert('Success', 'Use the share options to save the post to your gallery!');
+            }
+          }
+        } catch (iosError) {
+          console.error('iOS save error:', iosError);
+          // Fallback to sharing
+          const result = await Share.share({
+            title: 'Save Post to Gallery',
+            message: 'Save this post image to your gallery',
+            url: uri,
+          });
+        }
       }
-
-      // Save to photo library
-      const asset = await MediaLibrary.createAssetAsync(uri);
-      
-      // Create album if needed (optional)
-      const album = await MediaLibrary.getAlbumAsync('Uthutho');
-      if (album) {
-        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-      } else {
-        await MediaLibrary.createAlbumAsync('Uthutho', asset, false);
-      }
-
-      Alert.alert('Success', 'Post saved to your photo gallery!');
-
     } catch (error) {
       console.error('Error downloading post:', error);
       
-      if (error.message.includes('permissions')) {
-        Alert.alert(
-          'Permission Required', 
-          'Please grant photo library access to save posts.',
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert(
-          'Download Failed', 
-          'Could not save post image. Please try again.',
-          [{ text: 'OK' }]
-        );
-      }
+      // Show a more generic error message
+      Alert.alert(
+        'Save Post', 
+        'You can save this post by sharing it and choosing "Save to Photos" from the share options.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setSharing(false);
     }
