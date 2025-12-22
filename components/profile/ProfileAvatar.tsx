@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator, Platform } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { router } from 'expo-router';
@@ -12,36 +12,30 @@ export default function EditProfileScreen() {
   const [email, setEmail] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [points, setPoints] = useState(0);
-  const [uploading, setUploading] = useState(false); // State for avatar upload loading
-  const [loading, setLoading] = useState(false); // State for profile update loading
+  const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Fetch profile data on component mount
   useEffect(() => {
     const fetchProfile = async () => {
       try {
         const { data: session, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !session?.session) {
-          throw new Error('No user session found. Please log in.');
-        }
+        if (sessionError || !session?.session) throw new Error('No user session found. Please log in.');
 
         const userId = session.session.user.id;
-
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
           .single();
 
-        if (profileError || !profileData) {
-          throw new Error('Failed to fetch profile data.');
-        }
+        if (profileError || !profileData) throw new Error('Failed to fetch profile data.');
 
         setFirstName(profileData.first_name);
         setLastName(profileData.last_name);
         setEmail(profileData.email);
         setAvatarUrl(profileData.avatar_url);
         setPoints(profileData.points || 0);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching profile:', error.message);
       }
     };
@@ -49,17 +43,13 @@ export default function EditProfileScreen() {
     fetchProfile();
   }, []);
 
-  // Handle saving profile changes
   const handleSave = async () => {
     try {
       setLoading(true);
       const { data: session, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session?.session) {
-        throw new Error('No user session found. Please log in.');
-      }
+      if (sessionError || !session?.session) throw new Error('No user session found. Please log in.');
 
       const userId = session.session.user.id;
-
       const updates = {
         id: userId,
         first_name: firstName,
@@ -69,34 +59,32 @@ export default function EditProfileScreen() {
         updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
-        .from('profiles')
-        .upsert(updates);
-
+      const { error } = await supabase.from('profiles').upsert(updates);
       if (error) throw error;
 
       alert('Profile updated successfully!');
       router.back();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating profile:', error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle image picker for avatar upload
+  // Updated image picker handler
   const handleImagePicker = async () => {
     try {
-      setUploading(true); // Start loading
+      setUploading(true);
 
-      // Request media library permissions
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        alert('Sorry, we need camera roll permissions to make this work!');
-        return;
+      // Android 13+ doesn't need full permission if using system picker
+      if (!(Platform.OS === 'android' && Platform.Version >= 33)) {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          alert('Sorry, we need access to your photos to make this work!');
+          return;
+        }
       }
 
-      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -106,58 +94,44 @@ export default function EditProfileScreen() {
 
       if (!result.canceled) {
         const selectedImage = result.assets[0].uri;
-        await uploadImage(selectedImage); // Upload the selected image
+        await uploadImage(selectedImage);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error picking image:', error);
       alert('Failed to pick an image. Please try again.');
     } finally {
-      setUploading(false); // Stop loading
+      setUploading(false);
     }
   };
 
-  // Upload image to Supabase storage
   const uploadImage = async (uri: string) => {
     try {
       const fileExt = uri.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
 
-      // Fetch the image file
       const response = await fetch(uri);
       const blob = await response.blob();
 
-      // Upload the image to Supabase storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, blob, {
-          cacheControl: '3600',
-          upsert: true,
-        });
+        .upload(filePath, blob, { cacheControl: '3600', upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // Get the public URL of the uploaded image
-      const { data: { publicUrl } } = await supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      // Update the avatar URL in the profiles table
+      const { data: { publicUrl } } = await supabase.storage.from('avatars').getPublicUrl(filePath);
       await handleAvatarUpload(publicUrl);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading image:', error.message);
-
+      alert('Failed to upload image. Please try again.');
     }
   };
 
-  // Update the avatar URL in the profiles table
   const handleAvatarUpload = async (publicUrl: string) => {
     try {
       setLoading(true);
       const { data: session, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session?.session) {
-        throw new Error('No user session found.');
-      }
+      if (sessionError || !session?.session) throw new Error('No user session found.');
 
       const updates = {
         id: session.session.user.id,
@@ -165,14 +139,11 @@ export default function EditProfileScreen() {
         updated_at: new Date().toISOString(),
       };
 
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .upsert(updates);
-
+      const { error: updateError } = await supabase.from('profiles').upsert(updates);
       if (updateError) throw updateError;
 
-      setAvatarUrl(publicUrl); // Update the avatar URL in state
-    } catch (error) {
+      setAvatarUrl(publicUrl);
+    } catch (error: any) {
       console.error('Error updating avatar URL:', error.message);
       alert('Failed to update avatar URL. Please try again.');
     } finally {
@@ -183,7 +154,6 @@ export default function EditProfileScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.formContainer}>
-        {/* Avatar Upload Section */}
         <TouchableOpacity onPress={handleImagePicker} style={styles.avatarContainer} disabled={uploading || loading}>
           {uploading || loading ? (
             <View style={[styles.avatar, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -198,12 +168,10 @@ export default function EditProfileScreen() {
           )}
         </TouchableOpacity>
 
-        {/* Points Display */}
         <View style={styles.pointsContainer}>
           <Text style={[styles.pointsText, { color: colors.text }]}>Points: {points}</Text>
         </View>
 
-        {/* First Name Input */}
         <Text style={[styles.label, { color: colors.text }]}>First Name</Text>
         <TextInput
           style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
@@ -213,7 +181,6 @@ export default function EditProfileScreen() {
           placeholderTextColor={colors.textSecondary}
         />
 
-        {/* Last Name Input */}
         <Text style={[styles.label, { color: colors.text }]}>Last Name</Text>
         <TextInput
           style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
@@ -223,7 +190,6 @@ export default function EditProfileScreen() {
           placeholderTextColor={colors.textSecondary}
         />
 
-        {/* Email Input */}
         <Text style={[styles.label, { color: colors.text }]}>Email</Text>
         <TextInput
           style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
@@ -234,7 +200,6 @@ export default function EditProfileScreen() {
           keyboardType="email-address"
         />
 
-        {/* Save Button */}
         <TouchableOpacity
           style={[styles.saveButton, { backgroundColor: colors.primary }]}
           onPress={handleSave}
@@ -248,56 +213,15 @@ export default function EditProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  formContainer: {
-    gap: 16,
-  },
-  avatarContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
-  avatarPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pointsContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  pointsText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  input: {
-    height: 40,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-  },
-  saveButton: {
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  container: { flex: 1, padding: 16 },
+  formContainer: { gap: 16 },
+  avatarContainer: { alignItems: 'center', marginBottom: 16 },
+  avatar: { width: 100, height: 100, borderRadius: 50 },
+  avatarPlaceholder: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center' },
+  pointsContainer: { alignItems: 'center', marginBottom: 16 },
+  pointsText: { fontSize: 18, fontWeight: 'bold' },
+  label: { fontSize: 16, fontWeight: 'bold' },
+  input: { height: 40, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, paddingHorizontal: 8 },
+  saveButton: { padding: 12, borderRadius: 8, alignItems: 'center' },
+  saveButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
 });
