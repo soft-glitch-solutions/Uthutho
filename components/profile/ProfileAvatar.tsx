@@ -71,31 +71,23 @@ export default function EditProfileScreen() {
     }
   };
 
-  // Updated image picker handler
   const handleImagePicker = async () => {
     try {
       setUploading(true);
-
-      // Android 13+ doesn't need full permission if using system picker
-      if (!(Platform.OS === 'android' && Platform.Version >= 33)) {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          alert('Sorry, we need access to your photos to make this work!');
-          return;
-        }
-      }
-
+  
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 1,
       });
-
-      if (!result.canceled) {
-        const selectedImage = result.assets[0].uri;
-        await uploadImage(selectedImage);
+  
+      if (result.canceled || !result.assets?.length) {
+        return;
       }
+  
+      const selectedImage = result.assets[0].uri;
+      await uploadImage(selectedImage);
     } catch (error: any) {
       console.error('Error picking image:', error);
       alert('Failed to pick an image. Please try again.');
@@ -103,7 +95,7 @@ export default function EditProfileScreen() {
       setUploading(false);
     }
   };
-
+  
   const uploadImage = async (uri: string) => {
     try {
       const fileExt = uri.split('.').pop();

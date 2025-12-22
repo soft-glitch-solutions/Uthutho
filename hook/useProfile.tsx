@@ -200,38 +200,31 @@ export function useProfile() {
   const handleImagePicker = useCallback(async () => {
     try {
       setUploading(true);
-
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        alert("Permission to access gallery is required!");
-        return;
-      }
-
+  
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: [ImagePicker.MediaType.IMAGE], // ✅ fixed deprecation
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 1,
       });
-
+  
       console.log("📂 Picker result:", result);
-
+  
       if (result.canceled || !result.assets?.length) {
         console.log("⚠️ No image selected");
         return;
       }
-
+  
       let localUri = result.assets[0].uri;
-
+  
       // iOS ph:// fix
-      if (localUri.startsWith("ph://")) {
+      if (Platform.OS === "ios" && localUri.startsWith("ph://")) {
         const assetId = localUri.split("/").pop();
         const dest = `${FileSystem.cacheDirectory}${assetId}.jpg`;
         await FileSystem.copyAsync({ from: localUri, to: dest });
         localUri = dest;
-        console.log("📱 iOS converted URI:", localUri);
       }
-
+  
       await uploadAvatar(localUri);
     } catch (error: any) {
       console.error("❌ Error in handleImagePicker:", error.message || error);
@@ -239,6 +232,7 @@ export function useProfile() {
       setUploading(false);
     }
   }, [uploadAvatar]);
+  
 
   // Handle sign out
   const handleSignOut = useCallback(async () => {
