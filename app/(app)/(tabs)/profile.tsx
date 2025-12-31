@@ -13,6 +13,8 @@ import { useProfile } from '@/hook/useProfile';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 
 // Components
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
@@ -216,6 +218,153 @@ export default function ProfileScreen() {
     }
   };
 
+  // Function to handle connecting social accounts
+  const handleConnectAccount = async (provider: string) => {
+    console.log(`Starting ${provider} connection...`);
+    
+    try {
+      // First, get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      
+      if (!session) {
+        throw new Error('No active session found');
+      }
+      
+      // Create a deep link URL for the OAuth callback
+      // This should match your supabase URL configuration
+      const callbackUrl = Linking.createURL('/profile');
+      
+      // Set up OAuth parameters based on provider
+      let oauthProvider: 'google' | 'facebook' | null = null;
+      
+      switch (provider) {
+        case 'google':
+          oauthProvider = 'google';
+          break;
+        case 'facebook':
+          oauthProvider = 'facebook';
+          break;
+        default:
+          throw new Error(`Unsupported provider: ${provider}`);
+      }
+      
+      // For web platform, use OAuth URL
+      if (Platform.OS === 'web') {
+        const { data, error } = await supabase.auth.linkIdentity({
+          provider: oauthProvider,
+          options: {
+            redirectTo: window.location.origin,
+          },
+        });
+        
+        if (error) throw error;
+        
+        if (data?.url) {
+          // Open the OAuth URL in a new window/tab
+          window.open(data.url, '_blank');
+        }
+        
+        // Reload accounts after a short delay
+        setTimeout(() => {
+          loadLinkedAccounts();
+        }, 2000);
+        
+      } else {
+        // For mobile, use Expo WebBrowser
+        const { data, error } = await supabase.auth.linkIdentity({
+          provider: oauthProvider,
+          options: {
+            redirectTo: callbackUrl,
+          },
+        });
+        
+        if (error) throw error;
+        
+        if (data?.url) {
+          // Open the OAuth URL in a browser
+          const result = await WebBrowser.openAuthSessionAsync(data.url, callbackUrl);
+          
+          if (result.type === 'success') {
+            // Parse the URL to get the code
+            const url = new URL(result.url);
+            const code = url.searchParams.get('code');
+            
+            if (code) {
+              // Exchange the code for a session
+              const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+              if (exchangeError) throw exchangeError;
+              
+              // Reload accounts
+              await loadLinkedAccounts();
+            }
+          }
+        }
+      }
+      
+      // Award points for connecting (if your system has a points system)
+      await awardPointsForConnection(provider);
+      
+    } catch (error) {
+      console.error(`Error connecting ${provider} account:`, error);
+      throw error;
+    }
+  };
+
+  // Function to award points for connecting accounts
+  const awardPointsForConnection = async (provider: string) => {
+    try {
+      const pointsMap: Record<string, number> = {
+        'google': 50,
+        'facebook': 50,
+        'twitter': 30,
+      };
+      
+      const points = pointsMap[provider] || 0;
+      
+      if (points > 0) {
+        // Get current user points
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('points')
+          .eq('id', profile.id)
+          .single();
+          
+        if (profileError) throw profileError;
+        
+        const newPoints = (profileData?.points || 0) + points;
+        
+        // Update points in database
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ points: newPoints })
+          .eq('id', profile.id);
+          
+        if (updateError) throw updateError;
+        
+        console.log(`Awarded ${points} points for connecting ${provider}`);
+        
+        // Create a points transaction record if you have that table
+        const { error: transactionError } = await supabase
+          .from('point_transactions')
+          .insert({
+            user_id: profile.id,
+            amount: points,
+            type: 'social_connection',
+            description: `Connected ${provider} account`,
+            provider: provider
+          });
+          
+        if (transactionError) {
+          console.error('Error creating transaction record:', transactionError);
+        }
+      }
+    } catch (error) {
+      console.error('Error awarding points:', error);
+      // Don't throw this error - points are secondary to the connection
+    }
+  };
+
   // Event handlers
   const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -310,6 +459,7 @@ export default function ProfileScreen() {
             accountsLoading={accountsLoading}
             linkedAccounts={linkedAccounts}
             onSignOut={handleSignOut}
+            onConnectAccount={handleConnectAccount}
             isDesktop={isDesktop}
           />
         );
