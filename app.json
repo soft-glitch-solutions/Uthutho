@@ -2,17 +2,14 @@
   "expo": {
     "name": "Uthutho",
     "slug": "uthutho",
-    "version": "1",
+    "version": "1.5",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
     "scheme": "uthutho",
-    "platforms": [
-      "ios",
-      "android",
-      "web"
-    ],
+    "platforms": ["ios", "android", "web"],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -24,31 +21,59 @@
           {
             "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork"
           }
-        ]
+        ],
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["uthutho"]
+          }
+        ],
+        "LSApplicationQueriesSchemes": ["https", "uthutho"]
       },
       "bundleIdentifier": "com.softglitch.uthutho"
     },
+    
     "android": {
       "package": "com.softglitch.uthutho",
-      "versionCode": 34,
+      "versionCode": 35,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#000000"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "uthutho",
+              "host": "*"
+            },
+            {
+              "scheme": "uthutho",
+              "host": "auth",
+              "pathPrefix": "/callback"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
+    
     "web": {
       "favicon": "./assets/images/logo.png",
       "bundler": "metro",
       "output": "single"
     },
+    
     "plugins": [
       "expo-router",
       "expo-localization",
       "expo-secure-store"
     ],
+    
     "experiments": {
       "typedRoutes": true
     },
+    
     "extra": {
       "router": {
         "origin": false
@@ -57,10 +82,12 @@
         "projectId": "2669c125-3910-49ce-a24b-5675a796b3ec"
       }
     },
+    
     "splash": {
       "image": "./assets/images/SplashScreen.png",
       "backgroundColor": "#000000"
     },
+    
     "owner": "soft-glitch-solution"
   }
 }

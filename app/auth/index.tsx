@@ -129,129 +129,191 @@ export default function Auth() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setGoogleLoading(true);
-    setErrorMessage(null);
-  
-    try {
-      // Use app scheme for mobile, web URL for web
-      const redirectUrl = Platform.OS === 'web'
-        ? 'https://www.mobile.uthutho.co.za/auth/callback'
-        : 'uthutho://auth/callback'; // Use app scheme directly
-  
-      console.log('Google OAuth - Redirect URL:', redirectUrl);
-  
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-          skipBrowserRedirect: Platform.OS !== 'web',
-        },
-      });
-  
-      if (error) throw error;
-  
-      // For mobile, open the OAuth URL
-      if (Platform.OS !== 'web' && data?.url) {
-        console.log('Opening WebBrowser for Google OAuth');
-        
-        // Use openBrowserAsync instead of openAuthSessionAsync for better control
-        const result = await WebBrowser.openBrowserAsync(data.url, {
-          // These options help ensure return to app
-          enableBarCollapsing: true,
-          showTitle: false,
-          // Force browser to use app links
-          readerMode: false,
-          // Important: these help with returning to app
-          createTask: false,
-        });
-  
-        console.log('WebBrowser closed, checking session...');
-        
-        // After browser closes, check if we have a session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('Session error after OAuth:', sessionError);
-          throw sessionError;
-        }
-        
-        if (session) {
-          console.log('OAuth successful, redirecting to home');
-          router.replace('/(app)/(tabs)/home');
-        } else {
-          throw new Error('Authentication failed. No session found.');
-        }
-      }
-      
-    } catch (error: any) {
-      console.error('Google sign-in error:', error);
-      setErrorMessage(error.message || 'Google sign-in failed. Please try again.');
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
-  
-  const handleFacebookSignIn = async () => {
-    setFacebookLoading(true);
-    setErrorMessage(null);
+// Replace your current handleGoogleSignIn function with this:
+const handleGoogleSignIn = async () => {
+  setGoogleLoading(true);
+  setErrorMessage(null);
+
+  try {
+    // Generate redirect URL based on platform
+    let redirectUrl;
     
-    try {
-      const redirectUrl = Platform.OS === 'web'
-        ? 'https://www.mobile.uthutho.co.za/auth/callback'
-        : 'uthutho://auth/callback'; // Use app scheme directly
-  
-      console.log('Facebook OAuth - Redirect URL:', redirectUrl);
-  
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'facebook',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: Platform.OS !== 'web',
+    if (Platform.OS === 'web') {
+      // For web
+      redirectUrl = 'https://www.mobile.uthutho.co.za/auth/callback';
+    } else {
+      // For mobile (Android/iOS) - use your app scheme
+      redirectUrl = 'uthutho://auth/callback';
+    }
+
+    console.log('Google OAuth - Redirect URL:', redirectUrl);
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
         },
-      });
-  
-      if (error) throw error;
-  
-      if (Platform.OS !== 'web' && data?.url) {
-        console.log('Opening WebBrowser for Facebook OAuth');
-        
-        const result = await WebBrowser.openBrowserAsync(data.url, {
-          enableBarCollapsing: true,
+        skipBrowserRedirect: Platform.OS !== 'web', // Skip for mobile
+      },
+    });
+
+    if (error) throw error;
+
+    // For mobile, open the OAuth URL
+    if (Platform.OS !== 'web' && data?.url) {
+      console.log('Opening WebBrowser for Google OAuth');
+      
+      // Use openAuthSessionAsync for better deep link handling
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        redirectUrl,
+        {
           showTitle: false,
-          readerMode: false,
+          enableBarCollapsing: true,
+          // These settings help with returning to app
           createTask: false,
-        });
-  
-        console.log('WebBrowser closed, checking session...');
+          preferEphemeralSession: false,
+        }
+      );
+
+      console.log('OAuth Result Type:', result.type);
+
+      if (result.type === 'success' && result.url) {
+        console.log('OAuth successful, result URL:', result.url);
         
-        // Check session after browser closes
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        // Parse the returned URL
+        const { queryParams } = Linking.parse(result.url);
+        console.log('Query params from OAuth:', queryParams);
         
-        if (sessionError) {
-          console.error('Session error after OAuth:', sessionError);
-          throw sessionError;
+        if (queryParams?.error) {
+          throw new Error(queryParams.error_description || queryParams.error || 'Authentication failed');
         }
         
-        if (session) {
+        // Check if we got tokens
+        if (queryParams?.access_token) {
+          // Set the session directly
+          setStatus('Setting up session...');
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: queryParams.access_token as string,
+            refresh_token: queryParams.refresh_token as string,
+          });
+          
+          if (sessionError) throw sessionError;
+          
           console.log('OAuth successful, redirecting to home');
           router.replace('/(app)/(tabs)/home');
         } else {
-          throw new Error('Authentication failed. No session found.');
+          // If no tokens but URL looks successful, navigate to callback screen
+          console.log('No direct tokens, navigating to callback screen');
+          router.push('/auth/callback');
         }
+      } else if (result.type === 'cancel') {
+        throw new Error('Authentication cancelled by user');
+      } else {
+        console.log('WebBrowser result:', result);
+        throw new Error('Authentication failed or browser closed');
       }
-      
-    } catch (error: any) {
-      console.error('Facebook sign-in error:', error);
-      setErrorMessage(error.message || 'Facebook sign-in failed. Please try again.');
-    } finally {
-      setFacebookLoading(false);
     }
-  };
+    
+  } catch (error: any) {
+    console.error('Google sign-in error:', error);
+    setErrorMessage(error.message || 'Google sign-in failed. Please try again.');
+  } finally {
+    setGoogleLoading(false);
+  }
+};
+  
+// Replace your current handleFacebookSignIn function with this:
+const handleFacebookSignIn = async () => {
+  setFacebookLoading(true);
+  setErrorMessage(null);
+  
+  try {
+    // Generate redirect URL based on platform
+    let redirectUrl;
+    
+    if (Platform.OS === 'web') {
+      // For web
+      redirectUrl = 'https://www.mobile.uthutho.co.za/auth/callback';
+    } else {
+      // For mobile (Android/iOS) - use your app scheme
+      redirectUrl = 'uthutho://auth/callback';
+    }
+
+    console.log('Facebook OAuth - Redirect URL:', redirectUrl);
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+      options: {
+        redirectTo: redirectUrl,
+        skipBrowserRedirect: Platform.OS !== 'web',
+      },
+    });
+
+    if (error) throw error;
+
+    if (Platform.OS !== 'web' && data?.url) {
+      console.log('Opening WebBrowser for Facebook OAuth');
+      
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        redirectUrl,
+        {
+          showTitle: false,
+          enableBarCollapsing: true,
+          createTask: false,
+          preferEphemeralSession: false,
+        }
+      );
+
+      console.log('Facebook OAuth Result Type:', result.type);
+
+      if (result.type === 'success' && result.url) {
+        console.log('Facebook OAuth successful, result URL:', result.url);
+        
+        // Parse the returned URL
+        const { queryParams } = Linking.parse(result.url);
+        console.log('Query params from Facebook OAuth:', queryParams);
+        
+        if (queryParams?.error) {
+          throw new Error(queryParams.error_description || queryParams.error || 'Authentication failed');
+        }
+        
+        // Check if we got tokens
+        if (queryParams?.access_token) {
+          // Set the session directly
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: queryParams.access_token as string,
+            refresh_token: queryParams.refresh_token as string,
+          });
+          
+          if (sessionError) throw sessionError;
+          
+          console.log('Facebook OAuth successful, redirecting to home');
+          router.replace('/(app)/(tabs)/home');
+        } else {
+          // If no tokens but URL looks successful, navigate to callback screen
+          console.log('No direct tokens, navigating to callback screen');
+          router.push('/auth/callback');
+        }
+      } else if (result.type === 'cancel') {
+        throw new Error('Authentication cancelled by user');
+      } else {
+        console.log('Facebook WebBrowser result:', result);
+        throw new Error('Authentication failed or browser closed');
+      }
+    }
+    
+  } catch (error: any) {
+    console.error('Facebook sign-in error:', error);
+    setErrorMessage(error.message || 'Facebook sign-in failed. Please try again.');
+  } finally {
+    setFacebookLoading(false);
+  }
+};
   
 
   const handleSignIn = async () => {
@@ -742,7 +804,7 @@ export default function Auth() {
       </View>
 
       {/* Social Login Section - Only show on web platform */}
-      {Platform.OS === 'web' && !showForgotPassword && (
+      {!showForgotPassword && (
         <View style={styles.socialLoginContainer}>
           <Text style={[styles.socialLoginText, { color: colors.text }]}>
             {isLogin ? 'Continue with' : 'Sign up with'}
