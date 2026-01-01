@@ -100,6 +100,14 @@ export default function ProfileScreen() {
           email: hasFacebook ? user.email : undefined
         });
         
+        // Check for Twitter if you have it configured
+        const hasTwitter = identities.some(identity => identity.provider === 'twitter');
+        accounts.push({
+          provider: 'twitter',
+          connected: hasTwitter,
+          email: hasTwitter ? user.email : undefined
+        });
+        
         setLinkedAccounts(accounts);
       }
     } catch (error) {
@@ -218,25 +226,30 @@ export default function ProfileScreen() {
     }
   };
 
-  // Function to handle connecting social accounts
+  // Function to handle connecting social accounts with detailed error handling
   const handleConnectAccount = async (provider: string) => {
     console.log(`Starting ${provider} connection...`);
     
     try {
       // First, get the current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      
-      if (!session) {
-        throw new Error('No active session found');
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error(`Session error: ${sessionError.message}`);
       }
       
+      if (!session) {
+        throw new Error('No active session found. Please sign in again.');
+      }
+      
+      console.log('User session found:', session.user.email);
+      
       // Create a deep link URL for the OAuth callback
-      // This should match your supabase URL configuration
       const callbackUrl = Linking.createURL('/profile');
+      console.log('Callback URL:', callbackUrl);
       
       // Set up OAuth parameters based on provider
-      let oauthProvider: 'google' | 'facebook' | null = null;
+      let oauthProvider: 'google' | 'facebook' | 'twitter' | null = null;
       
       switch (provider) {
         case 'google':
@@ -245,69 +258,218 @@ export default function ProfileScreen() {
         case 'facebook':
           oauthProvider = 'facebook';
           break;
+        case 'twitter':
+          oauthProvider = 'twitter';
+          break;
         default:
           throw new Error(`Unsupported provider: ${provider}`);
       }
       
-      // For web platform, use OAuth URL
+      // For web platform
       if (Platform.OS === 'web') {
+        console.log('Starting web OAuth for provider:', oauthProvider);
+        
+        // First, check if we can get an OAuth URL
         const { data, error } = await supabase.auth.linkIdentity({
           provider: oauthProvider,
           options: {
             redirectTo: window.location.origin,
+            skipBrowserRedirect: false, // Let Supabase handle redirect
           },
         });
         
-        if (error) throw error;
+        console.log('linkIdentity response:', { data, error });
         
-        if (data?.url) {
-          // Open the OAuth URL in a new window/tab
-          window.open(data.url, '_blank');
+        if (error) {
+          console.error('linkIdentity error:', error);
+          
+          // Check for specific error types
+          if (error.message?.includes('already linked')) {
+            throw new Error('This social account is already linked to another user.');
+          } else if (error.message?.includes('User already registered')) {
+            throw new Error('This account is already registered with us.');
+          } else if (error.message?.includes('Provider not enabled')) {
+            throw new Error(`The ${provider} OAuth provider is not enabled in Supabase. Please contact support.`);
+          } else if (error.message?.includes('invalid_client')) {
+            throw new Error(`The ${provider} OAuth configuration is incorrect. Please contact support.`);
+          } else {
+            throw new Error(`OAuth setup error: ${error.message || 'Unknown error'}`);
+          }
         }
         
-        // Reload accounts after a short delay
-        setTimeout(() => {
-          loadLinkedAccounts();
-        }, 2000);
+        if (data?.url) {
+          console.log('Opening OAuth URL:', data.url);
+          
+          // Open the OAuth URL in a new window/tab
+          const authWindow = window.open(
+            data.url, 
+            '_blank', 
+            'width=600,height=700,scrollbars=yes,resizable=yes'
+          );
+          
+          if (!authWindow) {
+            throw new Error('Popup was blocked. Please allow popups for this website and try again.');
+          }
+          
+          // Focus the new window
+          authWindow.focus();
+          
+          // Set up a listener for the OAuth callback
+          let checkCount = 0;
+          const maxChecks = 120; // 2 minutes at 1-second intervals
+          
+          const checkOAuthCompletion = setInterval(async () => {
+            checkCount++;
+            
+            try {
+              // Check if the auth window is closed
+              if (authWindow.closed) {
+                clearInterval(checkOAuthCompletion);
+                throw new Error('Authentication window was closed before completing.');
+              }
+              
+              // Check if user is still in the same session
+              const { data: { session: newSession } } = await supabase.auth.getSession();
+              
+              // Check if the provider is now connected
+              if (newSession) {
+                const identities = newSession.user.identities || [];
+                const isNowConnected = identities.some(identity => 
+                  identity.provider === provider || 
+                  identity.provider === oauthProvider
+                );
+                
+                if (isNowConnected) {
+                  console.log(`${provider} account successfully connected!`);
+                  clearInterval(checkOAuthCompletion);
+                  authWindow.close();
+                  
+                  // Reload accounts
+                  await loadLinkedAccounts();
+                  
+                  // Award points
+                  await awardPointsForConnection(provider);
+                  return;
+                }
+              }
+              
+              // Timeout after max checks
+              if (checkCount >= maxChecks) {
+                clearInterval(checkOAuthCompletion);
+                authWindow.close();
+                throw new Error('Connection timed out after 2 minutes. Please try again.');
+              }
+              
+            } catch (checkError) {
+              console.error('Error checking OAuth completion:', checkError);
+              clearInterval(checkOAuthCompletion);
+              authWindow.close();
+              throw new Error(`Verification failed: ${checkError.message}`);
+            }
+          }, 1000);
+          
+        } else {
+          console.warn('No OAuth URL returned from linkIdentity');
+          throw new Error('Failed to start OAuth flow. No authentication URL was provided.');
+        }
         
       } else {
         // For mobile, use Expo WebBrowser
+        console.log('Starting mobile OAuth for provider:', oauthProvider);
+        
         const { data, error } = await supabase.auth.linkIdentity({
           provider: oauthProvider,
           options: {
             redirectTo: callbackUrl,
+            skipBrowserRedirect: true,
           },
         });
         
-        if (error) throw error;
+        console.log('Mobile linkIdentity response:', { data, error });
+        
+        if (error) {
+          console.error('Mobile OAuth error:', error);
+          throw new Error(`Mobile OAuth error: ${error.message || 'Unknown error'}`);
+        }
         
         if (data?.url) {
+          console.log('Opening mobile OAuth URL:', data.url);
+          
           // Open the OAuth URL in a browser
           const result = await WebBrowser.openAuthSessionAsync(data.url, callbackUrl);
+          console.log('WebBrowser result:', result);
           
           if (result.type === 'success') {
             // Parse the URL to get the code
-            const url = new URL(result.url);
-            const code = url.searchParams.get('code');
+            const url = result.url;
+            console.log('OAuth callback URL:', url);
+            
+            // Extract code from URL
+            const urlObj = new URL(url);
+            const code = urlObj.searchParams.get('code');
+            const errorParam = urlObj.searchParams.get('error');
+            
+            if (errorParam) {
+              throw new Error(`OAuth error: ${errorParam}`);
+            }
             
             if (code) {
+              console.log('Exchanging code for session...');
               // Exchange the code for a session
               const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-              if (exchangeError) throw exchangeError;
+              if (exchangeError) {
+                console.error('Session exchange error:', exchangeError);
+                throw new Error(`Session exchange error: ${exchangeError.message}`);
+              }
               
+              console.log('Session exchange successful');
               // Reload accounts
               await loadLinkedAccounts();
+              
+              // Award points for connecting
+              await awardPointsForConnection(provider);
+            } else {
+              throw new Error('No authorization code received from OAuth provider.');
             }
+          } else if (result.type === 'cancel') {
+            throw new Error('Connection cancelled by user.');
+          } else if (result.type === 'dismiss') {
+            throw new Error('Connection was dismissed.');
+          } else if (result.type === 'locked') {
+            throw new Error('Browser is locked or not available.');
+          } else {
+            throw new Error(`Connection failed with type: ${result.type}`);
           }
+        } else {
+          throw new Error('No OAuth URL provided for mobile authentication.');
         }
       }
       
-      // Award points for connecting (if your system has a points system)
-      await awardPointsForConnection(provider);
-      
     } catch (error) {
       console.error(`Error connecting ${provider} account:`, error);
-      throw error;
+      
+      // Extract meaningful error message
+      let errorMessage = 'Unable to connect account. Please try again.';
+      
+      if (error instanceof Error) {
+        // Show the actual error message
+        errorMessage = error.message;
+        
+        // Add troubleshooting tips for common errors
+        if (error.message.includes('already linked')) {
+          errorMessage += '\n\nTry: Sign out and sign in with that social account instead.';
+        } else if (error.message.includes('already registered')) {
+          errorMessage += '\n\nTry: Sign out and sign in with that social account, then link your current account from there.';
+        } else if (error.message.includes('Popup was blocked')) {
+          errorMessage += '\n\nTip: Check your browser settings to allow popups for this site.';
+        } else if (error.message.includes('timed out')) {
+          errorMessage += '\n\nTip: Try again and complete the authentication within 2 minutes.';
+        } else if (error.message.includes('Provider not enabled')) {
+          errorMessage += '\n\nAdmin: This OAuth provider needs to be configured in Supabase Dashboard.';
+        }
+      }
+      
+      throw new Error(errorMessage);
     }
   };
 
@@ -322,7 +484,7 @@ export default function ProfileScreen() {
       
       const points = pointsMap[provider] || 0;
       
-      if (points > 0) {
+      if (points > 0 && profile?.id) {
         // Get current user points
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
@@ -330,7 +492,10 @@ export default function ProfileScreen() {
           .eq('id', profile.id)
           .single();
           
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.error('Error fetching profile points:', profileError);
+          return; // Don't throw, points are secondary
+        }
         
         const newPoints = (profileData?.points || 0) + points;
         
@@ -340,23 +505,31 @@ export default function ProfileScreen() {
           .update({ points: newPoints })
           .eq('id', profile.id);
           
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('Error updating points:', updateError);
+          return; // Don't throw, points are secondary
+        }
         
         console.log(`Awarded ${points} points for connecting ${provider}`);
         
-        // Create a points transaction record if you have that table
-        const { error: transactionError } = await supabase
-          .from('point_transactions')
-          .insert({
-            user_id: profile.id,
-            amount: points,
-            type: 'social_connection',
-            description: `Connected ${provider} account`,
-            provider: provider
-          });
-          
-        if (transactionError) {
-          console.error('Error creating transaction record:', transactionError);
+        // Try to create a points transaction record if the table exists
+        try {
+          const { error: transactionError } = await supabase
+            .from('point_transactions')
+            .insert({
+              user_id: profile.id,
+              amount: points,
+              type: 'social_connection',
+              description: `Connected ${provider} account`,
+              provider: provider
+            });
+            
+          if (transactionError) {
+            console.error('Error creating transaction record:', transactionError);
+            // Don't throw, this is optional
+          }
+        } catch (tableError) {
+          console.log('point_transactions table might not exist, skipping:', tableError);
         }
       }
     } catch (error) {
@@ -370,7 +543,8 @@ export default function ProfileScreen() {
     try {
       const file = event.target.files?.[0];
       if (!file || !file.type.startsWith('image/')) {
-        alert('Please select a valid image file.');
+        // Use your modal system here instead of alert
+        console.warn('Please select a valid image file.');
         return;
       }
       const publicUrl = await uploadAvatar(file);

@@ -10,16 +10,25 @@ import {
   ScrollView,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Platform,
+  Image,
 } from 'react-native';
 import {
-  Compass,
-  Users,
-  MapPin,
-  Route,
-  Trophy,
   ChevronRight,
   ChevronLeft,
 } from 'lucide-react-native';
+import LottieView from 'lottie-react-native';
+
+// Only import web components on web
+let DotLottieReact: any = null;
+if (Platform.OS === 'web') {
+  try {
+    const module = require('@lottiefiles/dotlottie-react');
+    DotLottieReact = module.DotLottieReact;
+  } catch (error) {
+    console.warn('DotLottieReact not available');
+  }
+}
 
 interface WelcomeOverlayProps {
   visible: boolean;
@@ -39,8 +48,10 @@ const slides = [
     id: 1,
     title: 'Welcome to Uthutho',
     subtitle: 'Travel doesn’t have to feel lonely',
-    icon: Compass,
-    color: '#1ea2b1',
+    // Mobile Lottie file
+    lottieSource: require('@/assets/animations/Celebrate.json'),
+    // Web Lottie URL
+    lottieUrl: 'https://lottie.host/e298b4d7-ec25-4809-9971-fd981511e67a/rWHuAlLHeZ.lottie',
     content:
       'Uthutho is built around people who travel every day. It helps you feel connected, informed, and part of something shared.',
   },
@@ -48,8 +59,8 @@ const slides = [
     id: 2,
     title: 'A social transport app',
     subtitle: 'Built around real journeys',
-    icon: Users,
-    color: '#4ade80',
+    lottieSource: require('@/assets/animations/understand.json'),
+    lottieUrl: 'https://lottie.host/6a2179e4-c19b-447f-abf8-ba546671c275/buGwONChJP.lottie',
     content:
       'Uthutho is a social transport app. You join communities through the stops, hubs, and routes you actually use.',
   },
@@ -57,8 +68,8 @@ const slides = [
     id: 3,
     title: 'Join stops & hubs',
     subtitle: 'Your travel communities',
-    icon: MapPin,
-    color: '#fbbf24',
+    lottieSource: require('@/assets/animations/intro.json'),
+    lottieUrl: 'https://lottie.host/a9aeaf82-2750-44e9-b048-0bc121ed60db/GkljgALnFY.lottie',
     content:
       'Every stop and hub is its own community. Save the ones you use and see who else travels through them.',
   },
@@ -66,24 +77,24 @@ const slides = [
     id: 4,
     title: 'Join a journey',
     subtitle: 'Travel together, stay informed',
-    icon: Route,
-    color: '#60a5fa',
+    lottieSource: require('@/assets/animations/travel.json'),
+    lottieUrl: 'https://lottie.host/94a02803-32cc-4b11-9147-4b26f8cda9ee/4D5V0Q1cBG.lottie',
     content:
-      'When you’re traveling a route, you join a journey. Other commuters on the same route can see activity and help keep everyone informed about when transport is coming.',
+      'When you\'re traveling a route, you join a journey. Other commuters on the same route can see activity and help keep everyone informed about when transport is coming.',
   },
   {
     id: 5,
     title: 'Earn points by traveling',
     subtitle: 'Your journey matters',
-    icon: Trophy,
-    color: '#ff6b35',
+    lottieSource: require('@/assets/animations/Success.json'),
+    lottieUrl: 'https://lottie.host/b6e8a86c-ab25-4d67-a925-3b343636293b/SY1IXt6wHF.lottie',
     content:
       'Every journey earns you points. Travel more, contribute more, and unlock levels and titles that reflect how you move.',
   },
 ];
 
 /* -------------------------------------------------------------------------- */
-/*                               MAIN COMPONENT                                */
+/*                               MAIN COMPONENT                               */
 /* -------------------------------------------------------------------------- */
 
 export default function WelcomeOverlay({
@@ -143,22 +154,39 @@ export default function WelcomeOverlay({
   };
 
   const Slide = ({ slide }: { slide: typeof slides[0] }) => {
-    const Icon = slide.icon;
-
     return (
       <View style={[styles.slide, { width: SLIDE_WIDTH }]}>
-        <View
-          style={[
-            styles.iconWrap,
-            { backgroundColor: `${slide.color}20` },
-          ]}
-        >
-          <Icon size={34} color={slide.color} />
+        {/* Lottie Animation */}
+        <View style={styles.animationWrap}>
+          {Platform.OS === 'ios' || Platform.OS === 'android' ? (
+            <LottieView
+              source={slide.lottieSource}
+              autoPlay
+              loop
+              style={styles.lottieAnimation}
+              resizeMode="contain"
+            />
+          ) : Platform.OS === 'web' && DotLottieReact ? (
+            <DotLottieReact
+              src={slide.lottieUrl}
+              loop
+              autoplay
+              style={styles.lottieAnimation}
+            />
+          ) : (
+            // Fallback if Lottie is not available
+            <View style={styles.fallbackAnimation}>
+              <Image 
+                source={require('@/assets/logo.png')}
+                style={styles.fallbackImage}
+                resizeMode="contain"
+              />
+            </View>
+          )}
         </View>
 
         <Text style={styles.title}>{slide.title}</Text>
         <Text style={styles.subtitle}>{slide.subtitle}</Text>
-
         <Text style={styles.content}>{slide.content}</Text>
       </View>
     );
@@ -179,7 +207,11 @@ export default function WelcomeOverlay({
           {/* HEADER */}
           <View style={styles.header}>
             <View style={styles.logo}>
-              <Compass size={20} color="#1ea2b1" />
+              <Image 
+                source={require('@/assets/logo.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
               <Text style={styles.logoText}>Uthutho</Text>
             </View>
             <TouchableOpacity onPress={onClose}>
@@ -258,6 +290,7 @@ const styles = StyleSheet.create({
     padding: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     borderBottomWidth: 1,
     borderColor: '#222',
   },
@@ -265,6 +298,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  logoImage: {
+    width: 24,
+    height: 24,
   },
   logoText: {
     color: '#fff',
@@ -278,13 +315,28 @@ const styles = StyleSheet.create({
     padding: 32,
     alignItems: 'center',
   },
-  iconWrap: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+  animationWrap: {
+    width: 120,
+    height: 120,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
+  },
+  lottieAnimation: {
+    width: 120,
+    height: 120,
+  },
+  fallbackAnimation: {
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    borderRadius: 20,
+  },
+  fallbackImage: {
+    width: 60,
+    height: 60,
   },
   title: {
     fontSize: 24,
