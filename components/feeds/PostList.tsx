@@ -6,6 +6,7 @@ import { Community } from '@/types/feeds';
 import PostCreation from './PostCreation';
 import PostCard from './PostCard';
 import EmptyPosts from './EmptyPosts';
+import NativeAd from './NativeAd'; // Import the NativeAd component
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -51,26 +52,40 @@ const PostList: React.FC<PostListProps> = ({
 }) => {
   const desktopMode = isDesktop || propIsDesktop;
 
+  // Intersperse ads into the posts list
+  const dataWithAds = posts.reduce((acc, post, index) => {
+    acc.push(post);
+    if ((index + 1) % 5 === 0) {
+      acc.push({ isAd: true, id: `ad-${index}` });
+    }
+    return acc;
+  }, []);
+
   return (
     <FlatList
-      data={posts}
+      data={dataWithAds}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <PostCard
-          post={item}
-          userId={userId}
-          toggleReaction={toggleReaction}
-          sharePost={sharePost}
-          downloadPost={downloadPost}
-          sharingPost={sharingPost}
-          router={router}
-          viewShotRef={(ref: any) => {
-            viewShotRefs[item.id] = ref;
-          }}
-          disabled={previewMode && !isFollowingPreview}
-          isDesktop={desktopMode}
-        />
-      )}
+      renderItem={({ item }) => {
+        if (item.isAd) {
+          return <NativeAd />;
+        }
+        return (
+          <PostCard
+            post={item}
+            userId={userId}
+            toggleReaction={toggleReaction}
+            sharePost={sharePost}
+            downloadPost={downloadPost}
+            sharingPost={sharingPost}
+            router={router}
+            viewShotRef={(ref: any) => {
+              viewShotRefs[item.id] = ref;
+            }}
+            disabled={previewMode && !isFollowingPreview}
+            isDesktop={desktopMode}
+          />
+        );
+      }}
       ListHeaderComponent={
         selectedCommunity ? (
           <PostCreation

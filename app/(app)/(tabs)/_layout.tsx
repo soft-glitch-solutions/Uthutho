@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { House, User, Rss, Route, WalletCards, Search } from 'lucide-react-native';
-import { View, Text, Dimensions, Pressable, Image } from 'react-native';
+import { View, Text, Dimensions, Pressable, Image, Platform } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -21,8 +21,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import StreakOverlay from '@/components/StreakOverlay';
-import { Platform } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
+import BannerAdComponent from '@/components/ads/BannerAd';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const TAB_COUNT = 5;
@@ -518,7 +518,7 @@ export default function EnhancedTabLayout() {
   };
 
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <Tabs
         tabBar={(props) => 
           isDesktop ? 
@@ -598,6 +598,9 @@ export default function EnhancedTabLayout() {
         userId={userId}
         onClose={() => setShowStreakOverlay(false)}
       />
-    </>
+
+      {/* Banner Ad */}
+      <BannerAdComponent />
+    </View>
   );
 }
