@@ -25,6 +25,7 @@ import FavoritesSection from '@/components/home/FavoritesSection';
 import GamificationSection from '@/components/home/GamificationSection';
 import ScreenTransition from '@/components/ScreenTransition';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import BannerAd from '@/components/BannerAd';
 import LottieView from 'lottie-react-native';
 import RateTripModal from '@/components/home/RateTripModal';
 import SimpleDebugPanel from '@/components/debug/SimpleDebugPanel';
@@ -993,6 +994,16 @@ export default function HomeScreen() {
                   Explore Map
                 </Text>
               </View>
+
+              <View style={styles.adContainer}>
+                <BannerAd 
+                  position="top"
+                  size={Platform.OS === 'ios' ? 'ANCHORED_ADAPTIVE_BANNER' : 'ADAPTIVE_BANNER'}
+                  onAdLoaded={() => console.log('Home screen banner ad loaded')}
+                  onAdFailedToLoad={(error) => console.error('Home screen banner ad failed:', error)}
+                />
+              </View>
+
               
               <NearbySection
                 locationError={locationError}
@@ -1858,6 +1869,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+
+  adContainer: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   journeyBannerContent: {
     flex: 1,
