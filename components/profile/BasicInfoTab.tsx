@@ -26,7 +26,6 @@ const AVAILABLE_PROVIDERS = [
   { id: 'email', name: 'Email', icon: '@', color: '#666', points: 0 },
   { id: 'google', name: 'Google', icon: 'G', color: '#DB4437', points: 50 },
   { id: 'facebook', name: 'Facebook', icon: 'f', color: '#1877F2', points: 50 },
-  { id: 'twitter', name: 'Twitter', icon: '𝕏', color: '#000000', points: 30 },
 ];
 
 export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
