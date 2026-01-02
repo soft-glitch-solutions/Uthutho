@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
-import { Bell, Lock, Info, Shield, ChevronRight, MessageSquare, FileText, HelpCircle } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Linking, Platform } from 'react-native';
+import { Bell, Lock, Info, Shield, ChevronRight, MessageSquare, FileText, HelpCircle, ExternalLink } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
+import * as WebBrowser from 'expo-web-browser';
+
+// Required for WebBrowser
+WebBrowser.maybeCompleteAuthSession();
 
 export default function SettingsScreen() {
   const { colors } = useTheme();
@@ -20,6 +24,55 @@ export default function SettingsScreen() {
     appVersion: 'App Version 1.8.2',
     feedback: 'Feedback & Support',
     help: 'Help & FAQ',
+  };
+
+  const handleOpenTerms = async () => {
+    const termsUrl = 'https://uthutho.co.za/terms-and-conditions';
+    
+    try {
+      // Use WebBrowser to open within app (works on iOS/Android)
+      await WebBrowser.openBrowserAsync(termsUrl, {
+        // iOS settings
+        dismissButtonStyle: 'close',
+        preferredBarTintColor: '#1a1a1a',
+        preferredControlTintColor: '#1EA2B1',
+        // Android settings
+        toolbarColor: '#1a1a1a',
+        secondaryToolbarColor: '#000000',
+        enableDefaultShare: false,
+        enableBarCollapsing: false,
+        // Common settings
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+        createTask: false,
+      });
+    } catch (error) {
+      console.error('Error opening terms:', error);
+      // Fallback to Linking if WebBrowser fails
+      const supported = await Linking.canOpenURL(termsUrl);
+      if (supported) {
+        await Linking.openURL(termsUrl);
+      }
+    }
+  };
+
+  const handleOpenPrivacy = async () => {
+    const privacyUrl = 'https://uthutho.co.za/privacy-policy';
+    
+    try {
+      await WebBrowser.openBrowserAsync(privacyUrl, {
+        dismissButtonStyle: 'close',
+        preferredBarTintColor: '#1a1a1a',
+        preferredControlTintColor: '#1EA2B1',
+        toolbarColor: '#1a1a1a',
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+      });
+    } catch (error) {
+      console.error('Error opening privacy policy:', error);
+      const supported = await Linking.canOpenURL(privacyUrl);
+      if (supported) {
+        await Linking.openURL(privacyUrl);
+      }
+    }
   };
 
   return (
@@ -69,8 +122,9 @@ export default function SettingsScreen() {
                 <Lock size={20} color="#1EA2B1" />
               </View>
               <Text style={[styles.settingText, { color: colors.text }]}>{settings.privacyPolicy}</Text>
+
             </View>
-            <ChevronRight size={20} color="#666666" />
+                          <ChevronRight size={20} color="#666666" />
           </TouchableOpacity>
 
           {/* Security Settings */}
@@ -90,7 +144,7 @@ export default function SettingsScreen() {
           {/* Terms of Service */}
           <TouchableOpacity
             style={[styles.settingCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => router.push('/terms-of-service')}
+            onPress={handleOpenTerms}
           >
             <View style={styles.settingContent}>
               <View style={styles.settingIconContainer}>
@@ -98,7 +152,7 @@ export default function SettingsScreen() {
               </View>
               <Text style={[styles.settingText, { color: colors.text }]}>{settings.terms}</Text>
             </View>
-            <ChevronRight size={20} color="#666666" />
+            <ExternalLink size={20} color="#666666" />
           </TouchableOpacity>
         </View>
 
@@ -109,7 +163,7 @@ export default function SettingsScreen() {
           {/* Help & FAQ */}
           <TouchableOpacity
             style={[styles.settingCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => router.push('/help-faq')}
+            onPress={() => router.push('/help')}
           >
             <View style={styles.settingContent}>
               <View style={styles.settingIconContainer}>
