@@ -10,8 +10,20 @@ import {
   Alert,
   Dimensions,
   Platform,
+  SafeAreaView,
 } from 'react-native';
-import { Search, MapPin, Navigation, Bookmark, BookmarkCheck, Clock, DollarSign } from 'lucide-react-native';
+import { 
+  Search, 
+  MapPin, 
+  Navigation, 
+  Bookmark, 
+  BookmarkCheck, 
+  Users, 
+  Clock, 
+  DollarSign,
+  ArrowLeft,
+  X
+} from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useFavorites, FavoriteItem } from '@/hook/useFavorites';
 import { useAuth } from '@/hook/useAuth';
@@ -55,6 +67,113 @@ const SkeletonLoader = ({ isDesktop: propIsDesktop = false }) => {
   );
 };
 
+// Follow Button Component
+const FollowButton = ({ 
+  isFollowing, 
+  onToggle, 
+  loading, 
+  followerCount,
+  isDesktop = false 
+}: { 
+  isFollowing: boolean; 
+  onToggle: () => void; 
+  loading: boolean; 
+  followerCount: number;
+  isDesktop?: boolean;
+}) => {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.followButton,
+        isDesktop && styles.followButtonDesktop,
+        isFollowing && styles.followingButton,
+        loading && styles.followButtonLoading,
+      ]}
+      onPress={onToggle}
+      disabled={loading}
+    >
+      {loading ? (
+        <View style={styles.followButtonLoadingContent}>
+          <Text style={[
+            styles.followButtonText,
+            isFollowing && styles.followingButtonText,
+            isDesktop && styles.followButtonTextDesktop,
+          ]}>
+            {isFollowing ? 'Unfollowing...' : 'Following...'}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.followButtonContent}>
+          {isFollowing ? (
+            <>
+              <BookmarkCheck size={isDesktop ? 14 : 16} color="#ffffff" />
+              <Text style={[
+                styles.followButtonText,
+                styles.followingButtonText,
+                isDesktop && styles.followButtonTextDesktop,
+              ]}>
+                Following
+              </Text>
+              {followerCount > 0 && (
+                <View style={[styles.followerCountBadge, isDesktop && styles.followerCountBadgeDesktop]}>
+                  <Text style={styles.followerCountText}>{followerCount}</Text>
+                </View>
+              )}
+            </>
+          ) : (
+            <>
+              <Users size={isDesktop ? 14 : 16} color="#1ea2b1" />
+              <Text style={[
+                styles.followButtonText,
+                isDesktop && styles.followButtonTextDesktop,
+              ]}>
+                Follow
+              </Text>
+            </>
+          )}
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+};
+
+// Header Component with Back Button
+const HeaderWithBack = ({ 
+  onBack, 
+  title = "Explore Communities",
+  subtitle = "Discover and follow routes, stops, and hubs in your community",
+  isDesktop = false 
+}: { 
+  onBack?: () => void;
+  title?: string;
+  subtitle?: string;
+  isDesktop?: boolean;
+}) => {
+  const router = useRouter();
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      router.back();
+    }
+  };
+
+  return (
+    <View style={[styles.headerContainer, isDesktop && styles.headerContainerDesktop]}>
+
+      <View style={[styles.headerContent, isDesktop && styles.headerContentDesktop]}>
+        <Text style={[styles.headerTitle, isDesktop && styles.headerTitleDesktop]}>
+          {title}
+        </Text>
+        <Text style={[styles.headerSubtitle, isDesktop && styles.headerSubtitleDesktop]}>
+          {subtitle}
+        </Text>
+      </View>
+    </View>
+  );
+};
+
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -64,8 +183,7 @@ export default function SearchScreen() {
   const [recommendedNearby, setRecommendedNearby] = useState<SearchResult[]>([]);
   const [isLoadingRecommended, setIsLoadingRecommended] = useState(false);
   const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
-  const [routeFollowerCounts, setRouteFollowerCounts] = useState<Record<string, number>>({});
-  const [hubFollowerCounts, setHubFollowerCounts] = useState<Record<string, number>>({});
+  const [togglingFavorites, setTogglingFavorites] = useState<Record<string, boolean>>({});
   const router = useRouter();
   const { favorites, addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
   const { user } = useAuth();
@@ -181,21 +299,35 @@ export default function SearchScreen() {
         });
       }
 
-      // Sort by distance
-      const sortedResults = results.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+      // Get routes
+      const { data: routes } = await supabase
+        .from('routes')
+        .select('*')
+        .limit(8);
+
+      if (routes) {
+        console.log('Routes found:', routes.length);
+        routes.forEach(route => {
+          results.push({
+            id: route.id,
+            name: route.name,
+            type: 'route',
+            data: route,
+          });
+        });
+      }
+
+      // Sort by distance (where available)
+      const sortedResults = results.sort((a, b) => {
+        if (a.distance !== undefined && b.distance !== undefined) {
+          return a.distance - b.distance;
+        }
+        return 0;
+      });
       
-      // Get a balanced mix of stops and hubs
-      const stopsOnly = sortedResults.filter(r => r.type === 'stop').slice(0, 4);
-      const hubsOnly = sortedResults.filter(r => r.type === 'hub').slice(0, 4);
-      
-      // Combine and take up to 8 results
-      const balancedResults = [...stopsOnly, ...hubsOnly]
-        .sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity))
-        .slice(0, 8);
-        
-      console.log('Final recommended results:', balancedResults);
-      setRecommendedNearby(balancedResults);
-      populateFollowerCounts(balancedResults);
+      console.log('Final recommended results:', sortedResults.length);
+      setRecommendedNearby(sortedResults.slice(0, 8));
+      populateFollowerCounts(sortedResults);
     } catch (error) {
       console.error('Error loading recommended nearby:', error);
     } finally {
@@ -343,7 +475,7 @@ export default function SearchScreen() {
     }
 
     // Map result.type to your favorites entity_type
-    const entityType: 'route' | 'hub' | 'stop' | 'nearby_spot' = result.type;
+    const entityType: 'route' | 'hub' | 'stop' = result.type as 'route' | 'hub' | 'stop';
     if (entityType === 'nearby_spot') {
       Alert.alert('Not Supported', 'Nearby spots cannot be bookmarked yet.');
       return;
@@ -353,8 +485,14 @@ export default function SearchScreen() {
     const isFav = isFavorite(id);
     const delta = isFav ? -1 : 1;
 
+    // Set loading state
+    setTogglingFavorites(prev => ({ ...prev, [id]: true }));
+
     // Optimistic UI update
-    setFavoritesCountMap(prev => ({ ...prev, [id]: Math.max(0, (prev[id] || 0) + delta) }));
+    setFavoritesCountMap(prev => ({ 
+      ...prev, 
+      [id]: Math.max(0, (prev[id] || 0) + delta) 
+    }));
 
     try {
       if (isFav) {
@@ -386,13 +524,23 @@ export default function SearchScreen() {
         });
         if (bumpErr) console.warn('bump_favorites_count failed:', bumpErr);
 
-        await addToFavorites({ id, type: entityType, name: result.name, data: result.data });
+        await addToFavorites({ 
+          id, 
+          type: entityType, 
+          name: result.name, 
+          data: result.data 
+        });
       }
     } catch (e) {
       // Revert optimistic change on error
-      setFavoritesCountMap(prev => ({ ...prev, [id]: Math.max(0, (prev[id] || 0) - delta) }));
+      setFavoritesCountMap(prev => ({ 
+        ...prev, 
+        [id]: Math.max(0, (prev[id] || 0) - delta) 
+      }));
       console.error('Favorite toggle failed:', e);
       Alert.alert('Error', 'Could not update favorites. Please try again.');
+    } finally {
+      setTogglingFavorites(prev => ({ ...prev, [id]: false }));
     }
   };
 
@@ -424,6 +572,8 @@ export default function SearchScreen() {
   const renderResultItem = (result: SearchResult) => {
     const IconComponent = getResultIcon(result.type);
     const isResultFavorite = isFavorite(result.id);
+    const followerCount = favoritesCountMap[result.id] || 0;
+    const isLoading = togglingFavorites[result.id] || false;
 
     const handlePress = () => {
       // Navigate to appropriate detail screen based on type
@@ -456,21 +606,24 @@ export default function SearchScreen() {
           <View style={[styles.resultInfo, isDesktop && styles.resultInfoDesktop]}>
             <IconComponent size={isDesktop ? 18 : 20} color="#1ea2b1" />
             <View style={[styles.resultDetails, isDesktop && styles.resultDetailsDesktop]}>
-              <Text style={[styles.resultTitle, isDesktop && styles.resultTitleDesktop]}>{result.name}</Text>
-              <Text style={[styles.resultSubtitle, isDesktop && styles.resultSubtitleDesktop]}>{getResultSubtitle(result)}</Text>
+              <Text style={[styles.resultTitle, isDesktop && styles.resultTitleDesktop]} numberOfLines={1}>
+                {result.name}
+              </Text>
+              <Text style={[styles.resultSubtitle, isDesktop && styles.resultSubtitleDesktop]} numberOfLines={2}>
+                {getResultSubtitle(result)}
+              </Text>
             </View>
           </View>
           
-          <TouchableOpacity
-            style={[styles.favoriteButton, isDesktop && styles.favoriteButtonDesktop]}
-            onPress={() => handleFavoriteToggle(result)}
-          >
-            {isResultFavorite ? (
-              <BookmarkCheck size={isDesktop ? 18 : 20} color="#22c55e" />
-            ) : (
-              <Bookmark size={isDesktop ? 18 : 20} color="#888888" />
-            )}
-          </TouchableOpacity>
+          {result.type !== 'nearby_spot' && (
+            <FollowButton
+              isFollowing={isResultFavorite}
+              onToggle={() => handleFavoriteToggle(result)}
+              loading={isLoading}
+              followerCount={followerCount}
+              isDesktop={isDesktop}
+            />
+          )}
         </View>
         
         <View style={[styles.resultMeta, isDesktop && styles.resultMetaDesktop]}>
@@ -479,11 +632,14 @@ export default function SearchScreen() {
               {result.type.charAt(0).toUpperCase() + result.type.slice(1).replace('_', ' ')}
             </Text>
           </View>
-  
-          {(result.type === 'route' || result.type === 'hub' || result.type === 'stop') && (
-            <Text style={[styles.followersText, isDesktop && styles.followersTextDesktop]}>
-              Followers: {favoritesCountMap[result.id] || 0}
-            </Text>
+
+          {result.type !== 'nearby_spot' && followerCount > 0 && (
+            <View style={styles.followerCountContainer}>
+              <Users size={isDesktop ? 12 : 14} color="#1ea2b1" />
+              <Text style={[styles.followersText, isDesktop && styles.followersTextDesktop]}>
+                {followerCount} follower{followerCount !== 1 ? 's' : ''}
+              </Text>
+            </View>
           )}
         </View>
       </TouchableOpacity>
@@ -492,7 +648,11 @@ export default function SearchScreen() {
 
   const populateFollowerCounts = async (items: SearchResult[]) => {
     const byType: Record<'route'|'hub'|'stop', string[]> = { route: [], hub: [], stop: [] };
-    items.forEach(r => { if (r.type === 'route' || r.type === 'hub' || r.type === 'stop') byType[r.type].push(r.id); });
+    items.forEach(r => { 
+      if (r.type === 'route' || r.type === 'hub' || r.type === 'stop') {
+        byType[r.type].push(r.id);
+      }
+    });
 
     const newMap: Record<string, number> = {};
     const fetchType = async (type: 'route'|'hub'|'stop') => {
@@ -502,29 +662,150 @@ export default function SearchScreen() {
         .select('entity_id')
         .eq('entity_type', type)
         .in('entity_id', byType[type]);
-      (data || []).forEach(f => { newMap[f.entity_id] = (newMap[f.entity_id] || 0) + 1; });
+      (data || []).forEach(f => { 
+        newMap[f.entity_id] = (newMap[f.entity_id] || 0) + 1; 
+      });
     };
 
-    await Promise.all([fetchType('route'), fetchType('hub'), fetchType('stop')]);
+    await Promise.all([
+      fetchType('route'), 
+      fetchType('hub'), 
+      fetchType('stop')
+    ]);
     setFavoritesCountMap(prev => ({ ...prev, ...newMap }));
   };
 
   return (
-    <View style={[styles.container, isDesktop && styles.containerDesktop]}>
-      {/* Desktop layout with centered content */}
-      {isDesktop ? (
-        <ScrollView 
-          style={styles.desktopScrollWrapper}
-          contentContainerStyle={styles.desktopScrollContent}
-          showsVerticalScrollIndicator={true}
-        >
-          <View style={styles.desktopContentWrapper}>
-            <View style={[styles.header, isDesktop && styles.headerDesktop]}>
-              <Text style={[styles.headerTitle, isDesktop && styles.headerTitleDesktop]}>Search Community</Text>
-              <Text style={[styles.headerSubtitle, isDesktop && styles.headerSubtitleDesktop]}>
-                Find your community by your favorite stops.
-              </Text>
+    <SafeAreaView style={[styles.safeArea, isDesktop && styles.safeAreaDesktop]}>
+      <View style={[styles.container, isDesktop && styles.containerDesktop]}>
+        {/* Desktop layout with centered content */}
+        {isDesktop ? (
+          <ScrollView 
+            style={styles.desktopScrollWrapper}
+            contentContainerStyle={styles.desktopScrollContent}
+            showsVerticalScrollIndicator={true}
+          >
+            <View style={styles.desktopContentWrapper}>
+              <HeaderWithBack 
+                isDesktop={isDesktop}
+                onBack={() => router.back()}
+              />
+
+              {/* Search Input */}
+              <View style={[styles.searchContainer, isDesktop && styles.searchContainerDesktop]}>
+                <View style={[styles.searchInputContainer, isDesktop && styles.searchInputContainerDesktop]}>
+                  <Search size={isDesktop ? 18 : 20} color="#1ea2b1" />
+                  <TextInput
+                    style={[styles.searchInput, isDesktop && styles.searchInputDesktop]}
+                    placeholder="Search for routes, stops, hubs..."
+                    placeholderTextColor="#888888"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    autoFocus={!isDesktop}
+                  />
+                  {searchQuery.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => setSearchQuery('')}
+                      style={styles.clearSearchButton}
+                    >
+                      <X size={isDesktop ? 16 : 18} color="#888888" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              <View style={[styles.tabsWrapper, isDesktop && styles.tabsWrapperDesktop]}>
+                <ScrollView 
+                  horizontal={!isDesktop}
+                  showsHorizontalScrollIndicator={!isDesktop}
+                  contentContainerStyle={[styles.filtersContainer, isDesktop && styles.filtersContainerDesktop]}
+                >
+                  {filters.map((item) => (
+                    <TouchableOpacity
+                      key={item.key}
+                      style={[
+                        styles.filterTab, 
+                        isDesktop && styles.filterTabDesktop,
+                        selectedFilter === item.key && styles.activeFilterTab
+                      ]}
+                      onPress={() => setSelectedFilter(item.key as any)}
+                    >
+                      <item.icon size={isDesktop ? 14 : 16} color={selectedFilter === item.key ? '#FFFFFF' : '#888888'} />
+                      <Text style={[
+                        styles.filterText, 
+                        isDesktop && styles.filterTextDesktop,
+                        selectedFilter === item.key && styles.activeFilterText
+                      ]}>
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Search Results */}
+              <ScrollView 
+                style={[styles.resultsContainer, isDesktop && styles.resultsContainerDesktop]} 
+                contentContainerStyle={[styles.resultsContent, isDesktop && styles.resultsContentDesktop]}
+                showsVerticalScrollIndicator={isDesktop}
+              >
+                {loading ? (
+                  <SkeletonLoader isDesktop={isDesktop} />
+                ) : searchResults.length > 0 ? (
+                  <View style={styles.desktopResultsGrid}>
+                    {searchResults.map((result, index) => (
+                      <View key={result.id} style={[
+                        styles.desktopResultColumn,
+                        index % 2 === 0 ? styles.desktopResultLeft : styles.desktopResultRight
+                      ]}>
+                        {renderResultItem(result)}
+                      </View>
+                    ))}
+                  </View>
+                ) : searchQuery.length > 2 ? (
+                  <View style={[styles.noResultsContainer, isDesktop && styles.noResultsContainerDesktop]}>
+                    <Search size={isDesktop ? 40 : 48} color="#333333" />
+                    <Text style={[styles.noResultsTitle, isDesktop && styles.noResultsTitleDesktop]}>No results found</Text>
+                    <Text style={[styles.noResultsText, isDesktop && styles.noResultsTextDesktop]}>
+                      Try searching with different keywords or check your spelling.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[styles.emptyStateContainer, isDesktop && styles.emptyStateContainerDesktop]}>
+                    <Text style={[styles.recommendedTitle, isDesktop && styles.recommendedTitleDesktop]}>
+                      Recommended Nearby
+                    </Text>
+                    {isLoadingRecommended ? (
+                      <SkeletonLoader isDesktop={isDesktop} />
+                    ) : recommendedNearby.length > 0 ? (
+                      <View style={styles.desktopResultsGrid}>
+                        {recommendedNearby.map((result, index) => (
+                          <View key={result.id} style={[
+                            styles.desktopResultColumn,
+                            index % 2 === 0 ? styles.desktopResultLeft : styles.desktopResultRight
+                          ]}>
+                            {renderResultItem(result)}
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <View style={[styles.loadingRecommended, isDesktop && styles.loadingRecommendedDesktop]}>
+                        <Text style={[styles.loadingRecommendedText, isDesktop && styles.loadingRecommendedTextDesktop]}>
+                          No nearby locations found
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </ScrollView>
             </View>
+          </ScrollView>
+        ) : (
+          // Mobile layout
+          <>
+            <HeaderWithBack 
+              onBack={() => router.back()}
+            />
 
             {/* Search Input */}
             <View style={[styles.searchContainer, isDesktop && styles.searchContainerDesktop]}>
@@ -536,7 +817,16 @@ export default function SearchScreen() {
                   placeholderTextColor="#888888"
                   value={searchQuery}
                   onChangeText={setSearchQuery}
+                  autoFocus={!isDesktop}
                 />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setSearchQuery('')}
+                    style={styles.clearSearchButton}
+                  >
+                    <X size={isDesktop ? 16 : 18} color="#888888" />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
 
@@ -578,16 +868,7 @@ export default function SearchScreen() {
               {loading ? (
                 <SkeletonLoader isDesktop={isDesktop} />
               ) : searchResults.length > 0 ? (
-                <View style={styles.desktopResultsGrid}>
-                  {searchResults.map((result, index) => (
-                    <View key={result.id} style={[
-                      styles.desktopResultColumn,
-                      index % 2 === 0 ? styles.desktopResultLeft : styles.desktopResultRight
-                    ]}>
-                      {renderResultItem(result)}
-                    </View>
-                  ))}
-                </View>
+                searchResults.map(renderResultItem)
               ) : searchQuery.length > 2 ? (
                 <View style={[styles.noResultsContainer, isDesktop && styles.noResultsContainerDesktop]}>
                   <Search size={isDesktop ? 40 : 48} color="#333333" />
@@ -604,16 +885,7 @@ export default function SearchScreen() {
                   {isLoadingRecommended ? (
                     <SkeletonLoader isDesktop={isDesktop} />
                   ) : recommendedNearby.length > 0 ? (
-                    <View style={styles.desktopResultsGrid}>
-                      {recommendedNearby.map((result, index) => (
-                        <View key={result.id} style={[
-                          styles.desktopResultColumn,
-                          index % 2 === 0 ? styles.desktopResultLeft : styles.desktopResultRight
-                        ]}>
-                          {renderResultItem(result)}
-                        </View>
-                      ))}
-                    </View>
+                    recommendedNearby.map(renderResultItem)
                   ) : (
                     <View style={[styles.loadingRecommended, isDesktop && styles.loadingRecommendedDesktop]}>
                       <Text style={[styles.loadingRecommendedText, isDesktop && styles.loadingRecommendedTextDesktop]}>
@@ -624,105 +896,95 @@ export default function SearchScreen() {
                 </View>
               )}
             </ScrollView>
-          </View>
-        </ScrollView>
-      ) : (
-        // Mobile layout
-        <>
-          <View style={[styles.header, isDesktop && styles.headerDesktop]}>
-            <Text style={[styles.headerTitle, isDesktop && styles.headerTitleDesktop]}>Search Community</Text>
-            <Text style={[styles.headerSubtitle, isDesktop && styles.headerSubtitleDesktop]}>
-              Find your community by your favorite stops.
-            </Text>
-          </View>
-
-          {/* Search Input */}
-          <View style={[styles.searchContainer, isDesktop && styles.searchContainerDesktop]}>
-            <View style={[styles.searchInputContainer, isDesktop && styles.searchInputContainerDesktop]}>
-              <Search size={isDesktop ? 18 : 20} color="#1ea2b1" />
-              <TextInput
-                style={[styles.searchInput, isDesktop && styles.searchInputDesktop]}
-                placeholder="Search for routes, stops, hubs..."
-                placeholderTextColor="#888888"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
-          </View>
-
-          <View style={[styles.tabsWrapper, isDesktop && styles.tabsWrapperDesktop]}>
-            <ScrollView 
-              horizontal={!isDesktop}
-              showsHorizontalScrollIndicator={!isDesktop}
-              contentContainerStyle={[styles.filtersContainer, isDesktop && styles.filtersContainerDesktop]}
-            >
-              {filters.map((item) => (
-                <TouchableOpacity
-                  key={item.key}
-                  style={[
-                    styles.filterTab, 
-                    isDesktop && styles.filterTabDesktop,
-                    selectedFilter === item.key && styles.activeFilterTab
-                  ]}
-                  onPress={() => setSelectedFilter(item.key as any)}
-                >
-                  <item.icon size={isDesktop ? 14 : 16} color={selectedFilter === item.key ? '#FFFFFF' : '#888888'} />
-                  <Text style={[
-                    styles.filterText, 
-                    isDesktop && styles.filterTextDesktop,
-                    selectedFilter === item.key && styles.activeFilterText
-                  ]}>
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Search Results */}
-          <ScrollView 
-            style={[styles.resultsContainer, isDesktop && styles.resultsContainerDesktop]} 
-            contentContainerStyle={[styles.resultsContent, isDesktop && styles.resultsContentDesktop]}
-            showsVerticalScrollIndicator={isDesktop}
-          >
-            {loading ? (
-              <SkeletonLoader isDesktop={isDesktop} />
-            ) : searchResults.length > 0 ? (
-              searchResults.map(renderResultItem)
-            ) : searchQuery.length > 2 ? (
-              <View style={[styles.noResultsContainer, isDesktop && styles.noResultsContainerDesktop]}>
-                <Search size={isDesktop ? 40 : 48} color="#333333" />
-                <Text style={[styles.noResultsTitle, isDesktop && styles.noResultsTitleDesktop]}>No results found</Text>
-                <Text style={[styles.noResultsText, isDesktop && styles.noResultsTextDesktop]}>
-                  Try searching with different keywords or check your spelling.
-                </Text>
-              </View>
-            ) : (
-              <View style={[styles.emptyStateContainer, isDesktop && styles.emptyStateContainerDesktop]}>
-                <Text style={[styles.recommendedTitle, isDesktop && styles.recommendedTitleDesktop]}>
-                  Recommended Nearby
-                </Text>
-                {isLoadingRecommended ? (
-                  <SkeletonLoader isDesktop={isDesktop} />
-                ) : recommendedNearby.length > 0 ? (
-                  recommendedNearby.map(renderResultItem)
-                ) : (
-                  <View style={[styles.loadingRecommended, isDesktop && styles.loadingRecommendedDesktop]}>
-                    <Text style={[styles.loadingRecommendedText, isDesktop && styles.loadingRecommendedTextDesktop]}>
-                      No nearby locations found
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-          </ScrollView>
-        </>
-      )}
-    </View>
+          </>
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  safeAreaDesktop: {
+    backgroundColor: '#000000',
+  },
+  
+  // Header Styles
+  headerContainer: {
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: '#000000',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  headerContainerDesktop: {
+    paddingHorizontal: 32,
+    paddingTop: 16,
+    paddingBottom: 20,
+    borderBottomWidth: 0,
+    backgroundColor: 'transparent',
+  },
+  
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  backButtonDesktop: {
+    gap: 6,
+  },
+  
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  
+  headerContent: {
+    // No additional styles needed
+  },
+  headerContentDesktop: {
+    // No additional styles needed
+  },
+  
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  headerTitleDesktop: {
+    fontSize: 32,
+    marginBottom: 6,
+  },
+  
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#888888',
+    lineHeight: 22,
+  },
+  headerSubtitleDesktop: {
+    fontSize: 18,
+    lineHeight: 24,
+  },
+  
+  // Clear Search Button
+  clearSearchButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  
   // Base styles
   container: {
     flex: 1,
@@ -746,36 +1008,6 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 1200,
     alignSelf: 'center',
-  },
-  
-  header: {
-    padding: 24,
-    paddingTop: 60,
-    width: '100%',
-  },
-  headerDesktop: {
-    paddingTop: 24,
-    paddingBottom: 20,
-    paddingHorizontal: 32,
-  },
-  
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  headerTitleDesktop: {
-    fontSize: 32,
-  },
-  
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#888888',
-    marginTop: 4,
-  },
-  headerSubtitleDesktop: {
-    fontSize: 18,
-    marginTop: 6,
   },
   
   searchContainer: {
@@ -990,13 +1222,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   
-  favoriteButton: {
-    padding: 4,
-  },
-  favoriteButtonDesktop: {
-    padding: 2,
-  },
-  
   resultMeta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1027,12 +1252,91 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   
+  // Follow Button Styles
+  followButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#000000ff',
+    borderWidth: 1,
+    borderColor: '#1ea2b1',
+    minWidth: 90,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  followButtonDesktop: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    minWidth: 80,
+  },
+  
+  followingButton: {
+    backgroundColor: '#1ea2b1',
+    borderColor: '#1ea2b1',
+  },
+  
+  followButtonLoading: {
+    opacity: 0.7,
+  },
+  
+  followButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  
+  followButtonLoadingContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  followButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1ea2b1',
+  },
+  followButtonTextDesktop: {
+    fontSize: 13,
+  },
+  
+  followingButtonText: {
+    color: '#ffffff',
+  },
+  
+  followerCountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  
   followersText: {
     color: '#1ea2b1',
     fontSize: 12,
   },
   followersTextDesktop: {
     fontSize: 11,
+  },
+  
+  followerCountBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 4,
+  },
+  followerCountBadgeDesktop: {
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginLeft: 3,
+  },
+  
+  followerCountText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '600',
   },
   
   routeInfo: {

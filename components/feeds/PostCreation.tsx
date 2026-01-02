@@ -11,6 +11,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { PostCreationProps } from '@/types';
+import { useRouter } from 'expo-router';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -19,7 +20,14 @@ interface ExtendedPostCreationProps extends Omit<PostCreationProps, 'createPost'
   createPost: () => Promise<void>;
   maxLength?: number;
   isDesktop?: boolean;
-  selectedCommunity?: any;
+  selectedCommunity?: {
+    id: string;
+    name: string;
+    type: 'hub' | 'stop';
+    latitude?: number;
+    longitude?: number;
+    address?: string;
+  };
 }
 
 const PostCreation: React.FC<ExtendedPostCreationProps> = ({
@@ -32,6 +40,7 @@ const PostCreation: React.FC<ExtendedPostCreationProps> = ({
 }) => {
   const desktopMode = isDesktop || propIsDesktop;
   const [uploading, setUploading] = useState(false);
+  const router = useRouter();
 
   const characterCount = newPost.length;
   const isNearLimit = characterCount > maxLength * 0.8;
@@ -52,6 +61,17 @@ const PostCreation: React.FC<ExtendedPostCreationProps> = ({
     }
   };
 
+  const handleCommunityPress = () => {
+    if (!selectedCommunity) return;
+    
+    // Navigate to the community page based on type
+    if (selectedCommunity.type === 'hub') {
+      router.push(`/hub/${selectedCommunity.id}`);
+    } else if (selectedCommunity.type === 'stop') {
+      router.push(`/stop-details?stopId=${selectedCommunity.id}`);
+    }
+  };
+
   const canPost = newPost.trim() && !isOverLimit && !uploading;
 
   return (
@@ -59,8 +79,20 @@ const PostCreation: React.FC<ExtendedPostCreationProps> = ({
       {selectedCommunity && (
         <View style={[styles.communityHeader, desktopMode && styles.communityHeaderDesktop]}>
           <Text style={[styles.communityHeaderText, desktopMode && styles.communityHeaderTextDesktop]}>
-            Posting in <Text style={styles.communityName}>{selectedCommunity.name}</Text>
+            Posting in{' '}
           </Text>
+          
+          <TouchableOpacity 
+            onPress={handleCommunityPress}
+            activeOpacity={0.6}
+            style={styles.communityButton}
+          >
+            <View style={styles.communityButtonContent}>
+              <Text style={[styles.communityName, desktopMode && styles.communityNameDesktop]}>
+                {selectedCommunity.name}
+              </Text>
+            </View>
+          </TouchableOpacity>
         </View>
       )}
       
@@ -77,6 +109,7 @@ const PostCreation: React.FC<ExtendedPostCreationProps> = ({
         multiline
         maxLength={maxLength}
         textAlignVertical="top"
+        editable={!uploading}
       />
       
       <View style={[styles.postFooter, desktopMode && styles.postFooterDesktop]}>
@@ -99,6 +132,7 @@ const PostCreation: React.FC<ExtendedPostCreationProps> = ({
           ]}
           onPress={handleCreatePost}
           disabled={!canPost}
+          activeOpacity={0.8}
         >
           {uploading ? (
             <ActivityIndicator size="small" color="#ffffff" />
@@ -131,6 +165,9 @@ const styles = StyleSheet.create({
   },
   
   communityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
     marginBottom: 12,
     paddingBottom: 8,
     borderBottomWidth: 1,
@@ -147,9 +184,29 @@ const styles = StyleSheet.create({
   communityHeaderTextDesktop: {
     fontSize: 13,
   },
+  
+  communityButton: {
+    marginLeft: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+  },
+  communityButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   communityName: {
     color: '#1ea2b1',
     fontWeight: '600',
+    fontSize: 14,
+  },
+  communityNameDesktop: {
+    fontSize: 13,
+  },
+  navIcon: {
+    opacity: 0.8,
   },
   
   postInput: {
@@ -213,6 +270,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     minWidth: 80,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   postButtonDesktop: {
     paddingVertical: 7,
@@ -222,6 +284,8 @@ const styles = StyleSheet.create({
   },
   postButtonDisabled: {
     backgroundColor: '#333333',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   
   postButtonText: {

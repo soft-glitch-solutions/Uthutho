@@ -646,8 +646,13 @@ const handleFacebookSignIn = async () => {
       </View>
 
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          {showForgotPassword ? 'Reset Password' : isLogin ? 'Connect Community Community' : 'Join Uthutho Today'}
+        <View style={styles.taglineContainer}>
+          <Text style={[styles.taglineText, styles.commuteText]}>Commute.</Text>
+          <Text style={[styles.taglineText, styles.connectText]}> Connect.</Text>
+          <Text style={[styles.taglineText, styles.communityText]}> Communities.</Text>
+        </View>
+        <Text style={[styles.subtitle, { color: colors.text }]}>
+          {showForgotPassword ? 'Reset your password' : isLogin ? 'Sign in to continue your journey' : 'Join our community today'}
         </Text>
       </View>
 
@@ -924,6 +929,7 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: isDesktop ? 16 : scale(20),
+    alignItems: 'center',
   },
   title: {
     fontSize: isDesktop ? 20 : scale(20),
@@ -935,7 +941,27 @@ const styles = StyleSheet.create({
     fontSize: isDesktop ? 14 : scale(16),
     textAlign: 'center',
     opacity: 0.8,
-    marginBottom: isDesktop ? 8 : scale(10),
+    marginTop: isDesktop ? 8 : scale(10),
+  },
+  // Tagline styles
+  taglineContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: isDesktop ? 4 : scale(5),
+  },
+  taglineText: {
+    fontSize: isDesktop ? 16 : scale(18),
+    fontWeight: '600',
+  },
+  commuteText: {
+    color: '#1EA2B1', // Commute - blue
+  },
+  connectText: {
+    color: '#ED67B1', // Connect - pink
+  },
+  communityText: {
+    color: '#FD602D', // Community - orange
   },
   form: {
     gap: isDesktop ? 12 : scale(15),

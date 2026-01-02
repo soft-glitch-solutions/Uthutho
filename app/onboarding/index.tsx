@@ -501,7 +501,7 @@ export default function Onboarding() {
     return (
       <View style={styles.splashContainer}>
         <Text style={styles.logosplash}>Uthutho</Text>
-        <Text style={styles.taglinesplash}>Connect. Commute. Community.</Text>
+        <Text style={styles.taglinesplash}>Commute. Connect. Community.</Text>
       </View>
     );
   }

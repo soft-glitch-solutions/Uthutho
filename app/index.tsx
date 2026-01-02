@@ -109,7 +109,11 @@ export default function Index() {
     return (
       <View style={styles.container}>
         <Text style={styles.logo}>Uthutho</Text>
-        <Text style={styles.tagline}>Transform Your Daily Commute</Text>
+        <View style={styles.taglineContainer}>
+          <Text style={[styles.taglineText, styles.commuteText]}>Commute.</Text>
+          <Text style={[styles.taglineText, styles.connectText]}> Connect.</Text>
+          <Text style={[styles.taglineText, styles.communityText]}> Community.</Text>
+        </View>
         <ActivityIndicator color="#1ea2b1" style={{ marginTop: 16 }} />
       </View>
     );
@@ -135,9 +139,21 @@ const styles = StyleSheet.create({
     color: '#1ea2b1',
     marginBottom: 16,
   },
-  tagline: {
+  taglineContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  taglineText: {
     fontSize: 16,
-    color: '#ffffff',
-    textAlign: 'center',
+    fontWeight: '600',
+  },
+  commuteText: {
+    color: '#1EA2B1', // Commute - blue
+  },
+  connectText: {
+    color: '#ED67B1', // Connect - pink
+  },
+  communityText: {
+    color: '#FD602D', // Community - orange
   },
 });

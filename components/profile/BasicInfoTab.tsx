@@ -90,6 +90,12 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
     return account?.email || null;
   };
 
+  // Check if points have already been awarded for this provider
+  const hasPointsBeenAwarded = (provider: string) => {
+    const account = linkedAccounts.find(acc => acc.provider === provider);
+    return account?.points_awarded || false;
+  };
+
   const showModal = (type: 'success' | 'error' | 'info', title: string, message: string, points?: number) => {
     setModalContent({ type, title, message, points });
     setModalVisible(true);
@@ -112,13 +118,15 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       // Call the provided onConnectAccount function
       await onConnectAccount(provider);
       
-      // Show success message with points earned
+      // Check if points should be shown (only show if not already awarded)
       const points = getProviderPoints(provider);
-      if (points > 0) {
+      const pointsAwarded = hasPointsBeenAwarded(provider);
+      
+      if (points > 0 && !pointsAwarded) {
         showModal(
           'success',
           'Success! 🎉',
-          `You've connected your ${getProviderName(provider)} account!`,
+          `You've connected your ${getProviderName(provider)} account and earned points!`,
           points
         );
       } else {
@@ -181,6 +189,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
               const isConnected = isProviderConnected(provider.id);
               const email = getAccountEmail(provider.id);
               const points = getProviderPoints(provider.id);
+              const pointsAwarded = hasPointsBeenAwarded(provider.id);
               
               return (
                 <View key={provider.id} style={[styles.accountItem, { backgroundColor: colors.card }]}>
@@ -198,7 +207,8 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
                             <Text style={[styles.connectedText, { color: '#10B981' }]}>
                               Connected
                             </Text>
-                            {points > 0 && (
+                            {/* Only show points badge if points were recently awarded */}
+                            {points > 0 && !pointsAwarded && (
                               <Text style={[styles.pointsBadge, { color: colors.primary }]}>
                                 +{points} pts
                               </Text>
@@ -206,7 +216,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
                           </View>
                         ) : (
                           <Text style={[styles.pointsEarnable, { color: colors.primary }]}>
-                            +{points} points available
+                            Connect to earn +{points} points
                           </Text>
                         )}
                       </View>

@@ -70,7 +70,7 @@ export default function AuthCallback() {
     <View style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.logo}>Uthutho</Text>
-        <Text style={styles.tagline}>Transform Your Daily Commute</Text>
+        <Text style={styles.tagline}>Commute. Connect. Community.</Text>
         
         <View style={styles.statusContainer}>
           <ActivityIndicator size="large" color="#1ea2b1" />
