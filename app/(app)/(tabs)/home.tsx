@@ -320,6 +320,8 @@ export default function HomeScreen() {
     setShowWelcomeOverlay(false);
   };
 
+  const [streakVisible, setStreakVisible] = useState(false);
+
   useEffect(() => {
     const checkFirstTimeUser = async () => {
       if (hasCheckedWelcome.current) return;
@@ -1301,6 +1303,8 @@ export default function HomeScreen() {
         onClose={() => setShowDebugPanel(false)}
         onShowWelcomeOverlay={handleShowWelcomeOverlay}
         onHideWelcomeOverlay={handleHideWelcomeOverlay}
+        onShowStreakOverlay={() => setStreakVisible(true)}
+        onHideStreakOverlay={() => setStreakVisible(false)}
       />
 
       <RateTripModal

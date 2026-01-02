@@ -1,9 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, Platform } from 'react-native';
 import { Trophy, Award, Flame } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import GamificationSkeleton from './skeletons/GamificationSkeleton';
+import LottieView from 'lottie-react-native';
+
+// Only import web components on web
+let DotLottieReact: any = null;
+if (Platform.OS === 'web') {
+  try {
+    const module = require('@lottiefiles/dotlottie-react');
+    DotLottieReact = module.DotLottieReact;
+  } catch (error) {
+    console.warn('DotLottieReact not available');
+  }
+}
 
 interface GamificationSectionProps {
   isStatsLoading?: boolean;
@@ -30,6 +42,7 @@ const GamificationSection = ({ isStatsLoading: externalLoading, userStats: exter
   const shouldFetchData = !externalStats;
   const finalIsLoading = externalLoading !== undefined ? externalLoading : isLoading;
   const finalUserStats = externalStats || userStats;
+  const flameAnimationRef = useRef<any>(null);
 
   useEffect(() => {
     if (shouldFetchData) {
@@ -77,6 +90,30 @@ const GamificationSection = ({ isStatsLoading: externalLoading, userStats: exter
     return <GamificationSkeleton colors={colors} />;
   }
 
+    const FlameAnimation = () => {
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+        return (
+          <LottieView
+            ref={flameAnimationRef}
+            source={require('@/assets/animations/Fire.json')}
+            autoPlay={false}
+            loop={true}
+            style={styles.flameAnimation}
+            resizeMode="contain"
+          />
+        );
+      } else if (Platform.OS === 'web' && DotLottieReact) {
+        return (
+          <DotLottieReact
+            src="https://lottie.host/6e77d5d1-f49d-4ee8-9b98-81c81905eca1/Gw8bwrnNTJ.lottie"
+            loop
+            autoplay={true}
+            style={styles.flameAnimation}
+          />
+        );
+      }
+    };
+
   const getLevelTitle = (level: number) => {
     const titles = [
       'Newbie Explorer',
@@ -97,7 +134,7 @@ const GamificationSection = ({ isStatsLoading: externalLoading, userStats: exter
   return (
     <View style={[styles.gamificationCard, { borderColor: colors.border }]}>
       <View style={styles.gamificationHeader}>
-        <Trophy size={24} color="#fbbf24" />
+              <FlameAnimation />
         <Text style={[styles.gamificationTitle, { color: colors.text }]}>Your Progress</Text>
       </View>
       
@@ -116,7 +153,7 @@ const GamificationSection = ({ isStatsLoading: externalLoading, userStats: exter
         
         <View style={styles.statBox}>
           <View style={styles.streakContainer}>
-            <Flame size={16} color={finalUserStats.streak > 0 ? "#ff6b35" : "#666"} />
+              <FlameAnimation />
             <Text style={[styles.statNumber, { marginLeft: 4 }]}>
               {finalUserStats.streak}
             </Text>
@@ -190,6 +227,10 @@ const styles = {
   streakContainer: {
     flexDirection: 'row' as 'row',
     alignItems: 'center' as 'center',
+  },
+  flameAnimation: {
+    width: 20,
+    height: 20,
   },
   statNumber: {
     fontSize: 18,

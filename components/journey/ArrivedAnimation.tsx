@@ -79,7 +79,7 @@ export const ArrivedAnimation: React.FC<ArrivedAnimationProps> = ({
       ]}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>Congratulations! 🎉</Text>
+        <Text style={styles.title}>Congratulations! </Text>
         
         {/* Lottie Animation */}
         {Platform.OS === 'ios' || Platform.OS === 'android' ? (

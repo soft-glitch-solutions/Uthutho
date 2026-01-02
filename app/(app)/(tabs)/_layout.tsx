@@ -22,7 +22,6 @@ import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import StreakOverlay from '@/components/StreakOverlay';
 import { useRouter, useNavigation } from 'expo-router';
-import BannerAdComponent from '@/components/ads/BannerAd';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const TAB_COUNT = 5;
@@ -599,8 +598,6 @@ export default function EnhancedTabLayout() {
         onClose={() => setShowStreakOverlay(false)}
       />
 
-      {/* Banner Ad */}
-      <BannerAdComponent />
     </View>
   );
 }
