@@ -22,7 +22,8 @@ import {
   Clock, 
   DollarSign,
   ArrowLeft,
-  X
+  X,
+  Star
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useFavorites, FavoriteItem } from '@/hook/useFavorites';
@@ -99,7 +100,7 @@ const FollowButton = ({
             isFollowing && styles.followingButtonText,
             isDesktop && styles.followButtonTextDesktop,
           ]}>
-            {isFollowing ? 'Unfollowing...' : 'Following...'}
+            {isFollowing ? '...' : '...'}
           </Text>
         </View>
       ) : (
@@ -114,15 +115,10 @@ const FollowButton = ({
               ]}>
                 Following
               </Text>
-              {followerCount > 0 && (
-                <View style={[styles.followerCountBadge, isDesktop && styles.followerCountBadgeDesktop]}>
-                  <Text style={styles.followerCountText}>{followerCount}</Text>
-                </View>
-              )}
             </>
           ) : (
             <>
-              <Users size={isDesktop ? 14 : 16} color="#1ea2b1" />
+              <Star size={isDesktop ? 14 : 16} color="#1ea2b1" />
               <Text style={[
                 styles.followButtonText,
                 isDesktop && styles.followButtonTextDesktop,
@@ -161,15 +157,23 @@ const HeaderWithBack = ({
 
   return (
     <View style={[styles.headerContainer, isDesktop && styles.headerContainerDesktop]}>
-
-      <View style={[styles.headerContent, isDesktop && styles.headerContentDesktop]}>
-        <Text style={[styles.headerTitle, isDesktop && styles.headerTitleDesktop]}>
-          {title}
-        </Text>
-        <Text style={[styles.headerSubtitle, isDesktop && styles.headerSubtitleDesktop]}>
-          {subtitle}
-        </Text>
+      {/* Top Row: Back Button + Title on same line */}
+      <View style={[styles.headerTopRow, isDesktop && styles.headerTopRowDesktop]}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <ArrowLeft size={24} color="#ffffff" />
+        </TouchableOpacity>
+        
+        <View style={[styles.headerTitleContainer, isDesktop && styles.headerTitleContainerDesktop]}>
+          <Text style={[styles.headerTitle, isDesktop && styles.headerTitleDesktop]}>
+            {title}
+          </Text>
+        </View>
       </View>
+
+      {/* Subtitle below */}
+      <Text style={[styles.headerSubtitle, isDesktop && styles.headerSubtitleDesktop]}>
+        {subtitle}
+      </Text>
     </View>
   );
 };
@@ -255,7 +259,6 @@ export default function SearchScreen() {
         .select('*');
 
       if (stops) {
-        console.log('Stops found:', stops.length);
         stops.forEach(stop => {
           const distance = calculateDistance(
             userLocation.latitude,
@@ -280,7 +283,6 @@ export default function SearchScreen() {
         .select('*');
 
       if (hubs) {
-        console.log('Hubs found:', hubs.length);
         hubs.forEach(hub => {
           const distance = calculateDistance(
             userLocation.latitude,
@@ -306,7 +308,6 @@ export default function SearchScreen() {
         .limit(8);
 
       if (routes) {
-        console.log('Routes found:', routes.length);
         routes.forEach(route => {
           results.push({
             id: route.id,
@@ -325,7 +326,6 @@ export default function SearchScreen() {
         return 0;
       });
       
-      console.log('Final recommended results:', sortedResults.length);
       setRecommendedNearby(sortedResults.slice(0, 8));
       populateFollowerCounts(sortedResults);
     } catch (error) {
@@ -604,7 +604,9 @@ export default function SearchScreen() {
       >
         <View style={[styles.resultHeader, isDesktop && styles.resultHeaderDesktop]}>
           <View style={[styles.resultInfo, isDesktop && styles.resultInfoDesktop]}>
-            <IconComponent size={isDesktop ? 18 : 20} color="#1ea2b1" />
+            <View style={[styles.resultIconContainer, isDesktop && styles.resultIconContainerDesktop]}>
+              <IconComponent size={isDesktop ? 16 : 18} color="#1ea2b1" />
+            </View>
             <View style={[styles.resultDetails, isDesktop && styles.resultDetailsDesktop]}>
               <Text style={[styles.resultTitle, isDesktop && styles.resultTitleDesktop]} numberOfLines={1}>
                 {result.name}
@@ -634,10 +636,10 @@ export default function SearchScreen() {
           </View>
 
           {result.type !== 'nearby_spot' && followerCount > 0 && (
-            <View style={styles.followerCountContainer}>
+            <View style={[styles.followerCountContainer, isDesktop && styles.followerCountContainerDesktop]}>
               <Users size={isDesktop ? 12 : 14} color="#1ea2b1" />
               <Text style={[styles.followersText, isDesktop && styles.followersTextDesktop]}>
-                {followerCount} follower{followerCount !== 1 ? 's' : ''}
+                {followerCount}
               </Text>
             </View>
           )}
@@ -808,48 +810,46 @@ export default function SearchScreen() {
             />
 
             {/* Search Input */}
-            <View style={[styles.searchContainer, isDesktop && styles.searchContainerDesktop]}>
-              <View style={[styles.searchInputContainer, isDesktop && styles.searchInputContainerDesktop]}>
-                <Search size={isDesktop ? 18 : 20} color="#1ea2b1" />
+            <View style={styles.searchContainer}>
+              <View style={styles.searchInputContainer}>
+                <Search size={20} color="#1ea2b1" />
                 <TextInput
-                  style={[styles.searchInput, isDesktop && styles.searchInputDesktop]}
+                  style={styles.searchInput}
                   placeholder="Search for routes, stops, hubs..."
                   placeholderTextColor="#888888"
                   value={searchQuery}
                   onChangeText={setSearchQuery}
-                  autoFocus={!isDesktop}
+                  autoFocus={true}
                 />
                 {searchQuery.length > 0 && (
                   <TouchableOpacity
                     onPress={() => setSearchQuery('')}
                     style={styles.clearSearchButton}
                   >
-                    <X size={isDesktop ? 16 : 18} color="#888888" />
+                    <X size={18} color="#888888" />
                   </TouchableOpacity>
                 )}
               </View>
             </View>
 
-            <View style={[styles.tabsWrapper, isDesktop && styles.tabsWrapperDesktop]}>
+            <View style={styles.tabsWrapper}>
               <ScrollView 
-                horizontal={!isDesktop}
-                showsHorizontalScrollIndicator={!isDesktop}
-                contentContainerStyle={[styles.filtersContainer, isDesktop && styles.filtersContainerDesktop]}
+                horizontal={true}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filtersContainer}
               >
                 {filters.map((item) => (
                   <TouchableOpacity
                     key={item.key}
                     style={[
                       styles.filterTab, 
-                      isDesktop && styles.filterTabDesktop,
                       selectedFilter === item.key && styles.activeFilterTab
                     ]}
                     onPress={() => setSelectedFilter(item.key as any)}
                   >
-                    <item.icon size={isDesktop ? 14 : 16} color={selectedFilter === item.key ? '#FFFFFF' : '#888888'} />
+                    <item.icon size={16} color={selectedFilter === item.key ? '#FFFFFF' : '#888888'} />
                     <Text style={[
                       styles.filterText, 
-                      isDesktop && styles.filterTextDesktop,
                       selectedFilter === item.key && styles.activeFilterText
                     ]}>
                       {item.label}
@@ -861,34 +861,34 @@ export default function SearchScreen() {
 
             {/* Search Results */}
             <ScrollView 
-              style={[styles.resultsContainer, isDesktop && styles.resultsContainerDesktop]} 
-              contentContainerStyle={[styles.resultsContent, isDesktop && styles.resultsContentDesktop]}
-              showsVerticalScrollIndicator={isDesktop}
+              style={styles.resultsContainer} 
+              contentContainerStyle={styles.resultsContent}
+              showsVerticalScrollIndicator={true}
             >
               {loading ? (
-                <SkeletonLoader isDesktop={isDesktop} />
+                <SkeletonLoader />
               ) : searchResults.length > 0 ? (
                 searchResults.map(renderResultItem)
               ) : searchQuery.length > 2 ? (
-                <View style={[styles.noResultsContainer, isDesktop && styles.noResultsContainerDesktop]}>
-                  <Search size={isDesktop ? 40 : 48} color="#333333" />
-                  <Text style={[styles.noResultsTitle, isDesktop && styles.noResultsTitleDesktop]}>No results found</Text>
-                  <Text style={[styles.noResultsText, isDesktop && styles.noResultsTextDesktop]}>
+                <View style={styles.noResultsContainer}>
+                  <Search size={48} color="#333333" />
+                  <Text style={styles.noResultsTitle}>No results found</Text>
+                  <Text style={styles.noResultsText}>
                     Try searching with different keywords or check your spelling.
                   </Text>
                 </View>
               ) : (
-                <View style={[styles.emptyStateContainer, isDesktop && styles.emptyStateContainerDesktop]}>
-                  <Text style={[styles.recommendedTitle, isDesktop && styles.recommendedTitleDesktop]}>
+                <View style={styles.emptyStateContainer}>
+                  <Text style={styles.recommendedTitle}>
                     Recommended Nearby
                   </Text>
                   {isLoadingRecommended ? (
-                    <SkeletonLoader isDesktop={isDesktop} />
+                    <SkeletonLoader />
                   ) : recommendedNearby.length > 0 ? (
                     recommendedNearby.map(renderResultItem)
                   ) : (
-                    <View style={[styles.loadingRecommended, isDesktop && styles.loadingRecommendedDesktop]}>
-                      <Text style={[styles.loadingRecommendedText, isDesktop && styles.loadingRecommendedTextDesktop]}>
+                    <View style={styles.loadingRecommended}>
+                      <Text style={styles.loadingRecommendedText}>
                         No nearby locations found
                       </Text>
                     </View>
@@ -914,9 +914,9 @@ const styles = StyleSheet.create({
   
   // Header Styles
   headerContainer: {
-    paddingTop: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingTop: Platform.OS === 'ios' ? 12 : 30,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
     backgroundColor: '#000000',
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
@@ -931,42 +931,38 @@ const styles = StyleSheet.create({
   
   headerTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  headerTopRowDesktop: {
+    marginBottom: 16,
   },
   
   backButton: {
-    flexDirection: 'row',
+    backgroundColor: '#1a1a1a',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-  },
-  backButtonDesktop: {
-    gap: 6,
   },
   
-  backButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'flex-end',
   },
-  
-  headerContent: {
-    // No additional styles needed
-  },
-  headerContentDesktop: {
-    // No additional styles needed
+  headerTitleContainerDesktop: {
+    paddingRight: 40,
   },
   
   headerTitle: {
-    fontSize: 28,
+    fontSize: 25,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 4,
   },
   headerTitleDesktop: {
-    fontSize: 32,
-    marginBottom: 6,
+    fontSize: 24,
   },
   
   headerSubtitle: {
@@ -976,6 +972,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitleDesktop: {
     fontSize: 18,
+    textAlign: 'right',
     lineHeight: 24,
   },
   
@@ -1011,19 +1008,22 @@ const styles = StyleSheet.create({
   },
   
   searchContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 16,
     width: '100%',
+    backgroundColor: '#000000',
   },
   searchContainerDesktop: {
     paddingHorizontal: 32,
-    marginBottom: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
   
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111111',
+    backgroundColor: '#1a1a1a',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
@@ -1042,6 +1042,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     color: '#FFFFFF',
     fontSize: 16,
+    fontFamily: 'System',
   },
   searchInputDesktop: {
     marginLeft: 10,
@@ -1061,16 +1062,13 @@ const styles = StyleSheet.create({
   },
   
   filtersContainer: {
-    flex: 0,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    paddingVertical: 4,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
   filtersContainerDesktop: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: 0,
-    marginBottom: 0,
     paddingVertical: 0,
     gap: 8,
     maxWidth: 800,
@@ -1081,19 +1079,18 @@ const styles = StyleSheet.create({
   filterTab: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111111',
+    backgroundColor: '#1a1a1a',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 20,
-    margin: 6,
+    marginRight: 10,
     borderWidth: 1,
     borderColor: '#333333',
-    width: 'auto',
   },
   filterTabDesktop: {
     paddingHorizontal: 14,
     paddingVertical: 6,
-    margin: 0,
+    marginRight: 0,
   },
   
   activeFilterTab: {
@@ -1103,7 +1100,7 @@ const styles = StyleSheet.create({
   
   filterText: {
     color: '#888888',
-    fontSize: 14,
+    fontSize: 15,
     marginLeft: 6,
     fontWeight: '500',
   },
@@ -1125,8 +1122,8 @@ const styles = StyleSheet.create({
   },
   
   resultsContent: {
-    padding: 16,
-    paddingBottom: 100,
+    padding: 20,
+    paddingBottom: 120,
     width: '100%',
   },
   resultsContentDesktop: {
@@ -1149,20 +1146,10 @@ const styles = StyleSheet.create({
   desktopResultLeft: {},
   desktopResultRight: {},
   
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  
-  loadingText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-  },
-  
   resultCard: {
-    backgroundColor: '#111111',
+    backgroundColor: '#1a1a1a',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#333333',
@@ -1188,24 +1175,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     flex: 1,
+    marginRight: 12,
   },
   resultInfoDesktop: {
     alignItems: 'center',
   },
   
+  resultIconContainer: {
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  resultIconContainerDesktop: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
+  },
+  
   resultDetails: {
-    marginLeft: 12,
     flex: 1,
   },
-  resultDetailsDesktop: {
-    marginLeft: 10,
-  },
+  resultDetailsDesktop: {},
   
   resultTitle: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
+    lineHeight: 20,
   },
   resultTitleDesktop: {
     fontSize: 15,
@@ -1232,19 +1234,19 @@ const styles = StyleSheet.create({
   },
   
   resultType: {
-    backgroundColor: '#1ea2b1',
-    paddingHorizontal: 8,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
   },
   resultTypeDesktop: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
   },
   
   resultTypeText: {
-    color: '#FFFFFF',
+    color: '#1ea2b1',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -1257,10 +1259,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#000000ff',
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
     borderWidth: 1,
     borderColor: '#1ea2b1',
-    minWidth: 90,
+    minWidth: 80,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1268,7 +1270,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 16,
-    minWidth: 80,
+    minWidth: 70,
   },
   
   followingButton: {
@@ -1308,66 +1310,48 @@ const styles = StyleSheet.create({
   followerCountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     gap: 4,
+  },
+  followerCountContainerDesktop: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
   
   followersText: {
     color: '#1ea2b1',
     fontSize: 12,
+    fontWeight: '600',
   },
   followersTextDesktop: {
     fontSize: 11,
   },
   
-  followerCountBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginLeft: 4,
-  },
-  followerCountBadgeDesktop: {
-    borderRadius: 8,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    marginLeft: 3,
-  },
-  
-  followerCountText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  
-  routeInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  
-  routeInfoText: {
-    color: '#888888',
-    fontSize: 12,
-    marginLeft: 4,
-  },
-  
   noResultsContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
   },
   noResultsContainerDesktop: {
-    paddingVertical: 60,
+    paddingVertical: 80,
   },
   
   noResultsTitle: {
     color: '#FFFFFF',
     fontSize: 20,
     fontWeight: 'bold',
-    marginTop: 16,
+    marginTop: 20,
     marginBottom: 8,
+    textAlign: 'center',
   },
   noResultsTitleDesktop: {
     fontSize: 24,
-    marginTop: 20,
+    marginTop: 24,
     marginBottom: 12,
   },
   
@@ -1376,6 +1360,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 22,
+    maxWidth: 300,
   },
   noResultsTextDesktop: {
     fontSize: 18,
@@ -1394,26 +1379,26 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   recommendedTitleDesktop: {
     fontSize: 22,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   
   loadingRecommended: {
     alignItems: 'center',
-    paddingVertical: 40,
+    justifyContent: 'center',
+    paddingVertical: 60,
   },
   loadingRecommendedDesktop: {
-    paddingVertical: 60,
+    paddingVertical: 80,
   },
   
   loadingRecommendedText: {
     color: '#888888',
     fontSize: 16,
   },
-
   loadingRecommendedTextDesktop: {
     fontSize: 18,
   },
@@ -1422,14 +1407,12 @@ const styles = StyleSheet.create({
   skeletonContainer: {
     flex: 1,
   },
-  skeletonContainerDesktop: {
-    // Additional desktop styles for skeleton
-  },
+  skeletonContainerDesktop: {},
   
   skeletonCard: {
-    backgroundColor: '#111111',
+    backgroundColor: '#1a1a1a',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#333333',
@@ -1451,20 +1434,20 @@ const styles = StyleSheet.create({
   },
   
   skeletonIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#333333',
   },
   skeletonIconDesktop: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   
   skeletonTextContainer: {
-    marginLeft: 12,
     flex: 1,
+    marginLeft: 12,
   },
   skeletonTextContainerDesktop: {
     marginLeft: 10,
@@ -1473,37 +1456,35 @@ const styles = StyleSheet.create({
   skeletonLine: {
     backgroundColor: '#333333',
     borderRadius: 4,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   
   skeletonTitle: {
-    height: 16,
+    height: 20,
     width: '70%',
-    marginBottom: 8,
   },
   skeletonTitleDesktop: {
-    height: 15,
-    marginBottom: 6,
+    height: 18,
   },
   
   skeletonSubtitle: {
-    height: 14,
+    height: 16,
     width: '50%',
   },
   skeletonSubtitleDesktop: {
-    height: 13,
+    height: 14,
   },
   
   skeletonFavorite: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 80,
+    height: 32,
+    borderRadius: 20,
     backgroundColor: '#333333',
   },
   skeletonFavoriteDesktop: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 70,
+    height: 28,
+    borderRadius: 16,
   },
   
   skeletonMeta: {
@@ -1516,25 +1497,26 @@ const styles = StyleSheet.create({
   },
   
   skeletonTag: {
-    width: 60,
-    height: 20,
+    width: 70,
+    height: 24,
     borderRadius: 6,
     backgroundColor: '#333333',
   },
   skeletonTagDesktop: {
-    width: 50,
-    height: 18,
+    width: 60,
+    height: 20,
     borderRadius: 5,
   },
   
   skeletonRouteInfo: {
-    width: 40,
-    height: 14,
-    borderRadius: 4,
+    width: 50,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: '#333333',
   },
   skeletonRouteInfoDesktop: {
-    width: 35,
-    height: 13,
+    width: 40,
+    height: 18,
+    borderRadius: 9,
   },
 });

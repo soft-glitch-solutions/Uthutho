@@ -139,7 +139,7 @@ const StopBlock = ({
     checkLocation();
     
     // Check location periodically instead of watching
-    const locationInterval = setInterval(checkLocation, 30000);
+    const locationInterval = setInterval(checkLocation, 120000);
     
     return () => {
       mounted = false;
@@ -211,7 +211,7 @@ const StopBlock = ({
     
     checkIntervalRef.current = setInterval(() => {
       checkActiveJourneyParticipation();
-    }, 30000);
+    }, 120000);
     
     return () => {
       if (checkIntervalRef.current) {
