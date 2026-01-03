@@ -9,7 +9,7 @@ import { WaitingProvider } from '../context/WaitingContext';
 import { LanguageProvider } from '../context/LanguageContext';
 import { supabase } from '../lib/supabase';
 import NetworkGate from '@/components/NetworkGate';
-import mobileAds, { MaxAdContentRating } from 'react-native-google-mobile-ads';
+
 
 // Make sure this matches your app.json scheme
 const DEEP_LINK_SCHEME = 'uthutho';
