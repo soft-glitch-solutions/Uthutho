@@ -72,6 +72,37 @@ interface SchoolTransport {
   };
 }
 
+// Helper function to convert USD to ZAR (Rands)
+const formatToRands = (usdAmount: number): string => {
+  const exchangeRate = 18.5; // Approximate USD to ZAR exchange rate
+  const zarAmount = usdAmount * exchangeRate;
+  return `R${zarAmount.toFixed(0)}`;
+};
+
+// Skeleton Loading Components
+const SkeletonText = ({ width = 100, height = 16 }: { width?: number; height?: number }) => (
+  <View style={[styles.skeletonText, { width, height }]} />
+);
+
+const SkeletonButton = ({ width = '100%' }: { width?: number | string }) => (
+  <View style={[styles.skeletonButton, { width }]} />
+);
+
+const SkeletonCard = () => (
+  <View style={styles.skeletonCard}>
+    <View style={styles.skeletonCardContent}>
+      <SkeletonText width={120} height={20} />
+      <SkeletonText width={80} height={14} />
+    </View>
+  </View>
+);
+
+const SkeletonAvatar = () => (
+  <View style={styles.skeletonAvatar}>
+    <View style={styles.skeletonInner} />
+  </View>
+);
+
 export default function TransportDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -101,8 +132,6 @@ const fetchTransportDetails = async () => {
   try {
     console.log('📡 ===== STARTING FETCH =====');
     console.log('🔍 ID from URL:', id);
-    console.log('🔍 ID type:', typeof id);
-    console.log('🔍 ID length:', id?.length);
     
     // Check if ID is valid
     if (!id) {
@@ -118,58 +147,88 @@ const fetchTransportDetails = async () => {
 
     setLoading(true);
 
-    // STEP 1: First, let's check if we can access the table at all
-    console.log('🔍 STEP 1: Testing basic table access...');
-    const { data: testData, error: testError } = await supabase
-      .from('school_transports')
-      .select('id, school_name')
-      .limit(1);
+    // METHOD 1: Use the view that already has all the joined data
+    console.log('🔍 METHOD 1: Using transport_with_driver view...');
+    const { data: viewData, error: viewError } = await supabase
+      .from('transport_with_driver')
+      .select('*')
+      .eq('id', transportId)
+      .single();
 
-    console.log('📊 Basic table test:', {
-      hasData: !!testData,
-      dataCount: testData?.length,
-      error: testError,
-      errorMessage: testError?.message
+    console.log('📊 View query result:', {
+      success: !viewError,
+      hasData: !!viewData,
+      error: viewError,
+      errorMessage: viewError?.message,
+      errorCode: viewError?.code,
+      dataKeys: viewData ? Object.keys(viewData) : []
     });
 
-    // STEP 2: Try a SIMPLE query first - just get the transport without joins
-    console.log('🔍 STEP 2: Trying simple transport query...');
+    if (!viewError && viewData) {
+      console.log('✅ Got data from view!');
+      
+      // Format the data from the view
+      const formattedTransport: SchoolTransport = {
+        id: viewData.id || '',
+        school_name: viewData.school_name || 'Unknown School',
+        school_area: viewData.school_area || 'Unknown Area',
+        pickup_areas: Array.isArray(viewData.pickup_areas) 
+          ? viewData.pickup_areas 
+          : (typeof viewData.pickup_areas === 'string' ? [viewData.pickup_areas] : []),
+        pickup_times: Array.isArray(viewData.pickup_times) 
+          ? viewData.pickup_times 
+          : (typeof viewData.pickup_times === 'string' ? [viewData.pickup_times] : []),
+        capacity: viewData.capacity || 0,
+        current_riders: viewData.current_riders || 0,
+        price_per_month: viewData.price_per_month || 0,
+        price_per_week: viewData.price_per_week || 0,
+        vehicle_info: viewData.vehicle_info || '',
+        vehicle_type: viewData.vehicle_type || 'Standard Vehicle',
+        features: Array.isArray(viewData.features) 
+          ? viewData.features 
+          : (typeof viewData.features === 'string' ? [viewData.features] : []),
+        description: viewData.description || '',
+        is_verified: viewData.is_verified || false,
+        created_at: viewData.created_at || new Date().toISOString(),
+        updated_at: viewData.updated_at || new Date().toISOString(),
+        driver: {
+          id: viewData.driver_id || '',
+          user_id: viewData.driver_user_id || '',
+          is_verified: viewData.driver_verified || false,
+          profiles: {
+            first_name: viewData.driver_first_name || 'Unknown',
+            last_name: viewData.driver_last_name || 'Driver',
+            rating: viewData.driver_rating || 0,
+            total_trips: viewData.total_trips || 0,
+            phone: '', // Phone not in view
+            email: '', // Email not in view
+            avatar_url: viewData.driver_avatar_url
+          }
+        }
+      };
+
+      console.log('✅ ===== FORMATTED TRANSPORT FROM VIEW =====');
+      console.log('🏫 School:', formattedTransport.school_name);
+      console.log('👤 Driver:', `${formattedTransport.driver.profiles.first_name} ${formattedTransport.driver.profiles.last_name}`);
+      console.log('⭐ Rating:', formattedTransport.driver.profiles.rating);
+      console.log('==============================');
+
+      setTransport(formattedTransport);
+      return;
+    }
+
+    // METHOD 2: Fallback to separate queries if view doesn't work
+    console.log('🔍 METHOD 2: Falling back to separate queries...');
+    
+    // Get transport data
     const { data: transportData, error: transportError } = await supabase
       .from('school_transports')
       .select('*')
       .eq('id', transportId)
       .single();
 
-    console.log('📊 Simple transport query:', {
-      success: !transportError,
-      hasData: !!transportData,
-      error: transportError,
-      errorMessage: transportError?.message,
-      errorCode: transportError?.code,
-      dataKeys: transportData ? Object.keys(transportData) : []
-    });
-
     if (transportError) {
-      console.error('❌ Failed to fetch transport:', {
-        code: transportError.code,
-        message: transportError.message,
-        details: transportError.details,
-        hint: transportError.hint
-      });
-      
-      // Check if it's a "no rows" error
-      if (transportError.code === 'PGRST116') {
-        console.log('⚠️ No transport found with ID:', transportId);
-        
-        // Let's check what IDs exist in the database
-        const { data: allTransports } = await supabase
-          .from('school_transports')
-          .select('id, school_name')
-          .limit(5);
-        
-        console.log('📊 Available transports:', allTransports);
-      }
-      
+      console.error('❌ Failed to fetch transport:', transportError);
       setTransport(null);
       return;
     }
@@ -184,50 +243,44 @@ const fetchTransportDetails = async () => {
       id: transportData.id,
       school_name: transportData.school_name,
       driver_id: transportData.driver_id,
-      pickup_areas: transportData.pickup_areas,
-      capacity: transportData.capacity
     });
 
-    // STEP 3: Now get driver information
-    console.log('🔍 STEP 3: Fetching driver information...');
-    const { data: driverData, error: driverError } = await supabase
+    // Get driver and profile data using a direct join query
+    console.log('🔍 Fetching driver and profile...');
+    const { data: driverProfileData, error: driverProfileError } = await supabase
       .from('drivers')
       .select(`
         *,
-        profiles (*)
+        profiles!drivers_user_id_fkey (
+          first_name,
+          last_name,
+          phone,
+          email,
+          avatar_url
+        )
       `)
       .eq('id', transportData.driver_id)
       .single();
 
-    console.log('📊 Driver query:', {
-      success: !driverError,
-      hasData: !!driverData,
-      error: driverError,
-      driverId: transportData.driver_id,
-      data: driverData
+    console.log('📊 Driver+Profile query:', {
+      success: !driverProfileError,
+      hasData: !!driverProfileData,
+      error: driverProfileError,
+      driverId: transportData.driver_id
     });
 
-    // STEP 4: Format the complete transport object
-    console.log('🔍 STEP 4: Formatting complete transport object...');
-    
     let driverInfo = null;
     let profilesInfo = null;
     
-    if (driverData) {
-      driverInfo = driverData;
+    if (driverProfileData) {
+      driverInfo = driverProfileData;
       
-      // Handle profiles data (could be array or object)
-      if (Array.isArray(driverData.profiles) && driverData.profiles.length > 0) {
-        profilesInfo = driverData.profiles[0];
-      } else if (driverData.profiles && typeof driverData.profiles === 'object') {
-        profilesInfo = driverData.profiles;
+      // Handle profiles data (Supabase returns arrays for relationships)
+      if (Array.isArray(driverProfileData.profiles) && driverProfileData.profiles.length > 0) {
+        profilesInfo = driverProfileData.profiles[0];
+      } else if (driverProfileData.profiles && typeof driverProfileData.profiles === 'object') {
+        profilesInfo = driverProfileData.profiles;
       }
-      
-      console.log('📊 Extracted driver info:', {
-        driverId: driverInfo.id,
-        hasProfiles: !!profilesInfo,
-        profileName: profilesInfo ? `${profilesInfo.first_name} ${profilesInfo.last_name}` : 'No profile'
-      });
     }
 
     const formattedTransport: SchoolTransport = {
@@ -236,17 +289,19 @@ const fetchTransportDetails = async () => {
       school_area: transportData.school_area || 'Unknown Area',
       pickup_areas: Array.isArray(transportData.pickup_areas) 
         ? transportData.pickup_areas 
-        : (transportData.pickup_areas ? [transportData.pickup_areas] : []),
+        : (typeof transportData.pickup_areas === 'string' ? [transportData.pickup_areas] : []),
       pickup_times: Array.isArray(transportData.pickup_times) 
         ? transportData.pickup_times 
-        : (transportData.pickup_times ? [transportData.pickup_times] : []),
+        : (typeof transportData.pickup_times === 'string' ? [transportData.pickup_times] : []),
       capacity: transportData.capacity || 0,
       current_riders: transportData.current_riders || 0,
       price_per_month: transportData.price_per_month || 0,
       price_per_week: transportData.price_per_week || 0,
       vehicle_info: transportData.vehicle_info || '',
       vehicle_type: transportData.vehicle_type || 'Standard Vehicle',
-      features: Array.isArray(transportData.features) ? transportData.features : [],
+      features: Array.isArray(transportData.features) 
+        ? transportData.features 
+        : (typeof transportData.features === 'string' ? [transportData.features] : []),
       description: transportData.description || '',
       is_verified: transportData.is_verified || false,
       created_at: transportData.created_at || new Date().toISOString(),
@@ -267,14 +322,9 @@ const fetchTransportDetails = async () => {
       }
     };
 
-    console.log('✅ ===== FORMATTED TRANSPORT =====');
+    console.log('✅ ===== FORMATTED TRANSPORT FROM SEPARATE QUERIES =====');
     console.log('🏫 School:', formattedTransport.school_name);
-    console.log('📍 Area:', formattedTransport.school_area);
     console.log('👤 Driver:', `${formattedTransport.driver.profiles.first_name} ${formattedTransport.driver.profiles.last_name}`);
-    console.log('💺 Capacity:', `${formattedTransport.current_riders}/${formattedTransport.capacity}`);
-    console.log('💰 Price:', `$${formattedTransport.price_per_month}/month`);
-    console.log('📋 Pickup areas:', formattedTransport.pickup_areas.length);
-    console.log('🕐 Pickup times:', formattedTransport.pickup_times.length);
     console.log('==============================');
 
     setTransport(formattedTransport);
@@ -282,9 +332,7 @@ const fetchTransportDetails = async () => {
   } catch (error) {
     console.error('❌ ===== UNEXPECTED ERROR =====');
     console.error('Error:', error);
-    console.error('Error name:', error instanceof Error ? error.name : 'Unknown');
     console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
-    console.error('Error stack:', error instanceof Error ? error.stack : undefined);
     console.error('==============================');
     
     setTransport(null);
@@ -564,25 +612,169 @@ const formatTransportData = (data: any): SchoolTransport => {
     router.back();
   };
 
+  const renderSkeletonLoading = () => (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={handleGoBack}
+        >
+          <ArrowLeft size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+        <View style={styles.skeletonShareButton} />
+      </View>
+
+      <ScrollView 
+        style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header Section Skeleton */}
+        <View style={styles.skeletonHeader}>
+          <View style={styles.skeletonSchoolInfo}>
+            <View style={styles.skeletonSchoolIcon} />
+            <View style={styles.skeletonSchoolText}>
+              <SkeletonText width={200} height={24} />
+              <View style={{ marginTop: 8 }}>
+                <SkeletonText width={150} height={14} />
+              </View>
+            </View>
+          </View>
+          <View style={styles.skeletonBadge}>
+            <SkeletonText width={80} height={20} />
+          </View>
+        </View>
+
+        {/* Availability Banner Skeleton */}
+        <View style={styles.skeletonBanner}>
+          <View style={styles.skeletonBannerContent}>
+            <View style={styles.skeletonBannerIcon} />
+            <View style={styles.skeletonBannerText}>
+              <SkeletonText width={60} height={14} />
+              <View style={{ marginTop: 4 }}>
+                <SkeletonText width={120} height={12} />
+              </View>
+            </View>
+          </View>
+          <SkeletonText width={80} height={18} />
+        </View>
+
+        {/* Stats Grid Skeleton */}
+        <View style={styles.skeletonStatsGrid}>
+          {[1, 2, 3].map((i) => (
+            <React.Fragment key={i}>
+              <View style={styles.skeletonStatItem}>
+                <View style={styles.skeletonStatIcon} />
+                <SkeletonText width={40} height={18} />
+                <View style={{ marginTop: 4 }}>
+                  <SkeletonText width={60} height={12} />
+                </View>
+              </View>
+              {i < 3 && <View style={styles.skeletonStatDivider} />}
+            </React.Fragment>
+          ))}
+        </View>
+
+        {/* Pickup Areas Skeleton */}
+        <View style={styles.skeletonSection}>
+          <SkeletonText width={120} height={18} />
+          <View style={styles.skeletonPickupAreas}>
+            {[1, 2].map((i) => (
+              <View key={i} style={styles.skeletonPickupArea}>
+                <View style={styles.skeletonPickupIcon} />
+                <SkeletonText width={150} height={14} />
+                <View style={styles.skeletonPickupNavigation} />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Pickup Times Skeleton */}
+        <View style={styles.skeletonSection}>
+          <SkeletonText width={120} height={18} />
+          <View style={styles.skeletonPickupTimes}>
+            {[1, 2, 3].map((i) => (
+              <View key={i} style={styles.skeletonTimeSlot}>
+                <View style={styles.skeletonTimeIcon} />
+                <SkeletonText width={80} height={14} />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Description Skeleton */}
+        <View style={styles.skeletonSection}>
+          <SkeletonText width={120} height={18} />
+          <View style={styles.skeletonDescription}>
+            <SkeletonText width="100%" height={14} />
+            <SkeletonText width="90%" height={14} />
+            <SkeletonText width="80%" height={14} />
+          </View>
+        </View>
+
+        {/* Vehicle Info Skeleton */}
+        <View style={styles.skeletonSection}>
+          <SkeletonText width={150} height={18} />
+          <View style={styles.skeletonVehicleInfo}>
+            <View style={styles.skeletonVehicleDetail}>
+              <View style={styles.skeletonVehicleIcon} />
+              <SkeletonText width={100} height={16} />
+            </View>
+            <View style={styles.skeletonFeatures}>
+              <SkeletonText width={80} height={16} />
+              <View style={styles.skeletonFeatureGrid}>
+                {[1, 2, 3].map((i) => (
+                  <View key={i} style={styles.skeletonFeatureBadge}>
+                    <SkeletonText width={60} height={12} />
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Driver Info Skeleton */}
+        <View style={styles.skeletonSection}>
+          <SkeletonText width={150} height={18} />
+          <View style={styles.skeletonDriverCard}>
+            <View style={styles.skeletonDriverInfo}>
+              <SkeletonAvatar />
+              <View style={styles.skeletonDriverDetails}>
+                <SkeletonText width={120} height={16} />
+                <View style={styles.skeletonDriverStats}>
+                  <SkeletonText width={80} height={12} />
+                  <SkeletonText width={60} height={12} />
+                </View>
+              </View>
+            </View>
+          </View>
+          
+          <View style={styles.skeletonContactButtons}>
+            <SkeletonButton width={(width - 80) / 2} />
+            <SkeletonButton width={(width - 80) / 2} />
+          </View>
+        </View>
+
+        {/* Report Button Skeleton */}
+        <View style={styles.skeletonReportButton}>
+          <SkeletonText width={120} height={14} />
+        </View>
+
+        {/* Apply Button Skeleton */}
+        <View style={styles.skeletonApplyContainer}>
+          <SkeletonButton />
+        </View>
+
+        {/* Spacer for bottom padding */}
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    </View>
+  );
+
   console.log('🔄 Render - loading:', loading, 'transport:', !!transport);
 
   if (loading) {
-    console.log('⏳ Showing loading state');
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={handleGoBack}
-          >
-            <ArrowLeft size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading transport details...</Text>
-        </View>
-      </View>
-    );
+    console.log('⏳ Showing skeleton loading');
+    return renderSkeletonLoading();
   }
 
   if (!transport) {
@@ -700,7 +892,7 @@ const formatTransportData = (data: any): SchoolTransport => {
           </View>
           {!isFull && transport.price_per_month > 0 && (
             <Text style={styles.availabilityPrice}>
-              ${transport.price_per_month}/month
+              {formatToRands(transport.price_per_month)}/month
             </Text>
           )}
         </View>
@@ -710,7 +902,7 @@ const formatTransportData = (data: any): SchoolTransport => {
           <View style={styles.statItem}>
             <DollarSign size={20} color="#1ea2b1" />
             <Text style={styles.statValue}>
-              ${transport.price_per_month > 0 ? transport.price_per_month : 'N/A'}
+              {transport.price_per_month > 0 ? formatToRands(transport.price_per_month) : 'N/A'}
             </Text>
             <Text style={styles.statLabel}>Per Month</Text>
           </View>
@@ -899,7 +1091,7 @@ const formatTransportData = (data: any): SchoolTransport => {
           >
             <Text style={styles.applyButtonText}>
               {transport.price_per_month > 0 
-                ? `Apply Now - $${transport.price_per_month}/month`
+                ? `Apply Now - ${formatToRands(transport.price_per_month)}/month`
                 : 'Apply Now'}
             </Text>
           </TouchableOpacity>
@@ -1391,5 +1583,243 @@ const styles = StyleSheet.create({
   },
   fullButton: {
     backgroundColor: '#EF4444',
+  },
+  // Skeleton Loading Styles
+  skeletonText: {
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  skeletonButton: {
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    height: 48,
+    borderRadius: 8,
+  },
+  skeletonCard: {
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  skeletonCardContent: {
+    gap: 4,
+  },
+  skeletonAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    overflow: 'hidden',
+  },
+  skeletonInner: {
+    flex: 1,
+    backgroundColor: 'rgba(60, 60, 60, 0.5)',
+  },
+  skeletonShareButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+  },
+  skeletonHeader: {
+    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  skeletonSchoolInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+  skeletonSchoolIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    marginRight: 12,
+  },
+  skeletonSchoolText: {
+    flex: 1,
+    gap: 8,
+  },
+  skeletonBadge: {
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  skeletonBanner: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  skeletonBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  skeletonBannerIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+  },
+  skeletonBannerText: {
+    marginLeft: 12,
+    gap: 4,
+  },
+  skeletonStatsGrid: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
+    padding: 16,
+  },
+  skeletonStatItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  skeletonStatIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+  },
+  skeletonStatDivider: {
+    width: 1,
+    backgroundColor: 'rgba(60, 60, 60, 0.7)',
+  },
+  skeletonSection: {
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    padding: 20,
+    borderRadius: 12,
+    gap: 16,
+  },
+  skeletonPickupAreas: {
+    gap: 8,
+  },
+  skeletonPickupArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(40, 40, 40, 0.7)',
+    padding: 12,
+    borderRadius: 8,
+  },
+  skeletonPickupIcon: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+  },
+  skeletonPickupNavigation: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+  },
+  skeletonPickupTimes: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  skeletonTimeSlot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(40, 40, 40, 0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  skeletonTimeIcon: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+  },
+  skeletonDescription: {
+    gap: 4,
+  },
+  skeletonVehicleInfo: {
+    gap: 12,
+  },
+  skeletonVehicleDetail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  skeletonVehicleIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+  },
+  skeletonFeatures: {
+    gap: 8,
+  },
+  skeletonFeatureGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  skeletonFeatureBadge: {
+    backgroundColor: 'rgba(40, 40, 40, 0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  skeletonDriverCard: {
+    backgroundColor: 'rgba(40, 40, 40, 0.7)',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(60, 60, 60, 0.7)',
+  },
+  skeletonDriverInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  skeletonDriverDetails: {
+    flex: 1,
+    gap: 8,
+  },
+  skeletonDriverStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  skeletonContactButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  skeletonReportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(40, 40, 40, 0.7)',
+    marginHorizontal: 20,
+    marginBottom: 100,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(60, 60, 60, 0.7)',
+  },
+  skeletonApplyContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#000000',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#222222',
   },
 });

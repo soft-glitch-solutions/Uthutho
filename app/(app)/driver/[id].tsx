@@ -10,6 +10,7 @@ import {
   Alert,
   RefreshControl,
   Linking,
+  Dimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -17,37 +18,52 @@ import {
   Star,
   Shield,
   Car,
-  Calendar,
   Phone,
   Mail,
-  MapPin,
   Users,
-  Award,
-  MessageSquare,
+  MessageCircle,
   ChevronRight,
+  Calendar,
+  Award,
+  FileText,
+  MapPin,
+  CheckCircle,
+  TrendingUp,
+  Car as CarIcon,
+  PhoneCall,
+  Mail as MailIcon,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
+
+const { width } = Dimensions.get('window');
 
 interface DriverProfile {
   id: string;
   user_id: string;
   is_verified: boolean;
   license_number: string;
+  vehicle_type: string;
   vehicle_registration: string;
-  insurance_provider: string;
-  insurance_expiry: string;
-  years_experience: number;
+  is_active: boolean;
+  rating: number;
+  total_trips: number;
   created_at: string;
+  updated_at: string;
+  license_front_url?: string;
+  license_back_url?: string;
+  pdp_certificate_url?: string;
+  vehicle_photos?: string[];
+  verification_notes?: string;
+  verified_by?: string;
+  verified_at?: string;
   profiles: {
     first_name: string;
     last_name: string;
-    email: string;
-    phone: string;
-    avatar_url: string;
-    rating: number;
-    total_trips: number;
-    bio: string;
+    email?: string;
+    phone?: string;
+    avatar_url?: string;
+    bio?: string;
   };
   transports: Array<{
     id: string;
@@ -57,6 +73,7 @@ interface DriverProfile {
     current_riders: number;
     price_per_month: number;
     is_verified: boolean;
+    vehicle_type: string;
   }>;
   reviews: Array<{
     id: string;
@@ -69,6 +86,37 @@ interface DriverProfile {
     };
   }>;
 }
+
+// Helper function to convert USD to ZAR (Rands)
+const formatToRands = (usdAmount: number): string => {
+  const exchangeRate = 18.5; // Approximate USD to ZAR exchange rate
+  const zarAmount = usdAmount * exchangeRate;
+  return `R${zarAmount.toFixed(0)}`;
+};
+
+// Skeleton Loading Components
+const SkeletonAvatar = () => (
+  <View style={styles.skeletonAvatar}>
+    <View style={styles.skeletonInner} />
+  </View>
+);
+
+const SkeletonText = ({ width = 100, height = 16 }: { width?: number; height?: number }) => (
+  <View style={[styles.skeletonText, { width, height }]} />
+);
+
+const SkeletonButton = () => (
+  <View style={styles.skeletonButton} />
+);
+
+const SkeletonCard = () => (
+  <View style={styles.skeletonCard}>
+    <View style={styles.skeletonCardContent}>
+      <SkeletonText width={120} height={20} />
+      <SkeletonText width={80} height={14} />
+    </View>
+  </View>
+);
 
 export default function DriverProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -90,92 +138,155 @@ export default function DriverProfileScreen() {
     try {
       setLoading(true);
       
-      // Fetch driver details
       const { data: driverData, error: driverError } = await supabase
         .from('drivers')
         .select(`
           *,
-          profiles (
+          profiles!drivers_user_id_fkey (
             first_name,
             last_name,
-            email,
             phone,
-            avatar_url,
-            rating,
-            total_trips,
-            bio
+            email,
+            avatar_url
           )
         `)
         .eq('id', id)
         .single();
 
-      if (driverError) throw driverError;
-
-      // Fetch driver's transports
-      const { data: transportsData, error: transportsError } = await supabase
-        .from('school_transports')
-        .select(`
-          id,
-          school_name,
-          school_area,
-          capacity,
-          current_riders,
-          price_per_month,
-          is_verified
-        `)
-        .eq('driver_id', id)
-        .eq('is_active', true);
-
-      if (transportsError) throw transportsError;
-
-      // Fetch driver reviews
-      const { data: reviewsData, error: reviewsError } = await supabase
-        .from('transport_reviews')
-        .select(`
-          id,
-          rating,
-          comment,
-          created_at,
-          reviewer:profiles!transport_reviews_user_id_fkey (
-            first_name,
-            last_name
-          )
-        `)
-        .eq('driver_id', id)
-        .order('created_at', { ascending: false });
-
-      if (reviewsError) throw reviewsError;
-
-      const driverProfile: DriverProfile = {
-        ...driverData,
-        profiles: driverData.profiles || {
-          first_name: 'Unknown',
-          last_name: 'Driver',
-          email: '',
-          phone: '',
-          avatar_url: '',
-          rating: 0,
-          total_trips: 0,
-          bio: ''
-        },
-        transports: transportsData || [],
-        reviews: reviewsData || []
-      };
-
-      setDriver(driverProfile);
-      
-      // Check if this is the current user's profile
-      if (user && driverData.user_id === user.id) {
-        setIsCurrentUser(true);
+      if (driverError) {
+        // Fallback to separate queries
+        const { data: driverOnly } = await supabase
+          .from('drivers')
+          .select('*')
+          .eq('id', id)
+          .single();
+        
+        if (driverOnly) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, phone, email, avatar_url')
+            .eq('id', driverOnly.user_id)
+            .single();
+          
+          const driverWithProfile = {
+            ...driverOnly,
+            profiles: profileData || {
+              first_name: 'Unknown',
+              last_name: 'Driver',
+              phone: '',
+              email: '',
+              avatar_url: ''
+            }
+          };
+          
+          await fetchTransportsAndReviews(driverWithProfile);
+          return;
+        }
+        
+        Alert.alert('Error', 'Failed to load driver profile');
+        router.back();
+        return;
       }
-      
+
+      if (!driverData) {
+        Alert.alert('Error', 'Driver not found');
+        router.back();
+        return;
+      }
+
+      await fetchTransportsAndReviews(driverData);
+
     } catch (error) {
-      console.error('Error fetching driver profile:', error);
       Alert.alert('Error', 'Failed to load driver profile');
       router.back();
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const fetchTransportsAndReviews = async (driverData: any) => {
+    let profilesInfo = null;
+    if (Array.isArray(driverData.profiles) && driverData.profiles.length > 0) {
+      profilesInfo = driverData.profiles[0];
+    } else if (driverData.profiles && typeof driverData.profiles === 'object') {
+      profilesInfo = driverData.profiles;
+    }
+
+    const { data: transportsData } = await supabase
+      .from('school_transports')
+      .select(`
+        id,
+        school_name,
+        school_area,
+        capacity,
+        current_riders,
+        price_per_month,
+        is_verified,
+        vehicle_type
+      `)
+      .eq('driver_id', driverData.id)
+      .eq('is_active', true);
+
+    const { data: reviewsData } = await supabase
+      .from('transport_reviews')
+      .select(`
+        id,
+        rating,
+        comment,
+        created_at,
+        profiles!transport_reviews_user_id_fkey (
+          first_name,
+          last_name
+        )
+      `)
+      .eq('driver_id', driverData.id)
+      .order('created_at', { ascending: false });
+
+    const driverProfile: DriverProfile = {
+      id: driverData.id || '',
+      user_id: driverData.user_id || '',
+      is_verified: driverData.is_verified || false,
+      license_number: driverData.license_number || '',
+      vehicle_type: driverData.vehicle_type || '',
+      vehicle_registration: driverData.vehicle_registration || '',
+      is_active: driverData.is_active || false,
+      rating: driverData.rating || 0,
+      total_trips: driverData.total_trips || 0,
+      created_at: driverData.created_at || new Date().toISOString(),
+      updated_at: driverData.updated_at || new Date().toISOString(),
+      license_front_url: driverData.license_front_url,
+      license_back_url: driverData.license_back_url,
+      pdp_certificate_url: driverData.pdp_certificate_url,
+      vehicle_photos: driverData.vehicle_photos || [],
+      verification_notes: driverData.verification_notes,
+      verified_by: driverData.verified_by,
+      verified_at: driverData.verified_at,
+      profiles: {
+        first_name: profilesInfo?.first_name || 'Unknown',
+        last_name: profilesInfo?.last_name || 'Driver',
+        email: profilesInfo?.email,
+        phone: profilesInfo?.phone,
+        avatar_url: profilesInfo?.avatar_url,
+        bio: profilesInfo?.bio
+      },
+      transports: transportsData || [],
+      reviews: reviewsData?.map(review => ({
+        id: review.id,
+        rating: review.rating || 0,
+        comment: review.comment || '',
+        created_at: review.created_at || new Date().toISOString(),
+        reviewer: {
+          first_name: review.profiles?.first_name || 'Anonymous',
+          last_name: review.profiles?.last_name || 'User'
+        }
+      })) || []
+    };
+
+    setDriver(driverProfile);
+    
+    if (user && driverData.user_id === user.id) {
+      setIsCurrentUser(true);
     }
   };
 
@@ -207,270 +318,534 @@ export default function DriverProfileScreen() {
   };
 
   const handleSendMessage = () => {
-    // Navigate to chat with driver
     if (user && driver) {
       router.push(`/chat/${driver.id}`);
+    } else {
+      Alert.alert('Sign In Required', 'Please sign in to message the driver');
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading driver profile...</Text>
+  const handleGoBack = () => {
+    router.back();
+  };
+
+  const renderSkeletonLoading = () => (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={handleGoBack}
+        >
+          <ArrowLeft size={24} color="#FFFFFF" />
+        </TouchableOpacity>
       </View>
-    );
+
+      <ScrollView 
+        style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero Section Skeleton */}
+        <View style={styles.heroSection}>
+          <View style={styles.heroContent}>
+            <SkeletonAvatar />
+            <View style={styles.heroInfo}>
+              <SkeletonText width={180} height={28} />
+              <View style={{ marginVertical: 8 }}>
+                <SkeletonText width={120} height={16} />
+              </View>
+              <SkeletonText width={200} height={14} />
+            </View>
+          </View>
+          <SkeletonButton />
+        </View>
+
+        {/* Stats Grid Skeleton */}
+        <View style={styles.statsGrid}>
+          {[1, 2, 3, 4].map((i) => (
+            <View key={i} style={styles.statCard}>
+              <View style={styles.skeletonStatIcon} />
+              <SkeletonText width={40} height={20} />
+              <SkeletonText width={60} height={12} />
+            </View>
+          ))}
+        </View>
+
+        {/* Contact Information Skeleton */}
+        <View style={styles.section}>
+          <SkeletonText width={120} height={20} />
+          <View style={styles.contactGrid}>
+            {[1, 2].map((i) => (
+              <View key={i} style={styles.skeletonContactCard}>
+                <View style={styles.skeletonContactIcon} />
+                <View style={styles.skeletonContactDetails}>
+                  <SkeletonText width={40} height={12} />
+                  <SkeletonText width={100} height={16} />
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Driver Details Skeleton */}
+        <View style={styles.section}>
+          <SkeletonText width={120} height={20} />
+          <View style={styles.detailsGrid}>
+            {[1, 2, 3, 4].map((i) => (
+              <View key={i} style={styles.skeletonDetailItem}>
+                <View style={styles.skeletonIcon} />
+                <SkeletonText width={60} height={12} />
+                <SkeletonText width={80} height={15} />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Transports Skeleton */}
+        <View style={styles.section}>
+          <SkeletonText width={180} height={20} />
+          <View style={styles.transportsList}>
+            {[1, 2].map((i) => (
+              <View key={i} style={styles.skeletonTransportCard}>
+                <View style={styles.skeletonTransportHeader}>
+                  <View style={styles.skeletonTransportIcon} />
+                  <View style={styles.skeletonTransportInfo}>
+                    <SkeletonText width={150} height={16} />
+                    <SkeletonText width={100} height={14} />
+                  </View>
+                </View>
+                <View style={styles.skeletonTransportDetails}>
+                  <SkeletonText width={100} height={14} />
+                  <SkeletonText width={80} height={16} />
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Reviews Skeleton */}
+        <View style={styles.section}>
+          <SkeletonText width={150} height={20} />
+          <View style={styles.reviewsList}>
+            {[1, 2].map((i) => (
+              <View key={i} style={styles.skeletonReviewCard}>
+                <View style={styles.skeletonReviewHeader}>
+                  <View style={styles.skeletonReviewerAvatar} />
+                  <View style={styles.skeletonReviewerInfo}>
+                    <SkeletonText width={120} height={15} />
+                    <SkeletonText width={80} height={12} />
+                  </View>
+                </View>
+                <SkeletonText width="100%" height={40} />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.spacer} />
+      </ScrollView>
+    </View>
+  );
+
+  if (loading) {
+    return renderSkeletonLoading();
   }
 
   if (!driver) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Driver not found</Text>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handleGoBack}
+          >
+            <ArrowLeft size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorTitle}>Driver not found</Text>
+          <Text style={styles.errorMessage}>
+            The driver profile you're looking for doesn't exist or has been removed.
+          </Text>
+          <TouchableOpacity 
+            style={styles.primaryButton}
+            onPress={handleGoBack}
+          >
+            <Text style={styles.primaryButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   const profile = driver.profiles;
-  const averageRating = profile.rating || 0;
+  const averageRating = driver.rating || 0;
   const fullName = `${profile.first_name} ${profile.last_name}`;
+  const memberSince = new Date(driver.created_at).getFullYear();
+  const availableSeats = driver.transports.reduce((total, transport) => 
+    total + (transport.capacity - transport.current_riders), 0
+  );
+  const totalCapacity = driver.transports.reduce((total, transport) => 
+    total + transport.capacity, 0
+  );
 
   return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor="#1ea2b1"
-          colors={["#1ea2b1"]}
-        />
-      }
-    >
-      {/* Header */}
+    <View style={styles.container}>
+      {/* Header with Back Button */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleGoBack}
         >
           <ArrowLeft size={24} color="#FFFFFF" />
         </TouchableOpacity>
         
-        <View style={styles.profileHeader}>
-          {profile.avatar_url ? (
-            <Image 
-              source={{ uri: profile.avatar_url }} 
-              style={styles.avatar}
-            />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>
-                {profile.first_name?.[0]}{profile.last_name?.[0]}
-              </Text>
-            </View>
-          )}
-          
-          <View style={styles.profileInfo}>
-            <Text style={styles.name}>{fullName}</Text>
-            <View style={styles.ratingContainer}>
-              <Star size={16} color="#FBBF24" fill="#FBBF24" />
-              <Text style={styles.ratingText}>
-                {averageRating.toFixed(1)} ({profile.total_trips} trips)
-              </Text>
-            </View>
-            
-            {driver.is_verified && (
-              <View style={styles.verifiedBadge}>
-                <Shield size={16} color="#10B981" />
-                <Text style={styles.verifiedText}>Verified Driver</Text>
-              </View>
-            )}
-          </View>
-        </View>
-        
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          {isCurrentUser ? (
-            <TouchableOpacity 
-              style={styles.editButton}
-              onPress={handleEditProfile}
-            >
-              <Text style={styles.editButtonText}>Edit Profile</Text>
-            </TouchableOpacity>
-          ) : (
-            <>
-              <TouchableOpacity 
-                style={styles.messageButton}
-                onPress={handleSendMessage}
-              >
-                <MessageSquare size={20} color="#FFFFFF" />
-                <Text style={styles.messageButtonText}>Message</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </View>
-
-      {/* Contact Information */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Contact Information</Text>
-        <View style={styles.contactGrid}>
-          {profile.phone && (
-            <TouchableOpacity 
-              style={styles.contactItem}
-              onPress={() => handleContact('phone')}
-            >
-              <Phone size={20} color="#1ea2b1" />
-              <Text style={styles.contactText}>{profile.phone}</Text>
-            </TouchableOpacity>
-          )}
-          
-          {profile.email && (
-            <TouchableOpacity 
-              style={styles.contactItem}
-              onPress={() => handleContact('email')}
-            >
-              <Mail size={20} color="#1ea2b1" />
-              <Text style={styles.contactText}>{profile.email}</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Driver Information */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Driver Information</Text>
-        
-        <View style={styles.infoGrid}>
-          <View style={styles.infoItem}>
-            <Car size={20} color="#888888" />
-            <Text style={styles.infoLabel}>Experience</Text>
-            <Text style={styles.infoValue}>
-              {driver.years_experience || 0} years
-            </Text>
-          </View>
-          
-          <View style={styles.infoItem}>
-            <Shield size={20} color="#888888" />
-            <Text style={styles.infoLabel}>License</Text>
-            <Text style={styles.infoValue}>
-              {driver.license_number ? '✓ Verified' : 'Not provided'}
-            </Text>
-          </View>
-          
-          <View style={styles.infoItem}>
-            <Calendar size={20} color="#888888" />
-            <Text style={styles.infoLabel}>Insurance</Text>
-            <Text style={styles.infoValue}>
-              {driver.insurance_provider || 'Not provided'}
-            </Text>
-          </View>
-          
-          <View style={styles.infoItem}>
-            <Award size={20} color="#888888" />
-            <Text style={styles.infoLabel}>Member since</Text>
-            <Text style={styles.infoValue}>
-              {new Date(driver.created_at).toLocaleDateString('en-US', {
-                month: 'short',
-                year: 'numeric'
-              })}
-            </Text>
-          </View>
-        </View>
-        
-        {profile.bio && (
-          <View style={styles.bioContainer}>
-            <Text style={styles.bioText}>{profile.bio}</Text>
-          </View>
+        {!isCurrentUser && (
+          <TouchableOpacity 
+            style={styles.messageHeaderButton}
+            onPress={handleSendMessage}
+          >
+            <MessageCircle size={22} color="#1ea2b1" />
+          </TouchableOpacity>
         )}
       </View>
 
-      {/* Available Transports */}
-      {driver.transports.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Available Transports</Text>
-          
-          {driver.transports.map((transport) => (
-            <TouchableOpacity
-              key={transport.id}
-              style={styles.transportCard}
-              onPress={() => handleViewTransport(transport.id)}
-            >
-              <View style={styles.transportInfo}>
-                <Text style={styles.transportName}>{transport.school_name}</Text>
-                <Text style={styles.transportArea}>{transport.school_area}</Text>
-                
-                <View style={styles.transportDetails}>
-                  <View style={styles.transportDetail}>
-                    <Users size={16} color="#888888" />
-                    <Text style={styles.transportDetailText}>
-                      {transport.current_riders}/{transport.capacity} seats
-                    </Text>
+      <ScrollView 
+        style={styles.scrollContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#1ea2b1"
+            colors={["#1ea2b1"]}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <View style={styles.heroContent}>
+            {profile.avatar_url ? (
+              <Image 
+                source={{ uri: profile.avatar_url }} 
+                style={styles.heroAvatar}
+              />
+            ) : (
+              <View style={styles.heroAvatarPlaceholder}>
+                <Text style={styles.avatarInitials}>
+                  {profile.first_name?.[0]}{profile.last_name?.[0]}
+                </Text>
+              </View>
+            )}
+            
+            <View style={styles.heroInfo}>
+              <View style={styles.nameRow}>
+                <Text style={styles.heroName}>{fullName}</Text>
+                {driver.is_verified && (
+                  <View style={styles.verifiedIcon}>
+                    <Shield size={16} color="#10B981" />
                   </View>
-                  
-                  <View style={styles.transportDetail}>
-                    <Text style={styles.transportPrice}>
-                      ${transport.price_per_month}/month
-                    </Text>
-                  </View>
-                </View>
+                )}
               </View>
               
-              <ChevronRight size={20} color="#666666" />
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {/* Reviews */}
-      {driver.reviews.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Reviews ({driver.reviews.length})
-          </Text>
-          
-          {driver.reviews.slice(0, 3).map((review) => (
-            <View key={review.id} style={styles.reviewCard}>
-              <View style={styles.reviewHeader}>
-                <View style={styles.reviewerInfo}>
-                  <Text style={styles.reviewerName}>
-                    {review.reviewer.first_name} {review.reviewer.last_name}
-                  </Text>
-                  <Text style={styles.reviewDate}>
-                    {new Date(review.created_at).toLocaleDateString()}
-                  </Text>
+              <View style={styles.ratingRow}>
+                <View style={styles.ratingStars}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      size={16}
+                      color={star <= Math.round(averageRating) ? "#FBBF24" : "#4B5563"}
+                      fill={star <= Math.round(averageRating) ? "#FBBF24" : "transparent"}
+                    />
+                  ))}
                 </View>
-                
-                <View style={styles.reviewRating}>
-                  <Star size={16} color="#FBBF24" fill="#FBBF24" />
-                  <Text style={styles.ratingNumber}>{review.rating.toFixed(1)}</Text>
-                </View>
+                <Text style={styles.ratingText}>
+                  {averageRating.toFixed(1)} • {driver.total_trips} trips
+                </Text>
               </View>
               
-              {review.comment && (
-                <Text style={styles.reviewComment}>{review.comment}</Text>
-              )}
-            </View>
-          ))}
-          
-          {driver.reviews.length > 3 && (
-            <TouchableOpacity 
-              style={styles.viewAllButton}
-              onPress={() => router.push(`/driver/${id}/reviews`)}
-            >
-              <Text style={styles.viewAllText}>
-                View all {driver.reviews.length} reviews
+              <Text style={styles.heroSubtitle}>
+                Professional School Transport Driver
               </Text>
-              <ChevronRight size={20} color="#1ea2b1" />
+            </View>
+          </View>
+          
+          {isCurrentUser ? (
+            <TouchableOpacity 
+              style={styles.editProfileButton}
+              onPress={handleEditProfile}
+            >
+              <Text style={styles.editProfileButtonText}>Edit Profile</Text>
             </TouchableOpacity>
+          ) : (
+            <View style={styles.contactButtons}>
+              {profile.phone && (
+                <TouchableOpacity 
+                  style={styles.contactButton}
+                  onPress={() => handleContact('phone')}
+                >
+                  <PhoneCall size={20} color="#FFFFFF" />
+                  <Text style={styles.contactButtonText}>Call</Text>
+                </TouchableOpacity>
+              )}
+              
+              <TouchableOpacity 
+                style={[styles.contactButton, styles.messageButton]}
+                onPress={handleSendMessage}
+              >
+                <MessageCircle size={20} color="#FFFFFF" />
+                <Text style={styles.contactButtonText}>Message</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
-      )}
-    </ScrollView>
+
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: 'rgba(30, 162, 177, 0.1)' }]}>
+              <Car size={20} color="#1ea2b1" />
+            </View>
+            <Text style={styles.statValue}>{driver.transports.length}</Text>
+            <Text style={styles.statLabel}>Active Routes</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+              <Users size={20} color="#10B981" />
+            </View>
+            <Text style={styles.statValue}>{availableSeats}</Text>
+            <Text style={styles.statLabel}>Seats Available</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
+              <TrendingUp size={20} color="#F59E0B" />
+            </View>
+            <Text style={styles.statValue}>{driver.total_trips}</Text>
+            <Text style={styles.statLabel}>Total Trips</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
+              <Calendar size={20} color="#8B5CF6" />
+            </View>
+            <Text style={styles.statValue}>{memberSince}</Text>
+            <Text style={styles.statLabel}>Since</Text>
+          </View>
+        </View>
+
+        {/* Contact Information */}
+        {(profile.phone || profile.email) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Contact Info</Text>
+            <View style={styles.contactGrid}>
+              {profile.phone && (
+                <TouchableOpacity 
+                  style={styles.contactInfoCard}
+                  onPress={() => handleContact('phone')}
+                >
+                  <View style={styles.contactIcon}>
+                    <Phone size={20} color="#1ea2b1" />
+                  </View>
+                  <View style={styles.contactDetails}>
+                    <Text style={styles.contactType}>Phone</Text>
+                    <Text style={styles.contactValue}>{profile.phone}</Text>
+                  </View>
+                  <ChevronRight size={18} color="#6B7280" />
+                </TouchableOpacity>
+              )}
+              
+              {profile.email && (
+                <TouchableOpacity 
+                  style={styles.contactInfoCard}
+                  onPress={() => handleContact('email')}
+                >
+                  <View style={styles.contactIcon}>
+                    <MailIcon size={20} color="#1ea2b1" />
+                  </View>
+                  <View style={styles.contactDetails}>
+                    <Text style={styles.contactType}>Email</Text>
+                    <Text style={styles.contactValue}>{profile.email}</Text>
+                  </View>
+                  <ChevronRight size={18} color="#6B7280" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Driver Details */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Driver Details</Text>
+          <View style={styles.detailsGrid}>
+            <View style={styles.detailItem}>
+              <CarIcon size={18} color="#6B7280" />
+              <Text style={styles.detailLabel}>Vehicle</Text>
+              <Text style={styles.detailValue}>{driver.vehicle_type || 'Not specified'}</Text>
+            </View>
+            
+            <View style={styles.detailItem}>
+              <FileText size={18} color="#6B7280" />
+              <Text style={styles.detailLabel}>License</Text>
+              <Text style={styles.detailValue}>
+                {driver.license_number ? 'Verified' : 'Not provided'}
+              </Text>
+            </View>
+            
+            <View style={styles.detailItem}>
+              <Shield size={18} color="#6B7280" />
+              <Text style={styles.detailLabel}>Status</Text>
+              <Text style={[styles.detailValue, 
+                driver.is_active ? styles.activeStatus : styles.inactiveStatus
+              ]}>
+                {driver.is_active ? 'Active' : 'Inactive'}
+              </Text>
+            </View>
+            
+            <View style={styles.detailItem}>
+              <Award size={18} color="#6B7280" />
+              <Text style={styles.detailLabel}>Verified</Text>
+              <Text style={[styles.detailValue, 
+                driver.is_verified ? styles.verifiedStatus : styles.unverifiedStatus
+              ]}>
+                {driver.is_verified ? 'Yes' : 'No'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Available Transports */}
+        {driver.transports.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Available Transports</Text>
+              <Text style={styles.sectionSubtitle}>
+                {driver.transports.length} routes • {availableSeats}/{totalCapacity} seats
+              </Text>
+            </View>
+            
+            <View style={styles.transportsList}>
+              {driver.transports.map((transport) => (
+                <TouchableOpacity
+                  key={transport.id}
+                  style={styles.transportCard}
+                  onPress={() => handleViewTransport(transport.id)}
+                >
+                  <View style={styles.transportHeader}>
+                    <View style={styles.transportIcon}>
+                      <Car size={18} color="#1ea2b1" />
+                    </View>
+                    <View style={styles.transportInfo}>
+                      <Text style={styles.transportName}>{transport.school_name}</Text>
+                      <View style={styles.transportLocation}>
+                        <MapPin size={14} color="#6B7280" />
+                        <Text style={styles.transportArea}>{transport.school_area}</Text>
+                      </View>
+                    </View>
+                    <ChevronRight size={20} color="#6B7280" />
+                  </View>
+                  
+                  <View style={styles.transportDetails}>
+                    <View style={styles.transportDetail}>
+                      <Users size={16} color="#6B7280" />
+                      <Text style={styles.transportDetailText}>
+                        {transport.current_riders}/{transport.capacity} seats
+                      </Text>
+                    </View>
+                    
+                    {transport.price_per_month > 0 && (
+                      <View style={styles.transportDetail}>
+                        <Text style={styles.transportPrice}>
+                          {formatToRands(transport.price_per_month)}/month
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  
+                  {transport.is_verified && (
+                    <View style={styles.transportVerified}>
+                      <CheckCircle size={14} color="#10B981" />
+                      <Text style={styles.transportVerifiedText}>Verified Route</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Reviews */}
+        {driver.reviews.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Reviews</Text>
+              <Text style={styles.sectionSubtitle}>
+                {driver.reviews.length} total • {averageRating.toFixed(1)} avg rating
+              </Text>
+            </View>
+            
+            <View style={styles.reviewsList}>
+              {driver.reviews.slice(0, 2).map((review) => (
+                <View key={review.id} style={styles.reviewCard}>
+                  <View style={styles.reviewHeader}>
+                    <View style={styles.reviewerAvatar}>
+                      <Text style={styles.reviewerInitials}>
+                        {review.reviewer.first_name?.[0]}{review.reviewer.last_name?.[0]}
+                      </Text>
+                    </View>
+                    <View style={styles.reviewerInfo}>
+                      <Text style={styles.reviewerName}>
+                        {review.reviewer.first_name} {review.reviewer.last_name}
+                      </Text>
+                      <Text style={styles.reviewDate}>
+                        {new Date(review.created_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}
+                      </Text>
+                    </View>
+                    <View style={styles.reviewRating}>
+                      <Star size={14} color="#FBBF24" fill="#FBBF24" />
+                      <Text style={styles.reviewRatingText}>{review.rating.toFixed(1)}</Text>
+                    </View>
+                  </View>
+                  
+                  {review.comment && (
+                    <Text style={styles.reviewComment} numberOfLines={3}>
+                      {review.comment}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+            
+            {driver.reviews.length > 2 && (
+              <TouchableOpacity 
+                style={styles.viewAllButton}
+                onPress={() => router.push(`/driver/${id}/reviews`)}
+              >
+                <Text style={styles.viewAllText}>
+                  View all {driver.reviews.length} reviews
+                </Text>
+                <ChevronRight size={18} color="#1ea2b1" />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Safety Note */}
+        <View style={styles.safetyNote}>
+          <Shield size={20} color="#10B981" />
+          <Text style={styles.safetyText}>
+            All drivers are verified and background checked for your safety
+          </Text>
+        </View>
+        
+        {/* Spacer for bottom padding */}
+        <View style={styles.spacer} />
+      </ScrollView>
+    </View>
   );
 }
 
@@ -478,6 +853,37 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  header: {
+    position: 'absolute',
+    top: 40,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    zIndex: 100,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(30, 30, 30, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  messageHeaderButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(30, 30, 30, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(30, 162, 177, 0.3)',
   },
   loadingContainer: {
     flex: 1,
@@ -488,218 +894,315 @@ const styles = StyleSheet.create({
   loadingText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '500',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 32,
     backgroundColor: '#000000',
-    padding: 20,
   },
-  errorText: {
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: '700',
     color: '#FFFFFF',
-    fontSize: 18,
-    marginBottom: 20,
+    marginBottom: 12,
+    textAlign: 'center',
   },
-  header: {
-    backgroundColor: '#111111',
+  errorMessage: {
+    fontSize: 16,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 22,
+  },
+  primaryButton: {
+    backgroundColor: '#1ea2b1',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+    minWidth: 160,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  scrollContainer: {
+    flex: 1,
+    paddingTop: 100,
+  },
+  heroSection: {
     padding: 24,
-    paddingTop: 60,
     borderBottomWidth: 1,
-    borderBottomColor: '#222222',
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
-  backButton: {
-    position: 'absolute',
-    top: 60,
-    left: 24,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#222222',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  profileHeader: {
+  heroContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 20,
+    marginBottom: 24,
   },
-  avatar: {
+  heroAvatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    marginRight: 16,
+    marginRight: 20,
+    borderWidth: 3,
+    borderColor: '#1ea2b1',
   },
-  avatarPlaceholder: {
+  heroAvatarPlaceholder: {
     width: 80,
     height: 80,
     borderRadius: 40,
     backgroundColor: '#1ea2b1',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: 20,
+    borderWidth: 3,
+    borderColor: 'rgba(30, 162, 177, 0.3)',
   },
-  avatarText: {
+  avatarInitials: {
     color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
   },
-  profileInfo: {
+  heroInfo: {
     flex: 1,
   },
-  name: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  ratingContainer: {
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  heroName: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginRight: 8,
+  },
+  verifiedIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  ratingStars: {
+    flexDirection: 'row',
+    marginRight: 8,
   },
   ratingText: {
-    color: '#CCCCCC',
-    marginLeft: 6,
     fontSize: 14,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
+  heroSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
   },
-  verifiedText: {
-    color: '#10B981',
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    marginTop: 24,
-    gap: 12,
-  },
-  editButton: {
-    flex: 1,
+  editProfileButton: {
     backgroundColor: '#1ea2b1',
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
   },
-  editButtonText: {
+  editProfileButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
-  messageButton: {
+  contactButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  contactButton: {
     flex: 1,
-    backgroundColor: '#333333',
-    paddingVertical: 12,
+    backgroundColor: '#1ea2b1',
+    paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
   },
-  messageButtonText: {
+  messageButton: {
+    backgroundColor: '#374151',
+  },
+  contactButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
+  statsGrid: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  statIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
   section: {
-    padding: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#222222',
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#FFFFFF',
-    marginBottom: 16,
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   contactGrid: {
     gap: 12,
   },
-  contactItem: {
+  contactInfoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#111111',
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
-  contactText: {
-    color: '#FFFFFF',
+  contactIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  contactDetails: {
+    flex: 1,
+  },
+  contactType: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  contactValue: {
     fontSize: 16,
-    marginLeft: 12,
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
-  infoGrid: {
+  detailsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginBottom: 16,
   },
-  infoItem: {
-    width: '48%',
-    backgroundColor: '#111111',
+  detailItem: {
+    width: (width - 52) / 2,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
-  infoLabel: {
-    color: '#888888',
+  detailLabel: {
     fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
     marginTop: 8,
     marginBottom: 4,
   },
-  infoValue: {
+  detailValue: {
+    fontSize: 15,
     color: '#FFFFFF',
-    fontSize: 14,
     fontWeight: '600',
   },
-  bioContainer: {
-    backgroundColor: '#111111',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#333333',
-    marginTop: 12,
+  activeStatus: {
+    color: '#10B981',
   },
-  bioText: {
-    color: '#CCCCCC',
-    fontSize: 14,
-    lineHeight: 20,
+  inactiveStatus: {
+    color: '#EF4444',
+  },
+  verifiedStatus: {
+    color: '#10B981',
+  },
+  unverifiedStatus: {
+    color: '#6B7280',
+  },
+  transportsList: {
+    gap: 12,
   },
   transportCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#111111',
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  transportHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
+  },
+  transportIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   transportInfo: {
     flex: 1,
   },
   transportName: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
+  transportLocation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   transportArea: {
-    color: '#888888',
     fontSize: 14,
-    marginBottom: 8,
+    color: '#6B7280',
+    marginLeft: 4,
   },
   transportDetails: {
     flexDirection: 'row',
@@ -712,54 +1215,83 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   transportDetailText: {
-    color: '#888888',
-    fontSize: 12,
+    fontSize: 14,
+    color: '#9CA3AF',
   },
   transportPrice: {
-    color: '#1ea2b1',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
+    color: '#1ea2b1',
+  },
+  transportVerified: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  transportVerifiedText: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+  reviewsList: {
+    gap: 12,
   },
   reviewCard: {
-    backgroundColor: '#111111',
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#333333',
-    marginBottom: 12,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   reviewHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  reviewerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#1ea2b1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  reviewerInitials: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   reviewerInfo: {
     flex: 1,
   },
   reviewerName: {
-    color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
+    color: '#FFFFFF',
     marginBottom: 2,
   },
   reviewDate: {
-    color: '#888888',
     fontSize: 12,
+    color: '#6B7280',
   },
   reviewRating: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  ratingNumber: {
-    color: '#FFFFFF',
+  reviewRatingText: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#FFFFFF',
   },
   reviewComment: {
-    color: '#CCCCCC',
     fontSize: 14,
+    color: '#D1D5DB',
     lineHeight: 20,
   },
   viewAllButton: {
@@ -767,15 +1299,153 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
-    backgroundColor: '#111111',
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    marginTop: 8,
   },
   viewAllText: {
-    color: '#1ea2b1',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
+    color: '#1ea2b1',
     marginRight: 8,
+  },
+  safetyNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    padding: 16,
+    marginHorizontal: 20,
+    marginBottom: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    gap: 12,
+  },
+  safetyText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#10B981',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  spacer: {
+    height: 100,
+  },
+  // Skeleton Loading Styles
+  skeletonAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginRight: 20,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    overflow: 'hidden',
+  },
+  skeletonInner: {
+    flex: 1,
+    backgroundColor: 'rgba(60, 60, 60, 0.5)',
+  },
+  skeletonText: {
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  skeletonButton: {
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  skeletonStatIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    marginBottom: 12,
+  },
+  skeletonContactCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    padding: 16,
+    borderRadius: 12,
+  },
+  skeletonContactIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    marginRight: 12,
+  },
+  skeletonContactDetails: {
+    flex: 1,
+    gap: 4,
+  },
+  skeletonDetailItem: {
+    width: (width - 52) / 2,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    padding: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  skeletonIcon: {
+    width: 18,
+    height: 18,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    borderRadius: 4,
+  },
+  skeletonTransportCard: {
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
+  skeletonTransportHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  skeletonTransportIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    marginRight: 12,
+  },
+  skeletonTransportInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  skeletonTransportDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  skeletonReviewCard: {
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
+  skeletonReviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  skeletonReviewerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    marginRight: 12,
+  },
+  skeletonReviewerInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  skeletonCard: {
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    padding: 16,
+    borderRadius: 12,
+  },
+  skeletonCardContent: {
+    gap: 4,
   },
 });
