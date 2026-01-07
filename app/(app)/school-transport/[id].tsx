@@ -83,108 +83,298 @@ export default function TransportDetailsScreen() {
   const [hasApplied, setHasApplied] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
 
+  console.log('🚀 TransportDetailsScreen mounted with ID:', id);
+  console.log('📱 User:', user?.id ? 'Logged in' : 'Not logged in');
+
   useEffect(() => {
+    console.log('🔍 useEffect triggered, ID:', id);
     if (id) {
       fetchTransportDetails();
       checkIfApplied();
+    } else {
+      console.error('❌ No ID provided in URL params');
+      setLoading(false);
     }
   }, [id, user]);
 
-  const fetchTransportDetails = async () => {
-    try {
-      setLoading(true);
-      
-      console.log('Fetching transport details for ID:', id);
-      
-      const { data, error } = await supabase
-        .from('school_transports')
-        .select(`
-          *,
-          driver:driver_id (
-            id,
-            user_id,
-            is_verified,
-            profiles (
-              first_name,
-              last_name,
-              rating,
-              total_trips,
-              phone,
-              email,
-              avatar_url
-            )
-          )
-        `)
-        .eq('id', id)
-        .single();
-
-      console.log('Query result:', { 
-        hasData: !!data,
-        error: error?.message,
-        errorCode: error?.code 
-      });
-
-      if (error) {
-        console.error('Error fetching transport details:', error);
-        
-        // If transport not found, still set null and let UI handle it
-        setTransport(null);
-        return;
-      }
-
-      if (data) {
-        // Safely format the data, handling missing fields
-        const formattedTransport: SchoolTransport = {
-          id: data.id || '',
-          school_name: data.school_name || 'Unknown School',
-          school_area: data.school_area || 'Unknown Area',
-          pickup_areas: Array.isArray(data.pickup_areas) ? data.pickup_areas : (data.pickup_areas ? [data.pickup_areas] : []),
-          pickup_times: Array.isArray(data.pickup_times) ? data.pickup_times : (data.pickup_times ? [data.pickup_times] : []),
-          capacity: data.capacity || 0,
-          current_riders: data.current_riders || 0,
-          price_per_month: data.price_per_month || 0,
-          price_per_week: data.price_per_week || 0,
-          vehicle_info: data.vehicle_info || '',
-          vehicle_type: data.vehicle_type || 'Standard Vehicle',
-          features: Array.isArray(data.features) ? data.features : [],
-          description: data.description || '',
-          is_verified: data.is_verified || false,
-          created_at: data.created_at || new Date().toISOString(),
-          updated_at: data.updated_at || new Date().toISOString(),
-          driver: {
-            id: data.driver?.id || '',
-            user_id: data.driver?.user_id || '',
-            is_verified: data.driver?.is_verified || false,
-            profiles: {
-              first_name: data.driver?.profiles?.first_name || 'Unknown',
-              last_name: data.driver?.profiles?.last_name || 'Driver',
-              rating: data.driver?.profiles?.rating || 0,
-              total_trips: data.driver?.profiles?.total_trips || 0,
-              phone: data.driver?.profiles?.phone,
-              email: data.driver?.profiles?.email,
-              avatar_url: data.driver?.profiles?.avatar_url
-            }
-          }
-        };
-        
-        console.log('Formatted transport:', formattedTransport);
-        setTransport(formattedTransport);
-      } else {
-        setTransport(null);
-      }
-    } catch (error) {
-      console.error('Error:', error);
+const fetchTransportDetails = async () => {
+  try {
+    console.log('📡 ===== STARTING FETCH =====');
+    console.log('🔍 ID from URL:', id);
+    console.log('🔍 ID type:', typeof id);
+    console.log('🔍 ID length:', id?.length);
+    
+    // Check if ID is valid
+    if (!id) {
+      console.error('❌ No ID provided');
       setTransport(null);
-    } finally {
       setLoading(false);
-      setRefreshing(false);
+      return;
+    }
+
+    // If ID is an array, take the first element
+    const transportId = Array.isArray(id) ? id[0] : id;
+    console.log('🔍 Using transportId:', transportId);
+
+    setLoading(true);
+
+    // STEP 1: First, let's check if we can access the table at all
+    console.log('🔍 STEP 1: Testing basic table access...');
+    const { data: testData, error: testError } = await supabase
+      .from('school_transports')
+      .select('id, school_name')
+      .limit(1);
+
+    console.log('📊 Basic table test:', {
+      hasData: !!testData,
+      dataCount: testData?.length,
+      error: testError,
+      errorMessage: testError?.message
+    });
+
+    // STEP 2: Try a SIMPLE query first - just get the transport without joins
+    console.log('🔍 STEP 2: Trying simple transport query...');
+    const { data: transportData, error: transportError } = await supabase
+      .from('school_transports')
+      .select('*')
+      .eq('id', transportId)
+      .single();
+
+    console.log('📊 Simple transport query:', {
+      success: !transportError,
+      hasData: !!transportData,
+      error: transportError,
+      errorMessage: transportError?.message,
+      errorCode: transportError?.code,
+      dataKeys: transportData ? Object.keys(transportData) : []
+    });
+
+    if (transportError) {
+      console.error('❌ Failed to fetch transport:', {
+        code: transportError.code,
+        message: transportError.message,
+        details: transportError.details,
+        hint: transportError.hint
+      });
+      
+      // Check if it's a "no rows" error
+      if (transportError.code === 'PGRST116') {
+        console.log('⚠️ No transport found with ID:', transportId);
+        
+        // Let's check what IDs exist in the database
+        const { data: allTransports } = await supabase
+          .from('school_transports')
+          .select('id, school_name')
+          .limit(5);
+        
+        console.log('📊 Available transports:', allTransports);
+      }
+      
+      setTransport(null);
+      return;
+    }
+
+    if (!transportData) {
+      console.log('⚠️ No transport data returned');
+      setTransport(null);
+      return;
+    }
+
+    console.log('✅ Transport data received:', {
+      id: transportData.id,
+      school_name: transportData.school_name,
+      driver_id: transportData.driver_id,
+      pickup_areas: transportData.pickup_areas,
+      capacity: transportData.capacity
+    });
+
+    // STEP 3: Now get driver information
+    console.log('🔍 STEP 3: Fetching driver information...');
+    const { data: driverData, error: driverError } = await supabase
+      .from('drivers')
+      .select(`
+        *,
+        profiles (*)
+      `)
+      .eq('id', transportData.driver_id)
+      .single();
+
+    console.log('📊 Driver query:', {
+      success: !driverError,
+      hasData: !!driverData,
+      error: driverError,
+      driverId: transportData.driver_id,
+      data: driverData
+    });
+
+    // STEP 4: Format the complete transport object
+    console.log('🔍 STEP 4: Formatting complete transport object...');
+    
+    let driverInfo = null;
+    let profilesInfo = null;
+    
+    if (driverData) {
+      driverInfo = driverData;
+      
+      // Handle profiles data (could be array or object)
+      if (Array.isArray(driverData.profiles) && driverData.profiles.length > 0) {
+        profilesInfo = driverData.profiles[0];
+      } else if (driverData.profiles && typeof driverData.profiles === 'object') {
+        profilesInfo = driverData.profiles;
+      }
+      
+      console.log('📊 Extracted driver info:', {
+        driverId: driverInfo.id,
+        hasProfiles: !!profilesInfo,
+        profileName: profilesInfo ? `${profilesInfo.first_name} ${profilesInfo.last_name}` : 'No profile'
+      });
+    }
+
+    const formattedTransport: SchoolTransport = {
+      id: transportData.id || '',
+      school_name: transportData.school_name || 'Unknown School',
+      school_area: transportData.school_area || 'Unknown Area',
+      pickup_areas: Array.isArray(transportData.pickup_areas) 
+        ? transportData.pickup_areas 
+        : (transportData.pickup_areas ? [transportData.pickup_areas] : []),
+      pickup_times: Array.isArray(transportData.pickup_times) 
+        ? transportData.pickup_times 
+        : (transportData.pickup_times ? [transportData.pickup_times] : []),
+      capacity: transportData.capacity || 0,
+      current_riders: transportData.current_riders || 0,
+      price_per_month: transportData.price_per_month || 0,
+      price_per_week: transportData.price_per_week || 0,
+      vehicle_info: transportData.vehicle_info || '',
+      vehicle_type: transportData.vehicle_type || 'Standard Vehicle',
+      features: Array.isArray(transportData.features) ? transportData.features : [],
+      description: transportData.description || '',
+      is_verified: transportData.is_verified || false,
+      created_at: transportData.created_at || new Date().toISOString(),
+      updated_at: transportData.updated_at || new Date().toISOString(),
+      driver: {
+        id: driverInfo?.id || transportData.driver_id || '',
+        user_id: driverInfo?.user_id || '',
+        is_verified: driverInfo?.is_verified || false,
+        profiles: {
+          first_name: profilesInfo?.first_name || 'Unknown',
+          last_name: profilesInfo?.last_name || 'Driver',
+          rating: driverInfo?.rating || 0,
+          total_trips: driverInfo?.total_trips || 0,
+          phone: profilesInfo?.phone,
+          email: profilesInfo?.email,
+          avatar_url: profilesInfo?.avatar_url
+        }
+      }
+    };
+
+    console.log('✅ ===== FORMATTED TRANSPORT =====');
+    console.log('🏫 School:', formattedTransport.school_name);
+    console.log('📍 Area:', formattedTransport.school_area);
+    console.log('👤 Driver:', `${formattedTransport.driver.profiles.first_name} ${formattedTransport.driver.profiles.last_name}`);
+    console.log('💺 Capacity:', `${formattedTransport.current_riders}/${formattedTransport.capacity}`);
+    console.log('💰 Price:', `$${formattedTransport.price_per_month}/month`);
+    console.log('📋 Pickup areas:', formattedTransport.pickup_areas.length);
+    console.log('🕐 Pickup times:', formattedTransport.pickup_times.length);
+    console.log('==============================');
+
+    setTransport(formattedTransport);
+
+  } catch (error) {
+    console.error('❌ ===== UNEXPECTED ERROR =====');
+    console.error('Error:', error);
+    console.error('Error name:', error instanceof Error ? error.name : 'Unknown');
+    console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
+    console.error('Error stack:', error instanceof Error ? error.stack : undefined);
+    console.error('==============================');
+    
+    setTransport(null);
+  } finally {
+    console.log('🏁 fetchTransportDetails completed');
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
+
+// Helper function to format transport data
+const formatTransportData = (data: any): SchoolTransport => {
+  console.log('🔧 Formatting transport data...', {
+    rawData: data,
+    driversType: typeof data.drivers,
+    driversIsArray: Array.isArray(data.drivers)
+  });
+
+  // Handle driver data - it could be an array or object
+  let driverInfo = null;
+  
+  if (Array.isArray(data.drivers) && data.drivers.length > 0) {
+    driverInfo = data.drivers[0];
+  } else if (data.drivers && typeof data.drivers === 'object') {
+    driverInfo = data.drivers;
+  }
+  
+  console.log('🔧 Extracted driver info:', driverInfo);
+
+  // Handle profiles data
+  let profilesInfo = null;
+  if (driverInfo) {
+    if (Array.isArray(driverInfo.profiles) && driverInfo.profiles.length > 0) {
+      profilesInfo = driverInfo.profiles[0];
+    } else if (driverInfo.profiles && typeof driverInfo.profiles === 'object') {
+      profilesInfo = driverInfo.profiles;
+    }
+  }
+
+  const formattedTransport: SchoolTransport = {
+    id: data.id || '',
+    school_name: data.school_name || 'Unknown School',
+    school_area: data.school_area || 'Unknown Area',
+    pickup_areas: Array.isArray(data.pickup_areas) ? data.pickup_areas : (data.pickup_areas ? [data.pickup_areas] : []),
+    pickup_times: Array.isArray(data.pickup_times) ? data.pickup_times : (data.pickup_times ? [data.pickup_times] : []),
+    capacity: data.capacity || 0,
+    current_riders: data.current_riders || 0,
+    price_per_month: data.price_per_month || 0,
+    price_per_week: data.price_per_week || 0,
+    vehicle_info: data.vehicle_info || '',
+    vehicle_type: data.vehicle_type || 'Standard Vehicle',
+    features: Array.isArray(data.features) ? data.features : [],
+    description: data.description || '',
+    is_verified: data.is_verified || false,
+    created_at: data.created_at || new Date().toISOString(),
+    updated_at: data.updated_at || new Date().toISOString(),
+    driver: {
+      id: driverInfo?.id || data.driver_id || '',
+      user_id: driverInfo?.user_id || '',
+      is_verified: driverInfo?.is_verified || false,
+      profiles: {
+        first_name: profilesInfo?.first_name || 'Unknown',
+        last_name: profilesInfo?.last_name || 'Driver',
+        rating: driverInfo?.rating || 0,
+        total_trips: driverInfo?.total_trips || 0,
+        phone: profilesInfo?.phone,
+        email: profilesInfo?.email,
+        avatar_url: profilesInfo?.avatar_url
+      }
     }
   };
 
+  console.log('✅ Formatted transport:', {
+    schoolName: formattedTransport.school_name,
+    driverName: `${formattedTransport.driver.profiles.first_name} ${formattedTransport.driver.profiles.last_name}`,
+    hasPickupAreas: formattedTransport.pickup_areas.length
+  });
+
+  return formattedTransport;
+};
+
   const checkIfApplied = async () => {
-    if (!user) return;
+    console.log('🔍 Checking if user has applied...');
+    if (!user) {
+      console.log('👤 No user, skipping application check');
+      return;
+    }
 
     try {
+      console.log('📡 Querying transport_requests for user:', user.id);
       const { data, error } = await supabase
         .from('transport_requests')
         .select('id, status')
@@ -192,25 +382,42 @@ export default function TransportDetailsScreen() {
         .eq('user_id', user.id)
         .single();
 
+      console.log('📊 Application check result:', {
+        hasData: !!data,
+        data: data,
+        error: error,
+        errorCode: error?.code
+      });
+
       if (error && error.code !== 'PGRST116') { // PGRST116 means no rows returned
-        console.error('Error checking application:', error);
+        console.error('❌ Error checking application:', error);
+      } else if (error?.code === 'PGRST116') {
+        console.log('✅ User has not applied to this transport');
+      } else {
+        console.log('✅ User has applied, application ID:', data?.id);
       }
 
       setHasApplied(!!data);
     } catch (error) {
-      console.error('Error checking application:', error);
+      console.error('❌ Unexpected error in checkIfApplied:', error);
     }
   };
 
   const onRefresh = () => {
+    console.log('🔄 Manual refresh triggered');
     setRefreshing(true);
     fetchTransportDetails();
   };
 
   const handleApply = () => {
-    if (!transport) return;
+    console.log('📝 Apply button pressed');
+    if (!transport) {
+      console.error('❌ Cannot apply - no transport data');
+      return;
+    }
     
     if (transport.current_riders >= transport.capacity) {
+      console.log('⚠️ Transport is at full capacity');
       Alert.alert(
         'Full Capacity',
         'This transport service has reached its maximum capacity',
@@ -220,6 +427,7 @@ export default function TransportDetailsScreen() {
     }
 
     if (hasApplied) {
+      console.log('⚠️ User has already applied');
       Alert.alert(
         'Already Applied',
         'You have already applied to this transport service',
@@ -228,6 +436,7 @@ export default function TransportDetailsScreen() {
       return;
     }
 
+    console.log('➡️ Navigating to application form');
     // Navigate to application form
     router.push({
       pathname: '/transport-application',
@@ -241,11 +450,14 @@ export default function TransportDetailsScreen() {
   };
 
   const handleContactDriver = () => {
+    console.log('📞 Contact driver pressed');
     if (!transport || !transport.driver.profiles.phone) {
+      console.log('⚠️ No phone number available');
       Alert.alert('Contact Information', 'Phone number not available for this driver');
       return;
     }
 
+    console.log('📲 Calling driver:', transport.driver.profiles.phone);
     Alert.alert(
       'Contact Driver',
       `Call ${transport.driver.profiles.first_name}?`,
@@ -260,45 +472,55 @@ export default function TransportDetailsScreen() {
   };
 
   const handleMessageDriver = () => {
+    console.log('💬 Message driver pressed');
     if (!user) {
+      console.log('⚠️ User not logged in');
       Alert.alert('Sign In Required', 'Please sign in to message the driver');
       return;
     }
 
     if (transport) {
+      console.log('➡️ Navigating to chat with driver:', transport.driver.id);
       router.push(`/chat/${transport.driver.id}`);
     }
   };
 
   const handleViewDriverProfile = () => {
+    console.log('👤 View driver profile pressed');
     if (transport) {
+      console.log('➡️ Navigating to driver profile:', transport.driver.id);
       router.push(`/driver/${transport.driver.id}`);
     }
   };
 
   const handleShare = async () => {
+    console.log('📤 Share pressed');
     if (!transport) return;
 
     try {
+      console.log('📲 Sharing transport:', transport.id);
       await Share.share({
         message: `Check out this school transport service for ${transport.school_name} in ${transport.school_area}. Available seats: ${transport.capacity - transport.current_riders}/${transport.capacity}`,
         url: `https://mobile.uthutho.co.za/school-transport/${transport.id}`,
         title: `Transport Service: ${transport.school_name}`
       });
     } catch (error) {
-      console.error('Error sharing:', error);
+      console.error('❌ Error sharing:', error);
     }
   };
 
   const handleOpenMaps = (area: string) => {
+    console.log('🗺️ Opening maps for area:', area);
     const encodedArea = encodeURIComponent(area);
     const url = `https://maps.google.com/?q=${encodedArea}`;
     Linking.openURL(url).catch(() => {
+      console.error('❌ Failed to open maps');
       Alert.alert('Error', 'Unable to open maps');
     });
   };
 
   const handleReportIssue = () => {
+    console.log('🚨 Report issue pressed');
     Alert.alert(
       'Report Issue',
       'Select an issue to report',
@@ -313,6 +535,7 @@ export default function TransportDetailsScreen() {
   };
 
   const reportIssue = async (type: string) => {
+    console.log('📝 Submitting report type:', type);
     try {
       const { error } = await supabase
         .from('reports')
@@ -323,20 +546,28 @@ export default function TransportDetailsScreen() {
           status: 'pending'
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error submitting report:', error);
+        throw error;
+      }
 
+      console.log('✅ Report submitted successfully');
       Alert.alert('Report Submitted', 'Thank you for your report. We will review it shortly.');
     } catch (error) {
-      console.error('Error submitting report:', error);
+      console.error('❌ Error submitting report:', error);
       Alert.alert('Error', 'Failed to submit report');
     }
   };
 
   const handleGoBack = () => {
+    console.log('⬅️ Go back pressed');
     router.back();
   };
 
+  console.log('🔄 Render - loading:', loading, 'transport:', !!transport);
+
   if (loading) {
+    console.log('⏳ Showing loading state');
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -355,6 +586,7 @@ export default function TransportDetailsScreen() {
   }
 
   if (!transport) {
+    console.log('❌ No transport data, showing empty state');
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -388,6 +620,13 @@ export default function TransportDetailsScreen() {
   const driverName = `${transport.driver.profiles.first_name} ${transport.driver.profiles.last_name}`;
   const driverRating = transport.driver.profiles.rating || 0;
   const driverTrips = transport.driver.profiles.total_trips || 0;
+
+  console.log('✅ Rendering transport details:', {
+    schoolName: transport.school_name,
+    availableSeats,
+    driverName,
+    hasDriverProfile: !!transport.driver.id
+  });
 
   return (
     <View style={styles.container}>
