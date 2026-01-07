@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { useTheme } from '../../context/ThemeContext';
 import {
@@ -12,7 +12,10 @@ import {
   Linkedin,
   Facebook,
   Instagram,
-  MessageCircle
+  MessageCircle,
+  Car,
+  // Use BarChart3 instead of Dashboard if Dashboard doesn't exist
+  Activity 
 } from 'lucide-react-native';
 import {
   Pressable,
@@ -22,8 +25,11 @@ import {
   Animated,
   Image,
   Easing,
-  Linking
+  Linking,
+  ActivityIndicator
 } from 'react-native';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hook/useAuth';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -36,7 +42,7 @@ const FallbackIcon = ({ color, size }) => (
 const VISIBLE_DRAWER_SCREENS = [
   '(tabs)',
   'Leaderboard',
-  'trips', // Changed from 'ai' to 'trips'
+  'trips',
   'profile',
   'settings',
   'help'
@@ -45,6 +51,11 @@ const VISIBLE_DRAWER_SCREENS = [
 // Custom Drawer Content
 const CustomDrawerContent = (props) => {
   const { colors } = useTheme();
+  const { user } = useAuth();
+  
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [isDriver, setIsDriver] = useState(false);
+  const [loadingRole, setLoadingRole] = useState(true);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -57,6 +68,60 @@ const CustomDrawerContent = (props) => {
       useNativeDriver: true,
     }).start();
   }, []);
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!user) {
+        setLoadingRole(false);
+        return;
+      }
+
+      try {
+        // First check user_roles table
+        const { data: userRoles, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (rolesError && rolesError.code !== 'PGRST116') { // PGRST116 means no rows found
+          console.error('Error fetching user roles:', rolesError);
+        }
+
+        if (userRoles) {
+          setUserRole(userRoles.role);
+          setIsDriver(userRoles.role === 'driver');
+        } else {
+          // Fallback: check if user exists in drivers table
+          const { data: driverData, error: driverError } = await supabase
+            .from('drivers')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (driverError && driverError.code !== 'PGRST116') {
+            console.error('Error checking driver status:', driverError);
+          }
+
+          if (driverData) {
+            setUserRole('driver');
+            setIsDriver(true);
+          } else {
+            setUserRole('user');
+            setIsDriver(false);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user role:', error);
+        setUserRole('user');
+        setIsDriver(false);
+      } finally {
+        setLoadingRole(false);
+      }
+    };
+
+    fetchUserRole();
+  }, [user]);
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
@@ -76,6 +141,57 @@ const CustomDrawerContent = (props) => {
 
   const visibleRoutes = props.state.routes.filter(route =>
     VISIBLE_DRAWER_SCREENS.includes(route.name)
+  );
+
+  const handleDriverAction = () => {
+    if (isDriver) {
+      // Navigate to driver dashboard
+      props.navigation.navigate('/driver/dashboard');
+    } else {
+      // Navigate to driver onboarding
+      props.navigation.navigate('driver-onboarding');
+    }
+  };
+
+  // Create a Dashboard icon component if BarChart3 isn't appropriate
+  const DashboardIcon = ({ color, size }) => (
+    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{
+        width: size - 4,
+        height: size - 4,
+        borderRadius: 4,
+        backgroundColor: color,
+        position: 'relative'
+      }}>
+        <View style={{
+          position: 'absolute',
+          top: 4,
+          left: 4,
+          right: 4,
+          height: 6,
+          backgroundColor: '#FFFFFF',
+          borderRadius: 2,
+        }} />
+        <View style={{
+          position: 'absolute',
+          top: 14,
+          left: 4,
+          right: 4,
+          height: 4,
+          backgroundColor: '#FFFFFF',
+          borderRadius: 2,
+        }} />
+        <View style={{
+          position: 'absolute',
+          top: 22,
+          left: 4,
+          right: 4,
+          height: 8,
+          backgroundColor: '#FFFFFF',
+          borderRadius: 2,
+        }} />
+      </View>
+    </View>
   );
 
   return (
@@ -162,6 +278,74 @@ const CustomDrawerContent = (props) => {
             </AnimatedPressable>
           );
         })}
+
+        {/* Driver Section */}
+        {!loadingRole && (
+          <AnimatedPressable
+            onPress={handleDriverAction}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            style={[
+              styles.drawerItem,
+              styles.driverItem,
+              {
+                transform: [{ scale: scaleAnim }],
+                backgroundColor: isDriver ? 'rgba(30, 162, 177, 0.15)' : 'rgba(139, 92, 246, 0.15)',
+                borderLeftWidth: 4,
+                borderLeftColor: isDriver ? '#1ea2b1' : '#8B5CF6',
+                marginTop: 20,
+              },
+            ]}
+          >
+            <View style={styles.drawerItemContent}>
+              <View
+                style={[
+                  styles.iconContainer,
+                  { backgroundColor: isDriver ? '#1ea2b1' : '#8B5CF6' },
+                ]}
+              >
+                {isDriver ? (
+                  <DashboardIcon color="#FFFFFF" size={22} />
+                ) : (
+                  <Car size={22} color="#FFFFFF" />
+                )}
+              </View>
+              <View>
+                <Text
+                  style={[
+                    styles.drawerLabel,
+                    {
+                      color: isDriver ? '#1ea2b1' : '#8B5CF6',
+                      fontWeight: '600',
+                    },
+                  ]}
+                >
+                  {isDriver ? 'Driver Dashboard' : 'Apply as Driver'}
+                </Text>
+                <Text style={[styles.driverSubtitle, { color: `${colors.text}70` }]}>
+                  {isDriver ? 'Manage your transport services' : 'Get Clients with Uthutho'}
+                </Text>
+              </View>
+            </View>
+            <Activity 
+              size={16}
+              color={isDriver ? '#1ea2b1' : '#8B5CF6'}
+            />
+          </AnimatedPressable>
+        )}
+
+        {loadingRole && (
+          <View style={[styles.drawerItem, styles.loadingItem]}>
+            <View style={styles.drawerItemContent}>
+              <View style={[styles.iconContainer, { backgroundColor: colors.border }]}>
+                <ActivityIndicator size="small" color={colors.text} />
+              </View>
+              <Text style={[styles.drawerLabel, { color: colors.text }]}>
+                Loading...
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Footer */}
@@ -185,6 +369,24 @@ const CustomDrawerContent = (props) => {
             <MessageCircle size={20} color={colors.text} />
           </Pressable>
         </View>
+
+        {/* User Role Badge */}
+        {!loadingRole && userRole && (
+          <View style={[
+            styles.roleBadge,
+            { 
+              backgroundColor: isDriver ? 'rgba(30, 162, 177, 0.2)' : 'rgba(156, 163, 175, 0.2)',
+              borderColor: isDriver ? '#1ea2b1' : '#9CA3AF'
+            }
+          ]}>
+            <Text style={[
+              styles.roleText,
+              { color: isDriver ? '#1ea2b1' : '#9CA3AF' }
+            ]}>
+              {isDriver ? '🚗 Driver' : '👤 User'}
+            </Text>
+          </View>
+        )}
 
         <Text style={[styles.footerText, { color: `${colors.text}40` }]}>
           Version 1.8.2
@@ -247,6 +449,21 @@ export default function AppLayout() {
           drawerIcon: HelpCircle 
         }} 
       />
+      {/* Add driver dashboard screen */}
+      <Drawer.Screen 
+        name="driver-dashboard" 
+        options={{ 
+          title: 'Driver Dashboard', 
+          drawerItemStyle: { display: 'none' } // Hide from drawer items list
+        }} 
+      />
+      <Drawer.Screen 
+        name="driver-onboarding" 
+        options={{ 
+          title: 'Become a Driver', 
+          drawerItemStyle: { display: 'none' } // Hide from drawer items list
+        }} 
+      />
     </Drawer>
   );
 }
@@ -274,11 +491,17 @@ const styles = StyleSheet.create({
   drawerItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 12,
     marginHorizontal: 8,
+    marginVertical: 4,
     borderRadius: 12,
   },
-  drawerItemContent: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  drawerItemContent: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    flex: 1 
+  },
   iconContainer: {
     width: 40,
     height: 40,
@@ -288,17 +511,46 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   drawerLabel: { fontSize: 16 },
-  drawerFooter: { padding: 20, alignItems: 'center' },
-  footerText: { fontSize: 12 },
+  driverSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  drawerFooter: { 
+    padding: 20, 
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  footerText: { 
+    fontSize: 12,
+    marginTop: 8,
+  },
   socialContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 16,
   },
   socialIcon: {
     marginHorizontal: 10,
     padding: 8,
     borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  driverItem: {
+    borderLeftWidth: 4,
+  },
+  loadingItem: {
+    opacity: 0.7,
+  },
+  roleBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  roleText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

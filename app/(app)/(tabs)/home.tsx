@@ -1181,6 +1181,51 @@ export default function HomeScreen() {
         />
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>
+  <Text style={[styles.sectionTitle, { color: colors.text }]}>
+    Services
+  </Text>
+  
+  <View style={styles.servicesGrid}>
+    <TouchableOpacity 
+      style={[styles.serviceCard, { backgroundColor: colors.background }]}
+      onPress={() => router.push('/school-transport')}
+    >
+      <View style={[styles.serviceIcon, { backgroundColor: '#1ea2b1' }]}>
+        <Bus size={24} color="#FFFFFF" />
+      </View>
+      <Text style={[styles.serviceTitle, { color: colors.text }]}>
+        School Transport
+      </Text>
+
+    </TouchableOpacity>
+    
+    <TouchableOpacity 
+      style={[styles.serviceCard, { backgroundColor: colors.background }]}
+      onPress={() => router.push('/carpool')}
+    >
+      <View style={[styles.serviceIcon, { backgroundColor: '#10B981' }]}>
+        <Users size={24} color="#FFFFFF" />
+      </View>
+      <Text style={[styles.serviceTitle, { color: colors.text }]}>
+        Carpool
+      </Text>
+    </TouchableOpacity>
+    
+    <TouchableOpacity 
+      style={[styles.serviceCard, { backgroundColor: colors.background }]}
+      onPress={() => router.push('/long-distance')}
+    >
+      <View style={[styles.serviceIcon, { backgroundColor: '#fbbf24' }]}>
+        <Route size={24} color="#FFFFFF" />
+      </View>
+      <Text style={[styles.serviceTitle, { color: colors.text }]}>
+        Long Distance
+      </Text>
+    </TouchableOpacity>
+  </View>
+</View>
+
+        <View style={[styles.section, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             Your Community
           </Text>
@@ -1973,4 +2018,40 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
   },
+
+  servicesGrid: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  gap: 12,
+},
+serviceCard: {
+  flex: 1,
+  alignItems: 'center',
+  padding: 16,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#333333',
+},
+serviceCardDesktop: {
+  padding: 20,
+  borderRadius: 16,
+},
+serviceIcon: {
+  width: 56,
+  height: 56,
+  borderRadius: 28,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 12,
+},
+serviceTitle: {
+  fontSize: 14,
+  fontWeight: '600',
+  textAlign: 'center',
+  marginBottom: 4,
+},
+serviceSubtitle: {
+  fontSize: 12,
+  textAlign: 'center',
+},
 });
