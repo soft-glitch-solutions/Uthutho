@@ -14,8 +14,7 @@ import {
   Instagram,
   MessageCircle,
   Car,
-  // Use BarChart3 instead of Dashboard if Dashboard doesn't exist
-  Activity 
+  BarChart3
 } from 'lucide-react-native';
 import {
   Pressable,
@@ -84,7 +83,7 @@ const CustomDrawerContent = (props) => {
           .eq('user_id', user.id)
           .maybeSingle();
 
-        if (rolesError && rolesError.code !== 'PGRST116') { // PGRST116 means no rows found
+        if (rolesError && rolesError.code !== 'PGRST116') {
           console.error('Error fetching user roles:', rolesError);
         }
 
@@ -144,55 +143,21 @@ const CustomDrawerContent = (props) => {
   );
 
   const handleDriverAction = () => {
+    console.log('Driver action clicked. Is driver:', isDriver);
+    
     if (isDriver) {
-      // Navigate to driver dashboard
-      props.navigation.navigate('/driver/dashboard');
+      // Navigate to nested driver dashboard
+      console.log('Navigating to driver/dashboard...');
+      props.navigation.navigate('driver', {
+        screen: 'dashboard',
+        initial: false
+      });
     } else {
       // Navigate to driver onboarding
+      console.log('Navigating to driver-onboarding...');
       props.navigation.navigate('driver-onboarding');
     }
   };
-
-  // Create a Dashboard icon component if BarChart3 isn't appropriate
-  const DashboardIcon = ({ color, size }) => (
-    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{
-        width: size - 4,
-        height: size - 4,
-        borderRadius: 4,
-        backgroundColor: color,
-        position: 'relative'
-      }}>
-        <View style={{
-          position: 'absolute',
-          top: 4,
-          left: 4,
-          right: 4,
-          height: 6,
-          backgroundColor: '#FFFFFF',
-          borderRadius: 2,
-        }} />
-        <View style={{
-          position: 'absolute',
-          top: 14,
-          left: 4,
-          right: 4,
-          height: 4,
-          backgroundColor: '#FFFFFF',
-          borderRadius: 2,
-        }} />
-        <View style={{
-          position: 'absolute',
-          top: 22,
-          left: 4,
-          right: 4,
-          height: 8,
-          backgroundColor: '#FFFFFF',
-          borderRadius: 2,
-        }} />
-      </View>
-    </View>
-  );
 
   return (
     <View style={[styles.drawerContainer, { backgroundColor: colors.background }]}>
@@ -232,7 +197,10 @@ const CustomDrawerContent = (props) => {
           return (
             <AnimatedPressable
               key={route.key}
-              onPress={() => props.navigation.navigate(route.name)}
+              onPress={() => {
+                console.log('Navigating to:', route.name);
+                props.navigation.navigate(route.name);
+              }}
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
               style={[
@@ -305,7 +273,7 @@ const CustomDrawerContent = (props) => {
                 ]}
               >
                 {isDriver ? (
-                  <DashboardIcon color="#FFFFFF" size={22} />
+                  <BarChart3 size={22} color="#FFFFFF" />
                 ) : (
                   <Car size={22} color="#FFFFFF" />
                 )}
@@ -327,7 +295,7 @@ const CustomDrawerContent = (props) => {
                 </Text>
               </View>
             </View>
-            <Activity 
+            <ChevronRight
               size={16}
               color={isDriver ? '#1ea2b1' : '#8B5CF6'}
             />
@@ -407,6 +375,7 @@ export default function AppLayout() {
       }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
+      {/* Main Screens */}
       <Drawer.Screen 
         name="(tabs)" 
         options={{ 
@@ -449,19 +418,30 @@ export default function AppLayout() {
           drawerIcon: HelpCircle 
         }} 
       />
-      {/* Add driver dashboard screen */}
+
+      {/* Driver Screens Group */}
       <Drawer.Screen 
-        name="driver-dashboard" 
+        name="driver" 
+        options={{ 
+          title: 'Driver',
+          drawerIcon: Car,
+          drawerItemStyle: { display: 'none' } // Hide from drawer list
+        }} 
+      />
+
+      {/* Individual Driver Screens - Hidden from drawer */}
+      <Drawer.Screen 
+        name="driver/dashboard" 
         options={{ 
           title: 'Driver Dashboard', 
-          drawerItemStyle: { display: 'none' } // Hide from drawer items list
+          drawerItemStyle: { display: 'none' }
         }} 
       />
       <Drawer.Screen 
         name="driver-onboarding" 
         options={{ 
           title: 'Become a Driver', 
-          drawerItemStyle: { display: 'none' } // Hide from drawer items list
+          drawerItemStyle: { display: 'none' }
         }} 
       />
     </Drawer>
@@ -469,7 +449,9 @@ export default function AppLayout() {
 }
 
 const styles = StyleSheet.create({
-  drawerContainer: { flex: 1 },
+  drawerContainer: { 
+    flex: 1,
+  },
   drawerHeader: {
     paddingHorizontal: 20,
     paddingTop: 60,
@@ -484,15 +466,27 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 12,
   },
-  logo: { width: '100%', height: '100%' },
-  appTitle: { fontSize: 24, fontWeight: '700' },
-  appSubtitle: { fontSize: 14 },
-  drawerItems: { flex: 1, paddingVertical: 10 },
+  logo: { 
+    width: '100%', 
+    height: '100%' 
+  },
+  appTitle: { 
+    fontSize: 24, 
+    fontWeight: '700' 
+  },
+  appSubtitle: { 
+    fontSize: 14 
+  },
+  drawerItems: { 
+    flex: 1, 
+    paddingVertical: 10 
+  },
   drawerItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     marginHorizontal: 8,
     marginVertical: 4,
     borderRadius: 12,
@@ -510,7 +504,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  drawerLabel: { fontSize: 16 },
+  drawerLabel: { 
+    fontSize: 16 
+  },
   driverSubtitle: {
     fontSize: 12,
     marginTop: 2,
