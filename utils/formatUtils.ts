@@ -2,8 +2,7 @@ import { SchoolTransport } from '@/types/transport';
 
 // Helper function to convert USD to ZAR (Rands)
 export const formatToRands = (usdAmount: number): string => {
-  const exchangeRate = 18.5; // Approximate USD to ZAR exchange rate
-  const zarAmount = usdAmount * exchangeRate;
+  const zarAmount = usdAmount;
   return `R${zarAmount.toFixed(0)}`;
 };
 

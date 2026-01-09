@@ -43,12 +43,6 @@ export const TransportInfoHeader: React.FC<{ transport: SchoolTransport }> = ({ 
         </View>
       </View>
       
-      {transport.is_verified && (
-        <View style={styles.verifiedBadge}>
-          <Shield size={16} color="#10B981" />
-          <Text style={styles.verifiedText}>Verified Service</Text>
-        </View>
-      )}
     </View>
   );
 };

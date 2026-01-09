@@ -49,12 +49,6 @@ export const DriverInfo: React.FC<DriverInfoProps> = ({
                 </Text>
               </View>
               
-              {transport.driver.is_verified && (
-                <View style={styles.driverVerified}>
-                  <Shield size={14} color="#10B981" />
-                  <Text style={styles.driverVerifiedText}>Verified Driver</Text>
-                </View>
-              )}
             </View>
           </View>
         </View>
