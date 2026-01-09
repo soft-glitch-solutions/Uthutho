@@ -1,4 +1,4 @@
-// RootLayout.tsx - Complete version with AdMob integration
+// RootLayout.tsx - Complete version with AdMob and Notification initialization
 import { useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -9,7 +9,8 @@ import { WaitingProvider } from '../context/WaitingContext';
 import { LanguageProvider } from '../context/LanguageContext';
 import { supabase } from '../lib/supabase';
 import NetworkGate from '@/components/NetworkGate';
-
+import { registerForPushNotificationsAsync } from '@/lib/notifications';
+import * as Notifications from 'expo-notifications';
 
 // Make sure this matches your app.json scheme
 const DEEP_LINK_SCHEME = 'uthutho';
@@ -18,82 +19,70 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
 
-  // Initialize AdMob for iOS and Android (not web)
+
+  // Initialize Push Notifications for mobile only
   useEffect(() => {
-    // Don't initialize AdMob on web platform
     if (Platform.OS === 'web') {
-      console.log('[AdMob] Skipping initialization on web platform');
+      console.log('[Notifications] Skipping initialization on web platform');
       return;
     }
 
-    const initializeAdMob = async () => {
+    const initializeNotifications = async () => {
       try {
-        console.log(`[AdMob ${Platform.OS}] Starting initialization...`);
+        console.log(`[Notifications ${Platform.OS}] Starting initialization...`);
         
-        // Platform-specific App IDs from your AdMob dashboard
-        const appId = Platform.select({
-          ios: 'ca-app-pub-1853756758292263~9685813476', // Your iOS App ID
-          android: 'ca-app-pub-1853756758292263~9685813476', // Your Android App ID
+        // Configure notification handlers for mobile
+        Notifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+          }),
         });
 
-        console.log(`[AdMob ${Platform.OS}] Using App ID: ${appId}`);
-        
-        // Configure request settings for both platforms
-        await mobileAds()
-          .setRequestConfiguration({
-            // Set appropriate content rating for your app
-            // Options: G, PG, T, MA
-            maxAdContentRating: MaxAdContentRating.PG,
-            
-            // For child-directed apps targeting children
-            // tagForChildDirectedTreatment: true,
-            // tagForUnderAgeOfConsent: true,
-            
-            // Test devices for development
-            testDeviceIdentifiers: Platform.select({
-              ios: ['EMULATOR'],
-              android: ['EMULATOR'],
-            }),
-            
-            // Platform-specific optimizations
-            ...(Platform.OS === 'ios' && {
-              // iOS-specific settings if needed
-            }),
-            ...(Platform.OS === 'android' && {
-              // Android-specific settings if needed
-            }),
-          })
-          .then(() => {
-            console.log(`[AdMob ${Platform.OS}] Request configuration set`);
-          })
-          .catch((error) => {
-            console.warn(`[AdMob ${Platform.OS}] Error setting request configuration:`, error);
+        // Configure Android notification channel
+        if (Platform.OS === 'android') {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'Default',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#1ea2b1',
+            sound: 'default',
           });
+          console.log('[Notifications Android] Notification channel configured');
+        }
 
-        // Initialize the Google Mobile Ads SDK
-        const adapterStatuses = await mobileAds().initialize();
-        console.log(`[AdMob ${Platform.OS}] SDK initialized successfully`);
-        
-        // Log adapter status for debugging (useful for mediation)
-        if (__DEV__) {
-          adapterStatuses.forEach((status) => {
-            console.log(`[AdMob ${Platform.OS}] Adapter: ${status.name}, State: ${status.state}`);
-          });
+        // Request permission and register for push notifications
+        const token = await registerForPushNotificationsAsync();
+        if (token) {
+          console.log(`[Notifications ${Platform.OS}] Successfully registered with token`);
+          
+          // You could store this token in your database for sending notifications
+          // Example: await savePushTokenToDatabase(token);
         }
+
+        // Listen for notification responses (user taps on notification)
+        const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+          console.log('[Notifications] User tapped notification:', response);
+          const data = response.notification.request.content.data;
+          
+          // Handle deep linking from notifications
+          if (data.url) {
+            router.push(data.url);
+          }
+        });
+
+        console.log(`[Notifications ${Platform.OS}] Initialization complete`);
         
-        // Platform-specific logging for banner ad unit IDs
-        if (Platform.OS === 'ios') {
-          console.log('[AdMob iOS] Ready for banner ads with unit ID: ca-app-pub-1853756758292263/2482412191');
-        } else {
-          console.log('[AdMob Android] Ready for banner ads with unit ID: ca-app-pub-1853756758292263/2482412191');
-        }
-        
+        return () => {
+          responseListener.remove();
+        };
       } catch (error) {
-        console.error(`[AdMob ${Platform.OS}] Initialization failed:`, error);
+        console.error(`[Notifications ${Platform.OS}] Initialization failed:`, error);
       }
     };
 
-    initializeAdMob();
+    initializeNotifications();
   }, []);
 
   // Deep link handling for OAuth and password reset

@@ -380,21 +380,6 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
               </View>
             )}
 
-            <View style={styles.statsContainer}>
-              {streakData.pointsEarned > 0 && (
-                <View style={styles.statItem}>
-                  <Star size={20} color="#1ea2b1" />
-                  <Text style={styles.statValue}>+{streakData.pointsEarned}</Text>
-                  <Text style={styles.statLabel}>Points Earned</Text>
-                </View>
-              )}
-
-              <View style={styles.statItem}>
-                <Trophy size={20} color="#fbbf24" />
-                <Text style={styles.statValue}>{streakData.maxStreak}</Text>
-                <Text style={styles.statLabel}>Best Streak</Text>
-              </View>
-            </View>
 
             <TouchableOpacity style={styles.continueButton} onPress={onClose}>
               <Text style={styles.continueButtonText}>Continue</Text>

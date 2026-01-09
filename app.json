@@ -6,13 +6,10 @@
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
     "scheme": "uthutho",
-    "platforms": [
-      "ios",
-      "android",
-      "web"
-    ],
+    "platforms": ["ios", "android", "web"],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -20,25 +17,18 @@
         "SKAdNetworkItems": [
           {
             "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork"
-          },
-          {
-            "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork"
           }
         ],
         "CFBundleURLTypes": [
           {
-            "CFBundleURLSchemes": [
-              "uthutho"
-            ]
+            "CFBundleURLSchemes": ["uthutho"]
           }
         ],
-        "LSApplicationQueriesSchemes": [
-          "https",
-          "uthutho"
-        ]
+        "LSApplicationQueriesSchemes": ["https", "uthutho"]
       },
       "bundleIdentifier": "com.softglitch.uthutho"
     },
+    
     "android": {
       "package": "com.softglitch.uthutho",
       "versionCode": 39,
@@ -60,26 +50,36 @@
               "pathPrefix": "/callback"
             }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
     },
+    
     "web": {
       "favicon": "./assets/images/logo.png",
       "bundler": "metro",
       "output": "single"
     },
+    
     "plugins": [
       "expo-router",
       "expo-localization",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#1ea2b1",
+          "sounds": ["./assets/sounds/notification.wav"],
+          "defaultChannel": "default"
+        }
+      ]
     ],
+    
     "experiments": {
       "typedRoutes": true
     },
+    
     "extra": {
       "router": {
         "origin": false
@@ -88,10 +88,12 @@
         "projectId": "2669c125-3910-49ce-a24b-5675a796b3ec"
       }
     },
+    
     "splash": {
       "image": "./assets/images/SplashScreen.png",
       "backgroundColor": "#000000"
     },
+    
     "owner": "soft-glitch-solution"
   }
 }
