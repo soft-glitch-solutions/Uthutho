@@ -32,6 +32,7 @@
     "android": {
       "package": "com.softglitch.uthutho",
       "versionCode": 39,
+      "googleServicesFile": "./google-services.json", 
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#000000"
@@ -52,6 +53,10 @@
           ],
           "category": ["BROWSABLE", "DEFAULT"]
         }
+      ],
+      "permissions": [  
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
       ]
     },
     
@@ -60,21 +65,20 @@
       "bundler": "metro",
       "output": "single"
     },
-    
     "plugins": [
       "expo-router",
       "expo-localization",
       "expo-secure-store",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/images/notification-icon.png",
-          "color": "#1ea2b1",
-          "sounds": ["./assets/sounds/notification.wav"],
-          "defaultChannel": "default"
-        }
-      ]
+      "expo-notifications" 
     ],
+    
+    "notification": {
+      "icon": "./assets/images/notification-icon.png",
+      "color": "#1ea2b1",
+      "iosDisplayInForeground": true,
+      "androidMode": "default",
+      "androidCollapsedTitle": "New notification from Uthutho"
+    },
     
     "experiments": {
       "typedRoutes": true

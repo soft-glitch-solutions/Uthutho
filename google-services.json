@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "671364751418",
+    "project_id": "uthutho-ad38e",
+    "storage_bucket": "uthutho-ad38e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:671364751418:android:c00ea51a8a2301a4db9503",
+        "android_client_info": {
+          "package_name": "com.softglitch.uthutho"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5mIioOhp5Q871200g2v0yDBLjn_GeA1k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
