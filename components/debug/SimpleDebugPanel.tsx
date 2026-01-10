@@ -1,4 +1,4 @@
-// SimpleDebugPanel.tsx - With Push Notification Testing
+// components/SimpleDebugPanel.tsx - SIMPLIFIED VERSION
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -17,11 +17,11 @@ import * as Notifications from 'expo-notifications';
 import { supabase } from '@/lib/supabase';
 import {
   registerForPushNotificationsAsync,
-  schedulePushNotification, // Local notification
+  sendLocalNotification,
   scheduleDailyNotification,
   checkNotificationPermission,
   isMobilePlatform,
-  testPushNotificationSelf, // Push notification via Expo
+  testPushNotificationSelf,
 } from '@/lib/notifications';
 
 interface SimpleDebugPanelProps {
@@ -43,51 +43,10 @@ export default function SimpleDebugPanel({
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [sendingPush, setSendingPush] = useState(false);
-  const [notificationSettings, setNotificationSettings] = useState({
-    channelConfigured: false,
-    handlersConfigured: false,
-  });
 
   useEffect(() => {
     setIsMobile(isMobilePlatform());
-    
-    // Configure notification handlers on mobile
-    if (isMobilePlatform()) {
-      configureNotificationHandlers();
-    }
   }, []);
-
-  const configureNotificationHandlers = () => {
-    if (!isMobilePlatform()) return;
-
-    try {
-      // Handle notifications received while app is foregrounded
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,
-          shouldPlaySound: true,
-          shouldSetBadge: true,
-        }),
-      });
-
-      // Configure Android notification channel
-      if (Platform.OS === 'android') {
-        Notifications.setNotificationChannelAsync('default', {
-          name: 'default',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#1ea2b1',
-        }).then(() => {
-          setNotificationSettings(prev => ({ ...prev, channelConfigured: true }));
-        });
-      }
-
-      setNotificationSettings(prev => ({ ...prev, handlersConfigured: true }));
-      console.log('Notification handlers configured for', Platform.OS);
-    } catch (error) {
-      console.error('Error configuring notification handlers:', error);
-    }
-  };
 
   useEffect(() => {
     if (!visible) return;
@@ -177,12 +136,11 @@ export default function SimpleDebugPanel({
     }
   };
 
-  // LOCAL NOTIFICATION (shows immediately on device)
   const handleTestLocalNotification = async () => {
     if (!isMobile) return;
     
     try {
-      await schedulePushNotification(
+      await sendLocalNotification(
         'Local Test Notification 📱',
         'This is a local notification triggered from the app!',
         { 
@@ -198,7 +156,6 @@ export default function SimpleDebugPanel({
     }
   };
 
-  // PUSH NOTIFICATION (goes through Expo's servers)
   const handleTestPushNotification = async () => {
     if (!isMobile) return;
     
@@ -221,52 +178,6 @@ export default function SimpleDebugPanel({
       }
     } catch (error) {
       console.error('Error sending push notification:', error);
-      Alert.alert('Error', 'Failed to send push notification.');
-    } finally {
-      setSendingPush(false);
-    }
-  };
-
-  // ALTERNATIVE: Direct API call (for testing without the function)
-  const handleTestPushDirect = async () => {
-    if (!isMobile || !pushToken) return;
-    
-    setSendingPush(true);
-    try {
-      const response = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Accept-encoding': 'gzip, deflate',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: pushToken,
-          title: 'Direct Push Test 🚀',
-          body: 'This was sent directly from your debug panel!',
-          data: { 
-            debug: true, 
-            source: 'debug_panel',
-            timestamp: new Date().toISOString() 
-          },
-          sound: 'default',
-          priority: 'high',
-        }),
-      });
-
-      const result = await response.json();
-      console.log('Push API response:', result);
-      
-      if (result.data && result.data.status === 'ok') {
-        Alert.alert(
-          'Success!',
-          `Push notification sent!\nID: ${result.data.id}`
-        );
-      } else {
-        Alert.alert('Failed', result.data?.message || 'Unknown error');
-      }
-    } catch (error) {
-      console.error('Error:', error);
       Alert.alert('Error', 'Failed to send push notification.');
     } finally {
       setSendingPush(false);
@@ -314,9 +225,7 @@ export default function SimpleDebugPanel({
         'Notification Status',
         `Platform: ${Platform.OS.toUpperCase()}\n` +
         `Permission: ${permission ? '✅ Granted' : '❌ Denied'}\n` +
-        `Token: ${token ? '✅ Registered' : '❌ Not registered'}\n` +
-        `Channel: ${notificationSettings.channelConfigured ? '✅ Configured' : '❌ Not configured'}\n` +
-        `Handlers: ${notificationSettings.handlersConfigured ? '✅ Configured' : '❌ Not configured'}`
+        `Token: ${token ? '✅ Registered' : '❌ Not registered'}\n`
       );
     } catch (error) {
       console.error('Error checking settings:', error);
@@ -371,10 +280,7 @@ export default function SimpleDebugPanel({
                 Alert.alert(
                   'Full Token',
                   pushToken,
-                  [{ text: 'OK' }, { text: 'Copy', onPress: () => {
-                    // You can add clipboard copying here if needed
-                    console.log('Token copied to console');
-                  }}]
+                  [{ text: 'OK' }]
                 );
               }}
             >

@@ -1,4 +1,4 @@
-// RootLayout.tsx - Complete version with AdMob and Notification initialization
+// RootLayout.tsx - UPDATED VERSION
 import { useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -9,8 +9,7 @@ import { WaitingProvider } from '../context/WaitingContext';
 import { LanguageProvider } from '../context/LanguageContext';
 import { supabase } from '../lib/supabase';
 import NetworkGate from '@/components/NetworkGate';
-import { registerForPushNotificationsAsync } from '@/lib/notifications';
-import * as Notifications from 'expo-notifications';
+import { setupNotificationHandlers } from '@/lib/notifications'; // Use this instead
 
 // Make sure this matches your app.json scheme
 const DEEP_LINK_SCHEME = 'uthutho';
@@ -18,7 +17,6 @@ const DEEP_LINK_SCHEME = 'uthutho';
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
-
 
   // Initialize Push Notifications for mobile only
   useEffect(() => {
@@ -31,58 +29,27 @@ export default function RootLayout() {
       try {
         console.log(`[Notifications ${Platform.OS}] Starting initialization...`);
         
-        // Configure notification handlers for mobile
-        Notifications.setNotificationHandler({
-          handleNotification: async () => ({
-            shouldShowAlert: true,
-            shouldPlaySound: true,
-            shouldSetBadge: true,
-          }),
-        });
-
-        // Configure Android notification channel
-        if (Platform.OS === 'android') {
-          await Notifications.setNotificationChannelAsync('default', {
-            name: 'Default',
-            importance: Notifications.AndroidImportance.MAX,
-            vibrationPattern: [0, 250, 250, 250],
-            lightColor: '#1ea2b1',
-            sound: 'default',
-          });
-          console.log('[Notifications Android] Notification channel configured');
-        }
-
-        // Request permission and register for push notifications
-        const token = await registerForPushNotificationsAsync();
-        if (token) {
-          console.log(`[Notifications ${Platform.OS}] Successfully registered with token`);
-          
-          // You could store this token in your database for sending notifications
-          // Example: await savePushTokenToDatabase(token);
-        }
-
-        // Listen for notification responses (user taps on notification)
-        const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-          console.log('[Notifications] User tapped notification:', response);
-          const data = response.notification.request.content.data;
-          
-          // Handle deep linking from notifications
-          if (data.url) {
-            router.push(data.url);
-          }
-        });
-
+        // Use the centralized function from notifications.ts
+        const cleanup = setupNotificationHandlers();
+        
         console.log(`[Notifications ${Platform.OS}] Initialization complete`);
         
-        return () => {
-          responseListener.remove();
-        };
+        return cleanup;
       } catch (error) {
         console.error(`[Notifications ${Platform.OS}] Initialization failed:`, error);
       }
     };
 
-    initializeNotifications();
+    const cleanup = initializeNotifications();
+    
+    // Return cleanup function
+    return () => {
+      if (cleanup && typeof cleanup.then === 'function') {
+        cleanup.then(fn => fn && fn());
+      } else if (typeof cleanup === 'function') {
+        cleanup();
+      }
+    };
   }, []);
 
   // Deep link handling for OAuth and password reset
