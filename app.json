@@ -6,10 +6,13 @@
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
     "scheme": "uthutho",
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -21,18 +24,22 @@
         ],
         "CFBundleURLTypes": [
           {
-            "CFBundleURLSchemes": ["uthutho"]
+            "CFBundleURLSchemes": [
+              "uthutho"
+            ]
           }
         ],
-        "LSApplicationQueriesSchemes": ["https", "uthutho"]
+        "LSApplicationQueriesSchemes": [
+          "https",
+          "uthutho"
+        ]
       },
       "bundleIdentifier": "com.softglitch.uthutho"
     },
-    
     "android": {
       "package": "com.softglitch.uthutho",
-      "versionCode": 39,
-      "googleServicesFile": "./google-services.json", 
+      "versionCode": 40,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#000000"
@@ -51,15 +58,17 @@
               "pathPrefix": "/callback"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ],
-      "permissions": [  
+      "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE"
       ]
     },
-    
     "web": {
       "favicon": "./assets/images/logo.png",
       "bundler": "metro",
@@ -69,9 +78,8 @@
       "expo-router",
       "expo-localization",
       "expo-secure-store",
-      "expo-notifications" 
+      "expo-notifications"
     ],
-    
     "notification": {
       "icon": "./assets/images/notification-icon.png",
       "color": "#1ea2b1",
@@ -79,11 +87,9 @@
       "androidMode": "default",
       "androidCollapsedTitle": "New notification from Uthutho"
     },
-    
     "experiments": {
       "typedRoutes": true
     },
-    
     "extra": {
       "router": {
         "origin": false
@@ -92,12 +98,10 @@
         "projectId": "2669c125-3910-49ce-a24b-5675a796b3ec"
       }
     },
-    
     "splash": {
       "image": "./assets/images/SplashScreen.png",
       "backgroundColor": "#000000"
     },
-    
     "owner": "soft-glitch-solution"
   }
 }

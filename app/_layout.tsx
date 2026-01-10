@@ -9,7 +9,6 @@ import { WaitingProvider } from '../context/WaitingContext';
 import { LanguageProvider } from '../context/LanguageContext';
 import { supabase } from '../lib/supabase';
 import NetworkGate from '@/components/NetworkGate';
-import { setupNotificationHandlers } from '@/lib/notifications'; // Use this instead
 
 // Make sure this matches your app.json scheme
 const DEEP_LINK_SCHEME = 'uthutho';
@@ -17,40 +16,6 @@ const DEEP_LINK_SCHEME = 'uthutho';
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
-
-  // Initialize Push Notifications for mobile only
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      console.log('[Notifications] Skipping initialization on web platform');
-      return;
-    }
-
-    const initializeNotifications = async () => {
-      try {
-        console.log(`[Notifications ${Platform.OS}] Starting initialization...`);
-        
-        // Use the centralized function from notifications.ts
-        const cleanup = setupNotificationHandlers();
-        
-        console.log(`[Notifications ${Platform.OS}] Initialization complete`);
-        
-        return cleanup;
-      } catch (error) {
-        console.error(`[Notifications ${Platform.OS}] Initialization failed:`, error);
-      }
-    };
-
-    const cleanup = initializeNotifications();
-    
-    // Return cleanup function
-    return () => {
-      if (cleanup && typeof cleanup.then === 'function') {
-        cleanup.then(fn => fn && fn());
-      } else if (typeof cleanup === 'function') {
-        cleanup();
-      }
-    };
-  }, []);
 
   // Deep link handling for OAuth and password reset
   useEffect(() => {
