@@ -112,6 +112,13 @@ const getSlideConfig = () => {
 const BRAND_COLOR = '#1ea2b1';
 const BACKGROUND_COLOR = '#000000';
 
+// Tagline colors
+const TAGLINE_COLORS = {
+  commute: '#1EA2B1', // blue
+  connect: '#ED67B1', // pink
+  community: '#FD602D', // orange
+};
+
 // Fallback component for when animations fail to load
 const AnimationFallback = ({ icon: Icon, size = 200 }) => {
   const scaledSize = isDesktop ? Math.min(size, 180) : scale(size);
@@ -501,7 +508,11 @@ export default function Onboarding() {
     return (
       <View style={styles.splashContainer}>
         <Text style={styles.logosplash}>Uthutho</Text>
-        <Text style={styles.taglinesplash}>Commute. Connect. Community.</Text>
+        <View style={styles.taglineContainer}>
+          <Text style={[styles.taglineText, styles.commuteText]}>Commute.</Text>
+          <Text style={[styles.taglineText, styles.connectText]}> Connect.</Text>
+          <Text style={[styles.taglineText, styles.communityText]}> Community.</Text>
+        </View>
       </View>
     );
   }
@@ -709,11 +720,23 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(12),
     textAlign: 'center',
   },
-  taglinesplash: {
-    fontSize: scale(14),
-    color: '#ffffff',
-    textAlign: 'center',
-    opacity: 0.8,
+  taglineContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: verticalScale(8),
+  },
+  taglineText: {
+    fontSize: scale(16),
+    fontWeight: '600',
+  },
+  commuteText: {
+    color: TAGLINE_COLORS.commute, // blue
+  },
+  connectText: {
+    color: TAGLINE_COLORS.connect, // pink
+  },
+  communityText: {
+    color: TAGLINE_COLORS.community, // orange
   },
   background: {
     position: 'absolute',
