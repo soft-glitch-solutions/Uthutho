@@ -316,10 +316,8 @@ const CustomDrawerContent = (props) => {
         )}
       </View>
 
-      {/* Footer */}
       <View style={styles.drawerFooter}>
 
-        {/* Social Media Icons */}
         <View style={styles.socialContainer}>
           <Pressable onPress={() => Linking.openURL('https://www.linkedin.com/company/uthutho')} style={styles.socialIcon}>
             <Linkedin size={20} color={colors.text} />
