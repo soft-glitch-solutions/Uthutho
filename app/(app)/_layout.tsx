@@ -146,17 +146,28 @@ const CustomDrawerContent = (props) => {
     console.log('Driver action clicked. Is driver:', isDriver);
     
     if (isDriver) {
-      // Navigate to nested driver dashboard
-      console.log('Navigating to driver/dashboard...');
-      props.navigation.navigate('driver', {
-        screen: 'dashboard',
-        initial: false
-      });
+      // SIMPLE APPROACH: Navigate directly to the dashboard screen
+      console.log('Navigating to driver-dashboard...');
+      
+      // Close drawer first for better UX
+      props.navigation.closeDrawer();
+      
+      // Small delay to ensure drawer is closed
+      setTimeout(() => {
+        // Navigate to the actual screen name
+        props.navigation.navigate('driver-dashboard');
+      }, 100);
+      
     } else {
       // Navigate to driver onboarding
       console.log('Navigating to driver-onboarding...');
       props.navigation.navigate('driver-onboarding');
     }
+  };
+
+  const handleNavigation = (routeName) => {
+    console.log('Navigating to:', routeName);
+    props.navigation.navigate(routeName);
   };
 
   return (
@@ -197,10 +208,7 @@ const CustomDrawerContent = (props) => {
           return (
             <AnimatedPressable
               key={route.key}
-              onPress={() => {
-                console.log('Navigating to:', route.name);
-                props.navigation.navigate(route.name);
-              }}
+              onPress={() => handleNavigation(route.name)}
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
               style={[
@@ -397,24 +405,25 @@ export default function AppLayout() {
         }} 
       />
 
-      {/* Driver Screens Group */}
-      <Drawer.Screen 
+      {/* Driver Screens - Registered as flat screens, NOT nested */}
+      {/* Remove the 'driver' screen if you're not using it as a navigator */}
+      {/* <Drawer.Screen 
         name="driver" 
         options={{ 
           title: 'Driver',
           drawerIcon: Car,
-          drawerItemStyle: { display: 'none' } // Hide from drawer list
+          drawerItemStyle: { display: 'none' }
         }} 
-      />
-
-      {/* Individual Driver Screens - Hidden from drawer */}
+      /> */}
+      
       <Drawer.Screen 
-        name="driver/dashboard" 
+        name="driver-dashboard" 
         options={{ 
           title: 'Driver Dashboard', 
           drawerItemStyle: { display: 'none' }
         }} 
       />
+      
       <Drawer.Screen 
         name="driver-onboarding" 
         options={{ 
@@ -515,16 +524,5 @@ const styles = StyleSheet.create({
   },
   loadingItem: {
     opacity: 0.7,
-  },
-  roleBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  roleText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
 });
