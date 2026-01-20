@@ -25,11 +25,14 @@ import {
   Image,
   Easing,
   Linking,
-  ActivityIndicator
+  ActivityIndicator,
+  ScrollView,
+  Dimensions
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 // Fallback icon component
@@ -172,8 +175,7 @@ const CustomDrawerContent = (props) => {
 
   return (
     <View style={[styles.drawerContainer, { backgroundColor: colors.background }]}>
-      
-      {/* Header */}
+      {/* Header - Made more compact */}
       <View style={styles.drawerHeader}>
         <View style={styles.logoContainer}>
           <Image
@@ -182,14 +184,20 @@ const CustomDrawerContent = (props) => {
             resizeMode="contain"
           />
         </View>
-        <Text style={[styles.appTitle, { color: colors.text }]}>Uthutho</Text>
-        <Text style={[styles.appSubtitle, { color: `${colors.text}70` }]}>
-          Your Journey Companion
-        </Text>
+        <View>
+          <Text style={[styles.appTitle, { color: colors.text }]}>Uthutho</Text>
+          <Text style={[styles.appSubtitle, { color: `${colors.text}70` }]}>
+            Your Journey Companion
+          </Text>
+        </View>
       </View>
 
-      {/* Drawer Items */}
-      <View style={styles.drawerItems}>
+      {/* Drawer Items - Now in a ScrollView */}
+      <ScrollView 
+        style={styles.drawerScrollView}
+        contentContainerStyle={styles.drawerItems}
+        showsVerticalScrollIndicator={false}
+      >
         {visibleRoutes.map((route, index) => {
           const { options } = props.descriptors[route.key];
           const isFocused = props.state.index === index;
@@ -219,6 +227,7 @@ const CustomDrawerContent = (props) => {
                   backgroundColor: isFocused ? `${colors.primary}15` : 'transparent',
                   borderLeftWidth: isFocused ? 4 : 0,
                   borderLeftColor: colors.primary,
+                  height: 52, // Fixed height for consistency
                 },
               ]}
             >
@@ -231,7 +240,7 @@ const CustomDrawerContent = (props) => {
                 >
                   <IconComponent
                     color={isFocused ? colors.background : colors.text}
-                    size={22}
+                    size={20} // Slightly smaller icons
                     fill={isFocused ? colors.primary : 'transparent'}
                   />
                 </View>
@@ -241,8 +250,10 @@ const CustomDrawerContent = (props) => {
                     {
                       color: isFocused ? colors.primary : colors.text,
                       fontWeight: isFocused ? '600' : '400',
+                      fontSize: 15, // Slightly smaller font
                     },
                   ]}
+                  numberOfLines={1}
                 >
                   {options.title || route.name}
                 </Text>
@@ -269,7 +280,9 @@ const CustomDrawerContent = (props) => {
                 backgroundColor: isDriver ? 'rgba(30, 162, 177, 0.15)' : 'rgba(139, 92, 246, 0.15)',
                 borderLeftWidth: 4,
                 borderLeftColor: isDriver ? '#1ea2b1' : '#8B5CF6',
-                marginTop: 20,
+                marginTop: 12,
+                marginBottom: 12,
+                height: 60, // Slightly taller for emphasis
               },
             ]}
           >
@@ -281,24 +294,29 @@ const CustomDrawerContent = (props) => {
                 ]}
               >
                 {isDriver ? (
-                  <BarChart3 size={22} color="#FFFFFF" />
+                  <BarChart3 size={20} color="#FFFFFF" />
                 ) : (
-                  <Car size={22} color="#FFFFFF" />
+                  <Car size={20} color="#FFFFFF" />
                 )}
               </View>
-              <View>
+              <View style={styles.driverTextContainer}>
                 <Text
                   style={[
                     styles.drawerLabel,
                     {
                       color: isDriver ? '#1ea2b1' : '#8B5CF6',
                       fontWeight: '600',
+                      fontSize: 15,
                     },
                   ]}
+                  numberOfLines={1}
                 >
                   {isDriver ? 'Driver Dashboard' : 'Apply as Driver'}
                 </Text>
-                <Text style={[styles.driverSubtitle, { color: `${colors.text}70` }]}>
+                <Text 
+                  style={[styles.driverSubtitle, { color: `${colors.text}70` }]}
+                  numberOfLines={1}
+                >
                   {isDriver ? 'Manage your transport services' : 'Get Clients with Uthutho'}
                 </Text>
               </View>
@@ -311,36 +329,43 @@ const CustomDrawerContent = (props) => {
         )}
 
         {loadingRole && (
-          <View style={[styles.drawerItem, styles.loadingItem]}>
+          <View style={[styles.drawerItem, styles.loadingItem, { height: 52 }]}>
             <View style={styles.drawerItemContent}>
               <View style={[styles.iconContainer, { backgroundColor: colors.border }]}>
                 <ActivityIndicator size="small" color={colors.text} />
               </View>
-              <Text style={[styles.drawerLabel, { color: colors.text }]}>
+              <Text style={[styles.drawerLabel, { color: colors.text, fontSize: 15 }]}>
                 Loading...
               </Text>
             </View>
           </View>
         )}
-      </View>
+      </ScrollView>
 
+      {/* Footer - Made more compact */}
       <View style={styles.drawerFooter}>
-
         <View style={styles.socialContainer}>
-          <Pressable onPress={() => Linking.openURL('https://www.linkedin.com/company/uthutho')} style={styles.socialIcon}>
-            <Linkedin size={20} color={colors.text} />
+          <Pressable 
+            onPress={() => Linking.openURL('https://www.linkedin.com/company/uthutho')} 
+            style={styles.socialIcon}
+          >
+            <Linkedin size={18} color={colors.text} />
           </Pressable>
 
-          <Pressable onPress={() => Linking.openURL('https://www.facebook.com/uthuthorsa/')} style={styles.socialIcon}>
-            <Facebook size={20} color={colors.text} />
+          <Pressable 
+            onPress={() => Linking.openURL('https://www.facebook.com/uthuthorsa/')} 
+            style={styles.socialIcon}
+          >
+            <Facebook size={18} color={colors.text} />
           </Pressable>
 
-          <Pressable onPress={() => Linking.openURL('https://www.instagram.com/uthuthorsa/')} style={styles.socialIcon}>
-            <Instagram size={20} color={colors.text} />
+          <Pressable 
+            onPress={() => Linking.openURL('https://www.instagram.com/uthuthorsa/')} 
+            style={styles.socialIcon}
+          >
+            <Instagram size={18} color={colors.text} />
           </Pressable>
-
         </View>
-
 
         <Text style={[styles.footerText, { color: `${colors.text}40` }]}>
           Version 1.8.2
@@ -357,7 +382,12 @@ export default function AppLayout() {
     <Drawer
       screenOptions={{
         headerShown: false,
-        drawerStyle: { backgroundColor: colors.background },
+        drawerStyle: { 
+          backgroundColor: colors.background,
+          width: Math.min(300, SCREEN_HEIGHT * 0.8), // Responsive width
+        },
+        drawerType: 'front', // Better for small screens
+        overlayColor: 'rgba(0,0,0,0.5)',
       }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
@@ -406,16 +436,6 @@ export default function AppLayout() {
       />
 
       {/* Driver Screens - Registered as flat screens, NOT nested */}
-      {/* Remove the 'driver' screen if you're not using it as a navigator */}
-      {/* <Drawer.Screen 
-        name="driver" 
-        options={{ 
-          title: 'Driver',
-          drawerIcon: Car,
-          drawerItemStyle: { display: 'none' }
-        }} 
-      /> */}
-      
       <Drawer.Screen 
         name="driver-dashboard" 
         options={{ 
@@ -433,89 +453,100 @@ export default function AppLayout() {
       />
     </Drawer>
   );
-}
+};
 
 const styles = StyleSheet.create({
   drawerContainer: { 
     flex: 1,
   },
   drawerHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 30,
+    paddingHorizontal: 16,
+    paddingTop: 40, // Reduced padding
+    paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.05)',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   logoContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
+    width: 40, // Smaller logo
+    height: 40,
+    borderRadius: 10,
     overflow: 'hidden',
-    marginBottom: 12,
+    marginRight: 12,
   },
   logo: { 
     width: '100%', 
     height: '100%' 
   },
   appTitle: { 
-    fontSize: 24, 
-    fontWeight: '700' 
+    fontSize: 18, // Smaller font
+    fontWeight: '700',
+    marginBottom: 2,
   },
   appSubtitle: { 
-    fontSize: 14 
+    fontSize: 12 // Smaller font
+  },
+  drawerScrollView: {
+    flex: 1,
   },
   drawerItems: { 
-    flex: 1, 
-    paddingVertical: 10 
+    paddingVertical: 8,
+    paddingHorizontal: 4,
   },
   drawerItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8, // Reduced padding
     marginHorizontal: 8,
     marginVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   drawerItemContent: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    flex: 1 
+    flex: 1,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: 36, // Smaller container
+    height: 36,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   drawerLabel: { 
-    fontSize: 16 
+    fontSize: 15,
+    flexShrink: 1,
+  },
+  driverTextContainer: {
+    flex: 1,
   },
   driverSubtitle: {
-    fontSize: 12,
+    fontSize: 11, // Smaller font
     marginTop: 2,
   },
   drawerFooter: { 
-    padding: 20, 
+    padding: 16, // Reduced padding
+    paddingBottom: 24,
     alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.05)',
   },
   footerText: { 
-    fontSize: 12,
+    fontSize: 11, // Smaller font
     marginTop: 8,
   },
   socialContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   socialIcon: {
-    marginHorizontal: 10,
-    padding: 8,
+    marginHorizontal: 8,
+    padding: 6, // Reduced padding
     borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.05)',
   },
