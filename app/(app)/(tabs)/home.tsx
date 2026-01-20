@@ -1210,18 +1210,7 @@ export default function HomeScreen() {
         Carpool
       </Text>
     </TouchableOpacity>
-    
-    <TouchableOpacity 
-      style={[styles.serviceCard, { backgroundColor: colors.background }]}
-      onPress={() => router.push('/long-distance')}
-    >
-      <View style={[styles.serviceIcon, { backgroundColor: '#fbbf24' }]}>
-        <Route size={24} color="#FFFFFF" />
-      </View>
-      <Text style={[styles.serviceTitle, { color: colors.text }]}>
-        Long Distance
-      </Text>
-    </TouchableOpacity>
+
   </View>
 </View>
 
@@ -1525,6 +1514,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
+    paddingBottom: 16,
     fontWeight: 'bold',
   },
   sectionTitleDesktop: {
