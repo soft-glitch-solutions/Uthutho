@@ -57,7 +57,7 @@ interface CarpoolClub {
   is_full: boolean | null;
   creator_id: string;
   created_at: string;
-  creator: {
+  creator?: {
     profiles: {
       first_name: string;
       last_name: string;
@@ -73,7 +73,6 @@ interface CarpoolClub {
       last_name: string;
       rating: number;
     };
-    status: string;
   }>;
 }
 
@@ -85,8 +84,9 @@ export default function CarpoolDetailScreen() {
   const [carpool, setCarpool] = useState<CarpoolClub | null>(null);
   const [loading, setLoading] = useState(true);
   const [isMember, setIsMember] = useState(false);
-  const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const [isCreator, setIsCreator] = useState(false);
+  const [creatorProfile, setCreatorProfile] = useState<any>(null);
+  const [members, setMembers] = useState<any[]>([]);
   
   // Modal states
   const [showApplyModal, setShowApplyModal] = useState(false);
@@ -111,45 +111,52 @@ export default function CarpoolDetailScreen() {
 
   const fetchCarpoolDetails = async () => {
     try {
-      const { data, error } = await supabase
+      // First, fetch the carpool
+      const { data: carpoolData, error: carpoolError } = await supabase
         .from('carpool_clubs')
-        .select(`
-          *,
-          creator:creator_id (
-            profiles:user_id (
-              first_name,
-              last_name,
-              rating,
-              total_trips,
-              phone,
-              email
-            )
-          ),
-          members:carpool_members (
-            profiles:user_id (
-              first_name,
-              last_name,
-              rating
-            ),
-            status
-          )
-        `)
+        .select('*')
         .eq('id', id)
         .eq('is_active', true)
         .single();
 
-      if (error) {
-        console.error('Error fetching carpool:', error);
+      if (carpoolError) {
+        console.error('Error fetching carpool:', carpoolError);
         showErrorModal('Failed to load carpool details');
         return;
       }
 
-      setCarpool(data);
-      
+      // Fetch creator profile
+      const { data: creatorData, error: creatorError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', carpoolData.creator_id)
+        .single();
+
+      if (creatorError) {
+        console.error('Error fetching creator:', creatorError);
+      }
+
+      // Fetch members
+      const { data: membersData, error: membersError } = await supabase
+        .from('carpool_members')
+        .select(`
+          profiles (*)
+        `)
+        .eq('carpool_id', id)
+        .eq('is_active', true);
+
+      if (membersError) {
+        console.error('Error fetching members:', membersError);
+      }
+
       // Check if current user is the creator
-      if (user && data.creator_id === user.id) {
+      if (user && carpoolData.creator_id === user.id) {
         setIsCreator(true);
       }
+
+      setCarpool(carpoolData);
+      setCreatorProfile(creatorData);
+      setMembers(membersData || []);
       
     } catch (error) {
       console.error('Error:', error);
@@ -165,19 +172,19 @@ export default function CarpoolDetailScreen() {
     try {
       const { data, error } = await supabase
         .from('carpool_members')
-        .select('status')
+        .select('*')
         .eq('carpool_id', id)
         .eq('user_id', user.id)
+        .eq('is_active', true)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error checking membership:', error);
+        return;
+      }
 
       if (data) {
-        if (data.status === 'approved') {
-          setIsMember(true);
-        } else if (data.status === 'pending') {
-          setHasPendingRequest(true);
-        }
+        setIsMember(true);
       }
     } catch (error) {
       console.error('Error checking membership:', error);
@@ -223,11 +230,6 @@ export default function CarpoolDetailScreen() {
       return;
     }
 
-    if (hasPendingRequest) {
-      showErrorModal('You already have a pending request to join this carpool');
-      return;
-    }
-
     if (isCreator) {
       showErrorModal('You cannot join your own carpool');
       return;
@@ -247,34 +249,48 @@ export default function CarpoolDetailScreen() {
 
     setApplyLoading(true);
     try {
-      // Insert into carpool_members table (assuming it exists)
-      // If not, we can create a separate carpool_requests table
+      // Insert into carpool_members table
       const { error } = await supabase
         .from('carpool_members')
         .insert({
           carpool_id: carpool.id,
           user_id: user.id,
-          status: 'pending',
-          // Additional info could be stored here
+          is_active: true,
         });
 
       if (error) {
         if (error.code === '23505') { // Unique constraint violation
-          setHasPendingRequest(true);
-          showSuccessModal('Request already submitted. Waiting for approval.');
+          setIsMember(true);
+          showSuccessModal('You are already a member of this carpool.');
         } else {
           throw error;
         }
         return;
       }
 
-      setHasPendingRequest(true);
-      showSuccessModal('Join request submitted! The creator will review your request.');
+      // Update carpool member count
+      const { error: updateError } = await supabase
+        .from('carpool_clubs')
+        .update({
+          current_members: carpool.current_members + 1,
+          is_full: carpool.current_members + 1 >= carpool.max_members
+        })
+        .eq('id', carpool.id);
+
+      if (updateError) {
+        console.error('Error updating carpool count:', updateError);
+      }
+
+      setIsMember(true);
+      showSuccessModal('Successfully joined the carpool!');
       setShowApplyModal(false);
+      
+      // Refresh carpool details
+      fetchCarpoolDetails();
       
     } catch (error: any) {
       console.error('Error joining carpool:', error);
-      showErrorModal('Failed to submit request. Please try again.');
+      showErrorModal('Failed to join carpool. Please try again.');
     } finally {
       setApplyLoading(false);
     }
@@ -290,7 +306,7 @@ export default function CarpoolDetailScreen() {
   };
 
   const handleContactCreator = () => {
-    if (!carpool?.creator.profiles.phone && !carpool?.creator.profiles.email) {
+    if (!creatorProfile?.phone && !creatorProfile?.email) {
       showErrorModal('No contact information available');
       return;
     }
@@ -299,13 +315,13 @@ export default function CarpoolDetailScreen() {
       'Contact Creator',
       'Choose contact method:',
       [
-        carpool?.creator.profiles.phone ? {
+        creatorProfile?.phone ? {
           text: 'Call',
-          onPress: () => Linking.openURL(`tel:${carpool.creator.profiles.phone}`)
+          onPress: () => Linking.openURL(`tel:${creatorProfile.phone}`)
         } : null,
-        carpool?.creator.profiles.email ? {
+        creatorProfile?.email ? {
           text: 'Email',
-          onPress: () => Linking.openURL(`mailto:${carpool.creator.profiles.email}`)
+          onPress: () => Linking.openURL(`mailto:${creatorProfile.email}`)
         } : null,
         {
           text: 'Cancel',
@@ -347,7 +363,7 @@ export default function CarpoolDetailScreen() {
             try {
               const { error } = await supabase
                 .from('carpool_members')
-                .delete()
+                .update({ is_active: false })
                 .eq('carpool_id', carpool.id)
                 .eq('user_id', user.id);
 
@@ -586,64 +602,65 @@ export default function CarpoolDetailScreen() {
           )}
 
           {/* Creator Info */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Shield size={20} color="#1ea2b1" />
-              <Text style={styles.cardTitle}>Carpool Creator</Text>
-            </View>
-            <View style={styles.creatorInfo}>
-              <View style={styles.creatorDetails}>
-                <Text style={styles.creatorName}>
-                  {carpool.creator.profiles.first_name} {carpool.creator.profiles.last_name}
-                </Text>
-                <View style={styles.creatorStats}>
-                  <Star size={14} color="#F59E0B" />
-                  <Text style={styles.creatorRating}>
-                    {carpool.creator.profiles.rating || 'New'}
-                  </Text>
-                  <Text style={styles.creatorTrips}>
-                    • {carpool.creator.profiles.total_trips || 0} trips
-                  </Text>
-                </View>
+          {creatorProfile && (
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Shield size={20} color="#1ea2b1" />
+                <Text style={styles.cardTitle}>Carpool Creator</Text>
               </View>
-              <TouchableOpacity 
-                style={styles.contactButton}
-                onPress={handleContactCreator}
-                disabled={!carpool.creator.profiles.phone && !carpool.creator.profiles.email}
-              >
-                <Phone size={16} color="#FFFFFF" />
-                <Text style={styles.contactButtonText}>Contact</Text>
-              </TouchableOpacity>
+              <View style={styles.creatorInfo}>
+                <View style={styles.creatorDetails}>
+                  <Text style={styles.creatorName}>
+                    {creatorProfile.first_name} {creatorProfile.last_name}
+                  </Text>
+                  <View style={styles.creatorStats}>
+                    <Star size={14} color="#F59E0B" />
+                    <Text style={styles.creatorRating}>
+                      {creatorProfile.rating || 'New'}
+                    </Text>
+                    <Text style={styles.creatorTrips}>
+                      • {creatorProfile.total_trips || 0} trips
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity 
+                  style={styles.contactButton}
+                  onPress={handleContactCreator}
+                  disabled={!creatorProfile.phone && !creatorProfile.email}
+                >
+                  <Phone size={16} color="#FFFFFF" />
+                  <Text style={styles.contactButtonText}>Contact</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Members List */}
-          {carpool.members && carpool.members.length > 0 && (
+          {members.length > 0 && (
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Current Members</Text>
+              <Text style={styles.cardTitle}>Current Members ({members.length})</Text>
               <View style={styles.membersList}>
-                {carpool.members
-                  .filter(member => member.status === 'approved')
-                  .map((member, index) => (
-                    <View key={index} style={styles.memberItem}>
-                      <View style={styles.memberAvatar}>
-                        <Text style={styles.memberInitials}>
-                          {member.profiles.first_name[0]}{member.profiles.last_name[0]}
+                {members.map((member, index) => (
+                  <View key={index} style={styles.memberItem}>
+                    <View style={styles.memberAvatar}>
+                      <Text style={styles.memberInitials}>
+                        {member.profiles?.first_name?.[0] || 'U'}
+                        {member.profiles?.last_name?.[0] || 'S'}
+                      </Text>
+                    </View>
+                    <View style={styles.memberInfo}>
+                      <Text style={styles.memberName}>
+                        {member.profiles?.first_name || 'Unknown'} {member.profiles?.last_name || 'User'}
+                      </Text>
+                      <View style={styles.memberRating}>
+                        <Star size={12} color="#F59E0B" />
+                        <Text style={styles.memberRatingText}>
+                          {member.profiles?.rating || 'New'}
                         </Text>
-                      </View>
-                      <View style={styles.memberInfo}>
-                        <Text style={styles.memberName}>
-                          {member.profiles.first_name} {member.profiles.last_name}
-                        </Text>
-                        <View style={styles.memberRating}>
-                          <Star size={12} color="#F59E0B" />
-                          <Text style={styles.memberRatingText}>
-                            {member.profiles.rating || 'New'}
-                          </Text>
-                        </View>
                       </View>
                     </View>
-                  ))}
+                  </View>
+                ))}
               </View>
             </View>
           )}
@@ -665,10 +682,6 @@ export default function CarpoolDetailScreen() {
             >
               <Text style={styles.actionButtonText}>Leave Carpool</Text>
             </TouchableOpacity>
-          ) : hasPendingRequest ? (
-            <View style={[styles.actionButton, styles.pendingButton]}>
-              <Text style={styles.pendingButtonText}>Request Pending</Text>
-            </View>
           ) : (
             <TouchableOpacity 
               style={[styles.actionButton, styles.joinButton]}
@@ -1088,16 +1101,8 @@ const styles = StyleSheet.create({
   manageButton: {
     backgroundColor: '#10B981',
   },
-  pendingButton: {
-    backgroundColor: '#333333',
-  },
   actionButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  pendingButtonText: {
-    color: '#888888',
     fontSize: 16,
     fontWeight: 'bold',
   },
