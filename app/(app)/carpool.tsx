@@ -1,503 +1,647 @@
+// app/carpool.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
-import { Plus, Users, Clock, MapPin, DollarSign, Calendar, Car } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Search, MapPin, Users, Clock, Star, Shield, Car, Filter, Users as UsersIcon } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
+
+import SchoolTransportCard from '@/components/school-transport/SchoolTransportCard';
+import TransportFilters from '@/components/school-transport/TransportFilters';
+import ApplyModal from '@/components/modals/ApplyModal';
+import StatusModal from '@/components/modals/StatusModal';
 
 interface CarpoolClub {
   id: string;
   name: string;
-  description: string;
-  creator_id: string;
+  description: string | null;
   from_location: string;
   to_location: string;
+  from_latitude: number | null;
+  from_longitude: number | null;
+  to_latitude: number | null;
+  to_longitude: number | null;
   pickup_time: string;
-  return_time: string;
+  return_time: string | null;
   days_of_week: string[];
   max_members: number;
   current_members: number;
-  price_per_trip: number;
-  price_range: string;
-  vehicle_info: string;
-  is_full: boolean;
+  price_per_trip: number | null;
+  price_range: string | null;
+  vehicle_info: string | null;
+  rules: string | null;
+  is_active: boolean | null;
+  is_full: boolean | null;
+  creator_id: string;
   created_at: string;
-  profiles: {
-    first_name: string;
-    last_name: string;
+  updated_at: string;
+  creator: {
+    id: string;
+    user_id: string;
+    profiles: {
+      first_name: string;
+      last_name: string;
+      rating: number;
+      total_trips: number;
+    };
   };
 }
 
 export default function CarpoolScreen() {
+  const router = useRouter();
+  const { user } = useAuth();
+  
+  // State
   const [carpools, setCarpools] = useState<CarpoolClub[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const { user } = useAuth();
-
-  // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    from_location: '',
-    to_location: '',
-    pickup_time: '',
-    return_time: '',
-    days_of_week: [] as string[],
-    max_members: 4,
-    price_per_trip: '',
-    price_range: '',
-    vehicle_info: '',
-    rules: '',
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    fromLocation: '',
+    toLocation: '',
+    minPrice: '',
+    maxPrice: '',
+    pickupTime: '',
+    daysOfWeek: [] as string[],
+    vehicleType: '',
   });
 
-  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  // Modal states
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [selectedCarpool, setSelectedCarpool] = useState<string | null>(null);
+  const [modalStatus, setModalStatus] = useState<{
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+  }>({
+    type: 'info',
+    title: '',
+    message: '',
+  });
+  const [applyLoading, setApplyLoading] = useState(false);
 
   useEffect(() => {
     fetchCarpools();
-  }, []);
+  }, [filters]);
 
   const fetchCarpools = async () => {
+    console.log('📡 fetchCarpools called');
     try {
-      const { data, error } = await supabase
+      console.log('🔍 Building Supabase query...');
+      
+      // Start with base query
+      let query = supabase
         .from('carpool_clubs')
-        .select(`
-          *,
-          profiles:creator_id (first_name, last_name)
-        `)
+        .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setCarpools(data || []);
-    } catch (error) {
-      console.error('Error fetching carpools:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      // Apply filters
+      if (filters.fromLocation) {
+        query = query.ilike('from_location', `%${filters.fromLocation}%`);
+      }
+      if (filters.toLocation) {
+        query = query.ilike('to_location', `%${filters.toLocation}%`);
+      }
+      if (filters.pickupTime) {
+        query = query.ilike('pickup_time', `%${filters.pickupTime}%`);
+      }
+      if (filters.minPrice && filters.priceRange) {
+        const min = parseFloat(filters.minPrice);
+        query = query.or(`price_per_trip.gte.${min},price_range.ilike.%${filters.minPrice}%`);
+      }
+      if (filters.maxPrice) {
+        const max = parseFloat(filters.maxPrice);
+        query = query.or(`price_per_trip.lte.${max},price_range.ilike.%${filters.maxPrice}%`);
+      }
+      if (filters.daysOfWeek.length > 0) {
+        // Filter by days of week (array overlap)
+        query = query.contains('days_of_week', filters.daysOfWeek);
+      }
 
-  const createCarpool = async () => {
-    if (!user) {
-      Alert.alert('Error', 'Please sign in to create a carpool');
-      return;
-    }
+      console.log('🚀 Executing carpools query...');
+      const { data: carpoolsData, error: carpoolsError } = await query;
 
-    if (!formData.name || !formData.from_location || !formData.to_location || !formData.pickup_time) {
-      Alert.alert('Error', 'Please fill in all required fields');
-      return;
-    }
+      if (carpoolsError) {
+        console.error('❌ Error fetching carpools:', carpoolsError);
+        throw carpoolsError;
+      }
 
-    try {
-      const { error } = await supabase
-        .from('carpool_clubs')
-        .insert({
-          ...formData,
-          creator_id: user.id,
-          price_per_trip: formData.price_per_trip ? parseFloat(formData.price_per_trip) : null,
-        });
+      console.log('📦 Carpools fetched:', carpoolsData?.length || 0);
 
-      if (error) throw error;
-
-      Alert.alert('Success', 'Carpool created successfully!');
-      setShowCreateForm(false);
-      setFormData({
-        name: '',
-        description: '',
-        from_location: '',
-        to_location: '',
-        pickup_time: '',
-        return_time: '',
-        days_of_week: [],
-        max_members: 4,
-        price_per_trip: '',
-        price_range: '',
-        vehicle_info: '',
-        rules: '',
-      });
-      fetchCarpools();
-    } catch (error) {
-      console.error('Error creating carpool:', error);
-      Alert.alert('Error', 'Failed to create carpool');
-    }
-  };
-
-  const applyToCarpool = async (carpoolId: string) => {
-    if (!user) {
-      Alert.alert('Error', 'Please sign in to apply');
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('carpool_applications')
-        .insert({
-          carpool_id: carpoolId,
-          applicant_id: user.id,
-          message: 'I would like to join this carpool',
-        });
-
-      if (error) {
-        if (error.code === '23505') {
-          Alert.alert('Info', 'You have already applied to this carpool');
-        } else {
-          throw error;
-        }
+      if (!carpoolsData || carpoolsData.length === 0) {
+        console.log('📭 No carpool data found');
+        setCarpools([]);
         return;
       }
 
-      Alert.alert('Success', 'Application sent successfully!');
-    } catch (error) {
-      console.error('Error applying to carpool:', error);
-      Alert.alert('Error', 'Failed to send application');
+      // Get all creator IDs from carpools
+      const creatorIds = carpoolsData
+        .map(c => c.creator_id)
+        .filter(id => id) as string[];
+
+      console.log('👥 Creator IDs to fetch:', creatorIds);
+
+      let creatorsMap = new Map();
+      
+      if (creatorIds.length > 0) {
+        // Fetch creators with their profiles
+        const { data: creatorsData, error: creatorsError } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            user_id,
+            first_name,
+            last_name,
+            rating,
+            total_trips
+          `)
+          .in('id', creatorIds);
+
+        if (creatorsError) {
+          console.error('❌ Error fetching creators:', creatorsError);
+        } else if (creatorsData) {
+          console.log('👤 Creators fetched:', creatorsData.length);
+          
+          // Create a map for easy lookup
+          creatorsData.forEach(creator => {
+            creatorsMap.set(creator.id, {
+              id: creator.id,
+              user_id: creator.user_id,
+              profiles: {
+                first_name: creator.first_name || 'Unknown',
+                last_name: creator.last_name || 'User',
+                rating: creator.rating || 0,
+                total_trips: creator.total_trips || 0
+              }
+            });
+          });
+        }
+      }
+
+      // Format the combined data
+      const formattedData = carpoolsData.map(carpool => {
+        const creatorData = creatorsMap.get(carpool.creator_id) || {
+          id: carpool.creator_id || '',
+          user_id: '',
+          profiles: {
+            first_name: 'Unknown',
+            last_name: 'User',
+            rating: 0,
+            total_trips: 0
+          }
+        };
+
+        return {
+          ...carpool,
+          days_of_week: Array.isArray(carpool.days_of_week) ? carpool.days_of_week : [],
+          // Transform carpool data to match SchoolTransportCard interface
+          school_name: carpool.name,
+          school_area: carpool.to_location,
+          pickup_areas: [carpool.from_location],
+          pickup_times: [carpool.pickup_time],
+          capacity: carpool.max_members,
+          current_riders: carpool.current_members,
+          price_per_month: carpool.price_per_trip ? carpool.price_per_trip * 20 : 0, // Approximate monthly
+          price_per_week: carpool.price_per_trip ? carpool.price_per_trip * 5 : 0, // Approximate weekly
+          vehicle_info: carpool.vehicle_info || 'Not specified',
+          vehicle_type: carpool.vehicle_info?.includes('SUV') ? 'SUV' : 
+                       carpool.vehicle_info?.includes('Van') ? 'Van' : 
+                       carpool.vehicle_info?.includes('Sedan') ? 'Sedan' : 'Car',
+          features: [
+            ...carpool.days_of_week,
+            carpool.return_time ? 'Round Trip' : 'One Way',
+            carpool.rules ? 'Rules Apply' : 'Flexible'
+          ].filter(Boolean),
+          description: carpool.description || 'Join this carpool club!',
+          is_verified: false, // Carpool clubs don't have verification yet
+          driver_id: carpool.creator_id,
+          driver: {
+            id: creatorData.id,
+            user_id: creatorData.user_id,
+            is_verified: false, // Carpool creators aren't verified drivers
+            profiles: creatorData.profiles
+          }
+        };
+      }).filter(Boolean) as any[];
+
+      console.log('🎉 Formatted data:', {
+        length: formattedData.length,
+        firstItem: formattedData[0]
+      });
+      
+      setCarpools(formattedData);
+    } catch (error: any) {
+      console.error('💥 Critical error fetching carpools:', error);
+      
+      if (error.message?.includes('No rows returned') || 
+          error.message?.includes('no rows')) {
+        console.log('📭 No data available - showing empty state');
+        setCarpools([]);
+      } else {
+        showErrorModal('Failed to load carpool listings. Please try again.');
+      }
+    } finally {
+      console.log('🏁 fetchCarpools completed');
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const toggleDay = (day: string) => {
-    setFormData(prev => ({
-      ...prev,
-      days_of_week: prev.days_of_week.includes(day)
-        ? prev.days_of_week.filter(d => d !== day)
-        : [...prev.days_of_week, day]
-    }));
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchCarpools();
   };
 
-  const filteredCarpools = carpools.filter(carpool =>
-    carpool.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    carpool.from_location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    carpool.to_location.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Modal handlers
+  const showErrorModal = (message: string) => {
+    setModalStatus({
+      type: 'error',
+      title: 'Error',
+      message,
+    });
+    setShowStatusModal(true);
+  };
 
-  if (showCreateForm) {
+  const showSuccessModal = (message: string) => {
+    setModalStatus({
+      type: 'success',
+      title: 'Success',
+      message,
+    });
+    setShowStatusModal(true);
+  };
+
+  const showWarningModal = (title: string, message: string) => {
+    setModalStatus({
+      type: 'warning',
+      title,
+      message,
+    });
+    setShowStatusModal(true);
+  };
+
+  // Application handler
+  const handleApply = async (carpoolId: string) => {
+    if (!user) {
+      showErrorModal('Please sign in to join a carpool');
+      return;
+    }
+    
+    const carpool = carpools.find(c => c.id === carpoolId);
+    if (!carpool) {
+      showErrorModal('Carpool club not found');
+      return;
+    }
+
+    if (carpool.is_full || carpool.current_members >= carpool.max_members) {
+      showWarningModal('Full Capacity', 'This carpool club has reached its maximum capacity');
+      return;
+    }
+
+    try {
+      // Check if user is already a member or has pending request
+      // We'll need a carpool_members or carpool_requests table
+      // For now, just show the apply modal
+      setSelectedCarpool(carpoolId);
+      setShowApplyModal(true);
+    } catch (error) {
+      console.error('Error checking membership:', error);
+      showErrorModal('Failed to check membership status');
+    }
+  };
+
+  const handleSubmitApplication = async (applicationData: {
+    studentName: string;
+    grade: string;
+    pickupAddress: string;
+    parentPhone: string;
+    parentEmail: string;
+  }) => {
+    if (!selectedCarpool || !user) {
+      showErrorModal('Please sign in to apply');
+      return;
+    }
+
+    setApplyLoading(true);
+    try {
+      // Since we don't have a carpool_requests table yet,
+      // we'll update the carpool's current_members directly
+      // In production, you should create a proper join request system
+      const carpool = carpools.find(c => c.id === selectedCarpool);
+      if (!carpool) {
+        showErrorModal('Carpool not found');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('carpool_clubs')
+        .update({
+          current_members: carpool.current_members + 1,
+          is_full: carpool.current_members + 1 >= carpool.max_members
+        })
+        .eq('id', selectedCarpool);
+
+      if (error) throw error;
+
+      showSuccessModal('Successfully joined the carpool club! The creator will contact you with details.');
+      setShowApplyModal(false);
+      
+      // Refresh carpools to get updated counts
+      fetchCarpools();
+      
+    } catch (error: any) {
+      console.error('Error joining carpool:', error);
+      showErrorModal('Failed to join carpool. Please try again.');
+    } finally {
+      setApplyLoading(false);
+    }
+  };
+
+  const handleViewDetails = (carpoolId: string) => {
+    router.push(`/carpool/${carpoolId}`);
+  };
+
+  const handleCreateCarpool = () => {
+    router.push('/create-carpool');
+  };
+
+  // Filtered carpools
+  const filteredCarpools = carpools.filter(carpool => {
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase();
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setShowCreateForm(false)}>
-            <Text style={styles.backButton}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Create Carpool</Text>
-        </View>
+      carpool.name.toLowerCase().includes(query) ||
+      carpool.from_location.toLowerCase().includes(query) ||
+      carpool.to_location.toLowerCase().includes(query) ||
+      carpool.description?.toLowerCase().includes(query) ||
+      carpool.driver.profiles.first_name.toLowerCase().includes(query) ||
+      carpool.driver.profiles.last_name.toLowerCase().includes(query)
+    );
+  });
 
-        <View style={styles.formContainer}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Carpool Name *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., Morning Commute to Sandton"
-              placeholderTextColor="#888888"
-              value={formData.name}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Description</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Tell people about your carpool..."
-              placeholderTextColor="#888888"
-              value={formData.description}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-              multiline
-              numberOfLines={3}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>From Location *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Starting point"
-              placeholderTextColor="#888888"
-              value={formData.from_location}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, from_location: text }))}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>To Location *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Destination"
-              placeholderTextColor="#888888"
-              value={formData.to_location}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, to_location: text }))}
-            />
-          </View>
-
-          <View style={styles.timeRow}>
-            <View style={styles.timeInput}>
-              <Text style={styles.label}>Pickup Time *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="07:30"
-                placeholderTextColor="#888888"
-                value={formData.pickup_time}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, pickup_time: text }))}
-              />
-            </View>
-            <View style={styles.timeInput}>
-              <Text style={styles.label}>Return Time</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="17:30"
-                placeholderTextColor="#888888"
-                value={formData.return_time}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, return_time: text }))}
-              />
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Days of Week</Text>
-            <View style={styles.daysContainer}>
-              {daysOfWeek.map(day => (
-                <TouchableOpacity
-                  key={day}
-                  style={[
-                    styles.dayChip,
-                    formData.days_of_week.includes(day) && styles.dayChipSelected
-                  ]}
-                  onPress={() => toggleDay(day)}
-                >
-                  <Text style={[
-                    styles.dayChipText,
-                    formData.days_of_week.includes(day) && styles.dayChipTextSelected
-                  ]}>
-                    {day.slice(0, 3)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Max Members</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="4"
-              placeholderTextColor="#888888"
-              value={formData.max_members.toString()}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, max_members: parseInt(text) || 4 }))}
-              keyboardType="numeric"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Price per Trip (R)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="50.00"
-              placeholderTextColor="#888888"
-              value={formData.price_per_trip}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, price_per_trip: text }))}
-              keyboardType="numeric"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Vehicle Info</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., White Toyota Corolla, License: ABC123GP"
-              placeholderTextColor="#888888"
-              value={formData.vehicle_info}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, vehicle_info: text }))}
-            />
-          </View>
-
-          <TouchableOpacity style={styles.createButton} onPress={createCarpool}>
-            <Text style={styles.createButtonText}>Create Carpool</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+  // Loading state
+  if (loading && carpools.length === 0) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.skeletonHeader} />
+        <View style={styles.skeletonCard} />
+        <View style={styles.skeletonCard} />
+      </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Carpool Clubs</Text>
-        <Text style={styles.headerSubtitle}>Share rides, save money, help the environment</Text>
-      </View>
-
-      {/* Search and Create */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search carpools..."
-            placeholderTextColor="#888888"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
+    <>
+      <ScrollView 
+        style={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#1ea2b1"
+            colors={["#1ea2b1"]}
           />
+        }
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Carpool Clubs</Text>
+          <Text style={styles.subtitle}>Share rides and save on commuting</Text>
         </View>
-        <TouchableOpacity 
-          style={styles.createFab} 
-          onPress={() => setShowCreateForm(true)}
-        >
-          <Plus size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
 
-      {/* Carpools List */}
-      <View style={styles.carpoolsContainer}>
-        {loading ? (
-          <Text style={styles.loadingText}>Loading carpools...</Text>
-        ) : filteredCarpools.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Car size={48} color="#888888" />
-            <Text style={styles.emptyStateText}>No carpools found</Text>
-            <Text style={styles.emptyStateSubtext}>
-              {searchQuery ? 'Try a different search term' : 'Be the first to create one!'}
-            </Text>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchInputContainer}>
+            <Search size={20} color="#888888" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by location, destination, or creator..."
+              placeholderTextColor="#888888"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              returnKeyType="search"
+            />
           </View>
-        ) : (
-          filteredCarpools.map((carpool) => (
-            <View key={carpool.id} style={styles.carpoolCard}>
-              <View style={styles.carpoolHeader}>
-                <Text style={styles.carpoolName}>{carpool.name}</Text>
-                <View style={[
-                  styles.statusBadge,
-                  { backgroundColor: carpool.is_full ? '#ff6b35' : '#1ea2b1' }
-                ]}>
-                  <Text style={styles.statusText}>
-                    {carpool.is_full ? 'Full' : 'Available'}
-                  </Text>
-                </View>
-              </View>
+          <TouchableOpacity 
+            style={styles.filterButton}
+            onPress={() => setShowFilters(!showFilters)}
+          >
+            <Filter size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
 
-              <Text style={styles.carpoolCreator}>
-                Created by {carpool.profiles?.first_name} {carpool.profiles?.last_name}
-              </Text>
-
-              {carpool.description && (
-                <Text style={styles.carpoolDescription}>{carpool.description}</Text>
-              )}
-
-              <View style={styles.routeInfo}>
-                <MapPin size={16} color="#1ea2b1" />
-                <Text style={styles.routeText}>
-                  {carpool.from_location} → {carpool.to_location}
-                </Text>
-              </View>
-
-              <View style={styles.carpoolDetails}>
-                <View style={styles.detailItem}>
-                  <Clock size={16} color="#888888" />
-                  <Text style={styles.detailText}>
-                    {carpool.pickup_time}
-                    {carpool.return_time && ` - ${carpool.return_time}`}
-                  </Text>
-                </View>
-
-                <View style={styles.detailItem}>
-                  <Users size={16} color="#888888" />
-                  <Text style={styles.detailText}>
-                    {carpool.current_members}/{carpool.max_members} members
-                  </Text>
-                </View>
-
-                {carpool.price_per_trip && (
-                  <View style={styles.detailItem}>
-                    <DollarSign size={16} color="#888888" />
-                    <Text style={styles.detailText}>R{carpool.price_per_trip}/trip</Text>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.daysContainer}>
-                {carpool.days_of_week.map(day => (
-                  <View key={day} style={styles.dayTag}>
-                    <Text style={styles.dayTagText}>{day.slice(0, 3)}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {!carpool.is_full && carpool.creator_id !== user?.id && (
-                <TouchableOpacity 
-                  style={styles.applyButton}
-                  onPress={() => applyToCarpool(carpool.id)}
-                >
-                  <Text style={styles.applyButtonText}>Apply to Join</Text>
-                </TouchableOpacity>
-              )}
-
-              {carpool.creator_id === user?.id && (
-                <View style={styles.ownerBadge}>
-                  <Text style={styles.ownerBadgeText}>Your Carpool</Text>
-                </View>
-              )}
-            </View>
-          ))
+        {/* Filters */}
+        {showFilters && (
+          <TransportFilters
+            filters={filters}
+            onFiltersChange={setFilters}
+            onClose={() => setShowFilters(false)}
+            // Override filter labels for carpool
+            filterConfig={{
+              schoolArea: { label: 'Destination', icon: MapPin },
+              pickupArea: { label: 'Pickup Location', icon: MapPin },
+              minPrice: { label: 'Min Price per Trip', icon: '$' },
+              maxPrice: { label: 'Max Price per Trip', icon: '$' },
+              vehicleType: { label: 'Vehicle Type', icon: Car },
+            }}
+          />
         )}
-      </View>
-    </ScrollView>
+
+        {/* Stats */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Car size={20} color="#1ea2b1" />
+            <Text style={styles.statNumber}>{carpools.length}</Text>
+            <Text style={styles.statLabel}>Clubs</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <UsersIcon size={20} color="#10B981" />
+            <Text style={styles.statNumber}>
+              {carpools.reduce((sum, c) => sum + c.current_members, 0)}
+            </Text>
+            <Text style={styles.statLabel}>Members</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Clock size={20} color="#F59E0B" />
+            <Text style={styles.statNumber}>
+              {carpools.filter(c => !c.is_full).length}
+            </Text>
+            <Text style={styles.statLabel}>Open</Text>
+          </View>
+        </View>
+
+        {/* Carpool Listings */}
+        <View style={styles.carpoolsContainer}>
+          {filteredCarpools.length === 0 ? (
+            <View style={styles.emptyState}>
+              <UsersIcon size={48} color="#888888" />
+              <Text style={styles.emptyStateText}>
+                {searchQuery || Object.values(filters).some(f => 
+                  Array.isArray(f) ? f.length > 0 : f !== '' && f !== false
+                ) 
+                  ? 'No matching carpool clubs found' 
+                  : 'No carpool clubs available yet'}
+              </Text>
+              <Text style={styles.emptyStateSubtext}>
+                {searchQuery ? 'Try a different search term' : 'Be the first to create a carpool club'}
+              </Text>
+              <TouchableOpacity 
+                style={styles.createCarpoolButton}
+                onPress={handleCreateCarpool}
+              >
+                <Text style={styles.createCarpoolText}>Create Carpool Club</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            filteredCarpools.map((carpool) => (
+              <SchoolTransportCard
+                key={carpool.id}
+                transport={carpool}
+                onApply={() => handleApply(carpool.id)}
+                onViewDetails={() => handleViewDetails(carpool.id)}
+                // Override button text for carpool
+                applyButtonText="Join Club"
+                detailsButtonText="View Details"
+              />
+            ))
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Modals */}
+      <ApplyModal
+        visible={showApplyModal}
+        onClose={() => {
+          setShowApplyModal(false);
+          setSelectedCarpool(null);
+        }}
+        onSubmit={handleSubmitApplication}
+        loading={applyLoading}
+        // Customize modal for carpool
+        title="Join Carpool Club"
+        submitButtonText="Join Club"
+        fields={[
+          {
+            label: 'Your Name',
+            placeholder: 'Enter your full name',
+            key: 'studentName'
+          },
+          {
+            label: 'Pickup Address',
+            placeholder: 'Your exact pickup location',
+            key: 'pickupAddress'
+          },
+          {
+            label: 'Phone Number',
+            placeholder: 'Your contact number',
+            key: 'parentPhone'
+          },
+          {
+            label: 'Email',
+            placeholder: 'Your email address',
+            key: 'parentEmail'
+          }
+        ]}
+      />
+
+      <StatusModal
+        visible={showStatusModal}
+        type={modalStatus.type}
+        title={modalStatus.title}
+        message={modalStatus.message}
+        onClose={() => setShowStatusModal(false)}
+      />
+    </>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
   },
-  scrollContent: {
-    paddingBottom: 100,
-  },
   header: {
     padding: 24,
-    paddingTop: 30,
+    paddingTop: 40,
   },
-  backButton: {
-    color: '#1ea2b1',
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  headerTitle: {
+  title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
-  headerSubtitle: {
+  subtitle: {
     fontSize: 16,
     color: '#888888',
     marginTop: 4,
   },
   searchContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: 16,
     marginBottom: 16,
   },
   searchInputContainer: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#111111',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#333333',
+    marginRight: 12,
+  },
+  searchIcon: {
+    marginLeft: 16,
   },
   searchInput: {
+    flex: 1,
     padding: 16,
     color: '#FFFFFF',
     fontSize: 16,
   },
-  createFab: {
+  filterButton: {
     backgroundColor: '#1ea2b1',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 50,
+    height: 50,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#111111',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: '#333333',
+  },
+  statNumber: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 8,
+  },
+  statLabel: {
+    color: '#888888',
+    fontSize: 12,
+    marginTop: 4,
   },
   carpoolsContainer: {
     paddingHorizontal: 16,
-  },
-  loadingText: {
-    color: '#FFFFFF',
-    textAlign: 'center',
-    fontSize: 16,
-    marginTop: 40,
+    paddingBottom: 100,
   },
   emptyState: {
     alignItems: 'center',
@@ -513,176 +657,31 @@ const styles = StyleSheet.create({
     color: '#888888',
     fontSize: 14,
     marginTop: 8,
+    textAlign: 'center',
   },
-  carpoolCard: {
-    backgroundColor: '#111111',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  carpoolHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  carpoolName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    flex: 1,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  statusText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  carpoolCreator: {
-    color: '#888888',
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  carpoolDescription: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  routeInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  routeText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  carpoolDetails: {
-    marginBottom: 16,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  detailText: {
-    color: '#888888',
-    fontSize: 14,
-    marginLeft: 8,
-  },
-  daysContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 16,
-  },
-  dayTag: {
+  createCarpoolButton: {
     backgroundColor: '#1ea2b1',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginRight: 8,
-    marginBottom: 4,
-  },
-  dayTagText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  applyButton: {
-    backgroundColor: '#1ea2b1',
+    paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  applyButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  ownerBadge: {
-    backgroundColor: '#333333',
-    paddingVertical: 8,
     borderRadius: 8,
-    alignItems: 'center',
-  },
-  ownerBadgeText: {
-    color: '#888888',
-    fontSize: 14,
-  },
-  formContainer: {
-    padding: 16,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#222222',
-    borderRadius: 12,
-    padding: 16,
-    color: '#FFFFFF',
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#444444',
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  timeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  timeInput: {
-    flex: 0.48,
-  },
-  daysContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  dayChip: {
-    backgroundColor: '#333333',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  dayChipSelected: {
-    backgroundColor: '#1ea2b1',
-  },
-  dayChipText: {
-    color: '#888888',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  dayChipTextSelected: {
-    color: '#FFFFFF',
-  },
-  createButton: {
-    backgroundColor: '#1ea2b1',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
     marginTop: 20,
   },
-  createButtonText: {
+  createCarpoolText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
+  },
+  skeletonHeader: {
+    height: 120,
+    backgroundColor: '#111111',
+    margin: 16,
+    borderRadius: 12,
+  },
+  skeletonCard: {
+    height: 180,
+    backgroundColor: '#111111',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
   },
 });
