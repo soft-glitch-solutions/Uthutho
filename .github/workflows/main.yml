@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+      - shaqeel
+      - makhi
+      - ishmael
 
 jobs:
   deploy:
@@ -20,7 +23,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
-        # ✅ Ignores peer dependency mismatches safely in CI only
 
       - name: Build the app
         env:
@@ -29,7 +31,20 @@ jobs:
         run: |
           npm install undici@5.22.1 --save-exact --legacy-peer-deps
           npx expo export -p web
-        # ✅ No conflict, Expo web export works fine
+
+      # 🔥 Set deployment directory based on branch
+      - name: Set deploy directory
+        id: set-dir
+        run: |
+          if [[ "${GITHUB_REF##*/}" == "shaqeel" ]]; then
+            echo "DIR=/shaqeel.uthutho.co.za/" >> $GITHUB_OUTPUT
+          elif [[ "${GITHUB_REF##*/}" == "makhi" ]]; then
+            echo "DIR=/makhi.uthutho.co.za/" >> $GITHUB_OUTPUT
+          elif [[ "${GITHUB_REF##*/}" == "ishmael" ]]; then
+            echo "DIR=/ishmael.uthutho.co.za/" >> $GITHUB_OUTPUT
+          else
+            echo "DIR=/mobile.uthutho.co.za/" >> $GITHUB_OUTPUT
+          fi
 
       - name: Deploy to cPanel via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
@@ -40,5 +55,5 @@ jobs:
           protocol: ftp
           port: ${{ secrets.FTP_PORT }}
           local-dir: dist/
-          server-dir: /mobile.uthutho.co.za/
+          server-dir: ${{ steps.set-dir.outputs.DIR }}
           cleanup: true
