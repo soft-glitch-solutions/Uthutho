@@ -7,6 +7,7 @@ on:
       - shaqeel
       - Mahki
       - Ishmael
+      - mirror
 
 jobs:
   deploy:
@@ -40,6 +41,8 @@ jobs:
             echo "DIR=/shaqeel.uthutho.co.za/" >> $GITHUB_OUTPUT
           elif [[ "${GITHUB_REF##*/}" == "Mahki" ]]; then
             echo "DIR=/makhi.uthutho.co.za/" >> $GITHUB_OUTPUT
+          elif [[ "${GITHUB_REF##*/}" == "mirror" ]]; then
+            echo "DIR=/mirror.uthutho.co.za/" >> $GITHUB_OUTPUT
           elif [[ "${GITHUB_REF##*/}" == "Ishmael" ]]; then
             echo "DIR=/ishmael.uthutho.co.za/" >> $GITHUB_OUTPUT
           else
