@@ -5,8 +5,9 @@ on:
     branches:
       - main
       - shaqeel
-      - makhi
-      - ishmael
+      - Mahki
+      - Ishmael
+      - mirror
 
 jobs:
   deploy:
@@ -38,9 +39,11 @@ jobs:
         run: |
           if [[ "${GITHUB_REF##*/}" == "shaqeel" ]]; then
             echo "DIR=/shaqeel.uthutho.co.za/" >> $GITHUB_OUTPUT
-          elif [[ "${GITHUB_REF##*/}" == "makhi" ]]; then
+          elif [[ "${GITHUB_REF##*/}" == "Mahki" ]]; then
             echo "DIR=/makhi.uthutho.co.za/" >> $GITHUB_OUTPUT
-          elif [[ "${GITHUB_REF##*/}" == "ishmael" ]]; then
+          elif [[ "${GITHUB_REF##*/}" == "mirror" ]]; then
+            echo "DIR=/mirror.uthutho.co.za/" >> $GITHUB_OUTPUT
+          elif [[ "${GITHUB_REF##*/}" == "Ishmael" ]]; then
             echo "DIR=/ishmael.uthutho.co.za/" >> $GITHUB_OUTPUT
           else
             echo "DIR=/mobile.uthutho.co.za/" >> $GITHUB_OUTPUT
