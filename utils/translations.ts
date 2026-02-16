@@ -11,7 +11,7 @@ export const translations = {
     
     // Home
     greeting: 'Sawubona',
-    ready_journey: 'Ready for your journey?',
+    ready_journey: 'Ready your journey?',
     your_location: 'Your Location',
     nearest_hub: 'Nearest Hub',
     nearest_stop: 'Nearest Stop',
