@@ -1,9 +1,8 @@
-import React, { useRef, useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated, Dimensions } from 'react-native';
-import { Flag, MapPin } from 'lucide-react-native';
+import React, { useRef } from 'react';
+import { View, Text, Pressable, StyleSheet, Animated, ScrollView, ImageBackground } from 'react-native';
+import { MapPin } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import StopBlock from '@/components/stop/StopBlock';
-import HubFollowButton from '@/components/hub/HubFollowButton';
 
 interface NearbyCardsProps {
   userLocation: {
@@ -13,9 +12,10 @@ interface NearbyCardsProps {
   nearestLocations: {
     nearestStop: any;
     nearestHub: any;
+    nearestStops?: any[];
   } | null;
   handleNearestStopPress: (stopId: string) => void;
-  handleNearestHubPress: (hubId: string) => void;
+  handleNearestHubPress?: (hubId: string) => void;
   calculateWalkingTime: (lat1: number, lng1: number, lat2: number, lng2: number) => number;
   hasActiveJourney: boolean;
   onMarkAsWaiting: (locationId: string, locationType: string, locationName: string) => void;
@@ -30,38 +30,42 @@ interface LocationCardProps {
   colors: any;
   calculateWalkingTime: (lat1: number, lng1: number, lat2: number, lng2: number) => number;
   onPress: () => void;
-  type: 'stop' | 'hub';
 }
 
 const NearbyCards: React.FC<NearbyCardsProps> = ({
   userLocation,
   nearestLocations,
   handleNearestStopPress,
-  handleNearestHubPress,
   calculateWalkingTime,
 }) => {
   const { colors } = useTheme();
+  const stops = nearestLocations?.nearestStops || (nearestLocations?.nearestStop ? [nearestLocations.nearestStop] : []);
+
+  if (stops.length === 0) {
+    return (
+      <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
+        <Text style={[styles.emptyText, { color: colors.text }]}>No stops found nearby.</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.grid}>
-      <LocationCard
-        location={nearestLocations?.nearestStop}
-        userLocation={userLocation}
-        colors={colors}
-        calculateWalkingTime={calculateWalkingTime}
-        onPress={() => nearestLocations?.nearestStop && handleNearestStopPress(nearestLocations.nearestStop.id)}
-        type="stop"
-      />
-      
-      <LocationCard
-        location={nearestLocations?.nearestHub}
-        userLocation={userLocation}
-        colors={colors}
-        calculateWalkingTime={calculateWalkingTime}
-        onPress={() => nearestLocations?.nearestHub && handleNearestHubPress(nearestLocations.nearestHub.id)}
-        type="hub"
-      />
-    </View>
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.carouselContainer}
+    >
+      {stops.map((stop, index) => (
+        <LocationCard
+          key={stop.id || index}
+          location={stop}
+          userLocation={userLocation}
+          colors={colors}
+          calculateWalkingTime={calculateWalkingTime}
+          onPress={() => handleNearestStopPress(stop.id)}
+        />
+      ))}
+    </ScrollView>
   );
 };
 
@@ -71,9 +75,7 @@ const LocationCard: React.FC<LocationCardProps> = ({
   colors,
   calculateWalkingTime,
   onPress,
-  type
 }) => {
-  const isStop = type === 'stop';
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
 
@@ -108,125 +110,122 @@ const LocationCard: React.FC<LocationCardProps> = ({
   };
 
   const handlePress = () => {
-    // Add a small delay to ensure animation completes before navigation
     setTimeout(() => {
       onPress();
     }, 150);
   };
+
+  const imageUrl = location.image_url || 'https://images.caxton.co.za/wp-content/uploads/sites/10/2023/03/IMG_9281_07602-e1680074626338-780x470.jpg';
 
   return (
     <Pressable
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={handlePress}
-      android_ripple={{ color: colors.ripple || 'rgba(255, 255, 255, 0.2)', borderless: false }}
+      android_ripple={{ color: 'rgba(255, 255, 255, 0.2)', borderless: false }}
       style={({ pressed }) => [
         styles.pressable,
         pressed && styles.pressed // iOS fallback
       ]}
     >
-      {({ pressed }) => (
-        <Animated.View
-          style={[
-            styles.card,
-            { 
-              backgroundColor: colors.primary,
-              transform: [{ scale: scaleAnim }],
-              opacity: opacityAnim,
-              minHeight: 160, // Fixed minimum height
-            }
-          ]}
+      <Animated.View
+        style={[
+          styles.cardContainer,
+          { 
+            transform: [{ scale: scaleAnim }],
+            opacity: opacityAnim,
+          }
+        ]}
+      >
+        <ImageBackground
+          source={{ uri: imageUrl }}
+          style={styles.imageBackground}
+          imageStyle={styles.imageStyle}
         >
-          <View style={styles.headerContainer}>
-            <View style={styles.favoriteItem}>
-              {isStop ? (
-                <Flag size={24} color={colors.text} />
-              ) : (
-                <MapPin size={24} color={colors.text} />
-              )}
-              <Text style={[styles.cardTitle, { color: colors.text, marginLeft: 8 }]}>
-                Nearest {isStop ? 'Stop' : 'Hub'}
-              </Text>
-            </View>
-          </View>
+          <View style={styles.darkOverlay} />
           
-          <View style={styles.contentContainer}>
-            {location ? (
-              <>
-                <View style={styles.textContainer}>
-                  <Text 
-                    style={[styles.cardText, { color: colors.text }]}
-                    numberOfLines={2} // Limit to 2 lines
-                    ellipsizeMode="tail"
-                  >
-                    {location.name}
-                  </Text>
-                  <Text style={[styles.distanceText, { color: colors.text }]}>
-                    {calculateWalkingTime(
-                      userLocation.lat,
-                      userLocation.lng,
-                      location.latitude,
-                      location.longitude
-                    )} min walk
-                  </Text>
-                </View>
-                
-                <View style={styles.actionContainer}>
-                  {isStop ? (
-                    <StopBlock
-                      stopId={location.id}
-                      stopName={location.name}
-                      stopLocation={{
-                        latitude: location.latitude,
-                        longitude: location.longitude,
-                      }}
-                      colors={colors}
-                      radius={0.5}
-                    />
-                  ) : (
-                    <HubFollowButton
-                      hubId={location.id}
-                      hubName={location.name}
-                      colors={colors}
-                    />
-                  )}
-                </View>
-              </>
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Text style={[styles.emptyText, { color: colors.text }]}>
-                  No {isStop ? 'stops' : 'hubs'} found.
+          <View style={styles.contentOverlay}>
+            <View style={styles.headerContainer}>
+              <View style={styles.favoriteItem}>
+                <MapPin size={20} color="#ffffff" />
+                <Text style={styles.cardTitle}>Nearby Stop</Text>
+              </View>
+            </View>
+            
+            <View style={styles.contentBottom}>
+              <View style={styles.textContainer}>
+                <Text 
+                  style={styles.cardText}
+                  numberOfLines={2}
+                  ellipsizeMode="tail"
+                >
+                  {location.name}
+                </Text>
+                <Text style={styles.distanceText}>
+                  {calculateWalkingTime(
+                    userLocation.lat,
+                    userLocation.lng,
+                    location.latitude,
+                    location.longitude
+                  )} min walk
                 </Text>
               </View>
-            )}
+              
+              <View style={styles.actionContainer}>
+                <StopBlock
+                  stopId={location.id}
+                  stopName={location.name}
+                  stopLocation={{
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                  }}
+                  colors={colors}
+                  radius={0.5}
+                />
+              </View>
+            </View>
           </View>
-        </Animated.View>
-      )}
+        </ImageBackground>
+      </Animated.View>
     </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  carouselContainer: {
     gap: 12,
+    paddingRight: 16,
   },
   pressable: {
-    flex: 1,
-    minWidth: '48%',
-    borderRadius: 8,
-    overflow: 'hidden', // Important for ripple effect
+    width: 260,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
-  card: {
-    flex: 1, // Make card fill the Pressable
-    borderRadius: 8,
-    padding: 16,
+  cardContainer: {
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
+    backgroundColor: '#000', // To prevent weird background flashes
+  },
+  imageBackground: {
+    width: '100%',
+    minHeight: 180,
+  },
+  imageStyle: {
+    borderRadius: 12,
+  },
+  darkOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    borderRadius: 12,
+  },
+  contentOverlay: {
+    flex: 1,
+    padding: 16,
+    justifyContent: 'space-between',
   },
   headerContainer: {
     marginBottom: 12,
@@ -234,41 +233,54 @@ const styles = StyleSheet.create({
   favoriteItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
   },
-  contentContainer: {
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginLeft: 6,
+  },
+  contentBottom: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
   },
   textContainer: {
     marginBottom: 12,
   },
-  actionContainer: {
-    marginTop: 'auto', // Push to bottom
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardTitle: {
+  cardText: {
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  cardText: {
-    fontSize: 14,
-    fontWeight: '500',
+    color: '#ffffff',
     marginBottom: 4,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   distanceText: {
-    fontSize: 12,
-    opacity: 0.8,
+    fontSize: 13,
+    color: '#e0e0e0',
+    fontWeight: '500',
+  },
+  actionContainer: {
+    marginTop: 8,
+  },
+  emptyContainer: {
+    padding: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyText: {
-    fontSize: 14,
-    textAlign: 'center',
+    fontSize: 15,
+    opacity: 0.8,
   },
   pressed: {
-    opacity: 0.8, // Fallback for iOS when animated driver fails
+    opacity: 0.8,
   },
 });
 

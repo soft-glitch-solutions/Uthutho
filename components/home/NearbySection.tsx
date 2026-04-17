@@ -37,7 +37,7 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
   return (
     <View style={[styles.section, isDesktop && styles.sectionDesktop]}>
       <Text style={[styles.sectionTitle, { color: colors.text }, isDesktop && styles.sectionTitleDesktop]}>
-        Nearby You
+        Nearby Stops
       </Text>
       
       {locationError ? (

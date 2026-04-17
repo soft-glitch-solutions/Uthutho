@@ -9,7 +9,7 @@ import {
   ScrollView,
   Animated,
 } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -141,6 +141,27 @@ const MapVisualization = ({ stops, currentStopIndex, userLocation }) => {
         <View style={styles.userMarkerPulse} />
       </View>
 
+      {/* Search Location Marker */}
+      {searchLat && searchLng && (
+        <View 
+          style={[
+            styles.userMarker, 
+            { 
+              top: 100, 
+              left: SCREEN_WIDTH / 2, 
+              backgroundColor: '#ef4444',
+              borderRadius: 20,
+              padding: 8
+            }
+          ]}
+        >
+          <MapPin size={24} color="#ffffff" />
+          <View style={styles.currentStopIndicator}>
+            <Text style={styles.currentStopText}>{searchLabel || 'Destination'}</Text>
+          </View>
+        </View>
+      )}
+
       {/* Legend */}
       <View style={styles.mapLegend}>
         <View style={styles.legendItem}>
@@ -162,7 +183,12 @@ const MapVisualization = ({ stops, currentStopIndex, userLocation }) => {
 
 export default function JourneyMapScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const { activeJourney } = useJourney();
+
+  const searchLat = params.latitude ? parseFloat(params.latitude as string) : null;
+  const searchLng = params.longitude ? parseFloat(params.longitude as string) : null;
+  const searchLabel = params.label as string;
   
   const fadeAnim = useState(new Animated.Value(0))[0];
   const slideAnim = useState(new Animated.Value(20))[0];

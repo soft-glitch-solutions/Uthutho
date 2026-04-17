@@ -1,34 +1,39 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  ScrollView, 
-  TextInput, 
-  TouchableOpacity, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
   Alert,
   Dimensions,
   Platform,
   SafeAreaView,
+  Animated,
+  Easing
 } from 'react-native';
-import { 
-  Search, 
-  MapPin, 
-  Navigation, 
-  Bookmark, 
-  BookmarkCheck, 
-  Users, 
-  Clock, 
+import {
+  Search,
+  MapPin,
+  Navigation,
+  Bookmark,
+  BookmarkCheck,
+  Users,
+  Clock,
   DollarSign,
   ArrowLeft,
   X,
-  Star
+  Mic,
+  Star,
+  Map
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useFavorites, FavoriteItem } from '@/hook/useFavorites';
 import { useAuth } from '@/hook/useAuth';
-import { useRouter } from 'expo-router';
+import { useTheme } from '@/context/ThemeContext';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -37,15 +42,17 @@ const isDesktop = SCREEN_WIDTH >= 1024;
 interface SearchResult {
   id: string;
   name: string;
-  type: 'route' | 'stop' | 'hub' | 'nearby_spot';
+  type: 'route' | 'stop' | 'hub' | 'nearby_spot' | 'address';
   data: any;
   distance?: number;
+  coords?: { latitude: number; longitude: number };
+  contextTitle?: string;
 }
 
 // Skeleton Loading Component
 const SkeletonLoader = ({ isDesktop: propIsDesktop = false }) => {
   const desktopMode = isDesktop || propIsDesktop;
-  
+
   return (
     <View style={[styles.skeletonContainer, desktopMode && styles.skeletonContainerDesktop]}>
       {[1, 2, 3, 4, 5].map((item) => (
@@ -69,16 +76,16 @@ const SkeletonLoader = ({ isDesktop: propIsDesktop = false }) => {
 };
 
 // Follow Button Component
-const FollowButton = ({ 
-  isFollowing, 
-  onToggle, 
-  loading, 
+const FollowButton = ({
+  isFollowing,
+  onToggle,
+  loading,
   followerCount,
-  isDesktop = false 
-}: { 
-  isFollowing: boolean; 
-  onToggle: () => void; 
-  loading: boolean; 
+  isDesktop = false
+}: {
+  isFollowing: boolean;
+  onToggle: () => void;
+  loading: boolean;
   followerCount: number;
   isDesktop?: boolean;
 }) => {
@@ -134,12 +141,12 @@ const FollowButton = ({
 };
 
 // Header Component with Back Button
-const HeaderWithBack = ({ 
-  onBack, 
+const HeaderWithBack = ({
+  onBack,
   title = "Explore Communities",
   subtitle = "Discover and follow routes, stops, and hubs in your community",
-  isDesktop = false 
-}: { 
+  isDesktop = false
+}: {
   onBack?: () => void;
   title?: string;
   subtitle?: string;
@@ -162,7 +169,7 @@ const HeaderWithBack = ({
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <ArrowLeft size={24} color="#ffffff" />
         </TouchableOpacity>
-        
+
         <View style={[styles.headerTitleContainer, isDesktop && styles.headerTitleContainerDesktop]}>
           <Text style={[styles.headerTitle, isDesktop && styles.headerTitleDesktop]}>
             {title}
@@ -179,6 +186,35 @@ const HeaderWithBack = ({
 };
 
 export default function SearchScreen() {
+  const slideAnim = React.useRef(new Animated.Value(30)).current;
+  const opacityAnim = React.useRef(new Animated.Value(0)).current;
+
+  useFocusEffect(
+    useCallback(() => {
+      // Reset values before animating
+      slideAnim.setValue(30);
+      opacityAnim.setValue(0);
+
+      Animated.parallel([
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      return () => {
+        // Optional cleanup if needed when screen loses focus
+      };
+    }, [slideAnim, opacityAnim])
+  );
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -191,6 +227,7 @@ export default function SearchScreen() {
   const router = useRouter();
   const { favorites, addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
   const { user } = useAuth();
+  const { colors } = useTheme();
 
   const filters = [
     { key: 'all', label: 'All', icon: Search },
@@ -238,17 +275,17 @@ export default function SearchScreen() {
     const R = 6371; // Earth's radius in kilometers
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
 
   const loadRecommendedNearby = async () => {
     if (!userLocation) return;
-    
+
     setIsLoadingRecommended(true);
     try {
       const results: SearchResult[] = [];
@@ -325,7 +362,7 @@ export default function SearchScreen() {
         }
         return 0;
       });
-      
+
       setRecommendedNearby(sortedResults.slice(0, 8));
       populateFollowerCounts(sortedResults);
     } catch (error) {
@@ -453,10 +490,69 @@ export default function SearchScreen() {
         }
       }
 
-      // Sort by distance if location is available
-      if (userLocation) {
-        results.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+      // 5. Search for Physical Addresses (Geocoding)
+      if (selectedFilter === 'all' || selectedFilter === 'nearby_spot') {
+        try {
+          const geocoded = await Location.geocodeAsync(searchQuery);
+          if (geocoded && geocoded.length > 0) {
+            const first = geocoded[0];
+            results.push({
+              id: `address-${first.latitude}-${first.longitude}`,
+              name: searchQuery,
+              type: 'address',
+              data: { ...first, address: searchQuery },
+              coords: first,
+            });
+
+            // NOW: Find transit stops near this geocoded address
+            const { data: nearbyStops } = await supabase
+              .from('stops')
+              .select('*'); // Fetch more to ensure we find nearby ones
+
+            if (nearbyStops) {
+              const matchedStops: SearchResult[] = [];
+              nearbyStops.forEach(stop => {
+                const distance = calculateDistance(
+                  first.latitude,
+                  first.longitude,
+                  stop.latitude,
+                  stop.longitude
+                );
+
+                if (distance < 3) { // Only show stops within 3km of the searched address
+                  matchedStops.push({
+                    id: `nearby-stop-${stop.id}`,
+                    name: stop.name,
+                    type: 'stop',
+                    data: stop,
+                    distance,
+                    contextTitle: `Near ${searchQuery}`
+                  });
+                }
+              });
+
+              // Add top 4 closest stops
+              results.push(...matchedStops.sort((a, b) => (a.distance || 0) - (b.distance || 0)).slice(0, 4));
+            }
+          }
+        } catch (error) {
+          console.warn('Geocoding error:', error);
+        }
       }
+
+      // Sort results
+      // Keep exact name matches higher if possible, but sort by distance where it makes sense
+      results.sort((a, b) => {
+        // Address results should probably stay near the top
+        if (a.type === 'address' && b.type !== 'address') return -1;
+        if (b.type === 'address' && a.type !== 'address') return 1;
+        
+        // Then sort by distance if available
+        if (a.distance !== undefined && b.distance !== undefined) {
+          return a.distance - b.distance;
+        }
+        return 0;
+      });
 
       setSearchResults(results);
       populateFollowerCounts(results);
@@ -475,11 +571,12 @@ export default function SearchScreen() {
     }
 
     // Map result.type to your favorites entity_type
-    const entityType: 'route' | 'hub' | 'stop' = result.type as 'route' | 'hub' | 'stop';
-    if (entityType === 'nearby_spot') {
-      Alert.alert('Not Supported', 'Nearby spots cannot be bookmarked yet.');
+    if (result.type === 'address' || result.type === 'nearby_spot') {
+      Alert.alert('Coming Soon', 'Saving addresses and spots to favorites is not yet supported.');
       return;
     }
+
+    const entityType: 'route' | 'hub' | 'stop' = result.type as 'route' | 'hub' | 'stop';
 
     const id = result.id;
     const isFav = isFavorite(id);
@@ -489,9 +586,9 @@ export default function SearchScreen() {
     setTogglingFavorites(prev => ({ ...prev, [id]: true }));
 
     // Optimistic UI update
-    setFavoritesCountMap(prev => ({ 
-      ...prev, 
-      [id]: Math.max(0, (prev[id] || 0) + delta) 
+    setFavoritesCountMap(prev => ({
+      ...prev,
+      [id]: Math.max(0, (prev[id] || 0) + delta)
     }));
 
     try {
@@ -524,18 +621,18 @@ export default function SearchScreen() {
         });
         if (bumpErr) console.warn('bump_favorites_count failed:', bumpErr);
 
-        await addToFavorites({ 
-          id, 
-          type: entityType, 
-          name: result.name, 
-          data: result.data 
+        await addToFavorites({
+          id,
+          type: entityType,
+          name: result.name,
+          data: result.data
         });
       }
     } catch (e) {
       // Revert optimistic change on error
-      setFavoritesCountMap(prev => ({ 
-        ...prev, 
-        [id]: Math.max(0, (prev[id] || 0) - delta) 
+      setFavoritesCountMap(prev => ({
+        ...prev,
+        [id]: Math.max(0, (prev[id] || 0) - delta)
       }));
       console.error('Favorite toggle failed:', e);
       Alert.alert('Error', 'Could not update favorites. Please try again.');
@@ -550,11 +647,16 @@ export default function SearchScreen() {
       case 'stop': return MapPin;
       case 'hub': return MapPin;
       case 'nearby_spot': return MapPin;
+      case 'address': return Map;
       default: return MapPin;
     }
   };
 
   const getResultSubtitle = (result: SearchResult) => {
+    if (result.contextTitle) {
+      return `${result.contextTitle} • ${result.distance?.toFixed(1)}km away`;
+    }
+
     switch (result.type) {
       case 'route':
         return `${result.data.start_point} → ${result.data.end_point} • R${result.data.cost}`;
@@ -564,6 +666,8 @@ export default function SearchScreen() {
         return `${result.data.address || 'Transport Hub'}${result.distance ? ` • ${result.distance.toFixed(1)}km away` : ''}`;
       case 'nearby_spot':
         return `${result.data.category || 'Point of Interest'}${result.distance ? ` • ${result.distance.toFixed(1)}km away` : ''}`;
+      case 'address':
+        return `${result.data.street || ''} ${result.data.city || 'Location'}`;
       default:
         return '';
     }
@@ -591,14 +695,24 @@ export default function SearchScreen() {
           // You might want to create a nearby-spot-details screen
           router.push(`/nearby/${result.id}`);
           break;
+        case 'address':
+          router.push({
+            pathname: '/Map',
+            params: { 
+              latitude: result.coords?.latitude, 
+              longitude: result.coords?.longitude,
+              label: result.name
+            }
+          });
+          break;
         default:
           console.warn('Unknown result type:', result.type);
       }
     };
-    
+
     return (
-      <TouchableOpacity 
-        key={result.id} 
+      <TouchableOpacity
+        key={result.id}
         style={[styles.resultCard, isDesktop && styles.resultCardDesktop]}
         onPress={handlePress}
       >
@@ -616,7 +730,7 @@ export default function SearchScreen() {
               </Text>
             </View>
           </View>
-          
+
           {result.type !== 'nearby_spot' && (
             <FollowButton
               isFollowing={isResultFavorite}
@@ -627,7 +741,7 @@ export default function SearchScreen() {
             />
           )}
         </View>
-        
+
         <View style={[styles.resultMeta, isDesktop && styles.resultMetaDesktop]}>
           <View style={[styles.resultType, isDesktop && styles.resultTypeDesktop]}>
             <Text style={[styles.resultTypeText, isDesktop && styles.resultTypeTextDesktop]}>
@@ -649,29 +763,29 @@ export default function SearchScreen() {
   };
 
   const populateFollowerCounts = async (items: SearchResult[]) => {
-    const byType: Record<'route'|'hub'|'stop', string[]> = { route: [], hub: [], stop: [] };
-    items.forEach(r => { 
+    const byType: Record<'route' | 'hub' | 'stop', string[]> = { route: [], hub: [], stop: [] };
+    items.forEach(r => {
       if (r.type === 'route' || r.type === 'hub' || r.type === 'stop') {
         byType[r.type].push(r.id);
       }
     });
 
     const newMap: Record<string, number> = {};
-    const fetchType = async (type: 'route'|'hub'|'stop') => {
+    const fetchType = async (type: 'route' | 'hub' | 'stop') => {
       if (!byType[type].length) return;
       const { data } = await supabase
         .from('favorites')
         .select('entity_id')
         .eq('entity_type', type)
         .in('entity_id', byType[type]);
-      (data || []).forEach(f => { 
-        newMap[f.entity_id] = (newMap[f.entity_id] || 0) + 1; 
+      (data || []).forEach(f => {
+        newMap[f.entity_id] = (newMap[f.entity_id] || 0) + 1;
       });
     };
 
     await Promise.all([
-      fetchType('route'), 
-      fetchType('hub'), 
+      fetchType('route'),
+      fetchType('hub'),
       fetchType('stop')
     ]);
     setFavoritesCountMap(prev => ({ ...prev, ...newMap }));
@@ -679,45 +793,53 @@ export default function SearchScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, isDesktop && styles.safeAreaDesktop]}>
-      <View style={[styles.container, isDesktop && styles.containerDesktop]}>
+      <Animated.View 
+        style={[
+          styles.container, 
+          isDesktop && styles.containerDesktop,
+          {
+            opacity: opacityAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
         {/* Desktop layout with centered content */}
         {isDesktop ? (
-          <ScrollView 
+          <ScrollView
             style={styles.desktopScrollWrapper}
             contentContainerStyle={styles.desktopScrollContent}
             showsVerticalScrollIndicator={true}
           >
             <View style={styles.desktopContentWrapper}>
-              <HeaderWithBack 
-                isDesktop={isDesktop}
-                onBack={() => router.back()}
-              />
-
               {/* Search Input */}
               <View style={[styles.searchContainer, isDesktop && styles.searchContainerDesktop]}>
                 <View style={[styles.searchInputContainer, isDesktop && styles.searchInputContainerDesktop]}>
-                  <Search size={isDesktop ? 18 : 20} color="#1ea2b1" />
+                  <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
+                    <ArrowLeft size={isDesktop ? 18 : 20} color="#888888" />
+                  </TouchableOpacity>
                   <TextInput
                     style={[styles.searchInput, isDesktop && styles.searchInputDesktop]}
-                    placeholder="Search for routes, stops, hubs..."
+                    placeholder="Search for a destination"
                     placeholderTextColor="#888888"
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                     autoFocus={!isDesktop}
                   />
-                  {searchQuery.length > 0 && (
+                  {searchQuery.length > 0 ? (
                     <TouchableOpacity
                       onPress={() => setSearchQuery('')}
                       style={styles.clearSearchButton}
                     >
                       <X size={isDesktop ? 16 : 18} color="#888888" />
                     </TouchableOpacity>
+                  ) : (
+                    <Mic size={isDesktop ? 18 : 20} color={colors.primary} />
                   )}
                 </View>
               </View>
 
               <View style={[styles.tabsWrapper, isDesktop && styles.tabsWrapperDesktop]}>
-                <ScrollView 
+                <ScrollView
                   horizontal={!isDesktop}
                   showsHorizontalScrollIndicator={!isDesktop}
                   contentContainerStyle={[styles.filtersContainer, isDesktop && styles.filtersContainerDesktop]}
@@ -726,7 +848,7 @@ export default function SearchScreen() {
                     <TouchableOpacity
                       key={item.key}
                       style={[
-                        styles.filterTab, 
+                        styles.filterTab,
                         isDesktop && styles.filterTabDesktop,
                         selectedFilter === item.key && styles.activeFilterTab
                       ]}
@@ -734,7 +856,7 @@ export default function SearchScreen() {
                     >
                       <item.icon size={isDesktop ? 14 : 16} color={selectedFilter === item.key ? '#FFFFFF' : '#888888'} />
                       <Text style={[
-                        styles.filterText, 
+                        styles.filterText,
                         isDesktop && styles.filterTextDesktop,
                         selectedFilter === item.key && styles.activeFilterText
                       ]}>
@@ -746,8 +868,8 @@ export default function SearchScreen() {
               </View>
 
               {/* Search Results */}
-              <ScrollView 
-                style={[styles.resultsContainer, isDesktop && styles.resultsContainerDesktop]} 
+              <ScrollView
+                style={[styles.resultsContainer, isDesktop && styles.resultsContainerDesktop]}
                 contentContainerStyle={[styles.resultsContent, isDesktop && styles.resultsContentDesktop]}
                 showsVerticalScrollIndicator={isDesktop}
               >
@@ -805,35 +927,35 @@ export default function SearchScreen() {
         ) : (
           // Mobile layout
           <>
-            <HeaderWithBack 
-              onBack={() => router.back()}
-            />
-
             {/* Search Input */}
             <View style={styles.searchContainer}>
               <View style={styles.searchInputContainer}>
-                <Search size={20} color="#1ea2b1" />
+                <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
+                  <ArrowLeft size={20} color="#888888" />
+                </TouchableOpacity>
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="Search for routes, stops, hubs..."
+                  placeholder="Search for a destination"
                   placeholderTextColor="#888888"
                   value={searchQuery}
                   onChangeText={setSearchQuery}
                   autoFocus={true}
                 />
-                {searchQuery.length > 0 && (
+                {searchQuery.length > 0 ? (
                   <TouchableOpacity
                     onPress={() => setSearchQuery('')}
                     style={styles.clearSearchButton}
                   >
                     <X size={18} color="#888888" />
                   </TouchableOpacity>
+                ) : (
+                  <Mic size={20} color={colors.primary} />
                 )}
               </View>
             </View>
 
             <View style={styles.tabsWrapper}>
-              <ScrollView 
+              <ScrollView
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.filtersContainer}
@@ -842,14 +964,14 @@ export default function SearchScreen() {
                   <TouchableOpacity
                     key={item.key}
                     style={[
-                      styles.filterTab, 
+                      styles.filterTab,
                       selectedFilter === item.key && styles.activeFilterTab
                     ]}
                     onPress={() => setSelectedFilter(item.key as any)}
                   >
                     <item.icon size={16} color={selectedFilter === item.key ? '#FFFFFF' : '#888888'} />
                     <Text style={[
-                      styles.filterText, 
+                      styles.filterText,
                       selectedFilter === item.key && styles.activeFilterText
                     ]}>
                       {item.label}
@@ -860,8 +982,8 @@ export default function SearchScreen() {
             </View>
 
             {/* Search Results */}
-            <ScrollView 
-              style={styles.resultsContainer} 
+            <ScrollView
+              style={styles.resultsContainer}
               contentContainerStyle={styles.resultsContent}
               showsVerticalScrollIndicator={true}
             >
@@ -898,7 +1020,7 @@ export default function SearchScreen() {
             </ScrollView>
           </>
         )}
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -911,7 +1033,7 @@ const styles = StyleSheet.create({
   safeAreaDesktop: {
     backgroundColor: '#000000',
   },
-  
+
   // Header Styles
   headerContainer: {
     paddingTop: Platform.OS === 'ios' ? 12 : 30,
@@ -928,7 +1050,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     backgroundColor: 'transparent',
   },
-  
+
   headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -938,7 +1060,7 @@ const styles = StyleSheet.create({
   headerTopRowDesktop: {
     marginBottom: 16,
   },
-  
+
   backButton: {
     backgroundColor: '#1a1a1a',
     width: 44,
@@ -947,7 +1069,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   headerTitleContainer: {
     flex: 1,
     alignItems: 'flex-end',
@@ -955,7 +1077,7 @@ const styles = StyleSheet.create({
   headerTitleContainerDesktop: {
     paddingRight: 40,
   },
-  
+
   headerTitle: {
     fontSize: 25,
     fontWeight: 'bold',
@@ -964,7 +1086,7 @@ const styles = StyleSheet.create({
   headerTitleDesktop: {
     fontSize: 24,
   },
-  
+
   headerSubtitle: {
     fontSize: 16,
     color: '#888888',
@@ -975,13 +1097,13 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     lineHeight: 24,
   },
-  
+
   // Clear Search Button
   clearSearchButton: {
     padding: 4,
     marginLeft: 8,
   },
-  
+
   // Base styles
   container: {
     flex: 1,
@@ -991,7 +1113,7 @@ const styles = StyleSheet.create({
   containerDesktop: {
     width: '100%',
   },
-  
+
   // Desktop wrapper styles
   desktopScrollWrapper: {
     flex: 1,
@@ -1006,10 +1128,10 @@ const styles = StyleSheet.create({
     maxWidth: 1200,
     alignSelf: 'center',
   },
-  
+
   searchContainer: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: Platform.OS === 'ios' ? 44 : 34,
     paddingBottom: 16,
     width: '100%',
     backgroundColor: '#000000',
@@ -1019,24 +1141,29 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
   },
-  
+
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#333333',
+    backgroundColor: '#1A1D1E',
+    borderRadius: 28,
+    paddingHorizontal: 20,
+    height: 56,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   searchInputContainerDesktop: {
-    borderRadius: 10,
-    padding: 14,
+    borderRadius: 28,
+    paddingHorizontal: 20,
+    height: 56,
     maxWidth: 800,
     alignSelf: 'center',
     width: '100%',
   },
-  
+
   searchInput: {
     flex: 1,
     marginLeft: 12,
@@ -1048,7 +1175,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 15,
   },
-  
+
   tabsWrapper: {
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
@@ -1060,7 +1187,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     marginBottom: 16,
   },
-  
+
   filtersContainer: {
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -1075,7 +1202,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: '100%',
   },
-  
+
   filterTab: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1092,12 +1219,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     marginRight: 0,
   },
-  
+
   activeFilterTab: {
     backgroundColor: '#1ea2b1',
     borderColor: '#1ea2b1',
   },
-  
+
   filterText: {
     color: '#888888',
     fontSize: 15,
@@ -1108,11 +1235,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginLeft: 4,
   },
-  
+
   activeFilterText: {
     color: '#FFFFFF',
   },
-  
+
   resultsContainer: {
     flex: 1,
     width: '100%',
@@ -1120,7 +1247,7 @@ const styles = StyleSheet.create({
   resultsContainerDesktop: {
     paddingHorizontal: 32,
   },
-  
+
   resultsContent: {
     padding: 20,
     paddingBottom: 120,
@@ -1130,22 +1257,22 @@ const styles = StyleSheet.create({
     padding: 0,
     paddingBottom: 40,
   },
-  
+
   desktopResultsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 16,
     width: '100%',
   },
-  
+
   desktopResultColumn: {
     width: '48%',
     minWidth: 280,
   },
-  
+
   desktopResultLeft: {},
   desktopResultRight: {},
-  
+
   resultCard: {
     backgroundColor: '#1a1a1a',
     padding: 16,
@@ -1160,7 +1287,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 10,
   },
-  
+
   resultHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1170,7 +1297,7 @@ const styles = StyleSheet.create({
   resultHeaderDesktop: {
     marginBottom: 10,
   },
-  
+
   resultInfo: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1180,7 +1307,7 @@ const styles = StyleSheet.create({
   resultInfoDesktop: {
     alignItems: 'center',
   },
-  
+
   resultIconContainer: {
     backgroundColor: 'rgba(30, 162, 177, 0.1)',
     width: 40,
@@ -1196,12 +1323,12 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginRight: 10,
   },
-  
+
   resultDetails: {
     flex: 1,
   },
   resultDetailsDesktop: {},
-  
+
   resultTitle: {
     color: '#FFFFFF',
     fontSize: 16,
@@ -1213,7 +1340,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginBottom: 3,
   },
-  
+
   resultSubtitle: {
     color: '#888888',
     fontSize: 14,
@@ -1223,7 +1350,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 16,
   },
-  
+
   resultMeta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1232,7 +1359,7 @@ const styles = StyleSheet.create({
   resultMetaDesktop: {
     marginTop: 2,
   },
-  
+
   resultType: {
     backgroundColor: 'rgba(30, 162, 177, 0.1)',
     paddingHorizontal: 10,
@@ -1244,7 +1371,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 4,
   },
-  
+
   resultTypeText: {
     color: '#1ea2b1',
     fontSize: 12,
@@ -1253,7 +1380,7 @@ const styles = StyleSheet.create({
   resultTypeTextDesktop: {
     fontSize: 11,
   },
-  
+
   // Follow Button Styles
   followButton: {
     paddingHorizontal: 16,
@@ -1272,28 +1399,28 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     minWidth: 70,
   },
-  
+
   followingButton: {
     backgroundColor: '#1ea2b1',
     borderColor: '#1ea2b1',
   },
-  
+
   followButtonLoading: {
     opacity: 0.7,
   },
-  
+
   followButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
-  
+
   followButtonLoadingContent: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   followButtonText: {
     fontSize: 14,
     fontWeight: '600',
@@ -1302,11 +1429,11 @@ const styles = StyleSheet.create({
   followButtonTextDesktop: {
     fontSize: 13,
   },
-  
+
   followingButtonText: {
     color: '#ffffff',
   },
-  
+
   followerCountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1321,7 +1448,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 10,
   },
-  
+
   followersText: {
     color: '#1ea2b1',
     fontSize: 12,
@@ -1330,7 +1457,7 @@ const styles = StyleSheet.create({
   followersTextDesktop: {
     fontSize: 11,
   },
-  
+
   noResultsContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1340,7 +1467,7 @@ const styles = StyleSheet.create({
   noResultsContainerDesktop: {
     paddingVertical: 80,
   },
-  
+
   noResultsTitle: {
     color: '#FFFFFF',
     fontSize: 20,
@@ -1354,7 +1481,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 12,
   },
-  
+
   noResultsText: {
     color: '#888888',
     fontSize: 16,
@@ -1367,14 +1494,14 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     maxWidth: 400,
   },
-  
+
   emptyStateContainer: {
     flex: 1,
   },
   emptyStateContainerDesktop: {
     paddingTop: 8,
   },
-  
+
   recommendedTitle: {
     color: '#FFFFFF',
     fontSize: 20,
@@ -1385,7 +1512,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     marginBottom: 24,
   },
-  
+
   loadingRecommended: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1394,7 +1521,7 @@ const styles = StyleSheet.create({
   loadingRecommendedDesktop: {
     paddingVertical: 80,
   },
-  
+
   loadingRecommendedText: {
     color: '#888888',
     fontSize: 16,
@@ -1402,13 +1529,13 @@ const styles = StyleSheet.create({
   loadingRecommendedTextDesktop: {
     fontSize: 18,
   },
-  
+
   // Skeleton Loading Styles
   skeletonContainer: {
     flex: 1,
   },
   skeletonContainerDesktop: {},
-  
+
   skeletonCard: {
     backgroundColor: '#1a1a1a',
     padding: 16,
@@ -1422,7 +1549,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 10,
   },
-  
+
   skeletonHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1432,7 +1559,7 @@ const styles = StyleSheet.create({
   skeletonHeaderDesktop: {
     marginBottom: 10,
   },
-  
+
   skeletonIcon: {
     width: 40,
     height: 40,
@@ -1444,7 +1571,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
   },
-  
+
   skeletonTextContainer: {
     flex: 1,
     marginLeft: 12,
@@ -1452,13 +1579,13 @@ const styles = StyleSheet.create({
   skeletonTextContainerDesktop: {
     marginLeft: 10,
   },
-  
+
   skeletonLine: {
     backgroundColor: '#333333',
     borderRadius: 4,
     marginBottom: 8,
   },
-  
+
   skeletonTitle: {
     height: 20,
     width: '70%',
@@ -1466,7 +1593,7 @@ const styles = StyleSheet.create({
   skeletonTitleDesktop: {
     height: 18,
   },
-  
+
   skeletonSubtitle: {
     height: 16,
     width: '50%',
@@ -1474,7 +1601,7 @@ const styles = StyleSheet.create({
   skeletonSubtitleDesktop: {
     height: 14,
   },
-  
+
   skeletonFavorite: {
     width: 80,
     height: 32,
@@ -1486,7 +1613,7 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 16,
   },
-  
+
   skeletonMeta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1495,7 +1622,7 @@ const styles = StyleSheet.create({
   skeletonMetaDesktop: {
     marginTop: 2,
   },
-  
+
   skeletonTag: {
     width: 70,
     height: 24,
@@ -1507,7 +1634,7 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 5,
   },
-  
+
   skeletonRouteInfo: {
     width: 50,
     height: 20,

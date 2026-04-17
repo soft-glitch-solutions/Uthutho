@@ -1,11 +1,10 @@
 import React from 'react';
-import { View, Text, Pressable, Image } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Search } from 'lucide-react-native';
+import { Search, Mic } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import HeaderSkeleton from './skeletons/HeaderSkeleton';
 import { useTranslation } from '@/hook/useTranslation';
-import { Dimensions } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -18,85 +17,93 @@ interface HeaderSectionProps {
 
 const HeaderSection = ({ isProfileLoading, userProfile, colors }: HeaderSectionProps) => {
   const router = useRouter();
-  const { t } = useTranslation();
 
   if (isProfileLoading) {
     return <HeaderSkeleton colors={colors} />;
   }
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const nameString = userProfile?.first_name ? ` ${userProfile.first_name}` : '';
+
   return (
     <View style={[styles.header, isDesktop && styles.headerDesktop]}>
-      <View>
-        <View style={[styles.firstRow, isDesktop && styles.firstRowDesktop]}>
-          <Pressable onPress={() => router.push('/profile')}>
-            <Text style={[styles.title, { color: colors.text }, isDesktop && styles.titleDesktop]}>
-              {t('greeting')}, {userProfile?.first_name || 'User'}
-            </Text>
-            <Text style={[styles.subGreeting, isDesktop && styles.subGreetingDesktop]}>
-              {t('ready_journey')}
-            </Text>
-          </Pressable>
-          <Pressable 
-            onPress={() => router.push('/favorites')} 
-            style={[styles.addButton, isDesktop && styles.addButtonDesktop]}
-          >
-            <Search size={isDesktop ? 20 : 24} color={colors.text} />
-          </Pressable>
-        </View>
-        {userProfile?.selected_title && (
-          <Text style={[styles.selectedTitle, { color: colors.primary }, isDesktop && styles.selectedTitleDesktop]}>
-            {userProfile.selected_title}
-          </Text>
-        )}
-      </View>
+      <Text style={[styles.readyText, { color: colors.primary }]}>
+        READY TO MOVE
+      </Text>
+      
+      <Text style={[styles.greetingText, { color: colors.text }]}>
+        {getGreeting()}{nameString},
+      </Text>
+      
+      <Text style={[styles.headingText, { color: colors.primary }]}>
+        where are we heading?
+      </Text>
+
+      <Pressable 
+        style={[styles.searchBar, { backgroundColor: colors.card || '#1A1D1E' }]}
+        onPress={() => router.push('/favorites')}
+      >
+        <Search size={20} color="#888888" />
+        <Text style={styles.searchPlaceholder}>Search for a destination</Text>
+        <Mic size={20} color={colors.primary} />
+      </Pressable>
     </View>
   );
 };
 
-const styles = {
+const styles = StyleSheet.create({
   header: {
-    marginBottom: 20,
+    marginBottom: 24,
+    paddingTop: 8,
   },
   headerDesktop: {
-    marginBottom: 16,
+    marginBottom: 32,
+    paddingTop: 16,
   },
-  firstRow: {
-    flexDirection: 'row' as 'row',
-    alignItems: 'center' as 'center',
-    justifyContent: 'space-between' as 'space-between',
+  readyText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
+    marginBottom: 12,
+    textTransform: 'uppercase',
   },
-  firstRowDesktop: {
-    alignItems: 'flex-start' as 'flex-start',
+  greetingText: {
+    fontSize: 34,
+    fontWeight: '400',
+    marginBottom: 2,
+    letterSpacing: -0.5,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold' as 'bold',
+  headingText: {
+    fontSize: 34,
+    fontWeight: 'bold',
+    fontStyle: 'italic',
+    marginBottom: 28,
+    letterSpacing: -0.5,
   },
-  titleDesktop: {
-    fontSize: 20,
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 56,
+    borderRadius: 28,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  selectedTitle: {
+  searchPlaceholder: {
+    flex: 1,
     fontSize: 16,
-    fontStyle: 'italic' as 'italic',
-    marginTop: 4,
+    color: '#888888',
+    marginLeft: 12,
   },
-  selectedTitleDesktop: {
-    fontSize: 14,
-  },
-  addButton: {
-    padding: 8,
-  },
-  addButtonDesktop: {
-    padding: 6,
-  },
-  subGreeting: {
-    fontSize: 16,
-    color: '#cccccc',
-    marginTop: 4,
-  },
-  subGreetingDesktop: {
-    fontSize: 14,
-  },
-};
+});
 
 export default HeaderSection;

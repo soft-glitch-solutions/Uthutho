@@ -95,6 +95,26 @@ const findNearestLocation = (userLocation: LocationCoords, locations: any[]) => 
   return nearestLocation;
 };
 
+const findTopNearestLocations = (userLocation: LocationCoords, locations: any[], limit: number = 5) => {
+  if (!userLocation || !locations || locations.length === 0) return [];
+  
+  const locationsWithDistance = locations.map(location => {
+    return {
+      ...location,
+      distance: calculateWalkingTime(
+        userLocation.lat,
+        userLocation.lng,
+        location.latitude,
+        location.longitude
+      )
+    };
+  });
+
+  return locationsWithDistance
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, limit);
+};
+
 const getIconForType = (type: string, size: number = 20) => {
   switch (type) {
     case 'stop':
@@ -290,13 +310,14 @@ export default function HomeScreen() {
 
       console.log(`Found ${stops?.length || 0} stops and ${hubs?.length || 0} hubs`);
 
-      const nearestStop = findNearestLocation(userLocation, stops || []);
+      const nearestStops = findTopNearestLocations(userLocation, stops || [], 5);
+      const nearestStop = nearestStops.length > 0 ? nearestStops[0] : null;
       const nearestHub = findNearestLocation(userLocation, hubs || []);
 
-      console.log('Nearest stop:', nearestStop?.name);
+      console.log('Nearest top stops:', nearestStops?.length);
       console.log('Nearest hub:', nearestHub?.name);
 
-      setNearestLocations({ nearestStop, nearestHub });
+      setNearestLocations({ nearestStop, nearestHub, nearestStops });
     } catch (error) {
       console.error('Error fetching nearest locations:', error);
     } finally {
