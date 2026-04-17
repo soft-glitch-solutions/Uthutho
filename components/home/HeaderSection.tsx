@@ -13,10 +13,12 @@ interface HeaderSectionProps {
   isProfileLoading: boolean;
   userProfile: any;
   colors: any;
+  onSearchPress?: (y: number) => void;
 }
 
-const HeaderSection = ({ isProfileLoading, userProfile, colors }: HeaderSectionProps) => {
+const HeaderSection = ({ isProfileLoading, userProfile, colors, onSearchPress }: HeaderSectionProps) => {
   const router = useRouter();
+  const searchBarRef = React.useRef<View>(null);
 
   if (isProfileLoading) {
     return <HeaderSkeleton colors={colors} />;
@@ -27,6 +29,16 @@ const HeaderSection = ({ isProfileLoading, userProfile, colors }: HeaderSectionP
     if (hour < 12) return 'Good morning';
     if (hour < 18) return 'Good afternoon';
     return 'Good evening';
+  };
+
+  const handlePress = () => {
+    if (onSearchPress && searchBarRef.current) {
+      searchBarRef.current.measureInWindow((x, y) => {
+        onSearchPress(y);
+      });
+    } else {
+      router.push('/favorites');
+    }
   };
 
   const nameString = userProfile?.first_name ? ` ${userProfile.first_name}` : '';
@@ -46,12 +58,12 @@ const HeaderSection = ({ isProfileLoading, userProfile, colors }: HeaderSectionP
       </Text>
 
       <Pressable 
+        ref={searchBarRef}
         style={[styles.searchBar, { backgroundColor: colors.card || '#1A1D1E' }]}
-        onPress={() => router.push('/favorites')}
+        onPress={handlePress}
       >
-        <Search size={20} color="#888888" />
-        <Text style={styles.searchPlaceholder}>Search for a destination</Text>
-        <Mic size={20} color={colors.primary} />
+        <Search size={22} color="#888888" />
+        <Text style={styles.searchPlaceholder}>Search destinations, stations</Text>
       </Pressable>
     </View>
   );
@@ -89,9 +101,9 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 56,
-    borderRadius: 28,
-    paddingHorizontal: 20,
+    height: 54,
+    borderRadius: 16,
+    paddingHorizontal: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,

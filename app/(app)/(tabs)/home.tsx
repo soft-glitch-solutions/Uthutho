@@ -24,6 +24,7 @@ import NearbySection from '@/components/home/NearbySection';
 import FavoritesSection from '@/components/home/FavoritesSection';
 import GamificationSection from '@/components/home/GamificationSection';
 import ScreenTransition from '@/components/ScreenTransition';
+import SearchOverlay from '@/components/home/SearchOverlay';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 import LottieView from 'lottie-react-native';
@@ -288,6 +289,8 @@ export default function HomeScreen() {
   const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(false);
+  const [isSearchOverlayVisible, setIsSearchOverlayVisible] = useState(false);
+  const [searchBarY, setSearchBarY] = useState(160);
   const hasCheckedWelcome = useRef(false);
 
   // FIXED: Properly memoized fetchNearestLocations
@@ -1183,11 +1186,15 @@ export default function HomeScreen() {
           )}
         </View>
 
-        <HeaderSection
-          isProfileLoading={isProfileLoading}
-          userProfile={userProfile}
-          colors={colors}
-        />
+            <HeaderSection 
+              isProfileLoading={isProfileLoading} 
+              userProfile={userProfile} 
+              colors={colors} 
+              onSearchPress={(y) => {
+                setSearchBarY(y);
+                setIsSearchOverlayVisible(true);
+              }}
+            />
 
         {!journeyLoading && activeJourney && (
           <Pressable 
@@ -1401,13 +1408,15 @@ export default function HomeScreen() {
 
       <RateTripModal
         visible={showRatingModal}
-        onClose={() => {
-          console.log('Closing rating modal');
-          setShowRatingModal(false);
-          setJourneyRatingId(null);
-        }}
+        onClose={handleCloseModal}
         journeyId={journeyRatingId}
         onRatingSubmitted={handleRatingSubmitted}
+      />
+
+      <SearchOverlay 
+        visible={isSearchOverlayVisible} 
+        onClose={() => setIsSearchOverlayVisible(false)} 
+        initialY={searchBarY}
       />
     </ScreenTransition>
   );

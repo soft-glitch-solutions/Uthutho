@@ -27,7 +27,14 @@ import {
   X,
   Mic,
   Star,
-  Map
+  Map,
+  Home,
+  Briefcase,
+  History,
+  Settings,
+  ChevronRight,
+  Bus,
+  Zap
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useFavorites, FavoriteItem } from '@/hook/useFavorites';
@@ -186,33 +193,49 @@ const HeaderWithBack = ({
 };
 
 export default function SearchScreen() {
-  const slideAnim = React.useRef(new Animated.Value(30)).current;
-  const opacityAnim = React.useRef(new Animated.Value(0)).current;
+  const sectionAnims = React.useRef([
+    new Animated.Value(0), // Opacity for entire container
+    new Animated.Value(140), // Search bar travel (Start at Home's relative position)
+    new Animated.Value(200), // Shortcuts
+    new Animated.Value(220), // Recent Destinations
+    new Animated.Value(240), // Suggested Routes
+    new Animated.Value(20), // Container slight slide
+  ]).current;
 
   useFocusEffect(
     useCallback(() => {
-      // Reset values before animating
-      slideAnim.setValue(30);
-      opacityAnim.setValue(0);
+      // Reset values to create the "moving up" starting point
+      sectionAnims[0].setValue(0);   // Opacity
+      sectionAnims[1].setValue(140); // Search bar traveler
+      sectionAnims[2].setValue(200); // Shortcuts
+      sectionAnims[3].setValue(220); // Recents
+      sectionAnims[4].setValue(240); // Suggested
+      sectionAnims[5].setValue(20);  // Container
 
       Animated.parallel([
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          tension: 50,
-          friction: 8,
-          useNativeDriver: true,
+        // Fast opacity entry for the bar continuity
+        Animated.timing(sectionAnims[0], { toValue: 1, duration: 250, useNativeDriver: true }),
+        
+        // The Search Bar "Moves Up" to its locked-in position
+        Animated.spring(sectionAnims[1], { 
+          toValue: 0, 
+          tension: 40, 
+          friction: 9, 
+          useNativeDriver: true 
         }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
+
+        Animated.spring(sectionAnims[5], { toValue: 0, tension: 50, friction: 8, useNativeDriver: true }),
+        
+        // Staggered entry for discovery sections following the bar
+        Animated.stagger(60, [
+          Animated.spring(sectionAnims[2], { toValue: 0, tension: 35, friction: 8, useNativeDriver: true }),
+          Animated.spring(sectionAnims[3], { toValue: 0, tension: 35, friction: 8, useNativeDriver: true }),
+          Animated.spring(sectionAnims[4], { toValue: 0, tension: 35, friction: 8, useNativeDriver: true }),
+        ])
       ]).start();
 
-      return () => {
-        // Optional cleanup if needed when screen loses focus
-      };
-    }, [slideAnim, opacityAnim])
+      return () => {};
+    }, [])
   );
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -798,8 +821,8 @@ export default function SearchScreen() {
           styles.container, 
           isDesktop && styles.containerDesktop,
           {
-            opacity: opacityAnim,
-            transform: [{ translateY: slideAnim }]
+            opacity: sectionAnims[0],
+            transform: [{ translateY: sectionAnims[1] }]
           }
         ]}
       >
@@ -926,99 +949,116 @@ export default function SearchScreen() {
           </ScrollView>
         ) : (
           // Mobile layout
-          <>
-            {/* Search Input */}
-            <View style={styles.searchContainer}>
-              <View style={styles.searchInputContainer}>
-                <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
-                  <ArrowLeft size={20} color="#888888" />
+          <ScrollView
+            style={styles.resultsContainer}
+            contentContainerStyle={styles.resultsContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header Section */}
+            <Animated.View style={[styles.customHeader, { transform: [{ translateY: sectionAnims[1] }] }]}>
+              <View style={styles.headerRow}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backIconButton}>
+                  <ArrowLeft size={24} color="#FFFFFF" />
                 </TouchableOpacity>
+                <Text style={styles.largeTitle}>Where to?</Text>
+                <TouchableOpacity style={styles.settingsButton}>
+                  <Settings size={22} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Search Input */}
+              <View style={styles.searchBarWrapper}>
+                <Search size={22} color="#888888" style={styles.searchBarIcon} />
                 <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search for a destination"
+                  style={styles.premiumSearchInput}
+                  placeholder="Search destinations, stations"
                   placeholderTextColor="#888888"
                   value={searchQuery}
                   onChangeText={setSearchQuery}
-                  autoFocus={true}
+                  autoFocus={false}
                 />
-                {searchQuery.length > 0 ? (
-                  <TouchableOpacity
-                    onPress={() => setSearchQuery('')}
-                    style={styles.clearSearchButton}
-                  >
-                    <X size={18} color="#888888" />
-                  </TouchableOpacity>
-                ) : (
-                  <Mic size={20} color={colors.primary} />
+              </View>
+            </Animated.View>
+
+            {searchQuery.length > 0 ? (
+              <View style={styles.searchResultsWrapper}>
+                {loading ? <SkeletonLoader /> : searchResults.length > 0 ? searchResults.map(renderResultItem) : (
+                  <View style={styles.noResultsContainer}>
+                    <Search size={48} color="#333333" />
+                    <Text style={styles.noResultsTitle}>No results found</Text>
+                  </View>
                 )}
               </View>
-            </View>
+            ) : (
+              <View style={styles.defaultContent}>
+                {/* Shortcuts Section */}
+                <Animated.View style={{ transform: [{ translateY: sectionAnims[2] }] }}>
+                  <View style={styles.shortcutsGrid}>
+                    <TouchableOpacity style={styles.shortcutCard}>
+                      <View style={styles.shortcutIconBox}>
+                        <Home size={22} color="#1ea2b1" />
+                      </View>
+                      <View>
+                        <Text style={styles.shortcutTitle}>HOME</Text>
+                        <Text style={styles.shortcutSubtitle}>Set address</Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.shortcutCard}>
+                      <View style={[styles.shortcutIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
+                        <Briefcase size={22} color="#f59e0b" />
+                      </View>
+                      <View>
+                        <Text style={styles.shortcutTitle}>WORK</Text>
+                        <Text style={styles.shortcutSubtitle}>Sandton Central</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                </Animated.View>
 
-            <View style={styles.tabsWrapper}>
-              <ScrollView
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.filtersContainer}
-              >
-                {filters.map((item) => (
-                  <TouchableOpacity
-                    key={item.key}
-                    style={[
-                      styles.filterTab,
-                      selectedFilter === item.key && styles.activeFilterTab
-                    ]}
-                    onPress={() => setSelectedFilter(item.key as any)}
-                  >
-                    <item.icon size={16} color={selectedFilter === item.key ? '#FFFFFF' : '#888888'} />
-                    <Text style={[
-                      styles.filterText,
-                      selectedFilter === item.key && styles.activeFilterText
-                    ]}>
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
+                {/* Recent Destinations */}
+                <Animated.View style={[styles.sectionWrapper, { transform: [{ translateY: sectionAnims[3] }] }]}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Recent Destinations</Text>
+                    <TouchableOpacity>
+                      <Text style={styles.clearAllText}>Clear all</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {[
+                    { id: 'rec1', title: 'Cape Town International Airport', sub: 'Matroosfontein, Cape Town' },
+                    { id: 'rec2', title: 'V&A Waterfront', sub: 'Breakwater Blvd, Cape Town' },
+                    { id: 'rec3', title: 'Gautrain Sandton Station', sub: 'West St & Rivonia Rd, Sandton' },
+                  ].map((item) => (
+                    <TouchableOpacity key={item.id} style={styles.recentItem}>
+                      <View style={styles.recentIconBox}>
+                        <History size={18} color="#888888" />
+                      </View>
+                      <View style={styles.recentTextContainer}>
+                        <Text style={styles.recentTitle}>{item.title}</Text>
+                        <Text style={styles.recentSubtitle}>{item.sub}</Text>
+                      </View>
+                      <ChevronRight size={18} color="#444444" />
+                    </TouchableOpacity>
+                  ))}
+                </Animated.View>
 
-            {/* Search Results */}
-            <ScrollView
-              style={styles.resultsContainer}
-              contentContainerStyle={styles.resultsContent}
-              showsVerticalScrollIndicator={true}
-            >
-              {loading ? (
-                <SkeletonLoader />
-              ) : searchResults.length > 0 ? (
-                searchResults.map(renderResultItem)
-              ) : searchQuery.length > 2 ? (
-                <View style={styles.noResultsContainer}>
-                  <Search size={48} color="#333333" />
-                  <Text style={styles.noResultsTitle}>No results found</Text>
-                  <Text style={styles.noResultsText}>
-                    Try searching with different keywords or check your spelling.
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.emptyStateContainer}>
-                  <Text style={styles.recommendedTitle}>
-                    Recommended Nearby
-                  </Text>
-                  {isLoadingRecommended ? (
-                    <SkeletonLoader />
-                  ) : recommendedNearby.length > 0 ? (
-                    recommendedNearby.map(renderResultItem)
-                  ) : (
-                    <View style={styles.loadingRecommended}>
-                      <Text style={styles.loadingRecommendedText}>
-                        No nearby locations found
-                      </Text>
+                {/* Suggested Routes */}
+                <Animated.View style={[styles.sectionWrapper, { transform: [{ translateY: sectionAnims[4] }] }]}>
+                  <Text style={styles.sectionTitle}>Suggested Routes</Text>
+                  <TouchableOpacity style={styles.suggestedCard}>
+                    <View style={styles.suggestedHeader}>
+                      <View style={styles.fastestBadge}>
+                        <Zap size={10} color="#1ea2b1" style={{ marginRight: 4 }} />
+                        <Text style={styles.fastestText}>FASTEST</Text>
+                      </View>
+                      <Bus size={22} color="#FFFFFF" />
                     </View>
-                  )}
-                </View>
-              )}
-            </ScrollView>
-          </>
+                    <Text style={styles.suggestedTitle}>Sea Point Promenade</Text>
+                    <Text style={styles.suggestedSubtitle}>22 min via M6 Coastal Route</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
+            )}
+          </ScrollView>
         )}
       </Animated.View>
     </SafeAreaView>
@@ -1141,6 +1181,8 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
   },
+
+
 
   searchInputContainer: {
     flexDirection: 'row',
@@ -1645,5 +1687,177 @@ const styles = StyleSheet.create({
     width: 40,
     height: 18,
     borderRadius: 9,
+  },
+
+  // Premium Redesign Styles
+  customHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 24,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  backIconButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+  },
+  largeTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    flex: 1,
+    marginLeft: 8,
+  },
+  settingsButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  searchBarWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1A1D1E',
+    borderRadius: 16,
+    height: 54,
+    paddingHorizontal: 16,
+  },
+  searchBarIcon: {
+    marginRight: 12,
+  },
+  premiumSearchInput: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 16,
+  },
+  defaultContent: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  shortcutsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 32,
+  },
+  shortcutCard: {
+    backgroundColor: '#1A1D1E',
+    borderRadius: 20,
+    padding: 20,
+    width: '48%',
+    flexDirection: 'column',
+    justifyContent: 'center',
+  },
+  shortcutIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  shortcutTitle: {
+    color: '#888888',
+    fontSize: 12,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  shortcutSubtitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  sectionWrapper: {
+    marginBottom: 32,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  clearAllText: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  recentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  recentIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1A1D1E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  recentTextContainer: {
+    flex: 1,
+  },
+  recentTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  recentSubtitle: {
+    color: '#888888',
+    fontSize: 14,
+  },
+  suggestedCard: {
+    backgroundColor: '#1A1D1E',
+    borderRadius: 24,
+    padding: 24,
+    marginTop: 10,
+  },
+  suggestedHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  fastestBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  fastestText: {
+    color: '#1ea2b1',
+    fontSize: 11,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  suggestedTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  suggestedSubtitle: {
+    color: '#888888',
+    fontSize: 15,
+  },
+  searchResultsWrapper: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
   },
 });
