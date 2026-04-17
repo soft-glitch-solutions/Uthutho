@@ -24,7 +24,7 @@ import StreakOverlay from '@/components/StreakOverlay';
 import { useRouter, useNavigation } from 'expo-router';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const TAB_COUNT = 5;
+const TAB_COUNT = 4;
 const TAB_BAR_MARGIN = 20;
 const TAB_BAR_WIDTH = SCREEN_WIDTH - (TAB_BAR_MARGIN * 2);
 
@@ -255,6 +255,8 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
       }}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
+          if (options.href === null || !options.tabBarIcon) return null;
+          
           const isFocused = state.index === index;
 
           const onPress = () => {
@@ -393,6 +395,8 @@ const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount })
       
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
+        if (options.href === null || !options.tabBarIcon) return null;
+        
         const isFocused = state.index === index;
 
         const onPress = () => {
@@ -583,10 +587,7 @@ export default function EnhancedTabLayout() {
         <Tabs.Screen
           name="profile"
           options={{
-            title: 'Profile',
-            tabBarIcon: ({ color, size, focused }) => (
-              <User color={color} size={size} />
-            ),
+            href: null,
           }}
         />
       </Tabs>

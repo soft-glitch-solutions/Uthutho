@@ -409,7 +409,7 @@ export default function HomeScreen() {
       setUserId(userId);
       const { data, error } = await supabase
         .from('profiles')
-        .select('first_name, selected_title, favorites, points')
+        .select('first_name, selected_title, favorites, points, avatar_url')
         .eq('id', userId)
         .single();
   
@@ -906,15 +906,32 @@ export default function HomeScreen() {
               <Text style={[styles.uthuthoText, { color: colors.text }]}>Uthutho</Text>
             </Pressable>
             {isProfileLoading ? (
-              <View style={[styles.pointsContainer, { 
-                backgroundColor: colors.border,
-                width: 80,
-                height: 30,
-                borderRadius: 15
-              }]} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={[styles.pointsContainer, { 
+                  backgroundColor: colors.border,
+                  width: 80,
+                  height: 30,
+                  borderRadius: 15
+                }]} />
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.border }} />
+              </View>
             ) : (
-              <View style={styles.pointsContainer}>
-                <Text style={[styles.pointsText, { color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={styles.pointsContainer}>
+                  <Text style={[styles.pointsText, { color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
+                </View>
+                <TouchableOpacity onPress={() => router.push('/profile')}>
+                  {userProfile?.avatar_url ? (
+                    <Image 
+                      source={{ uri: userProfile.avatar_url }} 
+                      style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.primary }} 
+                    />
+                  ) : (
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
+                      <User color="#fff" size={20} />
+                    </View>
+                  )}
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -1115,15 +1132,32 @@ export default function HomeScreen() {
             <Text style={[styles.uthuthoText, { color: colors.text }]}>Uthutho</Text>
           </Pressable>
           {isProfileLoading ? (
-            <View style={[styles.pointsContainer, { 
-              backgroundColor: colors.border,
-              width: 80,
-              height: 30,
-              borderRadius: 15
-            }]} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={[styles.pointsContainer, { 
+                backgroundColor: colors.border,
+                width: 80,
+                height: 30,
+                borderRadius: 15
+              }]} />
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.border }} />
+            </View>
           ) : (
-            <View style={styles.pointsContainer}>
-              <Text style={[styles.pointsText, { color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={styles.pointsContainer}>
+                <Text style={[styles.pointsText, { color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
+              </View>
+              <TouchableOpacity onPress={() => router.push('/profile')}>
+                {userProfile?.avatar_url ? (
+                  <Image 
+                    source={{ uri: userProfile.avatar_url }} 
+                    style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.primary }} 
+                  />
+                ) : (
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
+                    <User color="#fff" size={20} />
+                  </View>
+                )}
+              </TouchableOpacity>
             </View>
           )}
         </View>
