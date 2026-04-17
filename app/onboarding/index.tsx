@@ -212,7 +212,13 @@ export default function Onboarding() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [lastTap, setLastTap] = useState(0);
+  
+  const currentSlideRef = useRef(currentSlide);
+  currentSlideRef.current = currentSlide;
+  const isTransitioningRef = useRef(isTransitioning);
+  isTransitioningRef.current = isTransitioning;
+  const lastTapRef = useRef(0);
+  
   const slideAnim = useRef(new Animated.Value(0)).current;
   const router = useRouter();
   const { colors } = useTheme();
@@ -309,17 +315,17 @@ export default function Onboarding() {
     const now = Date.now();
     const DOUBLE_PRESS_DELAY = 300;
     
-    if (lastTap && (now - lastTap) < DOUBLE_PRESS_DELAY) {
+    if (now - lastTapRef.current < DOUBLE_PRESS_DELAY) {
       return true;
     } else {
-      setLastTap(now);
+      lastTapRef.current = now;
       return false;
     }
   };
 
   // Unified slide transition function for both swipe and button
   const handleSlideTransition = (direction) => {
-    if (isTransitioning) return;
+    if (isTransitioningRef.current) return;
 
     setIsTransitioning(true);
     
@@ -334,7 +340,7 @@ export default function Onboarding() {
         useNativeDriver: true,
       }).start(() => {
         // Change slide
-        if (currentSlide < slides.length - 1) {
+        if (currentSlideRef.current < slides.length - 1) {
           setCurrentSlide(prev => prev + 1);
         } else {
           // If it's the last slide and going next, go to auth
@@ -363,7 +369,7 @@ export default function Onboarding() {
 
   // Fixed back slide animation
   const handleBackWithAnimation = () => {
-    if (isTransitioning || currentSlide === 0) return;
+    if (isTransitioningRef.current || currentSlideRef.current === 0) return;
     
     setIsTransitioning(true);
     
@@ -405,13 +411,13 @@ export default function Onboarding() {
                Math.abs(gestureState.dx) > 10;
       },
       onPanResponderMove: (_, gestureState) => {
-        if (!isTransitioning) {
+        if (!isTransitioningRef.current) {
           const constrainedDX = Math.max(Math.min(gestureState.dx, width * 0.5), -width * 0.5);
           slideAnim.setValue(constrainedDX);
         }
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (isTransitioning) return;
+        if (isTransitioningRef.current) return;
 
         const swipeThreshold = width * 0.15;
         const currentDX = gestureState.dx;
@@ -423,7 +429,7 @@ export default function Onboarding() {
           handleSlideTransition('next');
         } else if (currentDX > swipeThreshold || (currentDX > 10 && swipeVelocity > 0.5)) {
           // Swipe right - previous slide
-          if (currentSlide > 0) {
+          if (currentSlideRef.current > 0) {
             handleSlideTransition('prev');
           } else {
             // Reset if on first slide
