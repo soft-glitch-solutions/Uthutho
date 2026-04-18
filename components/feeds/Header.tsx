@@ -1,6 +1,5 @@
-// components/feeds/Header.tsx
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, Dimensions } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, Dimensions, Animated } from 'react-native';
 import { Bell, Plus, Users, MapPin, Bus, Share2, ArrowLeft } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Community } from '@/types/feeds';
@@ -19,34 +18,85 @@ interface HeaderProps {
   onUnfollow?: () => void;
   postCount?: number;
   reactionCount?: number;
+  scrollY?: Animated.Value; // Add scrollY prop for animated header
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-  unreadNotifications, 
+const Header: React.FC<HeaderProps> = ({
+  unreadNotifications,
   router,
   selectedCommunity,
   isFollowing,
   onFollow,
   onUnfollow,
   postCount = 0,
-  reactionCount = 0
+  reactionCount = 0,
+  scrollY = new Animated.Value(0) // Default if not provided
 }) => {
   if (selectedCommunity) {
     const imageUrl = selectedCommunity.image || (selectedCommunity.type === 'hub' ? DEFAULT_HUB_IMAGE : DEFAULT_STOP_IMAGE);
-    
+
+    // Animation values for collapsible header
+    const headerHeight = scrollY.interpolate({
+      inputRange: [0, 150],
+      outputRange: [320, 120],
+      extrapolate: 'clamp'
+    });
+
+    const imageOpacity = scrollY.interpolate({
+      inputRange: [0, 100, 150],
+      outputRange: [1, 0.5, 0],
+      extrapolate: 'clamp'
+    });
+
+    const contentOpacity = scrollY.interpolate({
+      inputRange: [0, 80, 150],
+      outputRange: [1, 0.3, 0],
+      extrapolate: 'clamp'
+    });
+
+    const compactOpacity = scrollY.interpolate({
+      inputRange: [0, 100, 150],
+      outputRange: [0, 0.5, 1],
+      extrapolate: 'clamp'
+    });
+
+    const compactTranslateY = scrollY.interpolate({
+      inputRange: [0, 150],
+      outputRange: [50, 0],
+      extrapolate: 'clamp'
+    });
+
+    const titleScale = scrollY.interpolate({
+      inputRange: [0, 150],
+      outputRange: [1, 0.8],
+      extrapolate: 'clamp'
+    });
+
+    const statsOpacity = scrollY.interpolate({
+      inputRange: [0, 100, 150],
+      outputRange: [1, 0.5, 0],
+      extrapolate: 'clamp'
+    });
+
     return (
-      <View style={styles.heroContainer}>
-        <ImageBackground
+      <Animated.View style={[styles.heroContainer, { height: headerHeight }]}>
+        <Animated.Image
           source={{ uri: imageUrl }}
-          style={styles.heroImage}
-          imageStyle={styles.imageStyle}
-        >
+          style={[styles.heroImage, { opacity: imageOpacity }]}
+          blurRadius={scrollY.interpolate({
+            inputRange: [0, 150],
+            outputRange: [0, 5],
+            extrapolate: 'clamp'
+          }) as any}
+        />
+
+        <Animated.View style={[styles.heroGradient, { opacity: imageOpacity }]}>
           <LinearGradient
             colors={['rgba(0,0,0,0.6)', 'transparent', '#000000']}
-            style={styles.heroGradient}
+            style={styles.gradientContent}
           >
-            <View style={styles.heroTopRow}>
-               <View style={styles.typeBadge}>
+            <Animated.View style={[styles.heroTopRow, { opacity: contentOpacity }]}>
+              <View style={styles.typeBadge}>
                 {selectedCommunity.type === 'hub' ? (
                   <Bus size={12} color="#1ea2b1" />
                 ) : (
@@ -54,9 +104,9 @@ const Header: React.FC<HeaderProps> = ({
                 )}
                 <Text style={styles.typeText}>{selectedCommunity.type.toUpperCase()}</Text>
               </View>
-              
-              <TouchableOpacity 
-                style={styles.notificationButtonHero}  
+
+              <TouchableOpacity
+                style={styles.notificationButtonHero}
                 onPress={() => router.push('/notification')}
               >
                 <Bell size={20} color="#ffffff" />
@@ -66,11 +116,13 @@ const Header: React.FC<HeaderProps> = ({
                   </View>
                 )}
               </TouchableOpacity>
-            </View>
+            </Animated.View>
 
-            <View style={styles.heroBottomContent}>
+            <Animated.View style={[styles.heroBottomContent, { opacity: contentOpacity }]}>
               <View style={styles.heroMainInfo}>
-                <Text style={styles.heroCommunityName}>{selectedCommunity.name}</Text>
+                <Animated.Text style={[styles.heroCommunityName, { transform: [{ scale: titleScale }] }]}>
+                  {selectedCommunity.name}
+                </Animated.Text>
                 {selectedCommunity.address && (
                   <View style={styles.heroAddressRow}>
                     <MapPin size={12} color="#888888" style={{ marginRight: 4 }} />
@@ -79,7 +131,7 @@ const Header: React.FC<HeaderProps> = ({
                 )}
               </View>
 
-              <View style={styles.heroStatsAndActions}>
+              <Animated.View style={[styles.heroStatsAndActions, { opacity: statsOpacity }]}>
                 <View style={styles.heroStatsContainer}>
                   <View style={styles.heroStatItem}>
                     <Text style={styles.heroStatNumber}>{postCount}</Text>
@@ -104,11 +156,69 @@ const Header: React.FC<HeaderProps> = ({
                     {isFollowing ? 'Following' : 'Follow'}
                   </Text>
                 </TouchableOpacity>
+              </Animated.View>
+            </Animated.View>
+          </LinearGradient>
+        </Animated.View>
+
+        {/* Compact Header for when scrolled */}
+        <Animated.View
+          style={[
+            styles.compactHeader,
+            {
+              opacity: compactOpacity,
+              transform: [{ translateY: compactTranslateY }]
+            }
+          ]}
+        >
+          <View style={styles.compactContent}>
+            <TouchableOpacity
+              style={styles.compactBackButton}
+              onPress={() => router.back()}
+            >
+              <ArrowLeft size={24} color="#ffffff" />
+            </TouchableOpacity>
+
+            <View style={styles.compactInfo}>
+              <Text style={styles.compactTitle} numberOfLines={1}>
+                {selectedCommunity.name}
+              </Text>
+              <View style={styles.compactTypeBadge}>
+                {selectedCommunity.type === 'hub' ? (
+                  <Bus size={10} color="#1ea2b1" />
+                ) : (
+                  <MapPin size={10} color="#1ea2b1" />
+                )}
+                <Text style={styles.compactTypeText}>{selectedCommunity.type.toUpperCase()}</Text>
               </View>
             </View>
-          </LinearGradient>
-        </ImageBackground>
-      </View>
+
+            <View style={styles.compactActions}>
+              <TouchableOpacity
+                style={styles.compactNotificationButton}
+                onPress={() => router.push('/notification')}
+              >
+                <Bell size={20} color="#ffffff" />
+                {unreadNotifications > 0 && (
+                  <View style={styles.compactNotificationBadge}>
+                    <Text style={styles.compactNotificationCount}>{unreadNotifications}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.compactFollowButton,
+                  isFollowing && styles.compactFollowingButton
+                ]}
+                onPress={isFollowing ? onUnfollow : onFollow}
+              >
+                <Users size={14} color={isFollowing ? "#1ea2b1" : "#ffffff"} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+      </Animated.View>
     );
   }
 
@@ -116,8 +226,8 @@ const Header: React.FC<HeaderProps> = ({
     <View style={styles.header}>
       <Text style={styles.headerTitle}>Communities</Text>
       <View style={styles.headerRight}>
-        <TouchableOpacity 
-          style={styles.notificationButton}  
+        <TouchableOpacity
+          style={styles.notificationButton}
           onPress={() => router.push('/notification')}
         >
           <Bell size={24} color="#ffffff" />
@@ -127,8 +237,8 @@ const Header: React.FC<HeaderProps> = ({
             </View>
           )}
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.addIconButton} 
+        <TouchableOpacity
+          style={styles.addIconButton}
           onPress={() => router.push('/favorites')}
         >
           <Plus size={24} color="#1ea2b1" />
@@ -191,22 +301,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   // Hero Header Styles
   heroContainer: {
     width: '100%',
-    height: 320,
     backgroundColor: '#000000',
     overflow: 'hidden',
+    position: 'relative',
   },
   heroImage: {
+    position: 'absolute',
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   imageStyle: {
     opacity: 0.85,
   },
   heroGradient: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+  },
+  gradientContent: {
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 60,
@@ -330,6 +447,97 @@ const styles = StyleSheet.create({
   },
   heroFollowingButtonText: {
     color: '#FFFFFF',
+  },
+
+  // Compact Header Styles
+  compactHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    backdropFilter: 'blur(10px)',
+    paddingTop: 50,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  compactContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  compactBackButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  compactInfo: {
+    flex: 1,
+    marginHorizontal: 12,
+  },
+  compactTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  compactTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    gap: 4,
+  },
+  compactTypeText: {
+    color: '#1ea2b1',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  compactActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  compactNotificationButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  compactNotificationBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  compactNotificationCount: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  compactFollowButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#1ea2b1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  compactFollowingButton: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: '#1ea2b1',
   },
 });
 

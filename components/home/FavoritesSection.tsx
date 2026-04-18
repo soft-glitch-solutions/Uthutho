@@ -1,7 +1,16 @@
-import React from 'react';
-import { View, Text, Pressable, TouchableOpacity, Alert, StyleSheet, Dimensions } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  Alert,
+  StyleSheet,
+  Dimensions,
+  Image,
+  Animated
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { MapPin, Flag, Route, BookmarkCheck, Plus } from 'lucide-react-native';
+import { MapPin, Flag, Route, Users, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import FavoritesSkeleton from './skeletons/FavoritesSkeleton';
 
@@ -13,6 +22,7 @@ interface FavoriteItem {
   name: string;
   type: 'stop' | 'route' | 'hub';
   distance?: string;
+  image_url?: string;
 }
 
 interface FavoritesSectionProps {
@@ -33,80 +43,229 @@ const FavoritesSection = ({
   favoritesCountMap
 }: FavoritesSectionProps) => {
   const router = useRouter();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (favorites.length > 1) {
+      const interval = setInterval(() => {
+        nextCommunity();
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [favorites.length, currentIndex]);
+
+  const animateTransition = (direction: 'next' | 'prev', callback: () => void) => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: direction === 'next' ? -50 : 50,
+        duration: 300,
+        useNativeDriver: true,
+      })
+    ]).start(() => {
+      callback();
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        })
+      ]).start();
+    });
+  };
+
+  const nextCommunity = () => {
+    if (favorites.length === 0) return;
+    animateTransition('next', () => {
+      setCurrentIndex((prev) => (prev + 1) % favorites.length);
+    });
+  };
+
+  const prevCommunity = () => {
+    if (favorites.length === 0) return;
+    animateTransition('prev', () => {
+      setCurrentIndex((prev) => (prev - 1 + favorites.length) % favorites.length);
+    });
+  };
 
   if (isProfileLoading) {
     return <FavoritesSkeleton colors={colors} />;
   }
 
-  return (
-    <View style={[styles.section, isDesktop && styles.sectionDesktop]}>
-      <Text style={[styles.sectionTitle, { color: colors.text }, isDesktop && styles.sectionTitleDesktop]}>
-        Your Favorites
-      </Text>
-      
-      {favorites.length > 0 ? (
-        <View style={[styles.grid, isDesktop && styles.gridDesktop]}>
-          {favorites.map((favorite, index) => {
-            const details = favoriteDetails.find(d => d.id === favorite.id) || {};
-            
-            return (
-              <Pressable
-                key={`${favorite.id}-${index}`}
-                style={[styles.card, { backgroundColor: colors.card }, isDesktop && styles.cardDesktop]}
-                onPress={() => {
-                  if (details.type === 'hub') {
-                    router.push(`/hub-details?hubId=${details.id}`);
-                  } else if (details.type === 'stop') {
-                    router.push(`/stop-details?stopId=${details.id}`);
-                  } else if (details.type === 'route') {
-                    router.push(`/route-details?routeId=${details.id}`);
-                  } else {
-                    Alert.alert('Info', `Favorite: ${favorite.name}`);
-                  }
-                }}
-              >
-                <View style={[styles.favoriteItem, isDesktop && styles.favoriteItemDesktop]}>
-                  {details.type === 'hub' && <MapPin size={isDesktop ? 20 : 24} color={colors.primary} />}
-                  {details.type === 'stop' && <Flag size={isDesktop ? 20 : 24} color={colors.primary} />}
-                  {details.type === 'route' && <Route size={isDesktop ? 20 : 24} color={colors.primary} />}
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.cardText, { color: colors.text }, isDesktop && styles.cardTextDesktop]}>
-                      {favorite.name}
-                    </Text>
-                    {favorite.distance && (
-                      <Text style={[styles.distanceText, { color: colors.text }, isDesktop && styles.distanceTextDesktop]}>
-                        {favorite.distance} away
-                      </Text>
-                    )}
-                    {/* Followers pill */}
-                    {details.id && (
-                      <View style={[styles.followerPill, isDesktop && styles.followerPillDesktop]}>
-                        <Text style={[styles.followerText, isDesktop && styles.followerTextDesktop]}>
-                          Followers: {favoritesCountMap[details.id] || 0}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                  {/* show bookmarked status */}
-                  <BookmarkCheck size={isDesktop ? 18 : 20} color={colors.primary} />
-                </View>
-              </Pressable>
-            );
-          })}
+  if (favorites.length === 0) {
+    return (
+      <View style={[styles.section, isDesktop && styles.sectionDesktop]}>
+        <View style={[styles.header, isDesktop && styles.headerDesktop]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }, isDesktop && styles.sectionTitleDesktop]}>
+            Your Communities
+          </Text>
         </View>
-      ) : (
-        <View style={[styles.emptyFavoritesContainer, isDesktop && styles.emptyFavoritesContainerDesktop]}>
+        <View style={[styles.emptyContainer, { backgroundColor: colors.card }, isDesktop && styles.emptyContainerDesktop]}>
           <Text style={[styles.emptyText, { color: colors.text }, isDesktop && styles.emptyTextDesktop]}>
-            No favorites added yet.
+            No communities joined yet.
           </Text>
           <Pressable
-            onPress={() => router.push('/favorites')}
-            style={[styles.addButton, { backgroundColor: colors.primary }, isDesktop && styles.addButtonDesktop]}
+            onPress={() => router.push('/explore')}
+            style={[styles.exploreButton, { backgroundColor: colors.primary }]}
           >
-            <Plus size={isDesktop ? 20 : 24} color="white" />
+            <Text style={styles.exploreButtonText}>Explore Communities</Text>
           </Pressable>
         </View>
-      )}
+      </View>
+    );
+  }
+
+  const currentFavorite = favorites[currentIndex];
+  const currentDetails = favoriteDetails.find(d => d.id === currentFavorite?.id) || {};
+  const followerCount = favoritesCountMap[currentFavorite?.id] || 0;
+
+  const getTypeIcon = (type: string, size: number) => {
+    switch (type) {
+      case 'hub':
+        return <MapPin size={size} color={colors.primary} />;
+      case 'stop':
+        return <Flag size={size} color={colors.primary} />;
+      case 'route':
+        return <Route size={size} color={colors.primary} />;
+      default:
+        return <Users size={size} color={colors.primary} />;
+    }
+  };
+
+  const getImageUrl = (favorite: FavoriteItem, details: any) => {
+    if (favorite?.image_url) return favorite.image_url;
+    if (details?.image || details?.image_url) return details.image || details.image_url;
+
+    switch (favorite?.type) {
+      case 'hub':
+        return 'https://images.theconversation.com/files/347103/original/file-20200713-42-1scm7g7.jpg?ixlib=rb-4.1.0&q=45&auto=format&w=1356&h=668&fit=crop';
+      case 'stop':
+        return 'https://ygkhmcnpjjvmbrbyybik.supabase.co/storage/v1/object/public/stops/stop_default.png';
+      default:
+        return 'https://ygkhmcnpjjvmbrbyybik.supabase.co/storage/v1/object/public/stops/stop_default.png';
+    }
+  };
+
+  const imageUrl = getImageUrl(currentFavorite, currentDetails);
+
+  return (
+    <View style={[styles.section, isDesktop && styles.sectionDesktop]}>
+      <View style={[styles.header, isDesktop && styles.headerDesktop]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }, isDesktop && styles.sectionTitleDesktop]}>
+          Your Communities
+        </Text>
+        {favorites.length > 0 && (
+          <Pressable onPress={() => router.push('/favorites')}>
+            <Text style={[styles.seeAllText, { color: colors.primary }]}>
+              See All ({favorites.length})
+            </Text>
+          </Pressable>
+        )}
+      </View>
+
+      <View style={[styles.communityBlock, { backgroundColor: colors.card }, isDesktop && styles.communityBlockDesktop]}>
+        {/* Navigation Arrows */}
+        {favorites.length > 1 && (
+          <>
+            <Pressable
+              onPress={prevCommunity}
+              style={[styles.navArrow, styles.navArrowLeft, { backgroundColor: colors.background + 'CC' }]}
+            >
+              <ChevronLeft size={24} color={colors.text} />
+            </Pressable>
+            <Pressable
+              onPress={nextCommunity}
+              style={[styles.navArrow, styles.navArrowRight, { backgroundColor: colors.background + 'CC' }]}
+            >
+              <ChevronRight size={24} color={colors.text} />
+            </Pressable>
+          </>
+        )}
+
+        {/* Animated Content */}
+        <Animated.View
+          style={[
+            styles.animatedContent,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateX: slideAnim }]
+            }
+          ]}
+        >
+          <Pressable
+            onPress={() => {
+              if (currentDetails.type === 'hub') {
+                router.push(`/hub-details?hubId=${currentDetails.id}`);
+              } else if (currentDetails.type === 'stop') {
+                router.push(`/stop-details?stopId=${currentDetails.id}`);
+              } else if (currentDetails.type === 'route') {
+                router.push(`/route-details?routeId=${currentDetails.id}`);
+              } else {
+                Alert.alert('Info', `Community: ${currentFavorite?.name}`);
+              }
+            }}
+            style={styles.communityPressable}
+          >
+            {/* Image Section */}
+            <View style={[styles.imageContainer, isDesktop && styles.imageContainerDesktop]}>
+              <Image
+                source={{ uri: imageUrl }}
+                style={styles.image}
+                defaultSource={require('@/assets/images/school.jpg')}
+              />
+              <View style={[styles.typeBadge, { backgroundColor: colors.primary + '20' }]}>
+                {getTypeIcon(currentFavorite?.type || 'hub', isDesktop ? 14 : 16)}
+                <Text style={[styles.typeText, { color: colors.primary }]}>
+                  {currentFavorite?.type?.charAt(0).toUpperCase() + currentFavorite?.type?.slice(1) || 'Community'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Content Section */}
+            <View style={styles.contentContainer}>
+              <Text style={[styles.communityName, { color: colors.text }, isDesktop && styles.communityNameDesktop]} numberOfLines={1}>
+                {currentFavorite?.name}
+              </Text>
+
+              {currentFavorite?.distance && (
+                <Text style={[styles.distanceText, { color: colors.text }, isDesktop && styles.distanceTextDesktop]}>
+                  📍 {currentFavorite.distance} away
+                </Text>
+              )}
+
+              {/* Followers Section */}
+              <View style={styles.followersContainer}>
+                <Users size={isDesktop ? 14 : 16} color={colors.text} />
+                <Text style={[styles.followerCount, { color: colors.text }, isDesktop && styles.followerCountDesktop]}>
+                  {followerCount.toLocaleString()} followers
+                </Text>
+              </View>
+
+              {/* Join/Leave Button */}
+              <Pressable
+                style={[styles.actionButton, { borderColor: colors.border }]}
+                onPress={() => toggleFavorite(currentFavorite)}
+              >
+                <Text style={[styles.actionButtonText, { color: colors.primary }]}>
+                  Joined
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Animated.View>
+
+      </View>
     </View>
   );
 };
@@ -114,99 +273,184 @@ const FavoritesSection = ({
 const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
+    paddingHorizontal: 16,
   },
   sectionDesktop: {
     marginBottom: 20,
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold' as 'bold',
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  headerDesktop: {
     marginBottom: 12,
   },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
   sectionTitleDesktop: {
-    fontSize: 16,
-    marginBottom: 10,
+    fontSize: 18,
   },
-  grid: {
-    flexDirection: 'row' as 'row',
-    flexWrap: 'wrap' as 'wrap',
-    gap: 12,
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
-  gridDesktop: {
-    gap: 10,
-  },
-  card: {
-    flex: 1,
-    borderRadius: 8,
-    padding: 16,
+  communityBlock: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    position: 'relative',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    minWidth: '48%',
+    shadowRadius: 8,
+    elevation: 3,
   },
-  cardDesktop: {
-    padding: 14,
-    minWidth: '48%',
+  communityBlockDesktop: {
+    maxWidth: 600,
+    alignSelf: 'center',
+    width: '100%',
   },
-  cardText: {
-    fontSize: 14,
+  animatedContent: {
+    width: '100%',
   },
-  cardTextDesktop: {
-    fontSize: 13,
+  communityPressable: {
+    flex: 1,
+  },
+  imageContainer: {
+    width: '100%',
+    height: 200,
+    position: 'relative',
+  },
+  imageContainerDesktop: {
+    height: 180,
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  typeBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 6,
+  },
+  typeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  contentContainer: {
+    padding: 16,
+    gap: 8,
+  },
+  communityName: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  communityNameDesktop: {
+    fontSize: 17,
   },
   distanceText: {
-    fontSize: 12,
-  },
-  distanceTextDesktop: {
-    fontSize: 11,
-  },
-  emptyText: {
-    fontSize: 14,
-  },
-  emptyTextDesktop: {
     fontSize: 13,
   },
-  emptyFavoritesContainer: {
-    flexDirection: 'row' as 'row',
-    alignItems: 'center' as 'center',
-    justifyContent: 'space-between' as 'space-between',
-    marginTop: 10,
-  },
-  emptyFavoritesContainerDesktop: {
-    marginTop: 8,
-  },
-  favoriteItem: {
-    flexDirection: 'row' as 'row',
-    alignItems: 'center' as 'center',
-  },
-  favoriteItemDesktop: {
-    gap: 10,
-  },
-  addButton: {
-    padding: 8,
-  },
-  addButtonDesktop: {
-    padding: 6,
-  },
-  followerPill: {
-    marginTop: 6,
-    alignSelf: 'flex-start',
-    backgroundColor: '#1ea2b120',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  followerPillDesktop: {
-    marginTop: 4,
-  },
-  followerText: {
-    color: '#1ea2b1',
+  distanceTextDesktop: {
     fontSize: 12,
   },
-  followerTextDesktop: {
-    fontSize: 11,
+  followersContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  followerCount: {
+    fontSize: 13,
+  },
+  followerCountDesktop: {
+    fontSize: 12,
+  },
+  actionButton: {
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  navArrow: {
+    position: 'absolute',
+    top: '50%',
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    transform: [{ translateY: -20 }],
+  },
+  navArrowLeft: {
+    left: 10,
+  },
+  navArrowRight: {
+    right: 10,
+  },
+  progressContainer: {
+    padding: 16,
+    paddingTop: 0,
+    gap: 8,
+  },
+  progressBar: {
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  progressText: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    padding: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    gap: 16,
+  },
+  emptyContainerDesktop: {
+    padding: 24,
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  emptyTextDesktop: {
+    fontSize: 14,
+  },
+  exploreButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  exploreButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
 });
 

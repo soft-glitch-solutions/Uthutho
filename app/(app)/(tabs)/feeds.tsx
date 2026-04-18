@@ -19,6 +19,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import * as FileSystem from 'expo-file-system';
 import { captureRef } from 'react-native-view-shot';
+import { Animated } from 'react-native';
+
 
 // Import components (Remove AddCommunityScreen import)
 import Header from '@/components/feeds/Header';
@@ -93,7 +95,7 @@ const WeekRangeHeader: React.FC<{
       <View style={[styles.filterButtons, isDesktop && styles.filterButtonsDesktop]}>
         <TouchableOpacity onPress={() => setPostFilter('week')}>
           <Text style={[
-            styles.filterText, 
+            styles.filterText,
             isDesktop && styles.filterTextDesktop,
             postFilter === 'week' && styles.filterTextActive
           ]}>
@@ -102,7 +104,7 @@ const WeekRangeHeader: React.FC<{
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setPostFilter('today')}>
           <Text style={[
-            styles.filterText, 
+            styles.filterText,
             isDesktop && styles.filterTextDesktop,
             postFilter === 'today' && styles.filterTextActive
           ]}>
@@ -111,7 +113,7 @@ const WeekRangeHeader: React.FC<{
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setPostFilter('all')}>
           <Text style={[
-            styles.filterText, 
+            styles.filterText,
             isDesktop && styles.filterTextDesktop,
             postFilter === 'all' && styles.filterTextActive
           ]}>
@@ -150,6 +152,7 @@ export default function FeedsScreen() {
   const [sharingPost, setSharingPost] = useState(false);
 
   // Preview state
+  const scrollY = useRef(new Animated.Value(0)).current;
   const [previewMode, setPreviewMode] = useState(false);
   const [previewCommunity, setPreviewCommunity] = useState<Community | null>(null);
   const [isFollowingPreview, setIsFollowingPreview] = useState(false);
@@ -197,11 +200,11 @@ export default function FeedsScreen() {
         address: hubData?.address,
         image: hubData?.image || hubData?.image_url,
       };
-      
+
       setPreviewCommunity(previewComm);
       setPreviewMode(true);
       setSelectedCommunity(previewComm);
-      
+
       // Check if user is already following this community
       checkIfFollowingPreview(previewComm.id);
     } else {
@@ -222,16 +225,16 @@ export default function FeedsScreen() {
     try {
       await toggleFavorite(previewCommunity.id);
       setIsFollowingPreview(true);
-      
+
       // Refresh communities to include the new one
       if (user?.id) {
         await loadFavoriteCommunities(user.id);
       }
-      
+
       Alert.alert('Success', `You're now following ${previewCommunity.name}!`, [
         { text: 'OK', onPress: () => setPreviewMode(false) }
       ]);
-      
+
     } catch (error) {
       console.error('Error following community:', error);
       Alert.alert('Error', 'Failed to follow community. Please try again.');
@@ -244,14 +247,14 @@ export default function FeedsScreen() {
     try {
       await toggleFavorite(previewCommunity.id);
       setIsFollowingPreview(false);
-      
+
       // Refresh communities
       if (user?.id) {
         await loadFavoriteCommunities(user.id);
       }
-      
+
       Alert.alert('Success', `You've unfollowed ${previewCommunity.name}`);
-      
+
     } catch (error) {
       console.error('Error unfollowing community:', error);
       Alert.alert('Error', 'Failed to unfollow community. Please try again.');
@@ -261,7 +264,7 @@ export default function FeedsScreen() {
   // Data loading functions
   const loadFavoriteCommunities = useCallback(async (uid: string) => {
     if (!uid || !isValidUUID(uid)) return;
-    
+
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -294,7 +297,7 @@ export default function FeedsScreen() {
 
       allFavorites.sort((a, b) => a.name.localeCompare(b.name));
       setCommunities(allFavorites);
-      
+
       // Set selected community if it exists in the new list, otherwise use first
       setSelectedCommunity(current => {
         if (current && allFavorites.find(c => c.id === current.id)) {
@@ -314,12 +317,12 @@ export default function FeedsScreen() {
         supabase.from('hubs').select('id, name, latitude, longitude, address, image'),
         supabase.from('stops').select('id, name, latitude, longitude, image_url'),
       ]);
-      
+
       const all: Community[] = [
         ...(hubs || []).map((hub) => ({ ...hub, type: 'hub' as const })),
         ...(stops || []).map((stop) => ({ ...stop, type: 'stop' as const, image: stop.image_url })),
       ];
-      
+
       all.sort((a, b) => a.name.localeCompare(b.name));
       setAllCommunities(all);
     } catch (error) {
@@ -329,7 +332,7 @@ export default function FeedsScreen() {
 
   const loadNotificationCount = useCallback(async (uid: string) => {
     if (!uid || !isValidUUID(uid)) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('notifications')
@@ -446,7 +449,7 @@ export default function FeedsScreen() {
 
   const createPost = useCallback(async () => {
     if (!newPost.trim() || !selectedCommunity || !isValidUUID(userId)) return;
-    
+
     try {
       const postData: any = {
         content: newPost.trim(),
@@ -455,10 +458,10 @@ export default function FeedsScreen() {
           ? { hub_id: selectedCommunity.id }
           : { stop_id: selectedCommunity.id }),
       };
-      
+
       const table = selectedCommunity.type === 'hub' ? 'hub_posts' : 'stop_posts';
       const { error } = await supabase.from(table).insert([postData]);
-      
+
       if (error) throw error;
 
       setNewPost('');
@@ -471,7 +474,7 @@ export default function FeedsScreen() {
 
   const toggleFavorite = useCallback(async (communityId: string) => {
     if (!isValidUUID(userId)) return;
-    
+
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -510,7 +513,7 @@ export default function FeedsScreen() {
 
   const toggleReaction = useCallback(async (postId: string, reactionType: string) => {
     if (!isValidUUID(userId)) return;
-    
+
     try {
       const post = posts.find(p => p.id === postId);
       if (!post) return;
@@ -572,7 +575,7 @@ export default function FeedsScreen() {
   const sharePost = useCallback(async (post: Post) => {
     try {
       setSharingPost(true);
-      
+
       const communityName = selectedCommunity?.name || "Uthutho Community";
       const userName = `${post.profiles.first_name} ${post.profiles.last_name}`;
       const shareUrl = `https://mobile.uthutho.co.za/post/${post.id}`;
@@ -597,7 +600,7 @@ export default function FeedsScreen() {
             message: message,
             title: `Post from ${communityName}`,
           });
-          
+
           if (result.action === Share.sharedAction) {
             console.log('Post shared successfully');
           } else if (result.action === Share.dismissedAction) {
@@ -607,7 +610,7 @@ export default function FeedsScreen() {
           console.error('Error sharing:', shareError);
           // Fallback to alert if sharing fails
           Alert.alert(
-            'Share Post', 
+            'Share Post',
             `${message}`,
             [{ text: 'OK' }]
           );
@@ -624,22 +627,22 @@ export default function FeedsScreen() {
   const downloadPost = useCallback(async (post: Post) => {
     try {
       setSharingPost(true);
-  
+
       const viewShotRef = viewShotRefs.current[post.id];
       if (!viewShotRef) throw new Error('Capture failed');
-  
+
       const uri = await captureRef(viewShotRef, {
         format: 'png',
         quality: 1,
         result: 'tmpfile',
       });
-  
+
       await Share.share({
         title: 'Uthutho Post',
         message: 'Shared from Uthutho',
         url: uri,
       });
-  
+
     } catch (error) {
       console.error('Error sharing post image:', error);
       Alert.alert('Error', 'Could not share post');
@@ -647,7 +650,7 @@ export default function FeedsScreen() {
       setSharingPost(false);
     }
   }, []);
-  
+
 
   // Load initial data
   useEffect(() => {
@@ -704,7 +707,7 @@ export default function FeedsScreen() {
         </View>
       );
     }
-    
+
     if (selectedCommunity && (!previewMode || isFollowingPreview)) {
       return (
         <PostCreation
@@ -716,7 +719,7 @@ export default function FeedsScreen() {
         />
       );
     }
-    
+
     return null;
   };
 
@@ -769,7 +772,7 @@ export default function FeedsScreen() {
                   followerCounts={{}}
                   isDesktop={isDesktop}
                 />
-                
+
                 {/* Desktop community stats */}
                 <View style={styles.communityStats}>
                   <Text style={styles.communityStatsTitle}>Community Stats</Text>
@@ -801,7 +804,7 @@ export default function FeedsScreen() {
 
                 {renderPostCreation()}
 
-                <ScrollView 
+                <ScrollView
                   style={styles.desktopPostsScroll}
                   contentContainerStyle={styles.desktopPostsContent}
                   showsVerticalScrollIndicator={false}
@@ -827,15 +830,15 @@ export default function FeedsScreen() {
                   ) : (
                     <EmptyPosts
                       title={
-                        previewMode && !isFollowingPreview 
-                          ? "Follow to See Posts" 
+                        previewMode && !isFollowingPreview
+                          ? "Follow to See Posts"
                           : selectedCommunity ? "No Posts Yet" : "Select a Community"
                       }
                       subtitle={
                         previewMode && !isFollowingPreview
                           ? "Follow this community to see what people are posting"
-                          : selectedCommunity 
-                            ? "Be the first to post in this community" 
+                          : selectedCommunity
+                            ? "Be the first to post in this community"
                             : "Choose a community to see posts"
                       }
                       showAnimation={!!selectedCommunity}
@@ -850,8 +853,8 @@ export default function FeedsScreen() {
                 <View style={styles.trendingSection}>
                   <Text style={styles.trendingTitle}>Trending Posts</Text>
                   {posts.slice(0, 3).map((post, index) => (
-                    <TouchableOpacity 
-                      key={post.id} 
+                    <TouchableOpacity
+                      key={post.id}
                       style={styles.trendingPost}
                       onPress={() => router.push(`/post/${post.id}`)}
                     >
@@ -882,6 +885,7 @@ export default function FeedsScreen() {
             onFollow={previewMode ? followPreviewCommunity : (selectedCommunity ? () => toggleFavorite(selectedCommunity.id) : undefined)}
             onUnfollow={previewMode ? unfollowPreviewCommunity : (selectedCommunity ? () => toggleFavorite(selectedCommunity.id) : undefined)}
             postCount={posts.length}
+            scrollY={scrollY}
             reactionCount={posts.reduce((acc, p) => acc + (p.post_reactions?.length || 0), 0)}
             isDesktop={isDesktop}
           />
@@ -926,15 +930,15 @@ export default function FeedsScreen() {
             ListEmptyComponent={
               <EmptyPosts
                 title={
-                  previewMode && !isFollowingPreview 
-                    ? "Follow to See Posts" 
+                  previewMode && !isFollowingPreview
+                    ? "Follow to See Posts"
                     : selectedCommunity ? "No Posts Yet" : "Select a Community"
                 }
                 subtitle={
                   previewMode && !isFollowingPreview
                     ? "Follow this community to see what people are posting"
-                    : selectedCommunity 
-                      ? "Be the first to post in this community" 
+                    : selectedCommunity
+                      ? "Be the first to post in this community"
                       : "Choose a community to see posts"
                 }
                 showAnimation={!!selectedCommunity}
@@ -942,8 +946,8 @@ export default function FeedsScreen() {
               />
             }
             refreshControl={
-              <RefreshControl 
-                refreshing={refreshing} 
+              <RefreshControl
+                refreshing={refreshing}
                 onRefresh={onRefresh}
                 tintColor="#1ea2b1"
                 colors={['#1ea2b1']}

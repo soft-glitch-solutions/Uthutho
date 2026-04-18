@@ -12,7 +12,7 @@ import {
   RefreshControl,
   Dimensions
 } from 'react-native';
-import { useRouter, useNavigation , useLocalSearchParams } from 'expo-router';
+import { useRouter, useNavigation, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
@@ -62,21 +62,21 @@ const calculateWalkingTime = (lat1, lng1, lat2, lng2) => {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
+    Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLng / 2) *
+    Math.sin(dLng / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distanceKm = R * c;
-  
+
   const walkingTimeMinutes = Math.round(distanceKm / 0.0833);
-  
+
   return walkingTimeMinutes;
 };
 
 // MOVED OUTSIDE COMPONENT: findNearestLocation is now a pure function
 const findNearestLocation = (userLocation: LocationCoords, locations: any[]) => {
   if (!userLocation || !locations || locations.length === 0) return null;
-  
+
   let nearestLocation = null;
   let minDistance = Infinity;
 
@@ -99,7 +99,7 @@ const findNearestLocation = (userLocation: LocationCoords, locations: any[]) => 
 
 const findTopNearestLocations = (userLocation: LocationCoords, locations: any[], limit: number = 5) => {
   if (!userLocation || !locations || locations.length === 0) return [];
-  
+
   const locationsWithDistance = locations.map(location => {
     return {
       ...location,
@@ -144,13 +144,13 @@ const getTypeLabel = (type: string) => {
 };
 
 // Desktop Grid Layout Component
-const CommunityGrid = ({ 
-  favorites, 
-  favoriteDetails, 
-  colors, 
-  router, 
-  toggleFavorite, 
-  favoritesCountMap 
+const CommunityGrid = ({
+  favorites,
+  favoriteDetails,
+  colors,
+  router,
+  toggleFavorite,
+  favoritesCountMap
 }) => {
   if (favorites.length === 0) {
     return (
@@ -164,7 +164,7 @@ const CommunityGrid = ({
         <Text style={[styles.emptyGridSubtext, { color: colors.text, opacity: 0.7 }]}>
           Add locations to see them here
         </Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.emptyGridButton, { backgroundColor: colors.primary }]}
           onPress={() => router.push('/favorites')}
         >
@@ -181,7 +181,7 @@ const CommunityGrid = ({
         const details = favoriteDetails.find(detail => detail.id === favorite.id);
         const type = details?.type || favorite.type;
         const followerCount = favoritesCountMap[details?.id] || 0;
-        
+
         return (
           <Pressable
             key={favorite.id}
@@ -209,18 +209,18 @@ const CommunityGrid = ({
                 </TouchableOpacity>
               </View>
             </View>
-            
+
             <Text style={[styles.gridItemName, { color: colors.text }]} numberOfLines={2}>
               {favorite.name}
             </Text>
-            
+
             <View style={styles.gridItemMeta}>
               <View style={[styles.typeBadge, { backgroundColor: `${colors.primary}20` }]}>
                 <Text style={[styles.typeBadgeText, { color: colors.primary }]}>
                   {getTypeLabel(type)}
                 </Text>
               </View>
-              
+
               {followerCount > 0 && (
                 <View style={styles.followerBadge}>
                   <Users size={12} color="#1ea2b1" />
@@ -240,8 +240,8 @@ const GridSkeletonLoader = ({ colors }) => {
   return (
     <View style={styles.gridContainer}>
       {[1, 2, 3, 4].map((item) => (
-        <View 
-          key={item} 
+        <View
+          key={item}
           style={[styles.gridItemSkeleton, { backgroundColor: colors.card, borderColor: colors.border }]}
         >
           <View style={styles.gridItemHeaderSkeleton}>
@@ -300,7 +300,7 @@ export default function HomeScreen() {
       console.log('No user location available');
       return;
     }
-    
+
     console.log('Fetching nearest locations...');
     setIsNearestLoading(true);
     try {
@@ -358,12 +358,12 @@ export default function HomeScreen() {
         if (!session.data.session?.user.id) return;
 
         const hasSeenWelcome = await AsyncStorage.getItem('hasSeenWelcome');
-        
+
         if (!hasSeenWelcome) {
           await new Promise(resolve => setTimeout(resolve, 1000));
           setShowWelcomeOverlay(true);
           await AsyncStorage.setItem('hasSeenWelcome', 'true');
-          
+
           const count = await AsyncStorage.getItem('welcomeShownCount') || '0';
           await AsyncStorage.setItem('welcomeShownCount', (parseInt(count) + 1).toString());
         }
@@ -382,10 +382,10 @@ export default function HomeScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-  
+
       const isFavorite = favorites.some(fav => fav.id === item.id);
       let newFavorites;
-  
+
       if (isFavorite) {
         newFavorites = favorites.filter(fav => fav.id !== item.id);
       } else {
@@ -396,12 +396,12 @@ export default function HomeScreen() {
           distance: item.distance
         }];
       }
-  
+
       const { error } = await supabase
         .from('profiles')
         .update({ favorites: newFavorites })
         .eq('id', user.id);
-  
+
       if (!error) {
         setFavorites(newFavorites);
         if (!isFavorite) {
@@ -425,30 +425,30 @@ export default function HomeScreen() {
     try {
       const session = await supabase.auth.getSession();
       const userId = session.data.session?.user.id;
-  
+
       if (!userId) {
         router.replace('/auth');
         return;
       }
-  
+
       setUserId(userId);
       const { data, error } = await supabase
         .from('profiles')
         .select('first_name, selected_title, favorites, points, avatar_url')
         .eq('id', userId)
         .single();
-  
+
       if (error) throw error;
-      
+
       if (isMounted) {
         setUserProfile(data);
-  
+
         if (data?.favorites?.length) {
           const processedFavorites = data.favorites.map(fav => {
             if (typeof fav === 'object' && fav.id && fav.name && fav.type) {
               return fav;
             }
-            
+
             if (typeof fav === 'string') {
               return {
                 id: fav,
@@ -456,7 +456,7 @@ export default function HomeScreen() {
                 type: 'stop'
               };
             }
-            
+
             if (typeof fav === 'object') {
               return {
                 id: fav.id || String(Math.random()),
@@ -464,23 +464,23 @@ export default function HomeScreen() {
                 type: fav.type || 'stop'
               };
             }
-            
+
             return {
               id: String(Math.random()),
               name: 'Unknown',
               type: 'stop'
             };
           });
-  
+
           setFavorites(processedFavorites);
-  
+
           const details = await Promise.all(
             processedFavorites.map(async (favorite) => {
               try {
                 const details = await handleFavoritePress(favorite.name || favorite.id);
-                return details ? { 
+                return details ? {
                   ...favorite,
-                  ...details 
+                  ...details
                 } : null;
               } catch (error) {
                 console.error('Error fetching favorite details:', error);
@@ -535,14 +535,14 @@ export default function HomeScreen() {
       console.log('Waiting for user location...');
       return;
     }
-    
+
     console.log('Running fetchNearestLocations effect');
-    
+
     // Add a small debounce to prevent too frequent calls
     const timer = setTimeout(() => {
       fetchNearestLocations();
     }, 500);
-    
+
     return () => clearTimeout(timer);
   }, [userLocation, fetchNearestLocations]);
 
@@ -667,10 +667,10 @@ export default function HomeScreen() {
           .select('points, selected_title')
           .eq('id', user.id)
           .single();
-        
+
         let streak = 0;
         let streakData = null;
-        
+
         try {
           const { data: streakResult } = await supabase
             .from('login_streaks')
@@ -682,7 +682,7 @@ export default function HomeScreen() {
         } catch (streakError) {
           console.log('Streak table not available, using default');
         }
-        
+
         if (profile) {
           setUserStats({
             points: profile.points || 0,
@@ -698,7 +698,7 @@ export default function HomeScreen() {
       setIsStatsLoading(false);
     }
   };
-  
+
   useEffect(() => {
     if (userProfile) {
       loadUserStats();
@@ -719,18 +719,18 @@ export default function HomeScreen() {
       try {
         if (params.showRatingForJourney) {
           console.log('🎯 Rating triggered from URL parameter:', params.showRatingForJourney);
-          
+
           setJourneyRatingId(params.showRatingForJourney as string);
           setShowRatingModal(true);
-          
+
           await AsyncStorage.setItem(
             'handled_rating_param',
             params.showRatingForJourney as string
           );
-          
+
           return;
         }
-        
+
         const pendingRating = await AsyncStorage.getItem('pending_journey_rating');
         if (pendingRating) {
           console.log('🎯 Found rating in storage:', pendingRating);
@@ -752,9 +752,9 @@ export default function HomeScreen() {
         try {
           if (params.showRatingForJourney) {
             console.log('🗑️ Clearing rating parameter on unmount');
-            
+
             const handledParam = await AsyncStorage.getItem('handled_rating_param');
-            
+
             if (handledParam === params.showRatingForJourney) {
               await AsyncStorage.removeItem('handled_rating_param');
               console.log('✅ Successfully cleared handled rating parameter');
@@ -764,7 +764,7 @@ export default function HomeScreen() {
           console.error('Error clearing params on unmount:', error);
         }
       };
-      
+
       clearParams();
     };
   }, []);
@@ -774,7 +774,7 @@ export default function HomeScreen() {
       try {
         if (params.showRatingForJourney) {
           const handledParam = await AsyncStorage.getItem('handled_rating_param');
-          
+
           if (handledParam === params.showRatingForJourney) {
             console.log('⏭️ Parameter already handled, preventing double show');
             return false;
@@ -786,7 +786,7 @@ export default function HomeScreen() {
         return true;
       }
     };
-    
+
     preventDoubleShow();
   }, [params.showRatingForJourney]);
 
@@ -794,18 +794,18 @@ export default function HomeScreen() {
     console.log('Closing rating modal');
     setShowRatingModal(false);
     setJourneyRatingId(null);
-    
+
     AsyncStorage.removeItem('handled_rating_param').catch(console.error);
   };
 
   const handleRatingSubmitted = (journeyId: string, rating: number) => {
     console.log('Rating submitted for journey:', journeyId, 'Rating:', rating);
-    
+
     handleCloseModal();
-    
+
     AsyncStorage.removeItem('pending_journey_rating').catch(console.error);
     AsyncStorage.removeItem('handled_rating_param').catch(console.error);
-    
+
     Alert.alert(
       'Thanks for Your Feedback!',
       `You rated your trip ${rating} stars!`,
@@ -847,11 +847,11 @@ export default function HomeScreen() {
         fetchNearestLocations(),
         loadUserStats(),
       ];
-      
+
       if (refreshActiveJourney) {
         refreshPromises.push(refreshActiveJourney());
       }
-      
+
       await Promise.all(refreshPromises);
     } catch (error) {
       console.error('Error during refresh:', error);
@@ -860,14 +860,14 @@ export default function HomeScreen() {
     }
   }, [fetchUserProfile, fetchNearestLocations, loadUserStats, refreshActiveJourney]);
 
-  const loadFavoriteFollowerCounts = async (items: Array<{ id: string; type: 'route'|'hub'|'stop' }>) => {
+  const loadFavoriteFollowerCounts = async (items: Array<{ id: string; type: 'route' | 'hub' | 'stop' }>) => {
     try {
-      const byType: Record<'route'|'hub'|'stop', string[]> = { route: [], hub: [], stop: [] };
+      const byType: Record<'route' | 'hub' | 'stop', string[]> = { route: [], hub: [], stop: [] };
       items.forEach(it => byType[it.type]?.push(it.id));
 
       const newMap: Record<string, number> = {};
 
-      const fetchType = async (type: 'route'|'hub'|'stop') => {
+      const fetchType = async (type: 'route' | 'hub' | 'stop') => {
         if (!byType[type].length) return;
         const { data } = await supabase
           .from('favorites')
@@ -889,7 +889,7 @@ export default function HomeScreen() {
   useEffect(() => {
     const resolved = favoriteDetails
       .filter(Boolean)
-      .map(d => ({ id: d.id as string, type: d.type as 'route'|'hub'|'stop' }));
+      .map(d => ({ id: d.id as string, type: d.type as 'route' | 'hub' | 'stop' }));
     if (resolved.length) loadFavoriteFollowerCounts(resolved);
     else setFavoritesCountMap({});
   }, [favoriteDetails]);
@@ -922,8 +922,8 @@ export default function HomeScreen() {
           }
         >
           <View style={styles.desktopHeader}>
-            <Pressable onPress={openSidebar}    onLongPress={() => setShowDebugPanel(true)}
-  delayLongPress={2000} style={styles.logoContainer}>
+            <Pressable onPress={openSidebar} onLongPress={() => setShowDebugPanel(true)}
+              delayLongPress={2000} style={styles.logoContainer}>
               <Image
                 source={require('../../../assets/uthutho-logo.png')}
                 style={styles.logo}
@@ -932,7 +932,7 @@ export default function HomeScreen() {
             </Pressable>
             {isProfileLoading ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <View style={[styles.pointsContainer, { 
+                <View style={[styles.pointsContainer, {
                   backgroundColor: colors.border,
                   width: 80,
                   height: 30,
@@ -947,9 +947,9 @@ export default function HomeScreen() {
                 </View>
                 <TouchableOpacity onPress={() => router.push('/profile')}>
                   {userProfile?.avatar_url ? (
-                    <Image 
-                      source={{ uri: userProfile.avatar_url }} 
-                      style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.primary }} 
+                    <Image
+                      source={{ uri: userProfile.avatar_url }}
+                      style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.primary }}
                     />
                   ) : (
                     <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
@@ -977,7 +977,7 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                 </View>
-                
+
                 <View style={styles.profileStats}>
                   <View style={styles.statItem}>
                     <Target size={20} color={colors.primary} />
@@ -988,9 +988,9 @@ export default function HomeScreen() {
                       Points
                     </Text>
                   </View>
-                  
+
                   <View style={styles.statDivider} />
-                  
+
                   <View style={styles.statItem}>
                     <Map size={20} color={colors.primary} />
                     <Text style={[styles.statValue, { color: colors.text }]}>
@@ -1004,7 +1004,7 @@ export default function HomeScreen() {
               </View>
 
               {!journeyLoading && activeJourney && (
-                <Pressable 
+                <Pressable
                   style={[styles.journeyCard, { backgroundColor: colors.primary }]}
                   onPress={() => router.push('/journey')}
                 >
@@ -1038,7 +1038,7 @@ export default function HomeScreen() {
               </View>
 
 
-              
+
               <NearbySection
                 locationError={locationError}
                 isNearestLoading={isNearestLoading}
@@ -1059,7 +1059,7 @@ export default function HomeScreen() {
                 <Text style={[styles.sectionTitle, styles.sectionTitleDesktop, { color: colors.text }]}>
                   Your Community
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.addCommunityButton, { backgroundColor: colors.primary }]}
                   onPress={() => router.push('/favorites')}
                 >
@@ -1067,11 +1067,11 @@ export default function HomeScreen() {
                   <Text style={styles.addCommunityText}>Add</Text>
                 </TouchableOpacity>
               </View>
-              
+
               {isProfileLoading || isFavoritesLoading ? (
                 <GridSkeletonLoader colors={colors} />
               ) : (
-                <CommunityGrid
+                <FavoritesSection
                   favorites={favorites}
                   favoriteDetails={favoriteDetails}
                   colors={colors}
@@ -1086,7 +1086,7 @@ export default function HomeScreen() {
                   Quick Actions
                 </Text>
                 <View style={styles.quickActionsGrid}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.quickAction, { backgroundColor: colors.background }]}
                     onPress={() => router.push('/Map')}
                   >
@@ -1095,8 +1095,8 @@ export default function HomeScreen() {
                       Explore Map
                     </Text>
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity 
+
+                  <TouchableOpacity
                     style={[styles.quickAction, { backgroundColor: colors.background }]}
                     onPress={() => router.push('/favorites')}
                   >
@@ -1105,8 +1105,8 @@ export default function HomeScreen() {
                       All Favorites
                     </Text>
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity 
+
+                  <TouchableOpacity
                     style={[styles.quickAction, { backgroundColor: colors.background }]}
                     onPress={() => router.push('/Leaderboard')}
                   >
@@ -1115,8 +1115,8 @@ export default function HomeScreen() {
                       Leaderboard
                     </Text>
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity 
+
+                  <TouchableOpacity
                     style={[styles.quickAction, { backgroundColor: colors.background }]}
                     onPress={() => router.push('/profile')}
                   >
@@ -1148,8 +1148,8 @@ export default function HomeScreen() {
         }
       >
         <View style={styles.topHeader}>
-          <Pressable onPress={openSidebar}  onLongPress={() => setShowDebugPanel(true)}
-  delayLongPress={2000} style={styles.logoContainer}>
+          <Pressable onPress={openSidebar} onLongPress={() => setShowDebugPanel(true)}
+            delayLongPress={2000} style={styles.logoContainer}>
             <Image
               source={require('../../../assets/uthutho-logo.png')}
               style={styles.logo}
@@ -1158,7 +1158,7 @@ export default function HomeScreen() {
           </Pressable>
           {isProfileLoading ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={[styles.pointsContainer, { 
+              <View style={[styles.pointsContainer, {
                 backgroundColor: colors.border,
                 width: 80,
                 height: 30,
@@ -1173,9 +1173,9 @@ export default function HomeScreen() {
               </View>
               <TouchableOpacity onPress={() => router.push('/profile')}>
                 {userProfile?.avatar_url ? (
-                  <Image 
-                    source={{ uri: userProfile.avatar_url }} 
-                    style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.primary }} 
+                  <Image
+                    source={{ uri: userProfile.avatar_url }}
+                    style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.primary }}
                   />
                 ) : (
                   <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
@@ -1187,18 +1187,18 @@ export default function HomeScreen() {
           )}
         </View>
 
-            <HeaderSection 
-              isProfileLoading={isProfileLoading} 
-              userProfile={userProfile} 
-              colors={colors} 
-              onSearchPress={(y) => {
-                setSearchBarY(y);
-                setIsSearchOverlayVisible(true);
-              }}
-            />
+        <HeaderSection
+          isProfileLoading={isProfileLoading}
+          userProfile={userProfile}
+          colors={colors}
+          onSearchPress={(y) => {
+            setSearchBarY(y);
+            setIsSearchOverlayVisible(true);
+          }}
+        />
 
         {!journeyLoading && activeJourney && (
-          <Pressable 
+          <Pressable
             style={[styles.journeyBanner]}
             onPress={() => router.push('/journey')}
           >
@@ -1245,113 +1245,36 @@ export default function HomeScreen() {
 
         <ServicesSection colors={colors} router={router} />
 
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Your Community
-          </Text>
-          
-          {isProfileLoading || isFavoritesLoading ? (
-            <View style={styles.communityList}>
-              {[1, 2, 3].map((item) => (
-                <View 
-                  key={item} 
-                  style={[styles.communityItemSkeleton, { backgroundColor: colors.card, borderColor: colors.border }]}
-                >
-                  <View style={styles.communityItemContent}>
-                    <View style={[styles.communityIconSkeleton, { backgroundColor: colors.border }]} />
-                    <View style={styles.communityInfoSkeleton}>
-                      <View style={[styles.skeletonTextLarge, { backgroundColor: colors.border }]} />
-                      <View style={[styles.skeletonTextSmall, { backgroundColor: colors.border }]} />
-                      <View style={[styles.skeletonTextMedium, { backgroundColor: colors.border }]} />
-                    </View>
-                  </View>
-                  <View style={[styles.removeButtonSkeleton, { backgroundColor: colors.border }]} />
-                </View>
-              ))}
-            </View>
-          ) : favorites.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={[styles.emptyText, { color: colors.text}]}>
-                You haven't added any locations to your community yet.
-              </Text>
-              <TouchableOpacity style={styles.addButton} onPress={() => router.push('/favorites')}>
-                <Plus size={20} color="#fff" />
-                <Text style={styles.addButtonText}>Add Community</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.communityList}>
-              {favorites.map((favorite, index) => {
-                const details = favoriteDetails.find(detail => detail.id === favorite.id);
-                const type = details?.type || favorite.type;
-                
-                return (
-                  <Pressable
-                    key={favorite.id}
-                    style={[styles.communityItem, { 
-                      backgroundColor: colors.background,
-                      borderColor: colors.border 
-                    }]}
-                    onPress={() => {
-                      if (type === 'stop') {
-                        router.push(`/stop-details?stopId=${favorite.id}`);
-                      } else if (type === 'hub') {
-                        router.push(`/hub/${favorite.id}`);
-                      } else if (type === 'route') {
-                        router.push(`/route-details?routeId=${favorite.id}`);
-                      }
-                    }}
-                  >
-                    <View style={styles.communityItemContent}>
-                      <View style={styles.communityIcon}>
-                        {getIconForType(type)}
-                      </View>
-                      <View style={styles.communityInfo}>
-                        <Text style={[styles.communityName, { color: colors.text }]}>{favorite.name}
-                        </Text>
-                        <View style={styles.communityTypeContainer}>
-                          <Text style={[styles.communityType, { color: colors.text }]}>
-                            {getTypeLabel(type)}
-                          </Text>
-                        </View>
 
-                        {details?.id && (
-                          <View style={{
-                            marginTop: 6,
-                            alignSelf: 'flex-start',
-                            backgroundColor: '#1ea2b120',
-                            borderRadius: 12,
-                            paddingHorizontal: 8,
-                            paddingVertical: 2,
-                          }}>
-                            <Text style={{ color: '#1ea2b1', fontSize: 12 }}>
-                              Followers: {favoritesCountMap[details.id] || 0}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                    <Pressable
-                      style={[styles.removeButton, { backgroundColor: colors.border }]}
-                      onPress={() => {
-                        const removedId = (details?.id as string) || favorite.id;
-                        setFavoritesCountMap(prev => ({
-                          ...prev,
-                          [removedId]: Math.max(0, (prev[removedId] || 0) - 1),
-                        }));
-                        toggleFavorite(favorite);
-                      }}
-                    >
-                      <Text style={[styles.removeButtonText, { color: colors.text }]}>
-                        Remove
-                      </Text>
-                    </Pressable>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-        </View>
+        {isProfileLoading || isFavoritesLoading ? (
+          <FavoritesSection
+            favorites={favorites}
+            favoriteDetails={favoriteDetails}
+            colors={colors}
+            router={router}
+            toggleFavorite={toggleFavorite}
+            favoritesCountMap={favoritesCountMap}
+          />
+        ) : favorites.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.text }]}>
+              You haven't added any locations to your community yet.
+            </Text>
+            <TouchableOpacity style={styles.addButton} onPress={() => router.push('/favorites')}>
+              <Plus size={20} color="#fff" />
+              <Text style={styles.addButtonText}>Add Community</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FavoritesSection
+            favorites={favorites}
+            favoriteDetails={favoriteDetails}
+            colors={colors}
+            router={router}
+            toggleFavorite={toggleFavorite}
+            favoritesCountMap={favoritesCountMap}
+          />
+        )}
 
         <GamificationSection
           isStatsLoading={isStatsLoading}
@@ -1382,9 +1305,9 @@ export default function HomeScreen() {
         onRatingSubmitted={handleRatingSubmitted}
       />
 
-      <SearchOverlay 
-        visible={isSearchOverlayVisible} 
-        onClose={() => setIsSearchOverlayVisible(false)} 
+      <SearchOverlay
+        visible={isSearchOverlayVisible}
+        onClose={() => setIsSearchOverlayVisible(false)}
         initialY={searchBarY}
       />
     </ScreenTransition>
@@ -1405,7 +1328,7 @@ const styles = StyleSheet.create({
   desktopContentContainer: {
     paddingTop: 0,
   },
-  
+
   // Desktop Header
   desktopHeader: {
     flexDirection: 'row',
@@ -1415,7 +1338,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingTop: 8,
   },
-  
+
   // Desktop Three-Column Layout
   desktopLayout: {
     flexDirection: 'row',
@@ -1437,7 +1360,7 @@ const styles = StyleSheet.create({
     width: '35%',
     minWidth: 0,
   },
-  
+
   // Profile Card
   profileCard: {
     borderRadius: 16,
@@ -1498,7 +1421,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#333333',
     marginHorizontal: 20,
   },
-  
+
   // Journey Card
   journeyCard: {
     borderRadius: 16,
@@ -1535,7 +1458,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     opacity: 0.9,
   },
-  
+
   // Section Header with Add Button
   sectionHeader: {
     flexDirection: 'row',
@@ -1566,7 +1489,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
-  
+
   // Map Container Styles
   mapContainer: {
     borderRadius: 16,
@@ -1632,7 +1555,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
-  
+
   // Grid Layout for Community
   gridContainer: {
     flexDirection: 'row',
@@ -1698,7 +1621,7 @@ const styles = StyleSheet.create({
     color: '#1ea2b1',
     fontWeight: '600',
   },
-  
+
   // Empty Grid State
   emptyGridContainer: {
     alignItems: 'center',
@@ -1738,7 +1661,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
-  
+
   // Quick Actions
   quickActions: {
     borderRadius: 16,
@@ -1774,7 +1697,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-  
+
   // Skeleton Grid
   gridItemSkeleton: {
     width: 'calc(50% - 6px)',
@@ -1819,7 +1742,7 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
   },
-  
+
   // Mobile-only styles
   topHeader: {
     flexDirection: 'row',
@@ -2043,38 +1966,38 @@ const styles = StyleSheet.create({
   },
 
   servicesGrid: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  gap: 12,
-},
-serviceCard: {
-  flex: 1,
-  alignItems: 'center',
-  padding: 16,
-  borderRadius: 12,
-  borderWidth: 1,
-  borderColor: '#333333',
-},
-serviceCardDesktop: {
-  padding: 20,
-  borderRadius: 16,
-},
-serviceIcon: {
-  width: 56,
-  height: 56,
-  borderRadius: 28,
-  justifyContent: 'center',
-  alignItems: 'center',
-  marginBottom: 12,
-},
-serviceTitle: {
-  fontSize: 14,
-  fontWeight: '600',
-  textAlign: 'center',
-  marginBottom: 4,
-},
-serviceSubtitle: {
-  fontSize: 12,
-  textAlign: 'center',
-},
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  serviceCard: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  serviceCardDesktop: {
+    padding: 20,
+    borderRadius: 16,
+  },
+  serviceIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  serviceTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  serviceSubtitle: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
 });
