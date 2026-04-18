@@ -19,6 +19,7 @@ import {
   Footprints,
   CheckCircle2,
   X,
+  Search,
 } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -26,23 +27,32 @@ import { useTheme } from '@/context/ThemeContext';
 const SA_ADDRESSES = [
   { id: '1', label: 'Sandton City Mall', address: '83 Rivonia Rd, Sandton, 2196', city: 'Johannesburg' },
   { id: '2', label: 'OR Tambo International Airport', address: 'OR Tambo Airport Rd, Kempton Park, 1627', city: 'Johannesburg' },
-  { id: '3', label: 'Carlton Centre', address: '150 Commissioner St, Johannesburg Central, 2001', city: 'Johannesburg' },
+  { id: '3', label: 'Carlton Centre', address: '150 Commissioner St, Johannesburg CBD, 2001', city: 'Johannesburg' },
   { id: '4', label: 'Soweto – Orlando Towers', address: 'Chris Hani Rd, Orlando West, 1804', city: 'Johannesburg' },
   { id: '5', label: 'Rosebank Mall', address: '50 Bath Ave, Rosebank, 2196', city: 'Johannesburg' },
-  { id: '6', label: 'V&A Waterfront', address: 'Dock Rd, V&A Waterfront, Cape Town, 8001', city: 'Cape Town' },
-  { id: '7', label: 'Cape Town Station', address: 'Adderley St, Cape Town City Centre, 8001', city: 'Cape Town' },
-  { id: '8', label: 'Camps Bay Beach', address: 'Victoria Rd, Camps Bay, 8005', city: 'Cape Town' },
-  { id: '9', label: 'Bellville Station', address: 'Durban Rd, Bellville, 7530', city: 'Cape Town' },
-  { id: '10', label: 'Stellenbosch Square', address: 'Banghoek Rd, Stellenbosch, 7600', city: 'Cape Town' },
-  { id: '11', label: 'Durban Station', address: 'NMR Ave, Greyville, 4001', city: 'Durban' },
-  { id: '12', label: 'Gateway Theatre of Shopping', address: 'Palm Blvd, Umhlanga Ridge, 4319', city: 'Durban' },
-  { id: '13', label: 'Berea Road Station', address: 'Berea Rd, Berea, 4001', city: 'Durban' },
-  { id: '14', label: 'Pretoria Station', address: 'Scheiding St, Pretoria Central, 0002', city: 'Pretoria' },
-  { id: '15', label: 'Menlyn Park', address: 'Atterbury Rd & Lois Ave, Menlo Park, 0181', city: 'Pretoria' },
-  { id: '16', label: 'Union Buildings', address: 'Government Ave, Arcadia, 0083', city: 'Pretoria' },
-  { id: '17', label: 'Mthatha Bus Terminal', address: 'Sutherland St, Mthatha, 5099', city: 'Mthatha' },
-  { id: '18', label: 'East London Station', address: 'Station Rd, East London, 5201', city: 'East London' },
-  { id: '19', label: 'Hemingways Mall', address: 'Bonza Bay Rd, Beacon Bay, 5241', city: 'East London' },
+  { id: '6', label: 'Park Station', address: 'Rissik St, Braamfontein, Johannesburg, 2001', city: 'Johannesburg' },
+  { id: '7', label: 'Bree Taxi Rank', address: 'Bree St, Johannesburg CBD, 2001', city: 'Johannesburg' },
+  { id: '8', label: 'V&A Waterfront', address: 'Dock Rd, V&A Waterfront, Cape Town, 8001', city: 'Cape Town' },
+  { id: '9', label: 'Cape Town Station', address: 'Adderley St, Cape Town City Centre, 8001', city: 'Cape Town' },
+  { id: '10', label: 'Camps Bay Beach', address: 'Victoria Rd, Camps Bay, 8005', city: 'Cape Town' },
+  { id: '11', label: 'Bellville Station', address: 'Durban Rd, Bellville, 7530', city: 'Cape Town' },
+  { id: '12', label: 'Stellenbosch Square', address: 'Banghoek Rd, Stellenbosch, 7600', city: 'Cape Town' },
+  { id: '13', label: 'Khayelitsha Transport Hub', address: 'Ntlazane Rd, Khayelitsha, 7784', city: 'Cape Town' },
+  { id: '14', label: 'Canal Walk Shopping Centre', address: 'Century Blvd, Century City, 7441', city: 'Cape Town' },
+  { id: '15', label: 'Durban Station', address: 'NMR Ave, Greyville, 4001', city: 'Durban' },
+  { id: '16', label: 'Gateway Theatre of Shopping', address: 'Palm Blvd, Umhlanga Ridge, 4319', city: 'Durban' },
+  { id: '17', label: 'Berea Road Station', address: 'Berea Rd, Berea, 4001', city: 'Durban' },
+  { id: '18', label: 'Durban Beach Front', address: 'OR Tambo Parade, Durban, 4001', city: 'Durban' },
+  { id: '19', label: 'Pretoria Station', address: 'Scheiding St, Pretoria Central, 0002', city: 'Pretoria' },
+  { id: '20', label: 'Menlyn Park', address: 'Atterbury Rd & Lois Ave, Menlo Park, 0181', city: 'Pretoria' },
+  { id: '21', label: 'Union Buildings', address: 'Government Ave, Arcadia, 0083', city: 'Pretoria' },
+  { id: '22', label: 'Hatfield Gautrain Station', address: 'Grosvenor St, Hatfield, Pretoria, 0083', city: 'Pretoria' },
+  { id: '23', label: 'Mthatha Bus Terminal', address: 'Sutherland St, Mthatha, 5099', city: 'Mthatha' },
+  { id: '24', label: 'East London Station', address: 'Station Rd, East London, 5201', city: 'East London' },
+  { id: '25', label: 'Hemingways Mall', address: 'Bonza Bay Rd, Beacon Bay, 5241', city: 'East London' },
+  { id: '26', label: 'Bloemfontein Central', address: 'Harvey Rd, Bloemfontein, 9301', city: 'Bloemfontein' },
+  { id: '27', label: 'Polokwane CBD', address: 'Landdros Mare St, Polokwane, 0699', city: 'Polokwane' },
+  { id: '28', label: 'Nelspruit Crossing', address: 'R40 & Madiba Dr, Nelspruit, 1200', city: 'Nelspruit' },
 ];
 
 interface TripLeg {
@@ -94,12 +104,16 @@ export default function PlannerTab() {
   const [tripPlan, setTripPlan] = useState<TripPlan | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // Show all addresses when field is focused but empty, filter when typing
   const query = activeField === 'from' ? fromQuery : toQuery;
-  const filteredAddresses = query.length > 0
-    ? SA_ADDRESSES.filter((a) =>
-        a.label.toLowerCase().includes(query.toLowerCase()) ||
-        a.address.toLowerCase().includes(query.toLowerCase())
-      )
+  const filteredAddresses = activeField
+    ? (query.length > 0
+        ? SA_ADDRESSES.filter((a) =>
+            a.label.toLowerCase().includes(query.toLowerCase()) ||
+            a.address.toLowerCase().includes(query.toLowerCase()) ||
+            a.city.toLowerCase().includes(query.toLowerCase())
+          )
+        : SA_ADDRESSES)
     : [];
 
   const handleSelect = (item: typeof SA_ADDRESSES[0]) => {
@@ -146,7 +160,7 @@ export default function PlannerTab() {
           <View style={styles.dotFilled} />
           <TextInput
             style={[styles.input, { color: colors.text }]}
-            placeholder="From"
+            placeholder="Where from? Try 'Sandton' or 'Cape Town'"
             placeholderTextColor="#555"
             value={fromQuery}
             onChangeText={(t) => { setFromQuery(t); setFromSelected(null); setTripPlan(null); }}
@@ -161,7 +175,7 @@ export default function PlannerTab() {
           <View style={[styles.dotOutline, { borderColor: colors.primary || '#1ea2b1' }]} />
           <TextInput
             style={[styles.input, { color: colors.text }]}
-            placeholder="To"
+            placeholder="Where to? Try 'OR Tambo' or 'Pretoria'"
             placeholderTextColor="#555"
             value={toQuery}
             onChangeText={(t) => { setToQuery(t); setToSelected(null); setTripPlan(null); }}
@@ -187,19 +201,40 @@ export default function PlannerTab() {
         )}
       </View>
 
-      {/* Suggestions */}
+      {/* Suggestions — shown on focus, filtered while typing */}
       {activeField && filteredAddresses.length > 0 && (
         <View style={[styles.suggestions, { backgroundColor: colors.card || '#1A1D1E' }]}>
-          {filteredAddresses.slice(0, 5).map((item) => (
+          <View style={styles.suggestionsHeader}>
+            <Search size={13} color="#666" />
+            <Text style={styles.suggestionsTitle}>
+              {query.length > 0 ? `Results for "${query}"` : 'All addresses'}
+            </Text>
+          </View>
+          {filteredAddresses.slice(0, 8).map((item) => (
             <TouchableOpacity key={item.id} style={styles.suggestion} onPress={() => handleSelect(item)}>
-              <MapPin size={14} color={colors.primary || '#1ea2b1'} />
+              <View style={[styles.suggestionDot, { backgroundColor: `${colors.primary || '#1ea2b1'}20` }]}>
+                <MapPin size={13} color={colors.primary || '#1ea2b1'} />
+              </View>
               <View style={styles.suggestionInfo}>
                 <Text style={[styles.suggestionLabel, { color: colors.text }]}>{item.label}</Text>
                 <Text style={styles.suggestionAddr} numberOfLines={1}>{item.address}</Text>
               </View>
-              <Text style={styles.suggestionCity}>{item.city}</Text>
+              <View style={[styles.cityBadge, { backgroundColor: `${colors.primary || '#1ea2b1'}15` }]}>
+                <Text style={[styles.cityText, { color: colors.primary || '#1ea2b1' }]}>{item.city}</Text>
+              </View>
             </TouchableOpacity>
           ))}
+          {filteredAddresses.length > 8 && (
+            <Text style={styles.moreText}>{filteredAddresses.length - 8} more results…</Text>
+          )}
+        </View>
+      )}
+
+      {/* No results */}
+      {activeField && query.length > 0 && filteredAddresses.length === 0 && (
+        <View style={[styles.noResults, { backgroundColor: colors.card || '#1A1D1E' }]}>
+          <Search size={16} color="#555" />
+          <Text style={styles.noResultsText}>No addresses match "{query}"</Text>
         </View>
       )}
 
@@ -225,7 +260,6 @@ export default function PlannerTab() {
       {/* Results */}
       {tripPlan && (
         <Animated.View style={[styles.result, { backgroundColor: colors.card || '#1A1D1E', opacity: fadeAnim }]}>
-          {/* Time row */}
           <View style={styles.timeRow}>
             <View style={styles.timeBlock}>
               <Text style={styles.timeLabel}>Depart</Text>
@@ -253,7 +287,6 @@ export default function PlannerTab() {
             </View>
           </View>
 
-          {/* Legs */}
           {tripPlan.legs.map((leg, i) => (
             <View key={i} style={styles.leg}>
               <View style={styles.legTrack}>
@@ -277,7 +310,7 @@ export default function PlannerTab() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 20, paddingBottom: 40 },
+  content: { padding: 20, paddingBottom: 100 },
 
   inputCard: { borderRadius: 16, overflow: 'hidden', marginBottom: 12 },
   inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
@@ -290,11 +323,19 @@ const styles = StyleSheet.create({
   actionText: { fontSize: 13, fontWeight: '600' },
 
   suggestions: { borderRadius: 14, marginBottom: 12, overflow: 'hidden' },
-  suggestion: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)' },
+  suggestionsHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+  suggestionsTitle: { fontSize: 12, color: '#666', fontWeight: '500' },
+  suggestion: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 11, gap: 10 },
+  suggestionDot: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   suggestionInfo: { flex: 1 },
   suggestionLabel: { fontSize: 14, fontWeight: '600', marginBottom: 1 },
   suggestionAddr: { fontSize: 12, color: '#666' },
-  suggestionCity: { fontSize: 11, color: '#1ea2b1', fontWeight: '600' },
+  cityBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  cityText: { fontSize: 11, fontWeight: '600' },
+  moreText: { fontSize: 12, color: '#555', textAlign: 'center', paddingVertical: 10 },
+
+  noResults: { borderRadius: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16 },
+  noResultsText: { color: '#555', fontSize: 14 },
 
   planBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, borderRadius: 14, marginBottom: 20 },
   planBtnDisabled: { opacity: 0.35 },

@@ -42,7 +42,7 @@ const ITEMS_PER_PAGE = 20;
 
 export default function RoutesScreen() {
   const { colors } = useTheme();
-  const [activeTab, setActiveTab] = useState<TabType>('stops');
+  const [activeTab, setActiveTab] = useState<TabType>('planner');
 
   // Shared state for all tabs
   const [routes, setRoutes] = useState<Route[]>([]);

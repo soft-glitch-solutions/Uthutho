@@ -9,10 +9,10 @@ export type TabType = 'planner' | 'stops' | 'routes' | 'hubs';
 
 // Default image used for all tabs — user will replace per tab later
 const TAB_IMAGES: Record<TabType, any> = {
-  planner: require('@/assets/images/carpool.jpg'),
-  stops: require('@/assets/images/carpool.jpg'),
-  routes: require('@/assets/images/carpool.jpg'),
-  hubs: require('@/assets/images/carpool.jpg'),
+  planner: require('@/assets/images/planner.gif'),
+  stops: require('@/assets/images/stop.gif'),
+  routes: require('@/assets/images/route.gif'),
+  hubs: require('@/assets/images/hub.gif'),
 };
 
 const TAB_HEADLINES: Record<TabType, { label: string; sub: string }> = {
