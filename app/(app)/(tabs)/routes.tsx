@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/lib/supabase';
-import { Header, TabNavigation, StopsTab, RoutesTab, HubsTab } from '@/components/routes';
+import { useTheme } from '@/context/ThemeContext';
+import { TabNavigation, StopsTab, RoutesTab, HubsTab, PlannerTab } from '@/components/routes';
+import type { TabType } from '@/components/routes';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -39,7 +41,8 @@ export interface Stop {
 const ITEMS_PER_PAGE = 20;
 
 export default function RoutesScreen() {
-  const [activeTab, setActiveTab] = useState<'stops' | 'routes' | 'hubs'>('stops');
+  const { colors } = useTheme();
+  const [activeTab, setActiveTab] = useState<TabType>('stops');
 
   // Shared state for all tabs
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -262,16 +265,17 @@ export default function RoutesScreen() {
             isDesktop={isDesktop}
           />
         );
+      case 'planner':
+        return <PlannerTab />;
       default:
         return null;
     }
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style="light" />
       <View style={[styles.innerContainer, isDesktop && styles.innerContainerDesktop]}>
-        <Header isDesktop={isDesktop} />
         <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} isDesktop={isDesktop} />
         {renderTabContent()}
       </View>
@@ -282,7 +286,6 @@ export default function RoutesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
     width: '100%',
   },
   innerContainer: {

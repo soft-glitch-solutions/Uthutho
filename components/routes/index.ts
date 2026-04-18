@@ -1,9 +1,11 @@
 // Export all components from a single entry point
 export { default as Header } from './Header';
 export { default as TabNavigation } from './TabNavigation';
+export type { TabType } from './TabNavigation';
 export { default as StopsTab } from './StopsTab';
 export { default as RoutesTab } from './RoutesTab';
 export { default as HubsTab } from './HubsTab';
+export { default as PlannerTab } from './PlannerTab';
 export { default as SearchSection } from './SearchSection';
 export { default as FilterButton } from './FilterButton';
 export { default as StopItem } from './StopItem';
