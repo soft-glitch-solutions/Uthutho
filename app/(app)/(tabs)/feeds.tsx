@@ -28,6 +28,7 @@ import EmptyState from '@/components/feeds/EmptyState';
 import SkeletonLoader from '@/components/feeds/SkeletonLoader';
 import PostCard from '@/components/feeds/PostCard';
 import EmptyPosts from '@/components/feeds/EmptyPosts';
+import CommunityHero from '@/components/feeds/CommunityHero';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -40,6 +41,7 @@ interface Community {
   latitude: number;
   longitude: number;
   address?: string;
+  image?: string;
 }
 
 interface UserProfile {
@@ -121,86 +123,8 @@ const WeekRangeHeader: React.FC<{
   );
 };
 
-const PreviewHeader: React.FC<{
-  previewCommunity: Community;
-  isFollowingPreview: boolean;
-  onFollow: () => void;
-  onUnfollow: () => void;
-  onViewFull: () => void;
-  posts: Post[];
-  isDesktop?: boolean;
-}> = ({ previewCommunity, isFollowingPreview, onFollow, onUnfollow, onViewFull, posts, isDesktop = false }) => {
-  return (
-    <View style={[styles.previewHeader, isDesktop && styles.previewHeaderDesktop]}>
-      <View style={[styles.previewHeaderContent, isDesktop && styles.previewHeaderContentDesktop]}>
-        <Text style={[styles.previewTitle, isDesktop && styles.previewTitleDesktop]}>Previewing Community</Text>
-        <Text style={[styles.previewCommunityName, isDesktop && styles.previewCommunityNameDesktop]}>{previewCommunity?.name}</Text>
-        <Text style={[styles.previewDescription, isDesktop && styles.previewDescriptionDesktop]}>
-          {isFollowingPreview 
-            ? "You're following this community and can see all posts!" 
-            : "Follow this community to see all posts and join the conversation"
-          }
-        </Text>
-        
-        {!isFollowingPreview ? (
-          <TouchableOpacity 
-            style={[styles.followButton, isDesktop && styles.followButtonDesktop]}
-            onPress={onFollow}
-          >
-            <Users size={isDesktop ? 18 : 20} color="#ffffff" />
-            <Text style={[styles.followButtonText, isDesktop && styles.followButtonTextDesktop]}>Follow Community</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={[styles.followActions, isDesktop && styles.followActionsDesktop]}>
-            <TouchableOpacity 
-              style={[styles.viewFullButton, isDesktop && styles.viewFullButtonDesktop]}
-              onPress={onViewFull}
-            >
-              <Text style={[styles.viewFullButtonText, isDesktop && styles.viewFullButtonTextDesktop]}>View Full Community</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.unfollowButton, isDesktop && styles.unfollowButtonDesktop]}
-              onPress={onUnfollow}
-            >
-              <Text style={[styles.unfollowButtonText, isDesktop && styles.unfollowButtonTextDesktop]}>Unfollow</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-      
-      {/* Week stats preview - show what they're missing */}
-      <View style={[styles.weekStats, isDesktop && styles.weekStatsDesktop]}>
-        <Text style={[styles.weekStatsTitle, isDesktop && styles.weekStatsTitleDesktop]}>
-          {isFollowingPreview ? 'This Week' : 'This Week in Preview'}
-        </Text>
-        <View style={[styles.statsGrid, isDesktop && styles.statsGridDesktop]}>
-          <View style={[styles.statItem, isDesktop && styles.statItemDesktop]}>
-            <Text style={[styles.statNumber, isDesktop && styles.statNumberDesktop]}>{posts.length}</Text>
-            <Text style={[styles.statLabel, isDesktop && styles.statLabelDesktop]}>Posts</Text>
-          </View>
-          <View style={[styles.statItem, isDesktop && styles.statItemDesktop]}>
-            <Text style={[styles.statNumber, isDesktop && styles.statNumberDesktop]}>
-              {posts.reduce((acc, post) => acc + (post.post_comments?.length || 0), 0)}
-            </Text>
-            <Text style={[styles.statLabel, isDesktop && styles.statLabelDesktop]}>Comments</Text>
-          </View>
-          <View style={[styles.statItem, isDesktop && styles.statItemDesktop]}>
-            <Text style={[styles.statNumber, isDesktop && styles.statNumberDesktop]}>
-              {posts.reduce((acc, post) => acc + (post.post_reactions?.length || 0), 0)}
-            </Text>
-            <Text style={[styles.statLabel, isDesktop && styles.statLabelDesktop]}>Reactions</Text>
-          </View>
-        </View>
-        
-        {!isFollowingPreview && posts.length > 0 && (
-          <Text style={[styles.previewHint, isDesktop && styles.previewHintDesktop]}>
-            Follow to see {posts.length} post{posts.length > 1 ? 's' : ''} from this week
-          </Text>
-        )}
-      </View>
-    </View>
-  );
-};
+// PreviewHeader has been replaced by CommunityHero for a more premium experience
+
 
 export default function FeedsScreen() {
   const { user } = useAuth();
@@ -271,6 +195,7 @@ export default function FeedsScreen() {
         latitude: hubData?.latitude || 0,
         longitude: hubData?.longitude || 0,
         address: hubData?.address,
+        image: hubData?.image || hubData?.image_url,
       };
       
       setPreviewCommunity(previewComm);
@@ -358,13 +283,13 @@ export default function FeedsScreen() {
       }
 
       const [{ data: hubs }, { data: stops }] = await Promise.all([
-        supabase.from('hubs').select('id, name, latitude, longitude, address').in('id', favoriteIds),
-        supabase.from('stops').select('id, name, latitude, longitude').in('id', favoriteIds),
+        supabase.from('hubs').select('id, name, latitude, longitude, address, image').in('id', favoriteIds),
+        supabase.from('stops').select('id, name, latitude, longitude, image_url').in('id', favoriteIds),
       ]);
 
       const allFavorites: Community[] = [
         ...(hubs || []).map((hub) => ({ ...hub, type: 'hub' as const })),
-        ...(stops || []).map((stop) => ({ ...stop, type: 'stop' as const })),
+        ...(stops || []).map((stop) => ({ ...stop, type: 'stop' as const, image: stop.image_url })),
       ];
 
       allFavorites.sort((a, b) => a.name.localeCompare(b.name));
@@ -386,13 +311,13 @@ export default function FeedsScreen() {
   const loadAllCommunities = useCallback(async () => {
     try {
       const [{ data: hubs }, { data: stops }] = await Promise.all([
-        supabase.from('hubs').select('id, name, latitude, longitude, address'),
-        supabase.from('stops').select('id, name, latitude, longitude'),
+        supabase.from('hubs').select('id, name, latitude, longitude, address, image'),
+        supabase.from('stops').select('id, name, latitude, longitude, image_url'),
       ]);
       
       const all: Community[] = [
         ...(hubs || []).map((hub) => ({ ...hub, type: 'hub' as const })),
-        ...(stops || []).map((stop) => ({ ...stop, type: 'stop' as const })),
+        ...(stops || []).map((stop) => ({ ...stop, type: 'stop' as const, image: stop.image_url })),
       ];
       
       all.sort((a, b) => a.name.localeCompare(b.name));
@@ -822,6 +747,12 @@ export default function FeedsScreen() {
             <Header
               unreadNotifications={unreadNotifications}
               router={router}
+              selectedCommunity={selectedCommunity}
+              isFollowing={previewMode ? isFollowingPreview : communities.some(c => c.id === selectedCommunity?.id)}
+              onFollow={previewMode ? followPreviewCommunity : (selectedCommunity ? () => toggleFavorite(selectedCommunity.id) : undefined)}
+              onUnfollow={previewMode ? unfollowPreviewCommunity : (selectedCommunity ? () => toggleFavorite(selectedCommunity.id) : undefined)}
+              postCount={posts.length}
+              reactionCount={posts.reduce((acc, p) => acc + (p.post_reactions?.length || 0), 0)}
               isDesktop={isDesktop}
             />
           </View>
@@ -857,18 +788,7 @@ export default function FeedsScreen() {
 
               {/* Main feed area */}
               <View style={styles.desktopMain}>
-                {/* Show preview header when in preview mode */}
-                {previewMode && previewCommunity && (
-                  <PreviewHeader
-                    previewCommunity={previewCommunity}
-                    isFollowingPreview={isFollowingPreview}
-                    onFollow={followPreviewCommunity}
-                    onUnfollow={unfollowPreviewCommunity}
-                    onViewFull={() => setPreviewMode(false)}
-                    posts={posts}
-                    isDesktop={isDesktop}
-                  />
-                )}
+                {/* Right sidebar - Trending/Recent activity */}
 
                 {weekRange && (
                   <WeekRangeHeader
@@ -957,21 +877,14 @@ export default function FeedsScreen() {
           <Header
             unreadNotifications={unreadNotifications}
             router={router}
+            selectedCommunity={selectedCommunity}
+            isFollowing={previewMode ? isFollowingPreview : communities.some(c => c.id === selectedCommunity?.id)}
+            onFollow={previewMode ? followPreviewCommunity : (selectedCommunity ? () => toggleFavorite(selectedCommunity.id) : undefined)}
+            onUnfollow={previewMode ? unfollowPreviewCommunity : (selectedCommunity ? () => toggleFavorite(selectedCommunity.id) : undefined)}
+            postCount={posts.length}
+            reactionCount={posts.reduce((acc, p) => acc + (p.post_reactions?.length || 0), 0)}
             isDesktop={isDesktop}
           />
-
-          {/* Show preview header when in preview mode */}
-          {previewMode && previewCommunity && (
-            <PreviewHeader
-              previewCommunity={previewCommunity}
-              isFollowingPreview={isFollowingPreview}
-              onFollow={followPreviewCommunity}
-              onUnfollow={unfollowPreviewCommunity}
-              onViewFull={() => setPreviewMode(false)}
-              posts={posts}
-              isDesktop={false}
-            />
-          )}
 
           <CommunityTabs
             communities={communities}
@@ -1303,112 +1216,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-  },
-  followButtonTextDesktop: {
-    fontSize: 14,
-  },
-  followActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  followActionsDesktop: {
-    gap: 10,
-  },
-  viewFullButton: {
-    flex: 2,
-    backgroundColor: '#1ea2b1',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  viewFullButtonDesktop: {
-    borderRadius: 8,
-    paddingVertical: 10,
-  },
-  viewFullButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  viewFullButtonTextDesktop: {
-    fontSize: 14,
-  },
-  unfollowButton: {
-    flex: 1,
-    backgroundColor: '#333333',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  unfollowButtonDesktop: {
-    borderRadius: 8,
-    paddingVertical: 10,
-  },
-  unfollowButtonText: {
-    color: '#CCCCCC',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  unfollowButtonTextDesktop: {
-    fontSize: 14,
-  },
-  weekStats: {
-    backgroundColor: '#0a0a0a',
-    borderRadius: 12,
-    padding: 16,
-  },
-  weekStatsDesktop: {
-    padding: 12,
-  },
-  weekStatsTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  weekStatsTitleDesktop: {
-    fontSize: 14,
-    marginBottom: 10,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 8,
-  },
-  statsGridDesktop: {
-    marginBottom: 6,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statItemDesktop: {
-    paddingHorizontal: 8,
-  },
-  statNumber: {
-    color: '#1ea2b1',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  statNumberDesktop: {
-    fontSize: 18,
-  },
-  statLabel: {
-    color: '#CCCCCC',
-    fontSize: 12,
-  },
-  statLabelDesktop: {
-    fontSize: 11,
-  },
-  previewHint: {
-    color: '#666666',
-    fontSize: 12,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  previewHintDesktop: {
-    fontSize: 11,
   },
   previewPostCreation: {
     backgroundColor: '#1a1a1a',

@@ -48,16 +48,16 @@ const HeaderSection = ({ isProfileLoading, userProfile, colors, onSearchPress }:
       <Text style={[styles.readyText, { color: colors.primary }]}>
         READY TO MOVE
       </Text>
-      
+
       <Text style={[styles.greetingText, { color: colors.text }]}>
         {getGreeting()}{nameString},
       </Text>
-      
+
       <Text style={[styles.headingText, { color: colors.primary }]}>
         where are we heading?
       </Text>
 
-      <Pressable 
+      <Pressable
         ref={searchBarRef}
         style={[styles.searchBar, { backgroundColor: colors.card || '#1A1D1E' }]}
         onPress={handlePress}
@@ -86,13 +86,13 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   greetingText: {
-    fontSize: 34,
+    fontSize: 24,
     fontWeight: '400',
     marginBottom: 2,
     letterSpacing: -0.5,
   },
   headingText: {
-    fontSize: 34,
+    fontSize: 24,
     fontWeight: 'bold',
     fontStyle: 'italic',
     marginBottom: 28,

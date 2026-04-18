@@ -21,6 +21,7 @@ import { MapPin, Bus, Brain as Train, Navigation, Users, Clock, Flag, Route, Boo
 import { useJourney } from '@/hook/useJourney';
 import HeaderSection from '@/components/home/HeaderSection';
 import NearbySection from '@/components/home/NearbySection';
+import ServicesSection from '@/components/home/ServicesSection';
 import FavoritesSection from '@/components/home/FavoritesSection';
 import GamificationSection from '@/components/home/GamificationSection';
 import ScreenTransition from '@/components/ScreenTransition';
@@ -1242,39 +1243,7 @@ export default function HomeScreen() {
           onMarkAsWaiting={handleMarkAsWaiting}
         />
 
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
-  <Text style={[styles.sectionTitle, { color: colors.text }]}>
-    Services
-  </Text>
-  
-  <View style={styles.servicesGrid}>
-    <TouchableOpacity 
-      style={[styles.serviceCard, { backgroundColor: colors.background }]}
-      onPress={() => router.push('/school-transport')}
-    >
-      <View style={[styles.serviceIcon, { backgroundColor: '#1ea2b1' }]}>
-        <Bus size={24} color="#FFFFFF" />
-      </View>
-      <Text style={[styles.serviceTitle, { color: colors.text }]}>
-        School Transport
-      </Text>
-
-    </TouchableOpacity>
-    
-    <TouchableOpacity 
-      style={[styles.serviceCard, { backgroundColor: colors.background }]}
-      onPress={() => router.push('/carpool')}
-    >
-      <View style={[styles.serviceIcon, { backgroundColor: '#10B981' }]}>
-        <Users size={24} color="#FFFFFF" />
-      </View>
-      <Text style={[styles.serviceTitle, { color: colors.text }]}>
-        Carpool
-      </Text>
-    </TouchableOpacity>
-
-  </View>
-</View>
+        <ServicesSection colors={colors} router={router} />
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>

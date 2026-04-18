@@ -8,6 +8,7 @@ export interface Community {
   latitude: number;
   longitude: number;
   address?: string;
+  image?: string;
 }
 
 export interface Hub {
@@ -16,6 +17,7 @@ export interface Hub {
   latitude: number;
   longitude: number;
   address?: string;
+  image?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -25,6 +27,7 @@ export interface Stop {
   name: string;
   latitude: number;
   longitude: number;
+  image_url?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -45,6 +48,7 @@ export interface FavoriteItem {
   id: string;
   name: string;
   type: 'hub' | 'stop';
+  image?: string;
 }
 
 // Post Types
