@@ -23,25 +23,31 @@ const GamificationSkeleton = ({ colors }: GamificationSkeletonProps) => (
           <View key={i} style={styles.statBox}>
             <View style={[styles.skeletonText, { 
               backgroundColor: colors.border,
-              width: 60,
-              height: 20,
+              width: 50,
+              height: 18,
               marginBottom: 4
             }]} />
             <View style={[styles.skeletonText, { 
               backgroundColor: colors.border,
               width: 40,
-              height: 12
+              height: 10
             }]} />
           </View>
         ))}
       </View>
 
+      <View style={styles.progressContainer}>
+        <View style={[styles.skeletonProgress, { backgroundColor: colors.border }]} />
+        <View style={[styles.skeletonProgressText, { backgroundColor: colors.border }]} />
+      </View>
+
       <View style={[styles.titleBadge, { backgroundColor: colors.border }]}>
-        <View style={[styles.skeletonIcon, { backgroundColor: colors.text }]} />
+        <View style={[styles.skeletonIcon, { backgroundColor: colors.text, opacity: 0.1 }]} />
         <View style={[styles.skeletonText, { 
           backgroundColor: colors.text,
           width: 80,
-          marginLeft: 4
+          marginLeft: 4,
+          opacity: 0.1
         }]} />
       </View>
     </View>
@@ -83,6 +89,20 @@ const styles = {
     height: 14,
     borderRadius: 4,
     marginVertical: 4,
+  },
+  progressContainer: {
+    marginBottom: 16,
+  },
+  skeletonProgress: {
+    height: 6,
+    borderRadius: 3,
+    marginBottom: 8,
+  },
+  skeletonProgressText: {
+    width: 60,
+    height: 10,
+    borderRadius: 4,
+    alignSelf: 'center' as 'center',
   },
   titleBadge: {
     flexDirection: 'row' as 'row',

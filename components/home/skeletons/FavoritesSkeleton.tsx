@@ -7,55 +7,58 @@ interface FavoritesSkeletonProps {
 }
 
 const FavoritesSkeleton = ({ colors }: FavoritesSkeletonProps) => (
-  <View style={styles.grid}>
-    {[1, 2].map((i) => (
-      <Shimmer key={i} colors={colors}>
-        <View style={[styles.card, { backgroundColor: colors.card }]}>
-          <View style={styles.favoriteItemSkeleton}>
+  <View style={styles.list}>
+    {[1, 2, 3].map((i) => (
+      <View key={i} style={[styles.card, { 
+        backgroundColor: colors.background,
+        borderColor: colors.border 
+      }]}>
+        <Shimmer colors={colors}>
+          <View style={styles.contentRow}>
             <View style={[styles.skeletonIcon, { backgroundColor: colors.border }]} />
-            <View style={{ flex: 1 }}>
-              <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '70%' }]} />
-              <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '50%', marginTop: 4 }]} />
+            <View style={styles.textColumn}>
+              <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '60%' }]} />
+              <View style={[styles.skeletonText, { backgroundColor: colors.border, width: '40%', height: 10 }]} />
             </View>
-            <View style={[styles.skeletonIcon, { backgroundColor: colors.border }]} />
+            <View style={[styles.skeletonButton, { backgroundColor: colors.border }]} />
           </View>
-        </View>
-      </Shimmer>
+        </Shimmer>
+      </View>
     ))}
   </View>
 );
 
 const styles = {
-  grid: {
-    flexDirection: 'row' as 'row',
-    flexWrap: 'wrap' as 'wrap',
+  list: {
     gap: 12,
   },
   card: {
-    flex: 1,
-    borderRadius: 8,
+    borderRadius: 16,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    minWidth: '48%',
+    borderWidth: 1,
   },
-  favoriteItemSkeleton: {
+  contentRow: {
     flexDirection: 'row' as 'row',
     alignItems: 'center' as 'center',
-    gap: 8,
+    gap: 12,
   },
   skeletonIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  textColumn: {
+    flex: 1,
+    gap: 6,
   },
   skeletonText: {
-    height: 14,
+    height: 16,
     borderRadius: 4,
-    marginVertical: 4,
+  },
+  skeletonButton: {
+    width: 70,
+    height: 32,
+    borderRadius: 16,
   },
 };
 
