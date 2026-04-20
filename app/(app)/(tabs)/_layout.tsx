@@ -22,6 +22,7 @@ import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import StreakOverlay from '@/components/StreakOverlay';
 import { useRouter, useNavigation } from 'expo-router';
+import { gifPrefetchService } from '@/services/gifPrefetchService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const TAB_COUNT = 4;
@@ -30,6 +31,8 @@ const TAB_BAR_WIDTH = SCREEN_WIDTH - (TAB_BAR_MARGIN * 2);
 
 // Check if desktop
 const isDesktop = SCREEN_WIDTH >= 1024;
+
+// GifPrefetchService is now imported from @/services/gifPrefetchService
 
 // Animated Components
 const AnimatedView = Animated.createAnimatedComponent(View);
@@ -103,7 +106,7 @@ const FloatingTabIcon = ({ color, size, focused, children, notificationCount = 0
   const badgeAnimatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
-        { 
+        {
           scale: interpolate(
             translateY.value,
             [0, -8],
@@ -151,9 +154,9 @@ const FloatingTabIcon = ({ color, size, focused, children, notificationCount = 0
       <AnimatedView style={iconAnimatedStyle}>
         {children}
       </AnimatedView>
-      
+
       {notificationCount > 0 && (
-        <AnimatedView 
+        <AnimatedView
           style={[
             {
               position: 'absolute',
@@ -221,14 +224,14 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
       entering={FadeIn.duration(500)}
     >
       {/* App Logo/Brand */}
-      <View style={{ 
-        position: 'absolute', 
+      <View style={{
+        position: 'absolute',
         left: 20,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8
       }}>
-        <Pressable 
+        <Pressable
           onPress={openSidebar}
           style={{ flexDirection: 'row', alignItems: 'center' }}
         >
@@ -236,11 +239,11 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
             source={require('../../../assets/uthutho-logo.png')}
             style={{ width: 30, height: 30, marginRight: 8 }}
           />
-          <Text style={{ 
-            fontSize: 30, 
-            fontWeight: 'bold', 
+          <Text style={{
+            fontSize: 30,
+            fontWeight: 'bold',
             color: colors.primary,
-            letterSpacing: -0.5 
+            letterSpacing: -0.5
           }}>
             Uthutho
           </Text>
@@ -248,15 +251,15 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
       </View>
 
       {/* Navigation Items */}
-      <View style={{ 
-        flexDirection: 'row', 
+      <View style={{
+        flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
       }}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           if (options.href === null || !options.tabBarIcon) return null;
-          
+
           const isFocused = state.index === index;
 
           const onPress = () => {
@@ -299,12 +302,12 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
                 position: 'relative',
               }}
             >
-              <IconComponent 
-                color={isFocused ? '#ffffff' : colors.text} 
-                size={18} 
+              <IconComponent
+                color={isFocused ? '#ffffff' : colors.text}
+                size={18}
                 focused={isFocused}
               />
-              
+
               <Text style={{
                 fontSize: 14,
                 fontWeight: '600',
@@ -314,7 +317,7 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
               </Text>
 
               {notificationCount > 0 && (
-                <View 
+                <View
                   style={{
                     position: 'absolute',
                     top: -2,
@@ -330,9 +333,9 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
                     zIndex: 10,
                   }}
                 >
-                  <Text style={{ 
-                    color: 'white', 
-                    fontSize: 8, 
+                  <Text style={{
+                    color: 'white',
+                    fontSize: 8,
                     fontWeight: 'bold',
                     lineHeight: 12,
                   }}>
@@ -392,11 +395,11 @@ const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount })
     >
       {/* Floating Background Indicator */}
       <FloatingBackground activeIndex={state.index} colors={colors} />
-      
+
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         if (options.href === null || !options.tabBarIcon) return null;
-        
+
         const isFocused = state.index === index;
 
         const onPress = () => {
@@ -437,7 +440,7 @@ const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount })
           >
             <AnimatedView
               entering={SlideInLeft.delay(index * 120).duration(500)}
-              style={{ 
+              style={{
                 alignItems: 'center',
                 justifyContent: 'center',
                 flex: 1,
@@ -452,13 +455,13 @@ const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount })
                 index={index}
                 colors={colors}
               >
-                <IconComponent 
-                  color={isFocused ? '#ffffff' : colors.text} 
-                  size={22} 
+                <IconComponent
+                  color={isFocused ? '#ffffff' : colors.text}
+                  size={22}
                   focused={isFocused}
                 />
               </FloatingTabIcon>
-              
+
               <AnimatedText
                 style={{
                   fontSize: 11,
@@ -484,6 +487,14 @@ export default function EnhancedTabLayout() {
   const [userId, setUserId] = useState<string | null>(null);
   const [showStreakOverlay, setShowStreakOverlay] = useState(false);
 
+  // ========== START GIF PREFETCHING WHEN APP LOADS ==========
+  useEffect(() => {
+    // Start prefetching GIFs immediately when the tab layout mounts
+    // This ensures GIFs are downloading while user navigates
+    gifPrefetchService.startPrefetching();
+  }, []); // Empty dependency array = runs once when component mounts
+  // ========== END GIF PREFETCHING ==========
+
   // Check for streak overlay when component mounts
   useEffect(() => {
     checkAndShowStreakOverlay();
@@ -493,7 +504,7 @@ export default function EnhancedTabLayout() {
     try {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         console.log('No user found for streak overlay');
         return;
@@ -505,7 +516,7 @@ export default function EnhancedTabLayout() {
       const today = new Date().toISOString().split('T')[0];
       const shownKey = `streakOverlayShown_${user.id}_${today}`;
       const hasShownToday = await AsyncStorage.getItem(shownKey);
-      
+
       console.log('Streak overlay check:', { userId: user.id, today, hasShownToday });
 
       if (!hasShownToday) {
@@ -523,9 +534,9 @@ export default function EnhancedTabLayout() {
   return (
     <View style={{ flex: 1 }}>
       <Tabs
-        tabBar={(props) => 
-          isDesktop ? 
-            <DesktopTopNavBar {...props} colors={colors} unreadCount={unreadCount} /> 
+        tabBar={(props) =>
+          isDesktop ?
+            <DesktopTopNavBar {...props} colors={colors} unreadCount={unreadCount} />
             : <FloatingTabBar {...props} colors={colors} unreadCount={unreadCount} />
         }
         screenOptions={{
