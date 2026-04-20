@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TextInput,
   ActivityIndicator,
   Animated,
+  Platform,
 } from 'react-native';
 import {
   MapPin,
@@ -20,40 +21,18 @@ import {
   CheckCircle2,
   X,
   Search,
+  Navigation,
+  LocateFixed,
+  Train,
+  Building2,
 } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
-
-// Real South African addresses
-const SA_ADDRESSES = [
-  { id: '1', label: 'Sandton City Mall', address: '83 Rivonia Rd, Sandton, 2196', city: 'Johannesburg' },
-  { id: '2', label: 'OR Tambo International Airport', address: 'OR Tambo Airport Rd, Kempton Park, 1627', city: 'Johannesburg' },
-  { id: '3', label: 'Carlton Centre', address: '150 Commissioner St, Johannesburg CBD, 2001', city: 'Johannesburg' },
-  { id: '4', label: 'Soweto – Orlando Towers', address: 'Chris Hani Rd, Orlando West, 1804', city: 'Johannesburg' },
-  { id: '5', label: 'Rosebank Mall', address: '50 Bath Ave, Rosebank, 2196', city: 'Johannesburg' },
-  { id: '6', label: 'Park Station', address: 'Rissik St, Braamfontein, Johannesburg, 2001', city: 'Johannesburg' },
-  { id: '7', label: 'Bree Taxi Rank', address: 'Bree St, Johannesburg CBD, 2001', city: 'Johannesburg' },
-  { id: '8', label: 'V&A Waterfront', address: 'Dock Rd, V&A Waterfront, Cape Town, 8001', city: 'Cape Town' },
-  { id: '9', label: 'Cape Town Station', address: 'Adderley St, Cape Town City Centre, 8001', city: 'Cape Town' },
-  { id: '10', label: 'Camps Bay Beach', address: 'Victoria Rd, Camps Bay, 8005', city: 'Cape Town' },
-  { id: '11', label: 'Bellville Station', address: 'Durban Rd, Bellville, 7530', city: 'Cape Town' },
-  { id: '12', label: 'Stellenbosch Square', address: 'Banghoek Rd, Stellenbosch, 7600', city: 'Cape Town' },
-  { id: '13', label: 'Khayelitsha Transport Hub', address: 'Ntlazane Rd, Khayelitsha, 7784', city: 'Cape Town' },
-  { id: '14', label: 'Canal Walk Shopping Centre', address: 'Century Blvd, Century City, 7441', city: 'Cape Town' },
-  { id: '15', label: 'Durban Station', address: 'NMR Ave, Greyville, 4001', city: 'Durban' },
-  { id: '16', label: 'Gateway Theatre of Shopping', address: 'Palm Blvd, Umhlanga Ridge, 4319', city: 'Durban' },
-  { id: '17', label: 'Berea Road Station', address: 'Berea Rd, Berea, 4001', city: 'Durban' },
-  { id: '18', label: 'Durban Beach Front', address: 'OR Tambo Parade, Durban, 4001', city: 'Durban' },
-  { id: '19', label: 'Pretoria Station', address: 'Scheiding St, Pretoria Central, 0002', city: 'Pretoria' },
-  { id: '20', label: 'Menlyn Park', address: 'Atterbury Rd & Lois Ave, Menlo Park, 0181', city: 'Pretoria' },
-  { id: '21', label: 'Union Buildings', address: 'Government Ave, Arcadia, 0083', city: 'Pretoria' },
-  { id: '22', label: 'Hatfield Gautrain Station', address: 'Grosvenor St, Hatfield, Pretoria, 0083', city: 'Pretoria' },
-  { id: '23', label: 'Mthatha Bus Terminal', address: 'Sutherland St, Mthatha, 5099', city: 'Mthatha' },
-  { id: '24', label: 'East London Station', address: 'Station Rd, East London, 5201', city: 'East London' },
-  { id: '25', label: 'Hemingways Mall', address: 'Bonza Bay Rd, Beacon Bay, 5241', city: 'East London' },
-  { id: '26', label: 'Bloemfontein Central', address: 'Harvey Rd, Bloemfontein, 9301', city: 'Bloemfontein' },
-  { id: '27', label: 'Polokwane CBD', address: 'Landdros Mare St, Polokwane, 0699', city: 'Polokwane' },
-  { id: '28', label: 'Nelspruit Crossing', address: 'R40 & Madiba Dr, Nelspruit, 1200', city: 'Nelspruit' },
-];
+import {
+  searchAddresses,
+  reverseGeocode,
+  type AddressSuggestion,
+} from '@/services/addressAutocomplete';
+import * as Location from 'expo-location';
 
 interface TripLeg {
   mode: 'walk' | 'bus';
@@ -97,26 +76,55 @@ export default function PlannerTab() {
   const { colors } = useTheme();
   const [fromQuery, setFromQuery] = useState('');
   const [toQuery, setToQuery] = useState('');
-  const [fromSelected, setFromSelected] = useState<typeof SA_ADDRESSES[0] | null>(null);
-  const [toSelected, setToSelected] = useState<typeof SA_ADDRESSES[0] | null>(null);
+  const [fromSelected, setFromSelected] = useState<AddressSuggestion | null>(null);
+  const [toSelected, setToSelected] = useState<AddressSuggestion | null>(null);
   const [activeField, setActiveField] = useState<'from' | 'to' | null>(null);
   const [planning, setPlanning] = useState(false);
   const [tripPlan, setTripPlan] = useState<TripPlan | null>(null);
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [locatingUser, setLocatingUser] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Show all addresses when field is focused but empty, filter when typing
   const query = activeField === 'from' ? fromQuery : toQuery;
-  const filteredAddresses = activeField
-    ? (query.length > 0
-        ? SA_ADDRESSES.filter((a) =>
-            a.label.toLowerCase().includes(query.toLowerCase()) ||
-            a.address.toLowerCase().includes(query.toLowerCase()) ||
-            a.city.toLowerCase().includes(query.toLowerCase())
-          )
-        : SA_ADDRESSES)
-    : [];
 
-  const handleSelect = (item: typeof SA_ADDRESSES[0]) => {
+  // Debounced address search
+  const fetchSuggestions = useCallback(async (text: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (text.trim().length < 2) {
+      setSuggestions([]);
+      setLoadingSuggestions(false);
+      return;
+    }
+
+    setLoadingSuggestions(true);
+
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const results = await searchAddresses(text, { limit: 8 });
+        setSuggestions(results);
+      } catch (e) {
+        console.error('Search error:', e);
+        setSuggestions([]);
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    }, 400);
+  }, []);
+
+  // Trigger search when query changes
+  useEffect(() => {
+    if (activeField) {
+      fetchSuggestions(query);
+    }
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query, activeField]);
+
+  const handleSelect = (item: AddressSuggestion) => {
     if (activeField === 'from') {
       setFromSelected(item);
       setFromQuery(item.label);
@@ -125,7 +133,42 @@ export default function PlannerTab() {
       setToQuery(item.label);
     }
     setActiveField(null);
+    setSuggestions([]);
     setTripPlan(null);
+  };
+
+  const handleUseMyLocation = async () => {
+    setLocatingUser(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocatingUser(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const result = await reverseGeocode(
+        location.coords.latitude,
+        location.coords.longitude
+      );
+
+      if (result) {
+        if (activeField === 'from') {
+          setFromSelected(result);
+          setFromQuery(result.label);
+        } else if (activeField === 'to') {
+          setToSelected(result);
+          setToQuery(result.label);
+        }
+        setActiveField(null);
+        setSuggestions([]);
+        setTripPlan(null);
+      }
+    } catch (e) {
+      console.error('Location error:', e);
+    } finally {
+      setLocatingUser(false);
+    }
   };
 
   const handleSwap = () => {
@@ -147,6 +190,28 @@ export default function PlannerTab() {
     Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
   };
 
+  const getTypeIcon = (type: AddressSuggestion['type']) => {
+    switch (type) {
+      case 'transport':
+        return <Bus size={13} color={colors.primary || '#1ea2b1'} />;
+      case 'poi':
+        return <Building2 size={13} color="#f59e0b" />;
+      default:
+        return <MapPin size={13} color={colors.primary || '#1ea2b1'} />;
+    }
+  };
+
+  const getTypeBadgeColor = (type: AddressSuggestion['type']) => {
+    switch (type) {
+      case 'transport':
+        return { bg: `${colors.primary || '#1ea2b1'}15`, text: colors.primary || '#1ea2b1' };
+      case 'poi':
+        return { bg: 'rgba(245,158,11,0.1)', text: '#f59e0b' };
+      default:
+        return { bg: `${colors.primary || '#1ea2b1'}15`, text: colors.primary || '#1ea2b1' };
+    }
+  };
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -160,11 +225,11 @@ export default function PlannerTab() {
           <View style={styles.dotFilled} />
           <TextInput
             style={[styles.input, { color: colors.text }]}
-            placeholder="Where from? Try 'Sandton' or 'Cape Town'"
+            placeholder="Where from? Search any address…"
             placeholderTextColor="#555"
             value={fromQuery}
             onChangeText={(t) => { setFromQuery(t); setFromSelected(null); setTripPlan(null); }}
-            onFocus={() => setActiveField('from')}
+            onFocus={() => { setActiveField('from'); setSuggestions([]); }}
           />
           {fromSelected && <CheckCircle2 size={16} color={colors.primary || '#1ea2b1'} />}
         </View>
@@ -175,11 +240,11 @@ export default function PlannerTab() {
           <View style={[styles.dotOutline, { borderColor: colors.primary || '#1ea2b1' }]} />
           <TextInput
             style={[styles.input, { color: colors.text }]}
-            placeholder="Where to? Try 'OR Tambo' or 'Pretoria'"
+            placeholder="Where to? Search any address…"
             placeholderTextColor="#555"
             value={toQuery}
             onChangeText={(t) => { setToQuery(t); setToSelected(null); setTripPlan(null); }}
-            onFocus={() => setActiveField('to')}
+            onFocus={() => { setActiveField('to'); setSuggestions([]); }}
           />
           {toSelected && <CheckCircle2 size={16} color={colors.primary || '#1ea2b1'} />}
         </View>
@@ -191,7 +256,7 @@ export default function PlannerTab() {
               <Text style={[styles.actionText, { color: colors.primary || '#1ea2b1' }]}>Swap</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => { setFromQuery(''); setToQuery(''); setFromSelected(null); setToSelected(null); setTripPlan(null); setActiveField(null); }}
+              onPress={() => { setFromQuery(''); setToQuery(''); setFromSelected(null); setToSelected(null); setTripPlan(null); setActiveField(null); setSuggestions([]); }}
               style={styles.actionBtn}
             >
               <X size={14} color="#666" />
@@ -201,40 +266,71 @@ export default function PlannerTab() {
         )}
       </View>
 
-      {/* Suggestions — shown on focus, filtered while typing */}
-      {activeField && filteredAddresses.length > 0 && (
+      {/* Use My Location button */}
+      {activeField && (
+        <TouchableOpacity
+          style={[styles.locationBtn, { backgroundColor: colors.card || '#1A1D1E' }]}
+          onPress={handleUseMyLocation}
+          disabled={locatingUser}
+        >
+          {locatingUser ? (
+            <ActivityIndicator size="small" color={colors.primary || '#1ea2b1'} />
+          ) : (
+            <LocateFixed size={18} color={colors.primary || '#1ea2b1'} />
+          )}
+          <Text style={[styles.locationBtnText, { color: colors.primary || '#1ea2b1' }]}>
+            {locatingUser ? 'Getting location…' : 'Use my current location'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Address Suggestions */}
+      {activeField && (loadingSuggestions || suggestions.length > 0) && (
         <View style={[styles.suggestions, { backgroundColor: colors.card || '#1A1D1E' }]}>
           <View style={styles.suggestionsHeader}>
             <Search size={13} color="#666" />
             <Text style={styles.suggestionsTitle}>
-              {query.length > 0 ? `Results for "${query}"` : 'All addresses'}
+              {loadingSuggestions
+                ? 'Searching addresses…'
+                : query.length >= 2
+                  ? `${suggestions.length} result${suggestions.length !== 1 ? 's' : ''} for "${query}"`
+                  : 'Type to search addresses'}
             </Text>
           </View>
-          {filteredAddresses.slice(0, 8).map((item) => (
-            <TouchableOpacity key={item.id} style={styles.suggestion} onPress={() => handleSelect(item)}>
-              <View style={[styles.suggestionDot, { backgroundColor: `${colors.primary || '#1ea2b1'}20` }]}>
-                <MapPin size={13} color={colors.primary || '#1ea2b1'} />
-              </View>
-              <View style={styles.suggestionInfo}>
-                <Text style={[styles.suggestionLabel, { color: colors.text }]}>{item.label}</Text>
-                <Text style={styles.suggestionAddr} numberOfLines={1}>{item.address}</Text>
-              </View>
-              <View style={[styles.cityBadge, { backgroundColor: `${colors.primary || '#1ea2b1'}15` }]}>
-                <Text style={[styles.cityText, { color: colors.primary || '#1ea2b1' }]}>{item.city}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-          {filteredAddresses.length > 8 && (
-            <Text style={styles.moreText}>{filteredAddresses.length - 8} more results…</Text>
+
+          {loadingSuggestions && suggestions.length === 0 && (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="small" color={colors.primary || '#1ea2b1'} />
+            </View>
           )}
+
+          {suggestions.map((item) => {
+            const badgeColors = getTypeBadgeColor(item.type);
+            return (
+              <TouchableOpacity key={item.id} style={styles.suggestion} onPress={() => handleSelect(item)}>
+                <View style={[styles.suggestionDot, { backgroundColor: `${colors.primary || '#1ea2b1'}20` }]}>
+                  {getTypeIcon(item.type)}
+                </View>
+                <View style={styles.suggestionInfo}>
+                  <Text style={[styles.suggestionLabel, { color: colors.text }]} numberOfLines={1}>{item.label}</Text>
+                  <Text style={styles.suggestionAddr} numberOfLines={1}>{item.address}</Text>
+                </View>
+                {item.city ? (
+                  <View style={[styles.cityBadge, { backgroundColor: badgeColors.bg }]}>
+                    <Text style={[styles.cityText, { color: badgeColors.text }]}>{item.city}</Text>
+                  </View>
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 
       {/* No results */}
-      {activeField && query.length > 0 && filteredAddresses.length === 0 && (
+      {activeField && query.length >= 2 && !loadingSuggestions && suggestions.length === 0 && (
         <View style={[styles.noResults, { backgroundColor: colors.card || '#1A1D1E' }]}>
           <Search size={16} color="#555" />
-          <Text style={styles.noResultsText}>No addresses match "{query}"</Text>
+          <Text style={styles.noResultsText}>No addresses found for "{query}"</Text>
         </View>
       )}
 
@@ -322,6 +418,17 @@ const styles = StyleSheet.create({
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionText: { fontSize: 13, fontWeight: '600' },
 
+  locationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginBottom: 12,
+  },
+  locationBtnText: { fontSize: 14, fontWeight: '600' },
+
   suggestions: { borderRadius: 14, marginBottom: 12, overflow: 'hidden' },
   suggestionsHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   suggestionsTitle: { fontSize: 12, color: '#666', fontWeight: '500' },
@@ -332,7 +439,7 @@ const styles = StyleSheet.create({
   suggestionAddr: { fontSize: 12, color: '#666' },
   cityBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   cityText: { fontSize: 11, fontWeight: '600' },
-  moreText: { fontSize: 12, color: '#555', textAlign: 'center', paddingVertical: 10 },
+  loadingRow: { paddingVertical: 20, alignItems: 'center' },
 
   noResults: { borderRadius: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16 },
   noResultsText: { color: '#555', fontSize: 14 },
