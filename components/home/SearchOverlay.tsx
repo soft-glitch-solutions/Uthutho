@@ -28,10 +28,17 @@ import {
   MapPin,
   Navigation,
   Star,
-  Users
+  Users,
+  LocateFixed
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
+import { useTheme } from '@/context/ThemeContext';
+import { 
+  searchAddresses, 
+  reverseGeocode, 
+  type AddressSuggestion 
+} from '@/services/addressAutocomplete';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -53,12 +60,16 @@ export interface SearchResult {
 
 const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps) => {
   const router = useRouter();
+  const { colors } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [userLocation, setUserLocation] = useState<Location.LocationObjectCoords | null>(null);
   const [user, setUser] = useState<any>(null);
   const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
+  const [suggestedRoutes, setSuggestedRoutes] = useState<any[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [locatingUser, setLocatingUser] = useState(false);
   
   const inputRef = useRef<TextInput>(null);
   
@@ -145,7 +156,8 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
   const deg2rad = (deg: number) => deg * (Math.PI / 180);
 
   const performSearch = async (query: string) => {
-    if (query.trim().length === 0) {
+    const trimmed = query.trim();
+    if (trimmed.length === 0) {
       setSearchResults([]);
       return;
     }
@@ -154,52 +166,141 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
     const results: SearchResult[] = [];
 
     try {
-      // 1. Search routes
-      const { data: routes } = await supabase
-        .from('routes')
-        .select('*')
-        .or(`name.ilike.%${query}%,start_point.ilike.%${query}%,end_point.ilike.%${query}%`)
-        .limit(5);
+      // 1. Search routes, stops, and addresses in parallel
+      const [routesData, stopsData, addresses] = await Promise.all([
+        supabase
+          .from('routes')
+          .select('*')
+          .or(`name.ilike.%${trimmed}%,start_point.ilike.%${trimmed}%,end_point.ilike.%${trimmed}%`)
+          .limit(5),
+        supabase
+          .from('stops')
+          .select('*')
+          .ilike('name', `%${trimmed}%`)
+          .limit(5),
+        searchAddresses(trimmed, { limit: 5 })
+      ]);
 
-      if (routes) {
-        routes.forEach(route => results.push({ id: route.id, name: route.name, type: 'route', data: route }));
+      // Process Routes
+      if (routesData.data) {
+        routesData.data.forEach(route => results.push({ 
+          id: route.id, 
+          name: route.name, 
+          type: 'route', 
+          data: route,
+          contextTitle: `${route.start_point} to ${route.end_point}`
+        }));
       }
 
-      // 2. Search stops
-      const { data: stops } = await supabase
-        .from('stops')
-        .select('*')
-        .ilike('name', `%${query}%`)
-        .limit(10);
-
-      if (stops) {
-        stops.forEach(stop => {
+      // Process Stops
+      if (stopsData.data) {
+        stopsData.data.forEach(stop => {
           let distance;
           if (userLocation) distance = calculateDistance(userLocation.latitude, userLocation.longitude, stop.latitude, stop.longitude);
-          results.push({ id: stop.id, name: stop.name, type: 'stop', data: stop, distance });
+          results.push({ 
+            id: stop.id, 
+            name: stop.name, 
+            type: 'stop', 
+            data: stop, 
+            distance,
+            coords: { latitude: stop.latitude, longitude: stop.longitude }
+          });
         });
       }
 
-      // 3. Geocoding
-      try {
-        const geocoded = await Location.geocodeAsync(query);
-        if (geocoded && geocoded.length > 0) {
-          const first = geocoded[0];
-          results.push({
-            id: `address-${first.latitude}-${first.longitude}`,
-            name: query,
-            type: 'address',
-            data: { ...first, address: query },
-            coords: first,
-          });
-        }
-      } catch (e) {}
+      // Process Addresses from Nominatim
+      addresses.forEach(addr => {
+        results.push({
+          id: `addr-${addr.id}`,
+          name: addr.label,
+          type: 'address',
+          data: addr,
+          coords: { latitude: addr.latitude, longitude: addr.longitude },
+          contextTitle: addr.address
+        });
+      });
 
       setSearchResults(results);
     } catch (error) {
       console.error('Search error:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSuggestedRoutes = async () => {
+    if (!userLocation) return;
+    
+    setLoadingSuggestions(true);
+    try {
+      // 1. Find nearest stops
+      const { data: stops } = await supabase
+        .from('stops')
+        .select('*, routes(*)')
+        .limit(50); // Get a reasonable set of stops to filter locally
+
+      if (!stops || stops.length === 0) return;
+
+      // 2. Sort by distance and take the 5 nearest
+      const nearestStops = stops
+        .map(stop => ({
+          ...stop,
+          distance: calculateDistance(userLocation.latitude, userLocation.longitude, stop.latitude, stop.longitude)
+        }))
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 5);
+
+      // 3. Extract unique routes from these stops
+      const uniqueRoutes = new Map();
+      nearestStops.forEach(stop => {
+        if (stop.routes && !uniqueRoutes.has(stop.routes.id)) {
+          uniqueRoutes.set(stop.routes.id, {
+            ...stop.routes,
+            distanceToStop: stop.distance,
+            nearestStopName: stop.name
+          });
+        }
+      });
+
+      setSuggestedRoutes(Array.from(uniqueRoutes.values()).slice(0, 3));
+    } catch (error) {
+      console.error('Error fetching suggested routes:', error);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  useEffect(() => {
+    if (visible && userLocation) {
+      fetchSuggestedRoutes();
+    }
+  }, [visible, userLocation]);
+
+  const handleUseMyLocation = async () => {
+    setLocatingUser(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+
+      const location = await Location.getCurrentPositionAsync({});
+      const result = await reverseGeocode(
+        location.coords.latitude,
+        location.coords.longitude
+      );
+
+      if (result) {
+        handleResultPress({
+          id: `curr-${result.id}`,
+          name: 'Current Location',
+          type: 'address',
+          data: result,
+          coords: { latitude: result.latitude, longitude: result.longitude }
+        });
+      }
+    } catch (e) {
+      console.error('Location error:', e);
+    } finally {
+      setLocatingUser(false);
     }
   };
 
@@ -299,7 +400,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
                     <View style={styles.resultDetails}>
                       <Text style={styles.resultTitle} numberOfLines={1}>{result.name}</Text>
                       <Text style={styles.resultSubtitle} numberOfLines={1}>
-                        {result.type.toUpperCase()} {result.distance ? `• ${result.distance.toFixed(1)}km` : ''}
+                        {result.contextTitle || (result.type.toUpperCase() + (result.distance ? ` • ${result.distance.toFixed(1)}km` : ''))}
                       </Text>
                     </View>
                     <ChevronRight size={18} color="#444444" />
@@ -317,18 +418,28 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
               {/* Shortcuts */}
               <Animated.View style={{ transform: [{ translateY: anims.shortcutsY }] }}>
                 <View style={styles.shortcutsGrid}>
-                  <TouchableOpacity style={styles.shortcutCard}>
-                    <View style={styles.shortcutIconBox}><Home size={22} color="#1ea2b1" /></View>
+                  <TouchableOpacity 
+                    style={[styles.shortcutCard, { backgroundColor: colors.card }]}
+                    onPress={handleUseMyLocation}
+                    disabled={locatingUser}
+                  >
+                    <View style={[styles.shortcutIconBox, { backgroundColor: `${colors.primary}15` }]}>
+                      {locatingUser ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <LocateFixed size={22} color={colors.primary} />
+                      )}
+                    </View>
                     <View>
-                      <Text style={styles.shortcutTitle}>HOME</Text>
-                      <Text style={styles.shortcutSubtitle}>Set address</Text>
+                      <Text style={styles.shortcutTitle}>NEARBY</Text>
+                      <Text style={[styles.shortcutSubtitle, { color: colors.text }]}>Current Location</Text>
                     </View>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.shortcutCard}>
-                    <View style={[styles.shortcutIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}><Briefcase size={22} color="#f59e0b" /></View>
+                  <TouchableOpacity style={[styles.shortcutCard, { backgroundColor: colors.card }]}>
+                    <View style={styles.shortcutIconBox}><Home size={22} color={colors.primary} /></View>
                     <View>
-                      <Text style={styles.shortcutTitle}>WORK</Text>
-                      <Text style={styles.shortcutSubtitle}>Sandton Central</Text>
+                      <Text style={styles.shortcutTitle}>HOME</Text>
+                      <Text style={[styles.shortcutSubtitle, { color: colors.text }]}>Set address</Text>
                     </View>
                   </TouchableOpacity>
                 </View>
@@ -357,18 +468,38 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
 
               {/* Suggested */}
               <Animated.View style={[styles.sectionWrapper, { transform: [{ translateY: anims.suggestedY }] }]}>
-                <Text style={styles.sectionTitle}>Suggested Routes</Text>
-                <TouchableOpacity style={styles.suggestedCard}>
-                  <View style={styles.suggestedHeader}>
-                    <View style={styles.fastestBadge}>
-                      <Zap size={10} color="#1ea2b1" style={{ marginRight: 4 }} />
-                      <Text style={styles.fastestText}>FASTEST</Text>
-                    </View>
-                    <Bus size={22} color="#FFFFFF" />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Suggested for You</Text>
+                
+                {loadingSuggestions ? (
+                  <View style={styles.suggestionLoading}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={styles.loadingText}>Finding nearby routes...</Text>
                   </View>
-                  <Text style={styles.suggestedTitle}>Sea Point Promenade</Text>
-                  <Text style={styles.suggestedSubtitle}>22 min via M6 Coastal Route</Text>
-                </TouchableOpacity>
+                ) : suggestedRoutes.length > 0 ? (
+                  suggestedRoutes.map((route) => (
+                    <TouchableOpacity 
+                      key={route.id} 
+                      style={[styles.suggestedCard, { backgroundColor: colors.card }]}
+                      onPress={() => router.push(`/route-details?routeId=${route.id}`)}
+                    >
+                      <View style={styles.suggestedHeader}>
+                        <View style={[styles.fastestBadge, { backgroundColor: `${colors.primary}15` }]}>
+                          <Zap size={10} color={colors.primary} style={{ marginRight: 4 }} />
+                          <Text style={[styles.fastestText, { color: colors.primary }]}>NEARBY</Text>
+                        </View>
+                        <Bus size={22} color={colors.text} />
+                      </View>
+                      <Text style={[styles.suggestedTitle, { color: colors.text }]}>{route.name}</Text>
+                      <Text style={styles.suggestedSubtitle}>
+                        Nearest stop: {route.nearestStopName} ({route.distanceToStop.toFixed(1)}km)
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={[styles.suggestedCard, { backgroundColor: colors.card }]}>
+                    <Text style={styles.suggestedSubtitle}>No routes found nearby. Try searching for a destination.</Text>
+                  </View>
+                )}
               </Animated.View>
             </View>
           )}
@@ -596,6 +727,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     marginTop: 16,
+  },
+  suggestionLoading: {
+    padding: 24,
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    color: '#888888',
+    fontSize: 14,
   }
 });
 

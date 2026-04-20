@@ -26,6 +26,7 @@ import FavoritesSection from '@/components/home/FavoritesSection';
 import GamificationSection from '@/components/home/GamificationSection';
 import ScreenTransition from '@/components/ScreenTransition';
 import SearchOverlay from '@/components/home/SearchOverlay';
+import SuggestedRoutesSection from '@/components/home/SuggestedRoutesSection';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 import LottieView from 'lottie-react-native';
@@ -292,6 +293,8 @@ export default function HomeScreen() {
   const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(false);
   const [isSearchOverlayVisible, setIsSearchOverlayVisible] = useState(false);
   const [searchBarY, setSearchBarY] = useState(160);
+  const [suggestedRoutes, setSuggestedRoutes] = useState<any[]>([]);
+  const [isSuggestedLoading, setIsSuggestedLoading] = useState(false);
   const hasCheckedWelcome = useRef(false);
 
   // FIXED: Properly memoized fetchNearestLocations
@@ -303,9 +306,10 @@ export default function HomeScreen() {
 
     console.log('Fetching nearest locations...');
     setIsNearestLoading(true);
+    setIsSuggestedLoading(true);
     try {
       const [stopsResult, hubsResult] = await Promise.allSettled([
-        supabase.from('stops').select('*'),
+        supabase.from('stops').select('*, routes(*)'),
         supabase.from('hubs').select('*')
       ]);
 
@@ -322,10 +326,25 @@ export default function HomeScreen() {
       console.log('Nearest hub:', nearestHub?.name);
 
       setNearestLocations({ nearestStop, nearestHub, nearestStops });
+
+      // Calculate suggested routes based on nearest stops
+      const uniqueRoutes = new Map();
+      nearestStops.forEach((stop: any) => {
+        if (stop.routes && !uniqueRoutes.has(stop.routes.id)) {
+          uniqueRoutes.set(stop.routes.id, {
+            id: stop.routes.id,
+            name: stop.routes.name,
+            nearestStopName: stop.name,
+            distanceToStop: stop.distance
+          });
+        }
+      });
+      setSuggestedRoutes(Array.from(uniqueRoutes.values()).slice(0, 3));
     } catch (error) {
       console.error('Error fetching nearest locations:', error);
     } finally {
       setIsNearestLoading(false);
+      setIsSuggestedLoading(false);
       console.log('Finished fetching nearest locations');
     }
   }, [userLocation]); // Only depends on userLocation
@@ -1039,6 +1058,13 @@ export default function HomeScreen() {
 
 
 
+              <SuggestedRoutesSection 
+                colors={colors}
+                router={router}
+                routes={suggestedRoutes}
+                loading={isSuggestedLoading}
+              />
+
               <NearbySection
                 locationError={locationError}
                 isNearestLoading={isNearestLoading}
@@ -1195,6 +1221,13 @@ export default function HomeScreen() {
             setSearchBarY(y);
             setIsSearchOverlayVisible(true);
           }}
+        />
+
+        <SuggestedRoutesSection 
+          colors={colors}
+          router={router}
+          routes={suggestedRoutes}
+          loading={isSuggestedLoading}
         />
 
         {!journeyLoading && activeJourney && (

@@ -33,7 +33,7 @@ import { supabase } from '@/lib/supabase';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Since we're on web, we'll use a simulated map with SVG visualization
-const MapVisualization = ({ stops, currentStopIndex, userLocation }) => {
+const MapVisualization = ({ stops, currentStopIndex, userLocation, searchLat, searchLng, searchLabel }) => {
   const getStopColor = (stop, index) => {
     if (stop.current) return '#1ea2b1';
     if (index < currentStopIndex) return '#34d399';
@@ -565,6 +565,9 @@ export default function JourneyMapScreen() {
           stops={stops}
           currentStopIndex={currentStopIndex}
           userLocation={userLocation}
+          searchLat={searchLat}
+          searchLng={searchLng}
+          searchLabel={searchLabel}
         />
 
         {/* Bottom Controls */}
