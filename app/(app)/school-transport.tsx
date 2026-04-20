@@ -1,10 +1,10 @@
-// app/school-transport.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Search, MapPin, Users, Clock, Star, Shield, Car, School, Filter } from 'lucide-react-native';
+import { Search, MapPin, Users, Clock, Star, Shield, Car, School, Filter, ArrowLeft, CheckCircle2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
+import { useTheme } from '@/context/ThemeContext';
 
 import SchoolTransportCard from '@/components/school-transport/SchoolTransportCard';
 import TransportFilters from '@/components/school-transport/TransportFilters';
@@ -43,6 +43,7 @@ interface SchoolTransport {
 export default function SchoolTransportScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { colors } = useTheme();
   
   // State
   const [transports, setTransports] = useState<SchoolTransport[]>([]);
@@ -79,11 +80,7 @@ export default function SchoolTransportScreen() {
   }, [filters]);
 
   const fetchTransports = async () => {
-    console.log('📡 fetchTransports called');
     try {
-      console.log('🔍 Building Supabase query...');
-      
-      // Start with a simple query to get transports
       let query = supabase
         .from('school_transports')
         .select('*')
@@ -91,50 +88,24 @@ export default function SchoolTransportScreen() {
         .order('is_verified', { ascending: false })
         .order('created_at', { ascending: false });
 
-      // Apply filters
-      if (filters.schoolArea) {
-        query = query.ilike('school_area', `%${filters.schoolArea}%`);
-      }
-      if (filters.verifiedOnly) {
-        query = query.eq('is_verified', true);
-      }
-      if (filters.vehicleType) {
-        query = query.eq('vehicle_type', filters.vehicleType);
-      }
-      if (filters.minPrice) {
-        query = query.gte('price_per_month', parseFloat(filters.minPrice));
-      }
-      if (filters.maxPrice) {
-        query = query.lte('price_per_month', parseFloat(filters.maxPrice));
-      }
+      if (filters.schoolArea) query = query.ilike('school_area', `%${filters.schoolArea}%`);
+      if (filters.verifiedOnly) query = query.eq('is_verified', true);
+      if (filters.vehicleType) query = query.eq('vehicle_type', filters.vehicleType);
+      if (filters.minPrice) query = query.gte('price_per_month', parseFloat(filters.minPrice));
+      if (filters.maxPrice) query = query.lte('price_per_month', parseFloat(filters.maxPrice));
 
-      console.log('🚀 Executing transports query...');
       const { data: transportsData, error: transportsError } = await query;
-
-      if (transportsError) {
-        console.error('❌ Error fetching transports:', transportsError);
-        throw transportsError;
-      }
-
-      console.log('📦 Transports fetched:', transportsData?.length || 0);
+      if (transportsError) throw transportsError;
 
       if (!transportsData || transportsData.length === 0) {
-        console.log('📭 No transport data found');
         setTransports([]);
         return;
       }
 
-      // Get all driver IDs from transports
-      const driverIds = transportsData
-        .map(t => t.driver_id)
-        .filter(id => id) as string[];
-
-      console.log('👥 Driver IDs to fetch:', driverIds);
-
+      const driverIds = transportsData.map(t => t.driver_id).filter(id => id) as string[];
       let driversMap = new Map();
       
       if (driverIds.length > 0) {
-        // Fetch drivers with their profiles
         const { data: driversData, error: driversError } = await supabase
           .from('drivers')
           .select(`
@@ -150,51 +121,29 @@ export default function SchoolTransportScreen() {
           `)
           .in('id', driverIds);
 
-        if (driversError) {
-          console.error('❌ Error fetching drivers:', driversError);
-        } else if (driversData) {
-          console.log('👤 Drivers fetched:', driversData.length);
-          
-          // Create a map for easy lookup
+        if (!driversError && driversData) {
           driversData.forEach(driver => {
             driversMap.set(driver.id, {
               id: driver.id,
               user_id: driver.user_id,
               is_verified: driver.is_verified,
-              profiles: driver.profiles || {
-                first_name: 'Unknown',
-                last_name: 'Driver',
-                rating: 0,
-                total_trips: 0
-              }
+              profiles: driver.profiles || { first_name: 'Unknown', last_name: 'Driver', rating: 0, total_trips: 0 }
             });
           });
         }
       }
 
-      // Format the combined data
       const formattedData = transportsData.map(transport => {
         const driverData = driversMap.get(transport.driver_id) || {
           id: transport.driver_id || '',
           user_id: '',
           is_verified: false,
-          profiles: {
-            first_name: 'Unknown',
-            last_name: 'Driver',
-            rating: 0,
-            total_trips: 0
-          }
+          profiles: { first_name: 'Unknown', last_name: 'Driver', rating: 0, total_trips: 0 }
         };
 
-        // Handle pickup_areas filter separately since it's an array
         if (filters.pickupArea) {
           const pickupAreas = Array.isArray(transport.pickup_areas) ? transport.pickup_areas : [];
-          const hasPickupArea = pickupAreas.some(area => 
-            area.toLowerCase().includes(filters.pickupArea.toLowerCase())
-          );
-          if (!hasPickupArea) {
-            return null; // Filter out this transport
-          }
+          if (!pickupAreas.some(area => area.toLowerCase().includes(filters.pickupArea.toLowerCase()))) return null;
         }
 
         return {
@@ -205,26 +154,12 @@ export default function SchoolTransportScreen() {
           driver: driverData
         };
       }).filter(Boolean) as SchoolTransport[];
-
-      console.log('🎉 Formatted data:', {
-        length: formattedData.length,
-        firstItem: formattedData[0]
-      });
       
       setTransports(formattedData);
     } catch (error: any) {
-      console.error('💥 Critical error fetching transports:', error);
-      
-      // Don't show error modal for empty data
-      if (error.message?.includes('No rows returned') || 
-          error.message?.includes('no rows')) {
-        console.log('📭 No data available - showing empty state');
-        setTransports([]);
-      } else {
-        showErrorModal('Failed to load transport listings. Please try again.');
-      }
+      console.error('Error fetching transports:', error);
+      setTransports([]);
     } finally {
-      console.log('🏁 fetchTransports completed');
       setLoading(false);
       setRefreshing(false);
     }
@@ -235,77 +170,40 @@ export default function SchoolTransportScreen() {
     fetchTransports();
   };
 
-  // Modal handlers
-  const showErrorModal = (message: string) => {
-    setModalStatus({
-      type: 'error',
-      title: 'Error',
-      message,
-    });
-    setShowStatusModal(true);
-  };
-
-  const showSuccessModal = (message: string) => {
-    setModalStatus({
-      type: 'success',
-      title: 'Success',
-      message,
-    });
-    setShowStatusModal(true);
-  };
-
-  const showWarningModal = (title: string, message: string) => {
-    setModalStatus({
-      type: 'warning',
-      title,
-      message,
-    });
-    setShowStatusModal(true);
-  };
-
-  // Application handler
   const handleApply = async (transportId: string) => {
     if (!user) {
-      showErrorModal('Please sign in to apply for transport');
+      setModalStatus({ type: 'error', title: 'Sign In Required', message: 'Please sign in to apply for transport' });
+      setShowStatusModal(true);
       return;
     }
     
     const transport = transports.find(t => t.id === transportId);
-    if (!transport) {
-      showErrorModal('Transport service not found');
-      return;
-    }
+    if (!transport) return;
 
     if (transport.current_riders >= transport.capacity) {
-      showWarningModal('Full Capacity', 'This transport service has reached its maximum capacity');
+      setModalStatus({ type: 'warning', title: 'Full Capacity', message: 'This transport service has reached its maximum capacity' });
+      setShowStatusModal(true);
       return;
     }
 
     try {
-      const { data: existingRequest, error: checkError } = await supabase
+      const { data: existingRequest } = await supabase
         .from('transport_requests')
         .select('id')
         .eq('transport_id', transportId)
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (checkError) {
-        console.error('Error checking application:', checkError);
-        showErrorModal('Failed to check application status');
-        return;
-      }
-
       if (existingRequest) {
-        showWarningModal('Already Applied', 'You have already applied to this transport service');
+        setModalStatus({ type: 'warning', title: 'Already Applied', message: 'You have already applied to this transport service' });
+        setShowStatusModal(true);
         return;
       }
 
-      // Open apply modal
       setSelectedTransport(transportId);
       setShowApplyModal(true);
     } catch (error) {
       console.error('Error checking application:', error);
-      showErrorModal('Failed to check application status');
     }
   };
 
@@ -316,14 +214,9 @@ export default function SchoolTransportScreen() {
     parentPhone: string;
     parentEmail: string;
   }) => {
-    if (!selectedTransport || !user) {
-      showErrorModal('Please sign in to apply');
-      return;
-    }
-
+    if (!selectedTransport || !user) return;
     setApplyLoading(true);
     try {
-      // Submit new application
       const { error } = await supabase
         .from('transport_requests')
         .insert({
@@ -337,154 +230,120 @@ export default function SchoolTransportScreen() {
           status: 'pending',
         });
 
-      if (error) {
-        if (error.code === '23505') { // Unique constraint violation
-          showWarningModal('Already Applied', 'You have already applied to this transport service');
-        } else {
-          throw error;
-        }
-        return;
-      }
-
-      showSuccessModal('Application submitted! The driver will review your request and contact you.');
+      if (error) throw error;
+      setModalStatus({ type: 'success', title: 'Success', message: 'Application submitted! The driver will review your request.' });
+      setShowStatusModal(true);
       setShowApplyModal(false);
-      
-      // Refresh transports to get updated counts
       fetchTransports();
-      
     } catch (error: any) {
       console.error('Error applying:', error);
-      showErrorModal('Failed to submit application. Please try again.');
     } finally {
       setApplyLoading(false);
     }
   };
 
-  const handleViewDetails = (transportId: string) => {
-    router.push(`/school-transport/${transportId}`);
-  };
-
-  const handleBecomeDriver = () => {
-    router.push('/driver-onboarding');
-  };
-
-  // Filtered transports
   const filteredTransports = transports.filter(transport => {
     if (!searchQuery.trim()) return true;
-    
     const query = searchQuery.toLowerCase();
     return (
       transport.school_name.toLowerCase().includes(query) ||
       transport.school_area.toLowerCase().includes(query) ||
       transport.pickup_areas.some(area => area.toLowerCase().includes(query)) ||
-      transport.driver.profiles.first_name.toLowerCase().includes(query) ||
-      transport.driver.profiles.last_name.toLowerCase().includes(query)
+      transport.driver.profiles.first_name.toLowerCase().includes(query)
     );
   });
 
-  // Loading state
-  if (loading && transports.length === 0) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.skeletonHeader} />
-        <View style={styles.skeletonCard} />
-        <View style={styles.skeletonCard} />
-      </View>
-    );
-  }
+  const renderSkeleton = () => (
+    <View style={styles.skeletonContainer}>
+      {[1, 2, 3].map(i => (
+        <View key={i} style={[styles.skeletonCard, { backgroundColor: colors.card, borderColor: colors.border }]} />
+      ))}
+    </View>
+  );
 
   return (
-    <>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView 
-        style={styles.container}
+        stickyHeaderIndices={[1]}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#1ea2b1"
-            colors={["#1ea2b1"]}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>School Transport</Text>
-          <Text style={styles.subtitle}>Find reliable transport services</Text>
+        {/* Hero Header */}
+        <View style={styles.heroSection}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ArrowLeft size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>School Transport</Text>
+          <Text style={[styles.heroSubtitle, { color: colors.text, opacity: 0.6 }]}>
+            Safe and reliable journeys for your children
+          </Text>
         </View>
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchInputContainer}>
-            <Search size={20} color="#888888" style={styles.searchIcon} />
+        {/* Search Bar (Sticky) */}
+        <View style={[styles.searchWrapper, { backgroundColor: colors.background }]}>
+          <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Search size={18} color={colors.primary} />
             <TextInput
-              style={styles.searchInput}
-              placeholder="Search by school, area, or driver..."
-              placeholderTextColor="#888888"
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder="Search schools or areas..."
+              placeholderTextColor="#888"
               value={searchQuery}
               onChangeText={setSearchQuery}
-              returnKeyType="search"
             />
-          </View>
-          <TouchableOpacity 
-            style={styles.filterButton}
-            onPress={() => setShowFilters(!showFilters)}
-          >
-            <Filter size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Filters */}
-        {showFilters && (
-          <TransportFilters
-            filters={filters}
-            onFiltersChange={setFilters}
-            onClose={() => setShowFilters(false)}
-          />
-        )}
-
-        {/* Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Car size={20} color="#1ea2b1" />
-            <Text style={styles.statNumber}>{transports.length}</Text>
-            <Text style={styles.statLabel}>Services</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Shield size={20} color="#10B981" />
-            <Text style={styles.statNumber}>
-              {transports.filter(t => t.is_verified).length}
-            </Text>
-            <Text style={styles.statLabel}>Verified</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Users size={20} color="#F59E0B" />
-            <Text style={styles.statNumber}>
-              {transports.reduce((sum, t) => sum + t.current_riders, 0)}
-            </Text>
-            <Text style={styles.statLabel}>Students</Text>
+            <TouchableOpacity 
+              style={[styles.filterIcon, { backgroundColor: colors.primary }]}
+              onPress={() => setShowFilters(true)}
+            >
+              <Filter size={18} color="#FFF" />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Transport Listings */}
-        <View style={styles.transportsContainer}>
-          {filteredTransports.length === 0 ? (
+        {/* Stats Section */}
+        <View style={styles.statsWrapper}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsContent}>
+            <View style={[styles.statPill, { backgroundColor: `${colors.primary}15`, borderColor: `${colors.primary}30` }]}>
+              <Car size={14} color={colors.primary} />
+              <Text style={[styles.statValue, { color: colors.text }]}>{transports.length}</Text>
+              <Text style={[styles.statLabel, { color: colors.text }]}>Services</Text>
+            </View>
+            <View style={[styles.statPill, { backgroundColor: '#10B98115', borderColor: '#10B98130' }]}>
+              <CheckCircle2 size={14} color="#10B981" />
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                {transports.filter(t => t.is_verified).length}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.text }]}>Verified</Text>
+            </View>
+            <View style={[styles.statPill, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B30' }]}>
+              <Users size={14} color="#F59E0B" />
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                {transports.reduce((sum, t) => sum + t.current_riders, 0)}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.text }]}>Students</Text>
+            </View>
+          </ScrollView>
+        </View>
+
+        {/* Content */}
+        <View style={styles.content}>
+          {loading ? (
+            renderSkeleton()
+          ) : filteredTransports.length === 0 ? (
             <View style={styles.emptyState}>
-              <School size={48} color="#888888" />
-              <Text style={styles.emptyStateText}>
-                {searchQuery || Object.values(filters).some(f => f !== '' && f !== false) 
-                  ? 'No matching transport services found' 
-                  : 'No transport services available yet'}
+              <School size={64} color={colors.border} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>No services found</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.text, opacity: 0.5 }]}>
+                Try adjusting your search or filters
               </Text>
-              <Text style={styles.emptyStateSubtext}>
-                {searchQuery ? 'Try a different search term' : 'Be the first to list your service'}
-              </Text>
-              <TouchableOpacity 
-                style={styles.becomeDriverButton}
-                onPress={handleBecomeDriver}
-              >
-                <Text style={styles.becomeDriverText}>Become a Driver</Text>
+              <TouchableOpacity style={[styles.secondaryButton, { borderColor: colors.primary }]} onPress={() => router.push('/driver-onboarding')}>
+                <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>Become a Driver</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -493,20 +352,23 @@ export default function SchoolTransportScreen() {
                 key={transport.id}
                 transport={transport}
                 onApply={() => handleApply(transport.id)}
-                onViewDetails={() => handleViewDetails(transport.id)}
+                onViewDetails={() => router.push(`/school-transport/${transport.id}`)}
               />
             ))
           )}
         </View>
       </ScrollView>
 
-      {/* Modals */}
+      <TransportFilters
+        visible={showFilters}
+        filters={filters}
+        onFiltersChange={setFilters}
+        onClose={() => setShowFilters(false)}
+      />
+
       <ApplyModal
         visible={showApplyModal}
-        onClose={() => {
-          setShowApplyModal(false);
-          setSelectedTransport(null);
-        }}
+        onClose={() => setShowApplyModal(false)}
         onSubmit={handleSubmitApplication}
         loading={applyLoading}
       />
@@ -518,131 +380,123 @@ export default function SchoolTransportScreen() {
         message={modalStatus.message}
         onClose={() => setShowStatusModal(false)}
       />
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
   },
-  header: {
+  heroSection: {
     padding: 24,
-    paddingTop: 40,
+    paddingTop: 12,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    marginLeft: -10,
   },
-  subtitle: {
+  heroTitle: {
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: -1,
+  },
+  heroSubtitle: {
     fontSize: 16,
-    color: '#888888',
+    fontWeight: '500',
     marginTop: 4,
   },
-  searchContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginBottom: 16,
+  searchWrapper: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    paddingTop: 8,
   },
-  searchInputContainer: {
-    flex: 1,
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111111',
-    borderRadius: 12,
+    padding: 12,
+    paddingLeft: 16,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#333333',
-    marginRight: 12,
-  },
-  searchIcon: {
-    marginLeft: 16,
+    gap: 12,
   },
   searchInput: {
     flex: 1,
-    padding: 16,
-    color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '500',
   },
-  filterButton: {
-    backgroundColor: '#1ea2b1',
-    width: 50,
-    height: 50,
+  filterIcon: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#111111',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 12,
-    padding: 16,
-  },
-  statItem: {
-    flex: 1,
     alignItems: 'center',
   },
-  statDivider: {
-    width: 1,
-    backgroundColor: '#333333',
+  statsWrapper: {
+    marginBottom: 20,
   },
-  statNumber: {
-    color: '#FFFFFF',
-    fontSize: 20,
+  statsContent: {
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  statPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 8,
+  },
+  statValue: {
+    fontSize: 16,
     fontWeight: 'bold',
-    marginTop: 8,
   },
   statLabel: {
-    color: '#888888',
     fontSize: 12,
-    marginTop: 4,
+    fontWeight: '600',
+    opacity: 0.6,
   },
-  transportsContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 100,
+  content: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 80,
   },
-  emptyStateText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
-  },
-  emptyStateSubtext: {
-    color: '#888888',
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  becomeDriverButton: {
-    backgroundColor: '#1ea2b1',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
     marginTop: 20,
   },
-  becomeDriverText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+  emptySubtitle: {
+    fontSize: 14,
+    marginTop: 4,
+    textAlign: 'center',
   },
-  skeletonHeader: {
-    height: 120,
-    backgroundColor: '#111111',
-    margin: 16,
+  secondaryButton: {
+    marginTop: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderRadius: 12,
+    borderWidth: 1,
+  },
+  secondaryButtonText: {
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  skeletonContainer: {
+    gap: 16,
   },
   skeletonCard: {
     height: 180,
-    backgroundColor: '#111111',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 12,
+    borderRadius: 24,
+    borderWidth: 1,
   },
 });

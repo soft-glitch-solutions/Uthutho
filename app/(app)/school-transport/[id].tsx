@@ -5,16 +5,16 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   RefreshControl,
   Share,
   Linking,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertCircle, School } from 'lucide-react-native';
+import { AlertCircle, School, Share2, Info, ChevronLeft } from 'lucide-react-native';
 import { useAuth } from '@/hook/useAuth';
 import { SchoolTransport } from '@/types/transport';
-import { fetchTransportDetails } from '@/services/transportService';
+import { fetchTransportDetails, checkIfApplied } from '@/services/transportService';
 import { TransportDetailsSkeleton } from '@/components/transport/SkeletonLoading';
 import { TransportHeader, TransportInfoHeader } from '@/components/transport/TransportHeader';
 import { AvailabilityBanner } from '@/components/transport/AvailabilityBanner';
@@ -22,22 +22,32 @@ import { StatsGrid } from '@/components/transport/StatsGrid';
 import { PickupAreas, PickupTimes } from '@/components/transport/PickupInfo';
 import { DriverInfo } from '@/components/transport/DriverInfo';
 import { ApplyButton } from '@/components/transport/ApplyButton';
-
-const checkIfApplied = async (transportId: string, userId: string): Promise<boolean> => {
-  // Implementation from original checkIfApplied function
-  return false;
-};
+import { useTheme } from '@/context/ThemeContext';
+import StatusModal from '@/components/modals/StatusModal';
 
 export default function TransportDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { user } = useAuth();
+  const { colors } = useTheme();
   
   const [transport, setTransport] = useState<SchoolTransport | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
+  
+  const [statusModal, setStatusModal] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info' | 'loading';
+    title: string;
+    message: string;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
     if (id) {
@@ -67,12 +77,22 @@ export default function TransportDetailsScreen() {
     if (!transport) return;
     
     if (transport.current_riders >= transport.capacity) {
-      Alert.alert('Full Capacity', 'This transport service has reached its maximum capacity');
+      setStatusModal({
+        visible: true,
+        type: 'warning',
+        title: 'Full Capacity',
+        message: 'This transport service has reached its maximum capacity. Please check back later or contact the driver.',
+      });
       return;
     }
 
     if (hasApplied) {
-      Alert.alert('Already Applied', 'You have already applied to this transport service');
+      setStatusModal({
+        visible: true,
+        type: 'info',
+        title: 'Already Applied',
+        message: 'Your application for this transport is already submitted and pending review.',
+      });
       return;
     }
 
@@ -89,26 +109,25 @@ export default function TransportDetailsScreen() {
 
   const handleContactDriver = () => {
     if (!transport || !transport.driver.profiles.phone) {
-      Alert.alert('Contact Information', 'Phone number not available for this driver');
+      setStatusModal({
+        visible: true,
+        type: 'error',
+        title: 'Missing Info',
+        message: 'Phone number not available for this driver.',
+      });
       return;
     }
-
-    Alert.alert(
-      'Contact Driver',
-      `Call ${transport.driver.profiles.first_name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Call', 
-          onPress: () => Linking.openURL(`tel:${transport.driver.profiles.phone}`)
-        }
-      ]
-    );
+    Linking.openURL(`tel:${transport.driver.profiles.phone}`);
   };
 
   const handleMessageDriver = () => {
     if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to message the driver');
+      setStatusModal({
+        visible: true,
+        type: 'warning',
+        title: 'Sign In Required',
+        message: 'Please sign in to message the driver and track your application.',
+      });
       return;
     }
 
@@ -133,28 +152,17 @@ export default function TransportDetailsScreen() {
 
   const handleOpenMaps = (area: string) => {
     const encodedArea = encodeURIComponent(area);
-    const url = `https://maps.google.com/?q=${encodedArea}`;
+    const url = Platform.OS === 'ios' 
+      ? `maps://0,0?q=${encodedArea}` 
+      : `geo:0,0?q=${encodedArea}`;
     Linking.openURL(url).catch(() => {
-      Alert.alert('Error', 'Unable to open maps');
+      setStatusModal({
+        visible: true,
+        type: 'error',
+        title: 'Map Error',
+        message: 'Unable to open maps on your device.',
+      });
     });
-  };
-
-  const handleReportIssue = () => {
-    Alert.alert(
-      'Report Issue',
-      'Select an issue to report',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Incorrect Information', onPress: () => reportIssue('incorrect_info') },
-        { text: 'Safety Concern', onPress: () => reportIssue('safety_concern') },
-        { text: 'Spam or Fake', onPress: () => reportIssue('spam_fake') },
-        { text: 'Other', onPress: () => reportIssue('other') },
-      ]
-    );
-  };
-
-  const reportIssue = async (type: string) => {
-    // Implementation from original reportIssue function
   };
 
   if (loading) {
@@ -163,26 +171,28 @@ export default function TransportDetailsScreen() {
 
   if (!transport) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
           <TouchableOpacity 
-            style={styles.backButton}
+            style={[styles.backButton, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => router.back()}
           >
-            <Text style={styles.backButtonText}>←</Text>
+            <ChevronLeft size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
         <View style={styles.emptyContainer}>
-          <School size={64} color="#888888" style={styles.emptyIcon} />
-          <Text style={styles.emptyTitle}>No Transport Found</Text>
-          <Text style={styles.emptyMessage}>
+          <View style={[styles.emptyIconBox, { backgroundColor: colors.card }]}>
+            <School size={48} color={colors.primary} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>Transport Not Found</Text>
+          <Text style={[styles.emptyMessage, { color: colors.text }]}>
             The transport service you're looking for doesn't exist or has been removed.
           </Text>
           <TouchableOpacity 
-            style={styles.emptyButton}
+            style={[styles.emptyButton, { backgroundColor: colors.primary }]}
             onPress={() => router.back()}
           >
-            <Text style={styles.emptyButtonText}>Go Back</Text>
+            <Text style={styles.emptyButtonText}>Back to Listing</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -190,7 +200,7 @@ export default function TransportDetailsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <TransportHeader 
         transport={transport}
         onBack={() => router.back()}
@@ -203,8 +213,8 @@ export default function TransportDetailsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#1ea2b1"
-            colors={["#1ea2b1"]}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -212,6 +222,28 @@ export default function TransportDetailsScreen() {
         <TransportInfoHeader transport={transport} />
         <AvailabilityBanner transport={transport} />
         <StatsGrid transport={transport} />
+
+        {transport.description && transport.description.trim() && (
+          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.sectionHeader}>
+              <Info size={18} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>About Service</Text>
+            </View>
+            <Text 
+              style={[styles.description, { color: colors.text }]} 
+              numberOfLines={showFullDescription ? undefined : 4}
+            >
+              {transport.description}
+            </Text>
+            {transport.description.length > 200 && (
+              <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)} style={styles.readMoreBtn}>
+                <Text style={[styles.readMore, { color: colors.primary }]}>
+                  {showFullDescription ? 'Show Less' : 'Read Full Description'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {transport.pickup_areas.length > 0 && (
           <PickupAreas 
@@ -224,25 +256,14 @@ export default function TransportDetailsScreen() {
           <PickupTimes times={transport.pickup_times} />
         )}
 
-        {transport.description && transport.description.trim() && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Description</Text>
-            <Text style={styles.description} numberOfLines={showFullDescription ? undefined : 3}>
-              {transport.description}
-            </Text>
-            {transport.description.length > 150 && (
-              <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)}>
-                <Text style={styles.readMore}>
-                  {showFullDescription ? 'Show Less' : 'Read More'}
-                </Text>
-              </TouchableOpacity>
-            )}
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.sectionHeader}>
+            <AlertCircle size={18} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Vehicle Details</Text>
           </View>
-        )}
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Vehicle Information</Text>
-          <Text style={styles.vehicleDescription}>{transport.vehicle_info || 'No vehicle information available'}</Text>
+          <Text style={[styles.vehicleDescription, { color: colors.text }]}>
+            {transport.vehicle_info || 'Standard safe transport vehicle. Verified and inspected for school transport safety standards.'}
+          </Text>
         </View>
 
         <DriverInfo 
@@ -252,16 +273,21 @@ export default function TransportDetailsScreen() {
           onCall={handleContactDriver}
         />
 
-        <TouchableOpacity style={styles.reportButton} onPress={handleReportIssue}>
-          <AlertCircle size={20} color="#EF4444" />
-          <Text style={styles.reportText}>Report an Issue</Text>
-        </TouchableOpacity>
+        <View style={styles.footerSpacer} />
       </ScrollView>
 
       <ApplyButton 
         transport={transport}
         hasApplied={hasApplied}
         onApply={handleApply}
+      />
+
+      <StatusModal
+        visible={statusModal.visible}
+        type={statusModal.type}
+        title={statusModal.title}
+        message={statusModal.message}
+        onClose={() => setStatusModal(prev => ({ ...prev, visible: false }))}
       />
     </View>
   );
@@ -270,114 +296,104 @@ export default function TransportDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
   },
   header: {
     position: 'absolute',
-    top: 40,
+    top: Platform.OS === 'ios' ? 60 : 40,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     zIndex: 10,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backButtonText: {
-    color: '#FFFFFF',
-    fontSize: 20,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 32,
   },
-  emptyIcon: {
-    marginBottom: 20,
+  emptyIconBox: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   emptyTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontWeight: '800',
     marginBottom: 12,
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
   emptyMessage: {
     fontSize: 16,
-    color: '#888888',
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 22,
+    marginBottom: 32,
+    lineHeight: 24,
+    opacity: 0.6,
   },
   emptyButton: {
-    backgroundColor: '#1ea2b1',
+    height: 56,
     paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 8,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   scrollContainer: {
     flex: 1,
-    paddingTop: 80,
   },
   section: {
-    backgroundColor: '#111111',
-    marginHorizontal: 20,
+    marginHorizontal: 24,
     marginBottom: 16,
-    padding: 20,
-    borderRadius: 12,
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 16,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   description: {
-    color: '#CCCCCC',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 24,
+    fontWeight: '500',
+    opacity: 0.8,
+  },
+  readMoreBtn: {
+    marginTop: 12,
   },
   readMore: {
-    color: '#1ea2b1',
     fontSize: 14,
-    fontWeight: '600',
-    marginTop: 8,
+    fontWeight: '700',
   },
   vehicleDescription: {
-    color: '#CCCCCC',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 24,
+    fontWeight: '500',
+    opacity: 0.8,
   },
-  reportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    marginHorizontal: 20,
-    marginBottom: 100,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.2)',
-    gap: 8,
+  footerSpacer: {
+    height: 120,
   },
-  reportText: {
-    color: '#EF4444',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});
+});

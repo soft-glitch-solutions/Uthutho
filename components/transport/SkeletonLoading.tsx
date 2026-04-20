@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, Platform } from 'react-native';
+import { useTheme } from '@/context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -8,64 +9,59 @@ interface SkeletonTextProps {
   height?: number;
 }
 
-export const SkeletonText: React.FC<SkeletonTextProps> = ({ width = 100, height = 16 }) => (
-  <View style={[styles.skeletonText, { width, height }]} />
-);
+export const SkeletonText: React.FC<SkeletonTextProps> = ({ width = 100, height = 16 }) => {
+  const { colors } = useTheme();
+  return <View style={[styles.skeletonText, { width, height, backgroundColor: colors.border }]} />;
+};
 
 interface SkeletonButtonProps {
   width?: number | string;
 }
 
-export const SkeletonButton: React.FC<SkeletonButtonProps> = ({ width = '100%' }) => (
-  <View style={[styles.skeletonButton, { width }]} />
-);
+export const SkeletonButton: React.FC<SkeletonButtonProps> = ({ width = '100%' }) => {
+  const { colors } = useTheme();
+  return <View style={[styles.skeletonButton, { width, backgroundColor: colors.border }]} />;
+};
 
-export const SkeletonAvatar = () => (
-  <View style={styles.skeletonAvatar}>
-    <View style={styles.skeletonInner} />
-  </View>
-);
+export const SkeletonAvatar = () => {
+  const { colors } = useTheme();
+  return <View style={[styles.skeletonAvatar, { backgroundColor: colors.border }]} />;
+};
 
 export const TransportDetailsSkeleton: React.FC = () => {
+  const { colors } = useTheme();
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header Skeleton */}
       <View style={styles.header}>
-        <View style={styles.skeletonBackButton} />
-        <View style={styles.skeletonShareButton} />
+        <View style={[styles.skeletonNavButton, { backgroundColor: colors.card, borderColor: colors.border }]} />
+        <View style={[styles.skeletonNavButton, { backgroundColor: colors.card, borderColor: colors.border }]} />
       </View>
 
       <View style={styles.scrollContainer}>
-        {/* Header Section Skeleton */}
-        <View style={styles.skeletonHeader}>
-          <View style={styles.skeletonSchoolInfo}>
-            <View style={styles.skeletonSchoolIcon} />
-            <View style={styles.skeletonSchoolText}>
-              <SkeletonText width={200} height={24} />
-              <View style={{ marginTop: 8 }}>
-                <SkeletonText width={150} height={14} />
-              </View>
-            </View>
-          </View>
-          <View style={styles.skeletonBadge}>
-            <SkeletonText width={80} height={20} />
+        {/* Info Header Skeleton */}
+        <View style={styles.skeletonInfoHeader}>
+          <View style={[styles.skeletonIconBox, { backgroundColor: colors.card, borderColor: colors.border }]} />
+          <View style={styles.skeletonTextCol}>
+            <SkeletonText width="70%" height={26} />
+            <SkeletonText width="40%" height={16} />
           </View>
         </View>
 
-        {/* Stats Grid Skeleton */}
-        <View style={styles.skeletonStatsGrid}>
+        {/* Banner Skeleton */}
+        <View style={[styles.skeletonBanner, { backgroundColor: colors.card, borderColor: colors.border }]} />
+
+        {/* Stats Skeleton */}
+        <View style={styles.skeletonStatsRow}>
           {[1, 2, 3].map((i) => (
-            <React.Fragment key={i}>
-              <View style={styles.skeletonStatItem}>
-                <View style={styles.skeletonStatIcon} />
-                <SkeletonText width={40} height={18} />
-                <View style={{ marginTop: 4 }}>
-                  <SkeletonText width={60} height={12} />
-                </View>
-              </View>
-              {i < 3 && <View style={styles.skeletonStatDivider} />}
-            </React.Fragment>
+            <View key={i} style={[styles.skeletonStatCard, { backgroundColor: colors.card, borderColor: colors.border }]} />
           ))}
         </View>
+
+        {/* Content Skeletons */}
+        <View style={[styles.skeletonSection, { backgroundColor: colors.card, borderColor: colors.border }]} />
+        <View style={[styles.skeletonSection, { backgroundColor: colors.card, borderColor: colors.border }]} />
       </View>
     </View>
   );
@@ -74,105 +70,80 @@ export const TransportDetailsSkeleton: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
   },
   header: {
     position: 'absolute',
-    top: 40,
+    top: Platform.OS === 'ios' ? 60 : 40,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     zIndex: 10,
   },
-  skeletonBackButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-  },
-  skeletonShareButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  skeletonNavButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
   },
   scrollContainer: {
     flex: 1,
-    paddingTop: 80,
+    paddingTop: Platform.OS === 'ios' ? 140 : 120,
   },
-  skeletonHeader: {
-    padding: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  skeletonSchoolInfo: {
+  skeletonInfoHeader: {
+    paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    marginRight: 12,
+    gap: 16,
+    marginBottom: 24,
   },
-  skeletonSchoolIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: 'rgba(30, 30, 30, 0.7)',
-    marginRight: 12,
+  skeletonIconBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    borderWidth: 1,
   },
-  skeletonSchoolText: {
+  skeletonTextCol: {
     flex: 1,
     gap: 8,
   },
-  skeletonBadge: {
-    backgroundColor: 'rgba(30, 30, 30, 0.7)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
+  skeletonBanner: {
+    height: 100,
+    marginHorizontal: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+    marginBottom: 24,
   },
-  skeletonStatsGrid: {
+  skeletonStatsRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(30, 30, 30, 0.7)',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 12,
-    padding: 16,
+    marginHorizontal: 24,
+    gap: 12,
+    marginBottom: 24,
   },
-  skeletonStatItem: {
+  skeletonStatCard: {
     flex: 1,
-    alignItems: 'center',
+    height: 90,
+    borderRadius: 24,
+    borderWidth: 1,
   },
-  skeletonStatIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(30, 30, 30, 0.7)',
-  },
-  skeletonStatDivider: {
-    width: 1,
-    backgroundColor: 'rgba(60, 60, 60, 0.7)',
+  skeletonSection: {
+    height: 160,
+    marginHorizontal: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+    marginBottom: 16,
   },
   skeletonText: {
-    backgroundColor: 'rgba(30, 30, 30, 0.7)',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  skeletonButton: {
-    backgroundColor: 'rgba(30, 30, 30, 0.7)',
-    height: 48,
     borderRadius: 8,
   },
+  skeletonButton: {
+    height: 56,
+    borderRadius: 16,
+  },
   skeletonAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(30, 30, 30, 0.7)',
-    overflow: 'hidden',
+    width: 52,
+    height: 52,
+    borderRadius: 18,
   },
-  skeletonInner: {
-    flex: 1,
-    backgroundColor: 'rgba(60, 60, 60, 0.5)',
-  },
-});
+});

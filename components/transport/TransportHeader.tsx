@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { ArrowLeft, Shield, School, MapPin, Share2 } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { ChevronLeft, Share2, School, MapPin } from 'lucide-react-native';
 import { SchoolTransport } from '@/types/transport';
+import { useTheme } from '@/context/ThemeContext';
 
 interface TransportHeaderProps {
   transport: SchoolTransport;
@@ -10,39 +11,45 @@ interface TransportHeaderProps {
 }
 
 export const TransportHeader: React.FC<TransportHeaderProps> = ({
-  transport,
   onBack,
   onShare,
 }) => {
+  const { colors } = useTheme();
+
   return (
     <View style={styles.header}>
-      <TouchableOpacity style={styles.backButton} onPress={onBack}>
-        <ArrowLeft size={24} color="#FFFFFF" />
+      <TouchableOpacity 
+        style={[styles.navButton, { backgroundColor: colors.card, borderColor: colors.border }]} 
+        onPress={onBack}
+      >
+        <ChevronLeft size={22} color={colors.text} />
       </TouchableOpacity>
       
-      <TouchableOpacity style={styles.shareButton} onPress={onShare}>
-        <Share2 size={24} color="#FFFFFF" />
+      <TouchableOpacity 
+        style={[styles.navButton, { backgroundColor: colors.card, borderColor: colors.border }]} 
+        onPress={onShare}
+      >
+        <Share2 size={20} color={colors.text} />
       </TouchableOpacity>
     </View>
   );
 };
 
 export const TransportInfoHeader: React.FC<{ transport: SchoolTransport }> = ({ transport }) => {
+  const { colors } = useTheme();
+
   return (
-    <View style={styles.transportHeader}>
-      <View style={styles.schoolInfo}>
-        <View style={styles.schoolIcon}>
-          <School size={24} color="#1ea2b1" />
-        </View>
-        <View style={styles.schoolText}>
-          <Text style={styles.schoolName}>{transport.school_name}</Text>
-          <View style={styles.locationRow}>
-            <MapPin size={16} color="#888888" />
-            <Text style={styles.schoolArea}>{transport.school_area}</Text>
-          </View>
+    <View style={styles.infoContainer}>
+      <View style={[styles.iconBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <School size={28} color={colors.primary} />
+      </View>
+      <View style={styles.textContainer}>
+        <Text style={[styles.schoolName, { color: colors.text }]}>{transport.school_name}</Text>
+        <View style={styles.locationRow}>
+          <MapPin size={16} color={colors.primary} />
+          <Text style={[styles.schoolArea, { color: colors.text, opacity: 0.6 }]}>{transport.school_area}</Text>
         </View>
       </View>
-      
     </View>
   );
 };
@@ -50,82 +57,66 @@ export const TransportInfoHeader: React.FC<{ transport: SchoolTransport }> = ({ 
 const styles = StyleSheet.create({
   header: {
     position: 'absolute',
-    top: 40,
+    top: Platform.OS === 'ios' ? 60 : 40,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    zIndex: 10,
+    paddingHorizontal: 24,
+    zIndex: 100,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    alignItems: 'center',
+  navButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
     justifyContent: 'center',
-  },
-  shareButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     alignItems: 'center',
-    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
-  transportHeader: {
-    padding: 20,
+  infoContainer: {
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 140 : 120,
+    paddingBottom: 24,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  schoolInfo: {
-    flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    marginRight: 12,
+    gap: 16,
   },
-  schoolIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: 'rgba(30, 162, 177, 0.1)',
-    alignItems: 'center',
+  iconBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    borderWidth: 1,
     justifyContent: 'center',
-    marginRight: 12,
+    alignItems: 'center',
   },
-  schoolText: {
+  textContainer: {
     flex: 1,
   },
   schoolName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
   },
   schoolArea: {
-    fontSize: 14,
-    color: '#888888',
-    marginLeft: 4,
+    fontSize: 15,
+    fontWeight: '500',
   },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-  verifiedText: {
-    color: '#10B981',
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-});
+});

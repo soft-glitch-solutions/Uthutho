@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
-import { Star, Shield, ChevronRight, MessageSquare, Phone } from 'lucide-react-native';
+import { Star, ChevronRight, MessageSquare, Phone } from 'lucide-react-native';
 import { SchoolTransport } from '@/types/transport';
+import { useTheme } from '@/context/ThemeContext';
 
 interface DriverInfoProps {
   transport: SchoolTransport;
@@ -16,14 +17,19 @@ export const DriverInfo: React.FC<DriverInfoProps> = ({
   onMessage,
   onCall,
 }) => {
+  const { colors } = useTheme();
   const driverName = `${transport.driver.profiles.first_name} ${transport.driver.profiles.last_name}`;
   const driverRating = transport.driver.profiles.rating || 0;
   const driverTrips = transport.driver.profiles.total_trips || 0;
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Driver Information</Text>
-      <TouchableOpacity style={styles.driverCard} onPress={onViewProfile}>
+    <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Driver Information</Text>
+      
+      <TouchableOpacity 
+        style={[styles.driverCard, { backgroundColor: colors.background, borderColor: colors.border }]} 
+        onPress={onViewProfile}
+      >
         <View style={styles.driverInfo}>
           {transport.driver.profiles.avatar_url ? (
             <Image 
@@ -31,7 +37,7 @@ export const DriverInfo: React.FC<DriverInfoProps> = ({
               style={styles.driverAvatar}
             />
           ) : (
-            <View style={styles.driverAvatarPlaceholder}>
+            <View style={[styles.driverAvatarPlaceholder, { backgroundColor: colors.primary }]}>
               <Text style={styles.avatarInitials}>
                 {transport.driver.profiles.first_name?.[0]}{transport.driver.profiles.last_name?.[0]}
               </Text>
@@ -39,40 +45,37 @@ export const DriverInfo: React.FC<DriverInfoProps> = ({
           )}
           
           <View style={styles.driverDetails}>
-            <Text style={styles.driverName}>{driverName}</Text>
-            
+            <Text style={[styles.driverName, { color: colors.text }]}>{driverName}</Text>
             <View style={styles.driverStats}>
               <View style={styles.driverStat}>
                 <Star size={14} color="#FBBF24" fill="#FBBF24" />
-                <Text style={styles.driverStatText}>
-                  {driverRating.toFixed(1)} ({driverTrips} trips)
+                <Text style={[styles.driverStatText, { color: colors.text }]}>
+                  {driverRating.toFixed(1)} <Text style={{ opacity: 0.5 }}>({driverTrips} trips)</Text>
                 </Text>
               </View>
-              
             </View>
           </View>
         </View>
-        
-        <ChevronRight size={20} color="#666666" />
+        <ChevronRight size={20} color={colors.text} opacity={0.3} />
       </TouchableOpacity>
 
       {(transport.driver.profiles.phone || transport.driver.profiles.email) && (
         <View style={styles.contactButtons}>
           <TouchableOpacity 
-            style={[styles.contactButton, styles.messageButton]}
+            style={[styles.contactButton, { backgroundColor: `${colors.primary}15`, borderColor: `${colors.primary}30` }]}
             onPress={onMessage}
           >
-            <MessageSquare size={20} color="#1ea2b1" />
-            <Text style={styles.messageButtonText}>Message</Text>
+            <MessageSquare size={18} color={colors.primary} />
+            <Text style={[styles.contactButtonText, { color: colors.primary }]}>Message</Text>
           </TouchableOpacity>
           
           {transport.driver.profiles.phone && (
             <TouchableOpacity 
-              style={[styles.contactButton, styles.callButton]}
+              style={[styles.contactButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
               onPress={onCall}
             >
-              <Phone size={20} color="#FFFFFF" />
-              <Text style={styles.callButtonText}>Call</Text>
+              <Phone size={18} color="#FFF" />
+              <Text style={[styles.contactButtonText, { color: '#FFF' }]}>Call Driver</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -83,28 +86,26 @@ export const DriverInfo: React.FC<DriverInfoProps> = ({
 
 const styles = StyleSheet.create({
   section: {
-    backgroundColor: '#111111',
-    marginHorizontal: 20,
+    marginHorizontal: 24,
     marginBottom: 16,
-    padding: 20,
-    borderRadius: 12,
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 16,
+    fontWeight: '800',
+    marginBottom: 20,
+    letterSpacing: -0.5,
   },
   driverCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1a1a1a',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#333333',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   driverInfo: {
     flexDirection: 'row',
@@ -112,61 +113,44 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   driverAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginRight: 12,
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    marginRight: 14,
   },
   driverAvatarPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#1ea2b1',
+    width: 52,
+    height: 52,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   avatarInitials: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '700',
   },
   driverDetails: {
     flex: 1,
   },
   driverName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
     marginBottom: 4,
   },
   driverStats: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
   },
   driverStat: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   driverStatText: {
-    color: '#888888',
-    fontSize: 12,
-    marginLeft: 4,
-  },
-  driverVerified: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  driverVerifiedText: {
-    color: '#10B981',
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '600',
-    marginLeft: 2,
+    marginLeft: 6,
   },
   contactButtons: {
     flexDirection: 'row',
@@ -177,26 +161,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
+    height: 52,
+    borderRadius: 16,
+    borderWidth: 1,
     gap: 8,
   },
-  messageButton: {
-    backgroundColor: 'rgba(30, 162, 177, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(30, 162, 177, 0.2)',
+  contactButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
-  messageButtonText: {
-    color: '#1ea2b1',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  callButton: {
-    backgroundColor: '#1ea2b1',
-  },
-  callButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+});

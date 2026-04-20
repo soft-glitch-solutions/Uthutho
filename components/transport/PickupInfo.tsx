@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { MapPin, Clock, Navigation } from 'lucide-react-native';
+import { MapPin, Clock, ArrowRight } from 'lucide-react-native';
+import { useTheme } from '@/context/ThemeContext';
 
 interface PickupAreasProps {
   areas: string[];
@@ -10,94 +11,105 @@ interface PickupAreasProps {
 export const PickupAreas: React.FC<PickupAreasProps> = ({
   areas,
   onOpenMaps,
-}) => (
-  <View style={styles.section}>
-    <Text style={styles.sectionTitle}>Pickup Areas</Text>
-    <View style={styles.pickupAreas}>
-      {areas.map((area, index) => (
-        <TouchableOpacity 
-          key={index}
-          style={styles.pickupAreaItem}
-          onPress={() => onOpenMaps(area)}
-        >
-          <MapPin size={16} color="#1ea2b1" />
-          <Text style={styles.pickupAreaText}>{area}</Text>
-          <Navigation size={16} color="#666666" />
-        </TouchableOpacity>
-      ))}
+}) => {
+  const { colors } = useTheme();
+
+  return (
+    <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Pickup Areas</Text>
+      <View style={styles.list}>
+        {areas.map((area, index) => (
+          <TouchableOpacity 
+            key={index}
+            style={[styles.item, { borderBottomColor: index === areas.length - 1 ? 'transparent' : colors.border }]}
+            onPress={() => onOpenMaps(area)}
+          >
+            <View style={[styles.iconBox, { backgroundColor: `${colors.primary}15` }]}>
+              <MapPin size={16} color={colors.primary} />
+            </View>
+            <Text style={[styles.itemText, { color: colors.text }]}>{area}</Text>
+            <ArrowRight size={16} color={colors.text} opacity={0.3} />
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 interface PickupTimesProps {
   times: string[];
 }
 
-export const PickupTimes: React.FC<PickupTimesProps> = ({ times }) => (
-  <View style={styles.section}>
-    <Text style={styles.sectionTitle}>Pickup Times</Text>
-    <View style={styles.pickupTimes}>
-      {times.map((time, index) => (
-        <View key={index} style={styles.timeSlot}>
-          <Clock size={16} color="#1ea2b1" />
-          <Text style={styles.timeText}>{time}</Text>
-        </View>
-      ))}
+export const PickupTimes: React.FC<PickupTimesProps> = ({ times }) => {
+  const { colors } = useTheme();
+
+  return (
+    <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Pickup Times</Text>
+      <View style={styles.grid}>
+        {times.map((time, index) => (
+          <View key={index} style={[styles.pill, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <Clock size={14} color={colors.primary} />
+            <Text style={[styles.pillText, { color: colors.text }]}>{time}</Text>
+          </View>
+        ))}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   section: {
-    backgroundColor: '#111111',
-    marginHorizontal: 20,
+    marginHorizontal: 24,
     marginBottom: 16,
-    padding: 20,
-    borderRadius: 12,
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 16,
+    fontWeight: '800',
+    marginBottom: 20,
+    letterSpacing: -0.5,
   },
-  pickupAreas: {
-    gap: 8,
+  list: {
+    gap: 0,
   },
-  pickupAreaItem: {
+  item: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#333333',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
   },
-  pickupAreaText: {
+  iconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  itemText: {
     flex: 1,
-    color: '#FFFFFF',
-    fontSize: 14,
-    marginLeft: 8,
-    marginRight: 8,
+    fontSize: 15,
+    fontWeight: '600',
   },
-  pickupTimes: {
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
   },
-  timeSlot: {
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#333333',
+    gap: 8,
   },
-  timeText: {
-    color: '#FFFFFF',
+  pillText: {
     fontSize: 14,
-    marginLeft: 6,
+    fontWeight: '700',
   },
-});
+});

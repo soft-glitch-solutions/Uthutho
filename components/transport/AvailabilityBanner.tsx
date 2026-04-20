@@ -1,84 +1,108 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Users } from 'lucide-react-native';
+import { Users, Banknote } from 'lucide-react-native';
 import { SchoolTransport } from '@/types/transport';
 import { formatToRands } from '@/utils/formatUtils';
+import { useTheme } from '@/context/ThemeContext';
 
 interface AvailabilityBannerProps {
   transport: SchoolTransport;
 }
 
 export const AvailabilityBanner: React.FC<AvailabilityBannerProps> = ({ transport }) => {
+  const { colors } = useTheme();
   const availableSeats = Math.max(0, transport.capacity - transport.current_riders);
   const isFull = availableSeats <= 0;
 
   return (
     <View style={[
-      styles.availabilityBanner,
-      isFull ? styles.fullBanner : styles.availableBanner
+      styles.container, 
+      { 
+        backgroundColor: colors.card, 
+        borderColor: colors.border
+      }
     ]}>
-      <View style={styles.availabilityContent}>
-        <Users size={20} color={isFull ? '#EF4444' : '#10B981'} />
-        <View style={styles.availabilityText}>
-          <Text style={[
-            styles.availabilityStatus,
-            { color: isFull ? '#EF4444' : '#10B981' }
-          ]}>
+      <View style={styles.content}>
+        <View style={[
+          styles.statusBadge, 
+          { backgroundColor: isFull ? '#EF4444' : '#10B981' }
+        ]}>
+          <Users size={14} color="#FFF" />
+          <Text style={styles.statusLabel}>
             {isFull ? 'FULL' : 'AVAILABLE'}
           </Text>
-          <Text style={styles.availabilitySeats}>
-            {availableSeats} of {transport.capacity} seats available
-          </Text>
+        </View>
+        
+        <View style={styles.infoRow}>
+          <View style={styles.infoCol}>
+            <Text style={[styles.infoLabel, { color: colors.text }]}>Seats</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>
+              {availableSeats}<Text style={{ opacity: 0.4 }}>/{transport.capacity}</Text>
+            </Text>
+          </View>
+          
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          
+          <View style={styles.infoCol}>
+            <Text style={[styles.infoLabel, { color: colors.text }]}>Monthly</Text>
+            <Text style={[styles.infoValue, { color: colors.primary }]}>
+              {formatToRands(transport.price_per_month)}
+            </Text>
+          </View>
         </View>
       </View>
-      {!isFull && transport.price_per_month > 0 && (
-        <Text style={styles.availabilityPrice}>
-          {formatToRands(transport.price_per_month)}/month
-        </Text>
-      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  availabilityBanner: {
-    marginHorizontal: 20,
-    marginBottom: 20,
-    padding: 16,
-    borderRadius: 12,
+  container: {
+    marginHorizontal: 24,
+    marginBottom: 24,
+    padding: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+  },
+  content: {
+    gap: 16,
+  },
+  statusBadge: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  statusLabel: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
   },
-  availableBanner: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
+  infoCol: {
+    flex: 1,
   },
-  fullBanner: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.2)',
-  },
-  availabilityContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  availabilityText: {
-    marginLeft: 12,
-  },
-  availabilityStatus: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  availabilitySeats: {
+  infoLabel: {
     fontSize: 12,
-    color: '#888888',
+    fontWeight: '600',
+    opacity: 0.5,
+    marginBottom: 4,
   },
-  availabilityPrice: {
+  infoValue: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
-});
+  divider: {
+    width: 1,
+    height: 32,
+    marginHorizontal: 20,
+  },
+});

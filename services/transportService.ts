@@ -144,3 +144,24 @@ const formatTransportFromSeparateQueries = (transportData: any, driverData: any)
     }
   };
 };
+
+export const checkIfApplied = async (transportId: string, userId: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('school_transport_applications')
+      .select('id')
+      .eq('transport_id', transportId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error checking application status:', error);
+      return false;
+    }
+
+    return !!data;
+  } catch (error) {
+    console.error('Error in checkIfApplied:', error);
+    return false;
+  }
+};

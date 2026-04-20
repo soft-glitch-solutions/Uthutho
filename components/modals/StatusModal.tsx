@@ -1,4 +1,3 @@
-// components/modals/StatusModal.tsx
 import React, { useEffect } from 'react';
 import {
   View,
@@ -8,7 +7,8 @@ import {
   TouchableOpacity,
   Animated,
 } from 'react-native';
-import { CheckCircle, XCircle, AlertCircle, Info, Clock } from 'lucide-react-native';
+import { CheckCircle2, XCircle, AlertCircle, Info, Loader2 } from 'lucide-react-native';
+import { useTheme } from '@/context/ThemeContext';
 
 type StatusType = 'success' | 'error' | 'warning' | 'info' | 'loading';
 
@@ -37,127 +37,62 @@ export default function StatusModal({
   actionText,
   onAction,
 }: StatusModalProps) {
+  const { colors } = useTheme();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
-  const slideAnim = React.useRef(new Animated.Value(50)).current;
+  const slideAnim = React.useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     if (visible) {
-      // Reset animations
       fadeAnim.setValue(0);
-      slideAnim.setValue(50);
+      slideAnim.setValue(20);
 
-      // Animate in
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 200,
+          duration: 300,
           useNativeDriver: true,
         }),
-        Animated.timing(slideAnim, {
+        Animated.spring(slideAnim, {
           toValue: 0,
-          duration: 300,
+          friction: 8,
+          tension: 40,
           useNativeDriver: true,
         }),
       ]).start();
 
-      // Auto close if enabled
       if (autoClose && type !== 'loading') {
         const timer = setTimeout(() => {
           handleClose();
         }, autoCloseDelay);
-
         return () => clearTimeout(timer);
       }
     }
   }, [visible, type]);
 
   const handleClose = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 50,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
       onClose();
     });
   };
 
   const handleAction = () => {
-    if (onAction) {
-      onAction();
-    }
+    if (onAction) onAction();
     handleClose();
   };
 
-  const getIcon = () => {
-    switch (type) {
-      case 'success':
-        return <CheckCircle size={64} color="#10B981" />;
-      case 'error':
-        return <XCircle size={64} color="#EF4444" />;
-      case 'warning':
-        return <AlertCircle size={64} color="#F59E0B" />;
-      case 'loading':
-        return <Clock size={64} color="#1ea2b1" />;
-      case 'info':
-      default:
-        return <Info size={64} color="#1ea2b1" />;
-    }
+  const statusConfig = {
+    success: { icon: <CheckCircle2 size={48} color="#10B981" />, color: '#10B981', bg: '#10B98115' },
+    error: { icon: <XCircle size={48} color="#EF4444" />, color: '#EF4444', bg: '#EF444415' },
+    warning: { icon: <AlertCircle size={48} color="#F59E0B" />, color: '#F59E0B', bg: '#F59E0B15' },
+    loading: { icon: <Loader2 size={48} color={colors.primary} />, color: colors.primary, bg: `${colors.primary}15` },
+    info: { icon: <Info size={48} color={colors.primary} />, color: colors.primary, bg: `${colors.primary}15` },
   };
 
-  const getBackgroundColor = () => {
-    switch (type) {
-      case 'success':
-        return 'rgba(16, 185, 129, 0.1)';
-      case 'error':
-        return 'rgba(239, 68, 68, 0.1)';
-      case 'warning':
-        return 'rgba(251, 191, 36, 0.1)';
-      case 'loading':
-        return 'rgba(30, 162, 177, 0.1)';
-      case 'info':
-      default:
-        return 'rgba(30, 162, 177, 0.1)';
-    }
-  };
-
-  const getBorderColor = () => {
-    switch (type) {
-      case 'success':
-        return 'rgba(16, 185, 129, 0.2)';
-      case 'error':
-        return 'rgba(239, 68, 68, 0.2)';
-      case 'warning':
-        return 'rgba(251, 191, 36, 0.2)';
-      case 'loading':
-        return 'rgba(30, 162, 177, 0.2)';
-      case 'info':
-      default:
-        return 'rgba(30, 162, 177, 0.2)';
-    }
-  };
-
-  const getActionButtonColor = () => {
-    switch (type) {
-      case 'success':
-        return '#10B981';
-      case 'error':
-        return '#EF4444';
-      case 'warning':
-        return '#F59E0B';
-      case 'loading':
-        return '#1ea2b1';
-      case 'info':
-      default:
-        return '#1ea2b1';
-    }
-  };
+  const config = statusConfig[type] || statusConfig.info;
 
   return (
     <Modal
@@ -173,37 +108,22 @@ export default function StatusModal({
             {
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }],
-              backgroundColor: '#111111',
-              borderColor: getBorderColor(),
-              borderWidth: 1,
+              backgroundColor: colors.background,
+              borderColor: colors.border,
             },
           ]}
         >
-          {/* Icon */}
-          <View style={[styles.iconContainer, { backgroundColor: getBackgroundColor() }]}>
-            {getIcon()}
+          <View style={[styles.iconWrapper, { backgroundColor: config.bg }]}>
+            {config.icon}
           </View>
           
-          {/* Title */}
-          <Text style={styles.title}>{title}</Text>
-          
-          {/* Message */}
-          <Text style={styles.message}>{message}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+          <Text style={[styles.message, { color: colors.text }]}>{message}</Text>
 
-          {/* Loading indicator */}
-          {type === 'loading' && (
-            <View style={styles.loadingContainer}>
-              <View style={styles.loadingDot} />
-              <View style={styles.loadingDot} />
-              <View style={styles.loadingDot} />
-            </View>
-          )}
-
-          {/* Action Buttons */}
           <View style={styles.buttonContainer}>
             {actionText && onAction && (
               <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: getActionButtonColor() }]}
+                style={[styles.actionButton, { backgroundColor: config.color }]}
                 onPress={handleAction}
               >
                 <Text style={styles.actionButtonText}>{actionText}</Text>
@@ -212,10 +132,10 @@ export default function StatusModal({
             
             {showCloseButton && type !== 'loading' && (
               <TouchableOpacity
-                style={styles.closeButton}
+                style={[styles.closeButton, { backgroundColor: colors.card, borderColor: colors.border }]}
                 onPress={handleClose}
               >
-                <Text style={styles.closeButtonText}>Close</Text>
+                <Text style={[styles.closeButtonText, { color: colors.text }]}>Close</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -228,50 +148,40 @@ export default function StatusModal({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
   modalContent: {
-    borderRadius: 20,
-    padding: 24,
+    padding: 32,
+    borderRadius: 32,
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 360,
     alignItems: 'center',
+    borderWidth: 1,
   },
-  iconContainer: {
+  iconWrapper: {
     width: 96,
     height: 96,
     borderRadius: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
+    letterSpacing: -0.5,
   },
   message: {
-    fontSize: 16,
-    color: '#CCCCCC',
+    fontSize: 15,
+    fontWeight: '500',
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 24,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    marginBottom: 24,
-    gap: 8,
-  },
-  loadingDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#1ea2b1',
+    marginBottom: 32,
+    lineHeight: 22,
     opacity: 0.6,
   },
   buttonContainer: {
@@ -279,24 +189,25 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   actionButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   actionButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   closeButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
-    backgroundColor: '#2a2a2a',
+    justifyContent: 'center',
+    borderWidth: 1,
   },
   closeButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-});
+});
