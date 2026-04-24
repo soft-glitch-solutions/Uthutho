@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Share,
   Linking,
   Platform,
+  Animated,
+  Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, School, Share2, Info, ChevronLeft } from 'lucide-react-native';
@@ -25,11 +27,17 @@ import { ApplyButton } from '@/components/transport/ApplyButton';
 import { useTheme } from '@/context/ThemeContext';
 import StatusModal from '@/components/modals/StatusModal';
 
+const HEADER_MAX_HEIGHT = 280;
+const HEADER_MIN_HEIGHT = Platform.OS === 'ios' ? 110 : 90;
+const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
+
 export default function TransportDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
+  
+  const scrollY = useRef(new Animated.Value(0)).current;
   
   const [transport, setTransport] = useState<SchoolTransport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -165,6 +173,24 @@ export default function TransportDetailsScreen() {
     });
   };
 
+  const headerImageHeight = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE],
+    outputRange: [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT],
+    extrapolate: 'clamp',
+  });
+
+  const imageOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE / 2, HEADER_SCROLL_DISTANCE],
+    outputRange: [1, 0.5, 0],
+    extrapolate: 'clamp',
+  });
+
+  const imageScale = scrollY.interpolate({
+    inputRange: [-100, 0],
+    outputRange: [1.5, 1],
+    extrapolate: 'clamp',
+  });
+
   if (loading) {
     return <TransportDetailsSkeleton />;
   }
@@ -172,7 +198,7 @@ export default function TransportDetailsScreen() {
   if (!transport) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
+        <View style={styles.headerSpacer}>
           <TouchableOpacity 
             style={[styles.backButton, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => router.back()}
@@ -201,13 +227,28 @@ export default function TransportDetailsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Animated.View style={[styles.imageHeader, { height: headerImageHeight }]}>
+        <Animated.Image 
+          source={require('@/assets/images/school-header.png')}
+          style={[styles.headerImage, { opacity: imageOpacity, transform: [{ scale: imageScale }] }]}
+        />
+        <View style={styles.imageOverlay} />
+        <TransportInfoHeader transport={transport} scrollY={scrollY} />
+      </Animated.View>
+
       <TransportHeader 
         transport={transport}
         onBack={() => router.back()}
         onShare={handleShare}
+        scrollY={scrollY}
       />
 
-      <ScrollView 
+      <Animated.ScrollView 
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
         style={styles.scrollContainer}
         refreshControl={
           <RefreshControl
@@ -215,66 +256,68 @@ export default function TransportDetailsScreen() {
             onRefresh={onRefresh}
             tintColor={colors.primary}
             colors={[colors.primary]}
+            progressViewOffset={HEADER_MAX_HEIGHT}
           />
         }
         showsVerticalScrollIndicator={false}
       >
-        <TransportInfoHeader transport={transport} />
-        <AvailabilityBanner transport={transport} />
-        <StatsGrid transport={transport} />
+        <View style={{ paddingTop: HEADER_MAX_HEIGHT }}>
+          <AvailabilityBanner transport={transport} />
+          <StatsGrid transport={transport} />
 
-        {transport.description && transport.description.trim() && (
+          {transport.description && transport.description.trim() && (
+            <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.sectionHeader}>
+                <Info size={18} color={colors.primary} />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>About Service</Text>
+              </View>
+              <Text 
+                style={[styles.description, { color: colors.text }]} 
+                numberOfLines={showFullDescription ? undefined : 4}
+              >
+                {transport.description}
+              </Text>
+              {transport.description.length > 200 && (
+                <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)} style={styles.readMoreBtn}>
+                  <Text style={[styles.readMore, { color: colors.primary }]}>
+                    {showFullDescription ? 'Show Less' : 'Read Full Description'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {transport.pickup_areas.length > 0 && (
+            <PickupAreas 
+              areas={transport.pickup_areas}
+              onOpenMaps={handleOpenMaps}
+            />
+          )}
+
+          {transport.pickup_times.length > 0 && (
+            <PickupTimes times={transport.pickup_times} />
+          )}
+
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.sectionHeader}>
-              <Info size={18} color={colors.primary} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>About Service</Text>
+              <AlertCircle size={18} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Vehicle Details</Text>
             </View>
-            <Text 
-              style={[styles.description, { color: colors.text }]} 
-              numberOfLines={showFullDescription ? undefined : 4}
-            >
-              {transport.description}
+            <Text style={[styles.vehicleDescription, { color: colors.text }]}>
+              {transport.vehicle_info || 'Standard safe transport vehicle. Verified and inspected for school transport safety standards.'}
             </Text>
-            {transport.description.length > 200 && (
-              <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)} style={styles.readMoreBtn}>
-                <Text style={[styles.readMore, { color: colors.primary }]}>
-                  {showFullDescription ? 'Show Less' : 'Read Full Description'}
-                </Text>
-              </TouchableOpacity>
-            )}
           </View>
-        )}
 
-        {transport.pickup_areas.length > 0 && (
-          <PickupAreas 
-            areas={transport.pickup_areas}
-            onOpenMaps={handleOpenMaps}
+          <DriverInfo 
+            transport={transport}
+            onViewProfile={() => router.push(`/driver/${transport.driver.id}`)}
+            onMessage={handleMessageDriver}
+            onCall={handleContactDriver}
           />
-        )}
 
-        {transport.pickup_times.length > 0 && (
-          <PickupTimes times={transport.pickup_times} />
-        )}
-
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.sectionHeader}>
-            <AlertCircle size={18} color={colors.primary} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Vehicle Details</Text>
-          </View>
-          <Text style={[styles.vehicleDescription, { color: colors.text }]}>
-            {transport.vehicle_info || 'Standard safe transport vehicle. Verified and inspected for school transport safety standards.'}
-          </Text>
+          <View style={styles.footerSpacer} />
         </View>
-
-        <DriverInfo 
-          transport={transport}
-          onViewProfile={() => router.push(`/driver/${transport.driver.id}`)}
-          onMessage={handleMessageDriver}
-          onCall={handleContactDriver}
-        />
-
-        <View style={styles.footerSpacer} />
-      </ScrollView>
+      </Animated.ScrollView>
 
       <ApplyButton 
         transport={transport}
@@ -297,13 +340,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
-    left: 0,
-    right: 0,
+  headerSpacer: {
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingHorizontal: 24,
     zIndex: 10,
+  },
+  imageHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
+    zIndex: 5,
+  },
+  headerImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.2)',
   },
   backButton: {
     width: 44,
