@@ -9,9 +9,10 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { CompactRouteSlider } from '@/components/journey/CompactRouteSlider';
+import { VerticalRouteTimeline } from '@/components/journey/VerticalRouteTimeline';
 import { ConnectionError } from '@/components/journey/ConnectionError';
 import { JourneyStop, Passenger } from '@/types/journey';
+import { JourneyChat } from './JourneyChat';
 import { CompactHeader } from './CompactHeader';
 import { ActionButtons } from './ActionButtons';
 import { YourStatusCard } from './YourStatusCard';
@@ -38,6 +39,12 @@ interface InfoTabProps {
   hasDriverInJourney: boolean;
   isDriver: boolean;
   onlineCount: number;
+  showChatAtBottom?: boolean;
+  chatMessages?: any[];
+  newMessage?: string;
+  setNewMessage?: (message: string) => void;
+  onSendMessage?: (message: string) => Promise<void>;
+  onNavigateToStopDetails?: (stopId: string) => void;
 }
 
 export const InfoTab: React.FC<InfoTabProps> = ({
@@ -60,7 +67,12 @@ export const InfoTab: React.FC<InfoTabProps> = ({
   connectionError,
   hasDriverInJourney,
   isDriver,
-  onlineCount
+  onlineCount,
+  showChatAtBottom,
+  chatMessages = [],
+  newMessage = '',
+  setNewMessage = () => {},
+  onSendMessage = async () => {},
 }) => {
   const router = useRouter();
 
@@ -93,8 +105,17 @@ export const InfoTab: React.FC<InfoTabProps> = ({
           endPoint={activeJourney.routes.end_point}
         />
 
-        {/* Route Slider */}
-        <CompactRouteSlider
+        {/* Action Buttons (Elevated to top) */}
+        <ActionButtons
+          participantStatus={participantStatus}
+          onPickedUp={onPickedUp}
+          onArrived={onArrived}
+          onNotifyAhead={onNotifyAhead}
+          onShare={onShare}
+        />
+
+        {/* Vertical Route Timeline */}
+        <VerticalRouteTimeline
           stops={journeyStops}
           currentUserStopName={userStopName}
           currentUserId={currentUserId}
@@ -104,15 +125,6 @@ export const InfoTab: React.FC<InfoTabProps> = ({
           participantStatus={participantStatus}
           onStopPress={onStopPress}
           onNavigateToStopDetails={handleNavigateToStopDetails}
-        />
-
-        {/* Action Buttons */}
-        <ActionButtons
-          participantStatus={participantStatus}
-          onPickedUp={onPickedUp}
-          onArrived={onArrived}
-          onNotifyAhead={onNotifyAhead}
-          onShare={onShare}
         />
 
         {/* Statistics Row */}
@@ -196,6 +208,24 @@ export const InfoTab: React.FC<InfoTabProps> = ({
             <Text style={styles.debugButtonText}>Test Complete Journey</Text>
           </TouchableOpacity>
         )}
+
+        {showChatAtBottom && (
+          <View style={styles.chatSection}>
+            <View style={styles.chatHeader}>
+              <Text style={styles.chatTitle}>Community Chat</Text>
+            </View>
+            <View style={{ height: 400 }}>
+              <JourneyChat
+                messages={chatMessages}
+                newMessage={newMessage}
+                setNewMessage={setNewMessage}
+                onSendMessage={onSendMessage}
+                currentUserId={currentUserId}
+                onlineCount={onlineCount}
+              />
+            </View>
+          </View>
+        )}
       </ScrollView>
     </Animated.View>
   );
@@ -277,5 +307,25 @@ const styles = {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  chatSection: {
+    marginTop: 24,
+    backgroundColor: '#0a0a0a',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  chatHeader: {
+    padding: 16,
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  chatTitle: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
 };

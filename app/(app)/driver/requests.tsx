@@ -354,11 +354,6 @@ export default function DriverRequestsScreen() {
                 
                 <View style={styles.requestDetails}>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Grade:</Text>
-                    <Text style={styles.detailValue}>{request.student_grade}</Text>
-                  </View>
-                  
-                  <View style={styles.detailRow}>
                     <MapPin size={14} color="#888888" />
                     <Text style={styles.detailValue} numberOfLines={1}>
                       {request.pickup_address}

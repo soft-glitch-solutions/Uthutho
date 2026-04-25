@@ -1,22 +1,26 @@
 // JourneyScreen.tsx (updated)
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  KeyboardAvoidingView, 
+import {
+  View,
+  KeyboardAvoidingView,
   Platform,
   Alert,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Animated
+  Animated,
+  Image,
+  Pressable,
+  Easing
 } from 'react-native';
+import { useRef } from 'react';
+import { useTheme } from '@/context/ThemeContext';
+import { Menu, User, ArrowLeft } from 'lucide-react-native';
 import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useJourney } from '@/hook/useJourney';
-import { JourneyHeader } from '@/components/journey/JourneyHeader';
-import { JourneyTabs } from '@/components/journey/JourneyTabs';
 import { JourneySkeleton } from '@/components/journey/JourneySkeleton';
 import { NoActiveJourney } from '@/components/journey/NoActiveJourney';
 import { JourneyContent } from '@/components/journey/JourneyContent';
@@ -28,14 +32,38 @@ import { useJourneyActions } from '@/components/journey/hooks/useJourneyActions'
 import { useLocationUpdates } from '@/components/journey/hooks/useLocationUpdates';
 import { useChat } from '@/components/journey/hooks/useChat';
 
+// Animated Hamburger Menu Component
+const AnimatedHamburgerMenu = ({ onPress, color, textColor }: any) => {
+  const rotation = useRef(new Animated.Value(0)).current;
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(rotation, { toValue: 1, duration: 150, easing: Easing.linear, useNativeDriver: true }),
+      Animated.timing(rotation, { toValue: 0, duration: 150, easing: Easing.linear, useNativeDriver: true })
+    ]).start();
+    if (onPress) onPress();
+  };
+
+  const rotateInterpolation = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '90deg']
+  });
+
+  return (
+    <Pressable onPress={handlePress} style={styles.logoContainer}>
+    </Pressable>
+  );
+};
+
 export default function JourneyScreen() {
+  const { colors } = useTheme();
   const router = useRouter();
   const { activeJourney, loading, refreshActiveJourney } = useJourney();
-  
+
   // Add state for showing arrived animation
   const [showArrivedAnimation, setShowArrivedAnimation] = useState(false);
   const [isProcessingArrival, setIsProcessingArrival] = useState(false);
-  
+
   // Use custom hooks
   const journeyData = useJourneyData();
   const {
@@ -48,7 +76,7 @@ export default function JourneyScreen() {
     activeJourney?.id,
     journeyData.currentUserId
   );
-  
+
   const {
     chatMessages,
     newMessage,
@@ -73,13 +101,14 @@ export default function JourneyScreen() {
     journeyData.refreshActiveJourney,
     journeyData.loadOtherPassengers,
     journeyData.loadJourneyStops,
-    () => {} // setUserStopName - handle this if needed
+    () => { } // setUserStopName - handle this if needed
   );
 
-  const [activeTab, setActiveTab] = useState<'info' | 'chat'>('info');
   const [selectedStop, setSelectedStop] = useState<JourneyStop | null>(null);
   const [showStopDetails, setShowStopDetails] = useState(false);
-  
+
+  const { userProfile } = journeyData;
+
   // Simple animation
   const fadeAnim = useState(new Animated.Value(0))[0];
 
@@ -109,17 +138,17 @@ export default function JourneyScreen() {
   // Custom handler for arrival that shows animation
   const handleArrived = async () => {
     if (isProcessingArrival) return;
-    
+
     try {
       setIsProcessingArrival(true);
       setShowArrivedAnimation(true);
-      
+
       // Update participant status to arrived
       await actions.updateParticipantStatus('arrived');
-      
+
       // Note: The navigation will happen inside updateParticipantStatus
       // The animation will be on screen while that's processing
-      
+
     } catch (error) {
       console.error('Error in arrival process:', error);
       setIsProcessingArrival(false);
@@ -145,7 +174,7 @@ export default function JourneyScreen() {
       return (
         <View style={styles.noJourneyContainer}>
           <NoActiveJourney />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.retryButton}
             onPress={async () => {
               console.log('Manual retry...');
@@ -163,7 +192,7 @@ export default function JourneyScreen() {
     return (
       <>
         <JourneyContent
-          activeTab={activeTab}
+          activeTab="info"
           fadeAnim={fadeAnim}
           activeJourney={activeJourney}
           journeyStops={journeyData.journeyStops}
@@ -190,8 +219,9 @@ export default function JourneyScreen() {
           selectedStop={selectedStop}
           showStopDetails={showStopDetails}
           setShowStopDetails={setShowStopDetails}
+          showChatAtBottom={true}
         />
-        
+
         <ArrivedAnimation
           isVisible={showArrivedAnimation}
           onAnimationComplete={handleAnimationComplete}
@@ -207,24 +237,46 @@ export default function JourneyScreen() {
   }
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
     >
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" />
-      
+
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <JourneyHeader title="Active Journey" />
-        
-        <JourneyTabs
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          unreadMessages={unreadMessages}
-          onlineCount={journeyData.onlineCount}
-        />
-        
+        <View style={styles.topHeader}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 10 }}>
+              <ArrowLeft size={24} color={colors.text} />
+            </TouchableOpacity>
+            <AnimatedHamburgerMenu
+              onPress={() => { }}
+              color={colors.primary}
+              textColor={colors.text}
+            />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <TouchableOpacity onPress={() => router.push('/profile')}>
+              {userProfile?.avatar_url ? (
+                <Image
+                  source={{ uri: userProfile.avatar_url }}
+                  style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.primary }}
+                />
+              ) : (
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
+                  <User color="#fff" size={20} />
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.greetingHeader}>
+          <Text style={[styles.greetingText, { color: colors.primary }]}>Let's get moving on your Journey</Text>
+        </View>
+
         {renderContent()}
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -255,5 +307,43 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  topHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  uthuthoText: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  pointsContainer: {
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(30, 162, 177, 0.2)',
+  },
+  pointsText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  greetingHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 5,
+  },
+  greetingText: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
 });

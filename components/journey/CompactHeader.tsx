@@ -16,86 +16,37 @@ export const CompactHeader: React.FC<CompactHeaderProps> = ({
   endPoint
 }) => {
   return (
-    <View style={styles.compactHeader}>
-      <View style={styles.routeRow}>
-        <Text style={styles.routeName} numberOfLines={1}>
-          {routeName}
-        </Text>
-        <View style={styles.transportBadge}>
-          <Text style={styles.transportText}>
-            {transportType}
-          </Text>
-        </View>
-      </View>
-      
-      <View style={styles.routeEndpoints}>
-        <Text style={styles.startPoint} numberOfLines={1}>
-          {startPoint}
-        </Text>
-        <ChevronRight size={12} color="#666666" style={styles.chevron} />
-        <Text style={styles.endPoint} numberOfLines={1}>
-          {endPoint}
-        </Text>
-      </View>
+    <View style={styles.headerContainer}>
+      <Text style={styles.routeNameText} numberOfLines={1}>
+        Route <Text style={styles.routeIdText}>{routeName}</Text>
+      </Text>
+      <Text style={styles.destinationText} numberOfLines={1}>
+        Heading to {endPoint}
+      </Text>
     </View>
   );
 };
 
-// Use StyleSheet.create instead of plain objects
 const styles = StyleSheet.create({
-  compactHeader: {
-    backgroundColor: '#1a1a1a',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#333333',
-    marginBottom: 10,
-  },
-  routeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  routeName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    flex: 1,
-    marginRight: 8,
-  },
-  transportBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1ea2b120',
+  headerContainer: {
+    paddingVertical: 12,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-    gap: 3,
+    marginBottom: 24,
   },
-  transportText: {
-    color: '#1ea2b1',
-    fontSize: 11,
+  routeNameText: {
+    fontSize: 28,
+    fontWeight: '300',
+    color: '#dddddd',
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  routeIdText: {
     fontWeight: '600',
+    color: '#ffffff',
   },
-  routeEndpoints: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  startPoint: {
-    color: '#4ade80',
-    fontSize: 11,
+  destinationText: {
+    fontSize: 14,
+    color: '#888888',
     fontWeight: '500',
-    flex: 1,
-  },
-  endPoint: {
-    color: '#ef4444',
-    fontSize: 11,
-    fontWeight: '500',
-    flex: 1,
-    textAlign: 'right',
-  },
-  chevron: {
-    marginHorizontal: 4,
-  },
+  }
 });

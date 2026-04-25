@@ -42,6 +42,7 @@
     "android": {
       "package": "com.softglitch.uthutho",
       "versionCode": 36,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#000000"
@@ -75,7 +76,8 @@
     "plugins": [
       "expo-router",
       "expo-localization",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true

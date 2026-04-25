@@ -35,6 +35,7 @@ interface JourneyContentProps {
   selectedStop: JourneyStop | null;
   showStopDetails: boolean;
   setShowStopDetails: (show: boolean) => void;
+  showChatAtBottom?: boolean;
 }
 
 export const JourneyContent: React.FC<JourneyContentProps> = ({
@@ -65,7 +66,8 @@ export const JourneyContent: React.FC<JourneyContentProps> = ({
   onSendMessage,
   selectedStop,
   showStopDetails,
-  setShowStopDetails
+  setShowStopDetails,
+  showChatAtBottom = false
 }) => {
   const router = useRouter(); // Initialize router
 
@@ -100,6 +102,12 @@ export const JourneyContent: React.FC<JourneyContentProps> = ({
           isDriver={isDriver}
           onlineCount={onlineCount}
           onNavigateToStopDetails={handleNavigateToStopDetails} // Pass navigation function
+          showChatAtBottom={showChatAtBottom}
+          chatMessages={chatMessages}
+          newMessage={newMessage}
+          setNewMessage={setNewMessage}
+          onSendMessage={onSendMessage}
+          currentUserId={currentUserId}
         />
         
         <StopDetailsModal

@@ -4,6 +4,9 @@ import { Bell, Lock, Info, Shield, ChevronRight, MessageSquare, FileText, HelpCi
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import * as WebBrowser from 'expo-web-browser';
+import { Alert } from 'react-native';
+import { useAuth } from '@/hook/useAuth';
+import { sendPushNotificationByUserId } from '@/services/pushNotificationService';
 
 // Required for WebBrowser
 WebBrowser.maybeCompleteAuthSession();
@@ -12,6 +15,7 @@ export default function SettingsScreen() {
   const { colors } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const router = useRouter();
+  const { user } = useAuth();
 
   const settings = {
     settings: 'Settings',
@@ -24,6 +28,22 @@ export default function SettingsScreen() {
     appVersion: 'App Version 1.8.2',
     feedback: 'Feedback & Support',
     help: 'Help & FAQ',
+  };
+
+  const handleTestPush = async () => {
+    if (!user) {
+      Alert.alert('Error', 'You must be logged in to test notifications.');
+      return;
+    }
+    const result = await sendPushNotificationByUserId(user.id, {
+      title: 'Uthutho says Hello 👋',
+      body: 'Your test push notification is working perfectly!',
+    });
+    if (result) {
+      Alert.alert('Success', 'Push notification triggered! You should receive it shortly.');
+    } else {
+      Alert.alert('Failed', 'Could not send the notification. Make sure you are on a physical device with permissions granted.');
+    }
   };
 
   const handleOpenTerms = async () => {
@@ -106,6 +126,23 @@ export default function SettingsScreen() {
               thumbColor={notificationsEnabled ? '#ffffff' : '#f4f3f4'}
             />
           </View>
+
+          {/* Test Push Notification */}
+          <TouchableOpacity
+            style={[styles.settingCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={handleTestPush}
+          >
+            <View style={styles.settingContent}>
+              <View style={styles.settingIconContainer}>
+                <Bell size={20} color="#ED67B1" />
+              </View>
+              <View style={styles.settingDetails}>
+                <Text style={[styles.settingText, { color: colors.text }]}>Test Push Notification</Text>
+                <Text style={[styles.settingSubtext, { color: '#666666' }]}>Send a test alert to this device</Text>
+              </View>
+            </View>
+            <ChevronRight size={20} color="#666666" />
+          </TouchableOpacity>
         </View>
 
         {/* Privacy & Security Section */}

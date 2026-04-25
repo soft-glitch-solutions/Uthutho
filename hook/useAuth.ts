@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
+import { registerPushToken } from './useRegisterPushToken';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -23,6 +24,12 @@ export function useAuth() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      registerPushToken(user.id);
+    }
+  }, [user?.id]);
 
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({

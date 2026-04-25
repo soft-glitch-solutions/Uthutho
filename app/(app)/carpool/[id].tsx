@@ -239,11 +239,8 @@ export default function CarpoolDetailScreen() {
   };
 
   const handleSubmitApplication = async (applicationData: {
-    studentName: string;
-    grade: string;
     pickupAddress: string;
-    parentPhone: string;
-    parentEmail: string;
+    additionalNotes?: string;
   }) => {
     if (!user || !carpool) return;
 
@@ -705,38 +702,6 @@ export default function CarpoolDetailScreen() {
         onClose={() => setShowApplyModal(false)}
         onSubmit={handleSubmitApplication}
         loading={applyLoading}
-        title="Join Carpool Club"
-        submitButtonText="Send Request"
-        fields={[
-          {
-            label: 'Your Name',
-            placeholder: 'Enter your full name',
-            key: 'studentName'
-          },
-          {
-            label: 'Pickup Address (if different)',
-            placeholder: 'Optional: Your exact pickup location',
-            key: 'pickupAddress',
-            optional: true
-          },
-          {
-            label: 'Phone Number',
-            placeholder: 'Your contact number',
-            key: 'parentPhone'
-          },
-          {
-            label: 'Email',
-            placeholder: 'Your email address',
-            key: 'parentEmail'
-          },
-          {
-            label: 'Message to Creator',
-            placeholder: 'Optional: Add a message...',
-            key: 'grade',
-            optional: true,
-            multiline: true
-          }
-        ]}
       />
 
       <StatusModal

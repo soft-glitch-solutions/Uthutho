@@ -4,11 +4,20 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme, Platform } from 'react-native';
 import * as Linking from 'expo-linking';
+import * as Notifications from 'expo-notifications';
 import { ThemeProvider } from '../context/ThemeContext';
 import { WaitingProvider } from '../context/WaitingContext';
 import { LanguageProvider } from '../context/LanguageContext';
 import { supabase } from '../lib/supabase';
 import NetworkGate from '@/components/NetworkGate';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 // Make sure this matches your app.json scheme
 const DEEP_LINK_SCHEME = 'uthutho';

@@ -17,11 +17,7 @@ interface ApplyModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (data: {
-    studentName: string;
-    grade: string;
     pickupAddress: string;
-    parentPhone: string;
-    parentEmail: string;
     additionalNotes?: string;
   }) => Promise<void>;
   loading?: boolean;
@@ -35,11 +31,7 @@ export default function ApplyModal({
 }: ApplyModalProps) {
   const { colors } = useTheme();
   const [formData, setFormData] = useState({
-    studentName: '',
-    grade: '',
     pickupAddress: '',
-    parentPhone: '',
-    parentEmail: '',
     additionalNotes: '',
   });
 
@@ -48,22 +40,8 @@ export default function ApplyModal({
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.studentName.trim()) {
-      newErrors.studentName = 'Student name is required';
-    }
-
     if (!formData.pickupAddress.trim()) {
-      newErrors.pickupAddress = 'Pickup address is required';
-    }
-
-    if (!formData.parentPhone.trim()) {
-      newErrors.parentPhone = 'Parent phone number is required';
-    } else if (!/^\+?[\d\s-]{10,}$/.test(formData.parentPhone)) {
-      newErrors.parentPhone = 'Please enter a valid phone number';
-    }
-
-    if (formData.parentEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.parentEmail)) {
-      newErrors.parentEmail = 'Please enter a valid email address';
+      newErrors.pickupAddress = 'Pickup location is required';
     }
 
     setErrors(newErrors);
@@ -76,21 +54,13 @@ export default function ApplyModal({
     }
 
     await onSubmit({
-      studentName: formData.studentName.trim(),
-      grade: formData.grade.trim(),
       pickupAddress: formData.pickupAddress.trim(),
-      parentPhone: formData.parentPhone.trim(),
-      parentEmail: formData.parentEmail.trim(),
       additionalNotes: formData.additionalNotes.trim(),
     });
 
     if (!loading) {
       setFormData({
-        studentName: '',
-        grade: '',
         pickupAddress: '',
-        parentPhone: '',
-        parentEmail: '',
         additionalNotes: '',
       });
       setErrors({});
@@ -100,11 +70,7 @@ export default function ApplyModal({
   const handleClose = () => {
     if (!loading) {
       setFormData({
-        studentName: '',
-        grade: '',
         pickupAddress: '',
-        parentPhone: '',
-        parentEmail: '',
         additionalNotes: '',
       });
       setErrors({});
@@ -145,47 +111,14 @@ export default function ApplyModal({
 
             {/* Form */}
             <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
-              {/* Input: Student Name */}
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Student Name <Text style={{ color: colors.primary }}>*</Text></Text>
-                <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: errors.studentName ? '#EF4444' : colors.border }]}>
-                  <User size={18} color={errors.studentName ? '#EF4444' : colors.primary} />
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="Full name of student"
-                    placeholderTextColor="#666"
-                    value={formData.studentName}
-                    onChangeText={(text) => updateField('studentName', text)}
-                    editable={!loading}
-                  />
-                </View>
-                {errors.studentName && <Text style={styles.errorText}>{errors.studentName}</Text>}
-              </View>
-
-              {/* Input: Grade */}
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Grade/Class</Text>
-                <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <BookOpen size={18} color={colors.primary} />
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="e.g., Grade 8"
-                    placeholderTextColor="#666"
-                    value={formData.grade}
-                    onChangeText={(text) => updateField('grade', text)}
-                    editable={!loading}
-                  />
-                </View>
-              </View>
-
               {/* Input: Pickup Address */}
               <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Pickup Address <Text style={{ color: colors.primary }}>*</Text></Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Pickup Location <Text style={{ color: colors.primary }}>*</Text></Text>
                 <View style={[styles.inputWrapper, styles.textAreaWrapper, { backgroundColor: colors.card, borderColor: errors.pickupAddress ? '#EF4444' : colors.border }]}>
                   <MapPin size={18} color={errors.pickupAddress ? '#EF4444' : colors.primary} style={{ marginTop: 14 }} />
                   <TextInput
                     style={[styles.input, styles.textArea, { color: colors.text }]}
-                    placeholder="Full home address"
+                    placeholder="Full pickup address and suburb"
                     placeholderTextColor="#666"
                     value={formData.pickupAddress}
                     onChangeText={(text) => updateField('pickupAddress', text)}
@@ -197,45 +130,9 @@ export default function ApplyModal({
                 {errors.pickupAddress && <Text style={styles.errorText}>{errors.pickupAddress}</Text>}
               </View>
 
-              {/* Input: Parent Phone */}
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Parent Phone <Text style={{ color: colors.primary }}>*</Text></Text>
-                <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: errors.parentPhone ? '#EF4444' : colors.border }]}>
-                  <Phone size={18} color={errors.parentPhone ? '#EF4444' : colors.primary} />
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="+27 12 345 6789"
-                    placeholderTextColor="#666"
-                    value={formData.parentPhone}
-                    onChangeText={(text) => updateField('parentPhone', text)}
-                    keyboardType="phone-pad"
-                    editable={!loading}
-                  />
-                </View>
-                {errors.parentPhone && <Text style={styles.errorText}>{errors.parentPhone}</Text>}
-              </View>
-
-              {/* Input: Parent Email */}
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Parent Email (Optional)</Text>
-                <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Mail size={18} color={colors.primary} />
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="parent@example.com"
-                    placeholderTextColor="#666"
-                    value={formData.parentEmail}
-                    onChangeText={(text) => updateField('parentEmail', text)}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    editable={!loading}
-                  />
-                </View>
-              </View>
-
               {/* Additional Notes */}
               <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Additional Notes</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Message to Driver / Creator (Optional)</Text>
                 <View style={[styles.inputWrapper, styles.textAreaWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <TextInput
                     style={[styles.input, styles.textArea, { color: colors.text, paddingLeft: 0 }]}

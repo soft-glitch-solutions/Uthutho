@@ -10,7 +10,9 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
-  Dimensions
+  Dimensions,
+  Animated,
+  Easing
 } from 'react-native';
 import { useRouter, useNavigation, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -142,6 +144,33 @@ const getTypeLabel = (type: string) => {
     default:
       return type;
   }
+};
+
+// Animated Hamburger Menu Component
+const AnimatedHamburgerMenu = ({ onPress, color, onLongPress, delayLongPress, textColor }: any) => {
+  const rotation = useRef(new Animated.Value(0)).current;
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(rotation, { toValue: 1, duration: 150, easing: Easing.linear, useNativeDriver: true }),
+      Animated.timing(rotation, { toValue: 0, duration: 150, easing: Easing.linear, useNativeDriver: true })
+    ]).start();
+    if (onPress) onPress();
+  };
+
+  const rotateInterpolation = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '90deg']
+  });
+
+  return (
+    <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={delayLongPress} style={styles.logoContainer}>
+      <Animated.View style={{ transform: [{ rotate: rotateInterpolation }] }}>
+        <Menu size={28} color={color} />
+      </Animated.View>
+      <Text style={[styles.uthuthoText, { color: textColor }]}> Uthutho </Text>
+    </Pressable>
+  );
 };
 
 // Desktop Grid Layout Component
@@ -925,6 +954,31 @@ export default function HomeScreen() {
     console.log('🔄 HomeScreen rendered');
   });
 
+  const bannerPulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!journeyLoading && activeJourney) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(bannerPulse, {
+            toValue: 1.05,
+            duration: 1500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(bannerPulse, {
+            toValue: 1,
+            duration: 1500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      bannerPulse.setValue(1);
+    }
+  }, [activeJourney, journeyLoading]);
+
   if (isDesktop) {
     return (
       <ScreenTransition>
@@ -941,14 +995,13 @@ export default function HomeScreen() {
           }
         >
           <View style={styles.desktopHeader}>
-            <Pressable onPress={openSidebar} onLongPress={() => setShowDebugPanel(true)}
-              delayLongPress={2000} style={styles.logoContainer}>
-              <Image
-                source={require('../../../assets/uthutho-logo.png')}
-                style={styles.logo}
-              />
-              <Text style={[styles.uthuthoText, { color: colors.text }]}>Uthutho</Text>
-            </Pressable>
+            <AnimatedHamburgerMenu
+              onPress={openSidebar}
+              onLongPress={() => setShowDebugPanel(true)}
+              delayLongPress={2000}
+              color={colors.primary}
+              textColor={colors.text}
+            />
             {isProfileLoading ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <View style={[styles.pointsContainer, {
@@ -1058,7 +1111,7 @@ export default function HomeScreen() {
 
 
 
-              <SuggestedRoutesSection 
+              <SuggestedRoutesSection
                 colors={colors}
                 router={router}
                 routes={suggestedRoutes}
@@ -1174,14 +1227,13 @@ export default function HomeScreen() {
         }
       >
         <View style={styles.topHeader}>
-          <Pressable onPress={openSidebar} onLongPress={() => setShowDebugPanel(true)}
-            delayLongPress={2000} style={styles.logoContainer}>
-            <Image
-              source={require('../../../assets/uthutho-logo.png')}
-              style={styles.logo}
-            />
-            <Text style={[styles.uthuthoText, { color: colors.text }]}>Uthutho</Text>
-          </Pressable>
+          <AnimatedHamburgerMenu
+            onPress={openSidebar}
+            onLongPress={() => setShowDebugPanel(true)}
+            delayLongPress={2000}
+            color={colors.primary}
+            textColor={colors.text}
+          />
           {isProfileLoading ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <View style={[styles.pointsContainer, {
@@ -1223,7 +1275,7 @@ export default function HomeScreen() {
           }}
         />
 
-        <SuggestedRoutesSection 
+        <SuggestedRoutesSection
           colors={colors}
           router={router}
           routes={suggestedRoutes}
@@ -1231,11 +1283,12 @@ export default function HomeScreen() {
         />
 
         {!journeyLoading && activeJourney && (
-          <Pressable
-            style={[styles.journeyBanner]}
-            onPress={() => router.push('/journey')}
-          >
-            <View style={styles.journeyBannerContent}>
+          <Animated.View style={{ transform: [{ scale: bannerPulse }] }}>
+            <Pressable
+              style={[styles.journeyBanner]}
+              onPress={() => router.push('/journey')}
+            >
+              <View style={styles.journeyBannerContent}>
               <View style={styles.journeyIcon}>
                 <Navigation size={20} color="#ffffff" />
               </View>
@@ -1259,8 +1312,9 @@ export default function HomeScreen() {
             </View>
             <View style={styles.journeyArrow}>
               <Text style={styles.journeyArrowText}>›</Text>
-            </View>
-          </Pressable>
+              </View>
+            </Pressable>
+          </Animated.View>
         )}
 
         <NearbySection

@@ -13,13 +13,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { 
-  ArrowLeft, 
-  User, 
-  School, 
-  MapPin, 
-  Phone, 
-  Mail, 
+import {
+  ArrowLeft,
+  User,
+  School,
+  MapPin,
+  Phone,
+  Mail,
   MessageSquare,
   Home,
   Navigation,
@@ -59,17 +59,17 @@ export default function TransportApplicationScreen() {
     transportName: string;
     schoolArea: string;
   }>();
-  
+
   const router = useRouter();
   const { user } = useAuth();
-  
+
   const [loading, setLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [transportInfo, setTransportInfo] = useState<TransportInfo | null>(null);
   const [children, setChildren] = useState<any[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string>('');
-  
+
   // Form state
   const [formData, setFormData] = useState({
     studentName: '',
@@ -107,7 +107,7 @@ export default function TransportApplicationScreen() {
   const fetchUserData = async () => {
     try {
       setProfileLoading(true);
-      
+
       // Fetch user profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -197,24 +197,12 @@ export default function TransportApplicationScreen() {
   const validateForm = (): boolean => {
     const errors: string[] = [];
 
-    if (!formData.studentName.trim()) {
-      errors.push('Student name is required');
-    }
-    
     if (!formData.pickupAddress.trim()) {
       errors.push('Pickup address is required');
     }
-    
+
     if (!formData.pickupCity.trim()) {
       errors.push('Pickup city/suburb is required');
-    }
-    
-    if (!formData.parentPhone.trim()) {
-      errors.push('Parent phone number is required');
-    }
-    
-    if (!formData.emergencyPhone.trim()) {
-      errors.push('Emergency contact phone is required');
     }
 
     if (errors.length > 0) {
@@ -233,7 +221,7 @@ export default function TransportApplicationScreen() {
     if (!validateForm()) return;
 
     setLoading(true);
-    
+
     try {
       // First, check if user has already applied
       const { data: existingApplication, error: checkError } = await supabase
@@ -259,30 +247,30 @@ export default function TransportApplicationScreen() {
           transport_id: transportId,
           user_id: user?.id,
           driver_id: driverId,
-          student_name: formData.studentName.trim(),
-          student_grade: formData.studentGrade.trim() || null,
-          student_age: formData.studentAge ? parseInt(formData.studentAge) : null,
-          
+          student_name: `${userProfile?.first_name || ''} ${userProfile?.last_name || ''}`.trim() || 'User',
+          student_grade: null,
+          student_age: null,
+
           pickup_address: formData.pickupAddress.trim(),
           pickup_suburb: formData.pickupSuburb.trim(),
           pickup_city: formData.pickupCity.trim(),
           pickup_time_preference: formData.pickupTimePreference.trim() || null,
-          
-          dropoff_address: formData.dropoffAddress.trim() || null,
-          dropoff_suburb: formData.dropoffSuburb.trim() || null,
-          dropoff_city: formData.dropoffCity.trim() || null,
-          
-          parent_name: formData.parentName.trim(),
-          parent_phone: formData.parentPhone.trim(),
-          parent_email: formData.parentEmail.trim() || null,
-          
-          emergency_contact: formData.emergencyContact.trim(),
-          emergency_phone: formData.emergencyPhone.trim(),
-          
-          medical_notes: formData.medicalNotes.trim() || null,
-          special_requirements: formData.specialRequirements.trim() || null,
+
+          dropoff_address: null,
+          dropoff_suburb: null,
+          dropoff_city: null,
+
+          parent_name: `${userProfile?.first_name || ''} ${userProfile?.last_name || ''}`.trim() || 'User',
+          parent_phone: userProfile?.phone || 'Not provided',
+          parent_email: userProfile?.email || null,
+
+          emergency_contact: `${userProfile?.first_name || ''} ${userProfile?.last_name || ''}`.trim() || 'User',
+          emergency_phone: userProfile?.phone || 'Not provided',
+
+          medical_notes: null,
+          special_requirements: null,
           additional_notes: formData.message.trim() || null,
-          
+
           status: 'pending',
           application_date: new Date().toISOString(),
         });
@@ -313,7 +301,7 @@ export default function TransportApplicationScreen() {
           }
         ]
       );
-      
+
     } catch (error: any) {
       console.error('Error submitting application:', error);
       Alert.alert(
@@ -366,19 +354,19 @@ export default function TransportApplicationScreen() {
   }
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
     >
-      <ScrollView 
+      <ScrollView
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTop}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.backButton}
               onPress={() => router.back()}
             >
@@ -394,7 +382,7 @@ export default function TransportApplicationScreen() {
               </View>
             </View>
           </View>
-          
+
           <View style={styles.userInfo}>
             <View style={styles.userAvatar}>
               <Text style={styles.userInitials}>
@@ -414,121 +402,7 @@ export default function TransportApplicationScreen() {
 
         {/* Form */}
         <View style={styles.formContainer}>
-          {/* Student Selection */}
-          {children.length > 0 && (
-            <View style={styles.formSection}>
-              <View style={styles.sectionHeader}>
-                <User size={20} color="#1ea2b1" />
-                <Text style={styles.sectionTitle}>Select Student</Text>
-              </View>
-              
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                style={styles.childrenContainer}
-              >
-                {children.map((child) => (
-                  <TouchableOpacity
-                    key={child.id}
-                    style={[
-                      styles.childCard,
-                      selectedChildId === child.id && styles.childCardSelected
-                    ]}
-                    onPress={() => handleChildSelect(child.id)}
-                  >
-                    <View style={styles.childAvatar}>
-                      <Text style={styles.childInitials}>
-                        {child.first_name?.[0]}{child.last_name?.[0]}
-                      </Text>
-                    </View>
-                    <Text style={styles.childName} numberOfLines={1}>
-                      {child.first_name} {child.last_name}
-                    </Text>
-                    <Text style={styles.childGrade}>
-                      {child.grade ? `Grade ${child.grade}` : 'Student'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                
-                <TouchableOpacity
-                  style={styles.addChildCard}
-                  onPress={handleAddNewChild}
-                >
-                  <View style={styles.addChildIcon}>
-                    <Text style={styles.addChildPlus}>+</Text>
-                  </View>
-                  <Text style={styles.addChildText}>Add New</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          )}
 
-          {/* Student Information */}
-          <View style={styles.formSection}>
-            <View style={styles.sectionHeader}>
-              <User size={20} color="#1ea2b1" />
-              <Text style={styles.sectionTitle}>Student Information</Text>
-            </View>
-            
-            <View style={styles.formRow}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Full Name *</Text>
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Student's full name"
-                    placeholderTextColor="#666666"
-                    value={formData.studentName}
-                    onChangeText={(text) => handleInputChange('studentName', text)}
-                  />
-                </View>
-              </View>
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Grade/Class</Text>
-                <View style={styles.inputContainer}>
-                  <School size={16} color="#888888" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g., Grade 8"
-                    placeholderTextColor="#666666"
-                    value={formData.studentGrade}
-                    onChangeText={(text) => handleInputChange('studentGrade', text)}
-                  />
-                </View>
-              </View>
-            </View>
-            
-            <View style={styles.formRow}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Age</Text>
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g., 14"
-                    placeholderTextColor="#666666"
-                    value={formData.studentAge}
-                    onChangeText={(text) => handleInputChange('studentAge', text)}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Pickup Time Preference</Text>
-                <View style={styles.inputContainer}>
-                  <Clock size={16} color="#888888" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g., 7:00 AM"
-                    placeholderTextColor="#666666"
-                    value={formData.pickupTimePreference}
-                    onChangeText={(text) => handleInputChange('pickupTimePreference', text)}
-                  />
-                </View>
-              </View>
-            </View>
-          </View>
 
           {/* Pickup Information */}
           <View style={styles.formSection}>
@@ -536,7 +410,7 @@ export default function TransportApplicationScreen() {
               <MapPin size={20} color="#1ea2b1" />
               <Text style={styles.sectionTitle}>Pickup Location *</Text>
             </View>
-            
+
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Street Address</Text>
               <View style={styles.inputContainer}>
@@ -550,7 +424,7 @@ export default function TransportApplicationScreen() {
                 />
               </View>
             </View>
-            
+
             <View style={styles.formRow}>
               <View style={[styles.inputGroup, { flex: 1 }]}>
                 <Text style={styles.inputLabel}>Suburb</Text>
@@ -564,7 +438,7 @@ export default function TransportApplicationScreen() {
                   />
                 </View>
               </View>
-              
+
               <View style={[styles.inputGroup, { flex: 1 }]}>
                 <Text style={styles.inputLabel}>City *</Text>
                 <View style={styles.inputContainer}>
@@ -580,176 +454,10 @@ export default function TransportApplicationScreen() {
             </View>
           </View>
 
-          {/* Dropoff Information */}
-          <View style={styles.formSection}>
-            <View style={styles.sectionHeader}>
-              <School size={20} color="#1ea2b1" />
-              <Text style={styles.sectionTitle}>Dropoff Location</Text>
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>School/Institution</Text>
-              <View style={styles.inputContainer}>
-                <School size={16} color="#888888" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder={transportName || 'School Name'}
-                  placeholderTextColor="#666666"
-                  value={formData.dropoffAddress}
-                  onChangeText={(text) => handleInputChange('dropoffAddress', text)}
-                />
-              </View>
-            </View>
-            
-            <View style={styles.formRow}>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.inputLabel}>Area</Text>
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder={schoolArea || 'School Area'}
-                    placeholderTextColor="#666666"
-                    value={formData.dropoffCity}
-                    onChangeText={(text) => handleInputChange('dropoffCity', text)}
-                  />
-                </View>
-              </View>
-            </View>
-          </View>
 
-          {/* Parent/Guardian Information */}
           <View style={styles.formSection}>
-            <View style={styles.sectionHeader}>
-              <User size={20} color="#1ea2b1" />
-              <Text style={styles.sectionTitle}>Parent/Guardian Details</Text>
-            </View>
-            
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Full Name</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Parent/Guardian name"
-                  placeholderTextColor="#666666"
-                  value={formData.parentName}
-                  onChangeText={(text) => handleInputChange('parentName', text)}
-                />
-              </View>
-            </View>
-            
-            <View style={styles.formRow}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Phone Number *</Text>
-                <View style={styles.inputContainer}>
-                  <Phone size={16} color="#888888" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="072 123 4567"
-                    placeholderTextColor="#666666"
-                    value={formData.parentPhone}
-                    onChangeText={(text) => handleInputChange('parentPhone', text)}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-              </View>
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Email</Text>
-                <View style={styles.inputContainer}>
-                  <Mail size={16} color="#888888" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="parent@email.com"
-                    placeholderTextColor="#666666"
-                    value={formData.parentEmail}
-                    onChangeText={(text) => handleInputChange('parentEmail', text)}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Emergency Contact */}
-          <View style={styles.formSection}>
-            <View style={styles.sectionHeader}>
-              <AlertCircle size={20} color="#1ea2b1" />
-              <Text style={styles.sectionTitle}>Emergency Contact *</Text>
-            </View>
-            
-            <View style={styles.formRow}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Contact Name</Text>
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Emergency contact "
-                    placeholderTextColor="#666666"
-                    value={formData.emergencyContact}
-                    onChangeText={(text) => handleInputChange('emergencyContact', text)}
-                  />
-                </View>
-              </View>
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Phone Number *</Text>
-                <View style={styles.inputContainer}>
-                  <Phone size={16} color="#888888" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="083 123 4567"
-                    placeholderTextColor="#666666"
-                    value={formData.emergencyPhone}
-                    onChangeText={(text) => handleInputChange('emergencyPhone', text)}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Special Information */}
-          <View style={styles.formSection}>
-            <View style={styles.sectionHeader}>
-              <MessageSquare size={20} color="#1ea2b1" />
-              <Text style={styles.sectionTitle}>Special Information</Text>
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Medical Notes/Allergies</Text>
-              <View style={[styles.inputContainer, styles.textAreaContainer]}>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="Any medical conditions, allergies, or special medical needs..."
-                  placeholderTextColor="#666666"
-                  value={formData.medicalNotes}
-                  onChangeText={(text) => handleInputChange('medicalNotes', text)}
-                  multiline
-                  numberOfLines={3}
-                  textAlignVertical="top"
-                />
-              </View>
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Special Requirements</Text>
-              <View style={[styles.inputContainer, styles.textAreaContainer]}>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="Any special requirements for the driver..."
-                  placeholderTextColor="#666666"
-                  value={formData.specialRequirements}
-                  onChangeText={(text) => handleInputChange('specialRequirements', text)}
-                  multiline
-                  numberOfLines={3}
-                  textAlignVertical="top"
-                />
-              </View>
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Additional Notes</Text>
+              <Text style={styles.inputLabel}>Message to Driver / Additional Info (Optional)</Text>
               <View style={[styles.inputContainer, styles.textAreaContainer]}>
                 <TextInput
                   style={[styles.input, styles.textArea]}
