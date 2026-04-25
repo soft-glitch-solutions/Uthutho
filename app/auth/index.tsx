@@ -195,7 +195,6 @@ const handleGoogleSignIn = async () => {
         // Check if we got tokens
         if (queryParams?.access_token) {
           // Set the session directly
-          setStatus('Setting up session...');
           const { error: sessionError } = await supabase.auth.setSession({
             access_token: queryParams.access_token as string,
             refresh_token: queryParams.refresh_token as string,
