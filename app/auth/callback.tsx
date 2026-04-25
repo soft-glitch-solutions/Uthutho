@@ -1,7 +1,8 @@
 // app/auth/callback.tsx
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, ActivityIndicator, StyleSheet, Linking } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import * as Linking from 'expo-linking';
 import { supabase } from '../../lib/supabase';
 
 export default function AuthCallback() {

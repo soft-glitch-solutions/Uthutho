@@ -44,7 +44,7 @@ export default function SchoolTransportScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
-  
+
   // State
   const [transports, setTransports] = useState<SchoolTransport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +104,7 @@ export default function SchoolTransportScreen() {
 
       const driverIds = transportsData.map(t => t.driver_id).filter(id => id) as string[];
       let driversMap = new Map();
-      
+
       if (driverIds.length > 0) {
         const { data: driversData, error: driversError } = await supabase
           .from('drivers')
@@ -154,7 +154,7 @@ export default function SchoolTransportScreen() {
           driver: driverData
         };
       }).filter(Boolean) as SchoolTransport[];
-      
+
       setTransports(formattedData);
     } catch (error: any) {
       console.error('Error fetching transports:', error);
@@ -176,7 +176,7 @@ export default function SchoolTransportScreen() {
       setShowStatusModal(true);
       return;
     }
-    
+
     const transport = transports.find(t => t.id === transportId);
     if (!transport) return;
 
@@ -263,7 +263,7 @@ export default function SchoolTransportScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView 
+      <ScrollView
         stickyHeaderIndices={[1]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -297,7 +297,7 @@ export default function SchoolTransportScreen() {
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.filterIcon, { backgroundColor: colors.primary }]}
               onPress={() => setShowFilters(true)}
             >
@@ -306,30 +306,6 @@ export default function SchoolTransportScreen() {
           </View>
         </View>
 
-        {/* Stats Section */}
-        <View style={styles.statsWrapper}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsContent}>
-            <View style={[styles.statPill, { backgroundColor: `${colors.primary}15`, borderColor: `${colors.primary}30` }]}>
-              <Car size={14} color={colors.primary} />
-              <Text style={[styles.statValue, { color: colors.text }]}>{transports.length}</Text>
-              <Text style={[styles.statLabel, { color: colors.text }]}>Services</Text>
-            </View>
-            <View style={[styles.statPill, { backgroundColor: '#10B98115', borderColor: '#10B98130' }]}>
-              <CheckCircle2 size={14} color="#10B981" />
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                {transports.filter(t => t.is_verified).length}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.text }]}>Verified</Text>
-            </View>
-            <View style={[styles.statPill, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B30' }]}>
-              <Users size={14} color="#F59E0B" />
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                {transports.reduce((sum, t) => sum + t.current_riders, 0)}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.text }]}>Students</Text>
-            </View>
-          </ScrollView>
-        </View>
 
         {/* Content */}
         <View style={styles.content}>

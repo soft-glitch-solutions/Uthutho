@@ -9,9 +9,9 @@ import {
   Alert,
   Image,
   Platform,
-  Linking,
   Dimensions,
 } from 'react-native';
+import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
