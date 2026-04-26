@@ -695,7 +695,6 @@ export default function FeedsScreen() {
     }
   }, [selectedCommunity, postFilter]);
 
-  // Render post creation based on preview mode
   const renderPostCreation = () => {
     if (previewMode && !isFollowingPreview) {
       return (
@@ -721,6 +720,30 @@ export default function FeedsScreen() {
     }
 
     return null;
+  };
+
+  const renderMobileHeader = () => {
+    return (
+      <View>
+        <View style={{ height: 320 }} />
+        <CommunityTabs
+          communities={communities}
+          selectedCommunity={selectedCommunity}
+          setSelectedCommunity={setSelectedCommunity}
+          followerCounts={{}}
+          isDesktop={false}
+        />
+        {weekRange && (
+          <WeekRangeHeader
+            weekRange={weekRange}
+            postFilter={postFilter}
+            setPostFilter={setPostFilter}
+            isDesktop={false}
+          />
+        )}
+        {renderPostCreation()}
+      </View>
+    );
   };
 
   // Show loading state
@@ -877,37 +900,22 @@ export default function FeedsScreen() {
       ) : (
         // Mobile layout
         <>
-          <Header
-            unreadNotifications={unreadNotifications}
-            router={router}
-            selectedCommunity={selectedCommunity}
-            isFollowing={previewMode ? isFollowingPreview : communities.some(c => c.id === selectedCommunity?.id)}
-            onFollow={previewMode ? followPreviewCommunity : (selectedCommunity ? () => toggleFavorite(selectedCommunity.id) : undefined)}
-            onUnfollow={previewMode ? unfollowPreviewCommunity : (selectedCommunity ? () => toggleFavorite(selectedCommunity.id) : undefined)}
-            postCount={posts.length}
-            scrollY={scrollY}
-            reactionCount={posts.reduce((acc, p) => acc + (p.post_reactions?.length || 0), 0)}
-            isDesktop={isDesktop}
-          />
-
-          <CommunityTabs
-            communities={communities}
-            selectedCommunity={selectedCommunity}
-            setSelectedCommunity={setSelectedCommunity}
-            followerCounts={{}}
-            isDesktop={false}
-          />
-
-          {weekRange && (
-            <WeekRangeHeader
-              weekRange={weekRange}
-              postFilter={postFilter}
-              setPostFilter={setPostFilter}
-              isDesktop={false}
+          <View style={styles.mobileHeaderWrapper}>
+            <Header
+              unreadNotifications={unreadNotifications}
+              router={router}
+              selectedCommunity={selectedCommunity}
+              isFollowing={previewMode ? isFollowingPreview : communities.some(c => c.id === selectedCommunity?.id)}
+              onFollow={previewMode ? followPreviewCommunity : (selectedCommunity ? () => toggleFavorite(selectedCommunity.id) : undefined)}
+              onUnfollow={previewMode ? unfollowPreviewCommunity : (selectedCommunity ? () => toggleFavorite(selectedCommunity.id) : undefined)}
+              postCount={posts.length}
+              scrollY={scrollY}
+              reactionCount={posts.reduce((acc, p) => acc + (p.post_reactions?.length || 0), 0)}
+              isDesktop={isDesktop}
             />
-          )}
+          </View>
 
-          <FlatList
+          <Animated.FlatList
             data={posts}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
@@ -926,7 +934,7 @@ export default function FeedsScreen() {
                 isDesktop={false}
               />
             )}
-            ListHeaderComponent={renderPostCreation()}
+            ListHeaderComponent={renderMobileHeader()}
             ListEmptyComponent={
               <EmptyPosts
                 title={
@@ -951,12 +959,18 @@ export default function FeedsScreen() {
                 onRefresh={onRefresh}
                 tintColor="#1ea2b1"
                 colors={['#1ea2b1']}
+                progressViewOffset={selectedCommunity ? 320 : 0}
               />
             }
             contentContainerStyle={[
               styles.postsListContent,
               previewMode && styles.previewContent,
             ]}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+              { useNativeDriver: false }
+            )}
+            scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
           />
         </>
@@ -1027,6 +1041,13 @@ const styles = StyleSheet.create({
   },
   desktopPostsContent: {
     paddingBottom: 40,
+  },
+  mobileHeaderWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
   communityStats: {
     backgroundColor: '#111111',

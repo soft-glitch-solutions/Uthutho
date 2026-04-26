@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Search, MapPin, Users, Clock, Star, Shield, Car, School, Filter, ArrowLeft, CheckCircle2 } from 'lucide-react-native';
@@ -7,9 +7,11 @@ import { useAuth } from '@/hook/useAuth';
 import { useTheme } from '@/context/ThemeContext';
 
 import SchoolTransportCard from '@/components/school-transport/SchoolTransportCard';
+import SchoolTransportGridCard from '@/components/school-transport/SchoolTransportGridCard';
 import TransportFilters from '@/components/school-transport/TransportFilters';
 import ApplyModal from '@/components/modals/ApplyModal';
 import StatusModal from '@/components/modals/StatusModal';
+import { Animated, Platform, Image } from 'react-native';
 
 interface SchoolTransport {
   id: string;
@@ -44,6 +46,11 @@ export default function SchoolTransportScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
+
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const HEADER_MAX_HEIGHT = 160;
+  const HEADER_MIN_HEIGHT = Platform.OS === 'ios' ? 100 : 80;
+  const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
 
   // State
   const [transports, setTransports] = useState<SchoolTransport[]>([]);
@@ -254,64 +261,105 @@ export default function SchoolTransportScreen() {
   });
 
   const renderSkeleton = () => (
-    <View style={styles.skeletonContainer}>
-      {[1, 2, 3].map(i => (
-        <View key={i} style={[styles.skeletonCard, { backgroundColor: colors.card, borderColor: colors.border }]} />
+    <View style={styles.skeletonGrid}>
+      {[1, 2, 3, 4].map(i => (
+        <View key={i} style={[styles.skeletonGridCard, { backgroundColor: colors.card, borderColor: colors.border }]} />
       ))}
     </View>
   );
 
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
-        stickyHeaderIndices={[1]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
+  const headerImageHeight = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE],
+    outputRange: [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT],
+    extrapolate: 'clamp',
+  });
+
+  const imageOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE / 2, HEADER_SCROLL_DISTANCE],
+    outputRange: [1, 0.5, 0],
+    extrapolate: 'clamp',
+  });
+
+  const headerTitleScale = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE],
+    outputRange: [1, 0.75],
+    extrapolate: 'clamp',
+  });
+
+  const headerTitleTranslateY = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE],
+    outputRange: [0, -10],
+    extrapolate: 'clamp',
+  });
+
+  const renderHeader = () => (
+    <View>
+      <View style={{ height: HEADER_MAX_HEIGHT - 30 }} />
+      <View style={[styles.searchWrapper, { backgroundColor: colors.background }]}>
+        <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Search size={18} color={colors.primary} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search schools or areas..."
+            placeholderTextColor="#888"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
-        }
-      >
-        {/* Hero Header */}
-        <View style={styles.heroSection}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeft size={24} color={colors.text} />
+          <TouchableOpacity
+            style={[styles.filterIcon, { backgroundColor: colors.primary }]}
+            onPress={() => setShowFilters(true)}
+          >
+            <Filter size={18} color="#FFF" />
           </TouchableOpacity>
-          <Text style={[styles.heroTitle, { color: colors.text }]}>School Transport</Text>
-          <Text style={[styles.heroSubtitle, { color: colors.text, opacity: 0.6 }]}>
-            Safe and reliable journeys for your children
-          </Text>
         </View>
+      </View>
+      {loading && renderSkeleton()}
+    </View>
+  );
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Animated Header */}
+      <Animated.View style={[styles.imageHeader, { height: headerImageHeight, backgroundColor: colors.background }]}>
+        <Animated.Image
+          source={require('@/assets/images/school-transport.jpg')}
+          style={[styles.headerImage, { opacity: imageOpacity }]}
+          resizeMode="cover"
+        />
+        <View style={styles.imageOverlay} />
 
-        {/* Search Bar (Sticky) */}
-        <View style={[styles.searchWrapper, { backgroundColor: colors.background }]}>
-          <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Search size={18} color={colors.primary} />
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Search schools or areas..."
-              placeholderTextColor="#888"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            <TouchableOpacity
-              style={[styles.filterIcon, { backgroundColor: colors.primary }]}
-              onPress={() => setShowFilters(true)}
-            >
-              <Filter size={18} color="#FFF" />
-            </TouchableOpacity>
-          </View>
+        <View style={styles.headerContent}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ArrowLeft size={24} color="#FFF" />
+          </TouchableOpacity>
+
+          <Animated.View style={{
+            transform: [
+              { scale: headerTitleScale },
+              { translateY: headerTitleTranslateY }
+            ]
+          }}>
+            <Text style={styles.heroTitle}>School Transport</Text>
+            <Animated.Text style={[styles.heroSubtitle, { opacity: imageOpacity }]}>
+              Safe and reliable journeys for your children
+            </Animated.Text>
+          </Animated.View>
         </View>
+      </Animated.View>
 
-
-        {/* Content */}
-        <View style={styles.content}>
-          {loading ? (
-            renderSkeleton()
-          ) : filteredTransports.length === 0 ? (
+      <Animated.FlatList
+        data={filteredTransports}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.columnWrapper}
+        renderItem={({ item }) => (
+          <SchoolTransportGridCard
+            transport={item}
+            onViewDetails={() => router.push(`/school-transport/${item.id}`)}
+          />
+        )}
+        ListHeaderComponent={renderHeader()}
+        ListEmptyComponent={
+          !loading ? (
             <View style={styles.emptyState}>
               <School size={64} color={colors.border} />
               <Text style={[styles.emptyTitle, { color: colors.text }]}>No services found</Text>
@@ -322,18 +370,25 @@ export default function SchoolTransportScreen() {
                 <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>Become a Driver</Text>
               </TouchableOpacity>
             </View>
-          ) : (
-            filteredTransports.map((transport) => (
-              <SchoolTransportCard
-                key={transport.id}
-                transport={transport}
-                onApply={() => handleApply(transport.id)}
-                onViewDetails={() => router.push(`/school-transport/${transport.id}`)}
-              />
-            ))
-          )}
-        </View>
-      </ScrollView>
+          ) : null
+        }
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressViewOffset={HEADER_MAX_HEIGHT}
+          />
+        }
+        contentContainerStyle={styles.flatListContent}
+        showsVerticalScrollIndicator={false}
+      />
 
       <TransportFilters
         visible={showFilters}
@@ -356,7 +411,7 @@ export default function SchoolTransportScreen() {
         message={modalStatus.message}
         onClose={() => setShowStatusModal(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -364,33 +419,53 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  heroSection: {
-    padding: 24,
-    paddingTop: 12,
+  imageHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
+    zIndex: 10,
+  },
+  headerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  headerContent: {
+    position: 'absolute',
+    bottom: 20,
+    left: 24,
+    right: 24,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
-    marginLeft: -10,
+    marginBottom: 16,
   },
   heroTitle: {
-    fontSize: 34,
+    fontSize: 28,
     fontWeight: '800',
-    letterSpacing: -1,
+    color: '#FFF',
+    letterSpacing: -0.5,
   },
   heroSubtitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
+    color: 'rgba(255,255,255,0.8)',
     marginTop: 4,
   },
   searchWrapper: {
     paddingHorizontal: 24,
     paddingBottom: 16,
-    paddingTop: 8,
+    paddingTop: 20,
   },
   searchBar: {
     flexDirection: 'row',
@@ -413,38 +488,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  statsWrapper: {
-    marginBottom: 20,
-  },
-  statsContent: {
+  columnWrapper: {
+    justifyContent: 'space-between',
     paddingHorizontal: 24,
-    gap: 12,
   },
-  statPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 8,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    opacity: 0.6,
-  },
-  content: {
-    paddingHorizontal: 24,
+  flatListContent: {
     paddingBottom: 40,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 80,
+    paddingVertical: 60,
+    paddingHorizontal: 24,
   },
   emptyTitle: {
     fontSize: 20,
@@ -467,12 +521,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14,
   },
-  skeletonContainer: {
-    gap: 16,
+  skeletonGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 24,
+    justifyContent: 'space-between',
   },
-  skeletonCard: {
-    height: 180,
-    borderRadius: 24,
+  skeletonGridCard: {
+    width: '48%',
+    height: 200,
+    borderRadius: 20,
     borderWidth: 1,
+    marginBottom: 16,
   },
 });

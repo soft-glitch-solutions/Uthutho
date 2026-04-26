@@ -36,15 +36,15 @@ export default function TransportDetailsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
-  
+
   const scrollY = useRef(new Animated.Value(0)).current;
-  
+
   const [transport, setTransport] = useState<SchoolTransport | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
-  
+
   const [statusModal, setStatusModal] = useState<{
     visible: boolean;
     type: 'success' | 'error' | 'warning' | 'info' | 'loading';
@@ -67,12 +67,12 @@ export default function TransportDetailsScreen() {
     setLoading(true);
     const data = await fetchTransportDetails(id as string);
     setTransport(data);
-    
+
     if (user && data) {
       const applied = await checkIfApplied(data.id, user.id);
       setHasApplied(applied);
     }
-    
+
     setLoading(false);
   };
 
@@ -83,7 +83,7 @@ export default function TransportDetailsScreen() {
 
   const handleApply = () => {
     if (!transport) return;
-    
+
     if (transport.current_riders >= transport.capacity) {
       setStatusModal({
         visible: true,
@@ -106,7 +106,7 @@ export default function TransportDetailsScreen() {
 
     router.push({
       pathname: '/transport-application',
-      params: { 
+      params: {
         transportId: transport.id,
         driverId: transport.driver.id,
         transportName: transport.school_name,
@@ -160,8 +160,8 @@ export default function TransportDetailsScreen() {
 
   const handleOpenMaps = (area: string) => {
     const encodedArea = encodeURIComponent(area);
-    const url = Platform.OS === 'ios' 
-      ? `maps://0,0?q=${encodedArea}` 
+    const url = Platform.OS === 'ios'
+      ? `maps://0,0?q=${encodedArea}`
       : `geo:0,0?q=${encodedArea}`;
     Linking.openURL(url).catch(() => {
       setStatusModal({
@@ -199,7 +199,7 @@ export default function TransportDetailsScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.headerSpacer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.backButton, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => router.back()}
           >
@@ -214,7 +214,7 @@ export default function TransportDetailsScreen() {
           <Text style={[styles.emptyMessage, { color: colors.text }]}>
             The transport service you're looking for doesn't exist or has been removed.
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.emptyButton, { backgroundColor: colors.primary }]}
             onPress={() => router.back()}
           >
@@ -228,22 +228,22 @@ export default function TransportDetailsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Animated.View style={[styles.imageHeader, { height: headerImageHeight }]}>
-        <Animated.Image 
-          source={require('@/assets/images/school-header.png')}
+        <Animated.Image
+          source={require('@/assets/images/school-header.jpg')}
           style={[styles.headerImage, { opacity: imageOpacity, transform: [{ scale: imageScale }] }]}
         />
         <View style={styles.imageOverlay} />
         <TransportInfoHeader transport={transport} scrollY={scrollY} />
       </Animated.View>
 
-      <TransportHeader 
+      <TransportHeader
         transport={transport}
         onBack={() => router.back()}
         onShare={handleShare}
         scrollY={scrollY}
       />
 
-      <Animated.ScrollView 
+      <Animated.ScrollView
         scrollEventThrottle={16}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -271,8 +271,8 @@ export default function TransportDetailsScreen() {
                 <Info size={18} color={colors.primary} />
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>About Service</Text>
               </View>
-              <Text 
-                style={[styles.description, { color: colors.text }]} 
+              <Text
+                style={[styles.description, { color: colors.text }]}
                 numberOfLines={showFullDescription ? undefined : 4}
               >
                 {transport.description}
@@ -288,7 +288,7 @@ export default function TransportDetailsScreen() {
           )}
 
           {transport.pickup_areas.length > 0 && (
-            <PickupAreas 
+            <PickupAreas
               areas={transport.pickup_areas}
               onOpenMaps={handleOpenMaps}
             />
@@ -308,7 +308,7 @@ export default function TransportDetailsScreen() {
             </Text>
           </View>
 
-          <DriverInfo 
+          <DriverInfo
             transport={transport}
             onViewProfile={() => router.push(`/driver/${transport.driver.id}`)}
             onMessage={handleMessageDriver}
@@ -319,7 +319,7 @@ export default function TransportDetailsScreen() {
         </View>
       </Animated.ScrollView>
 
-      <ApplyButton 
+      <ApplyButton
         transport={transport}
         hasApplied={hasApplied}
         onApply={handleApply}
@@ -453,4 +453,4 @@ const styles = StyleSheet.create({
   footerSpacer: {
     height: 120,
   },
-});
+});

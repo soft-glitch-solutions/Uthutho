@@ -120,6 +120,33 @@ export default function Auth() {
 
   const layoutConfig = getLayoutConfig();
 
+  const AuthTabs = () => (
+    <View style={styles.tabContainer}>
+      <TouchableOpacity
+        style={[styles.authTab, isLogin && styles.activeAuthTab]}
+        onPress={() => {
+          setIsLogin(true);
+          setShowForgotPassword(false);
+          setErrorMessage(null);
+        }}
+      >
+        <Text style={[styles.authTabText, isLogin && styles.activeAuthTabText]}>Sign In</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.authTab, !isLogin && !showForgotPassword && styles.activeAuthTab]}
+        onPress={() => {
+          setIsLogin(false);
+          setShowForgotPassword(false);
+          setErrorMessage(null);
+          setAcceptedTerms(false);
+          setAcceptedPrivacy(false);
+        }}
+      >
+        <Text style={[styles.authTabText, !isLogin && !showForgotPassword && styles.activeAuthTabText]}>Sign Up</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const handleOpenLink = async (url: string) => {
     try {
       await Linking.openURL(url);
@@ -655,6 +682,8 @@ const handleFacebookSignIn = async () => {
         </Text>
       </View>
 
+      {!showForgotPassword && <AuthTabs />}
+
       {errorMessage && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{errorMessage}</Text>
@@ -1181,4 +1210,31 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
-});
+  // Auth Tabs Styles
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#1a1a1a',
+    borderRadius: isDesktop ? 12 : scale(15),
+    padding: isDesktop ? 4 : scale(5),
+    marginBottom: isDesktop ? 20 : scale(25),
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  authTab: {
+    flex: 1,
+    paddingVertical: isDesktop ? 10 : scale(12),
+    alignItems: 'center',
+    borderRadius: isDesktop ? 8 : scale(10),
+  },
+  activeAuthTab: {
+    backgroundColor: '#1ea2b1',
+  },
+  authTabText: {
+    fontSize: isDesktop ? 14 : scale(14),
+    fontWeight: '600',
+    color: '#666',
+  },
+  activeAuthTabText: {
+    color: '#ffffff',
+  },
+});
