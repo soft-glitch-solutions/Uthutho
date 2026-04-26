@@ -678,50 +678,48 @@ export default function ProfileScreen() {
                 profile={profile}
                 uploading={uploading}
                 onImagePicker={handleImagePicker}
-                accountsLoading={accountsLoading}
-                linkedAccounts={linkedAccounts}
                 isDesktop={isDesktop}
               />
 
               {/* Tabs */}
-              <View style={[styles.tabs, isDesktop && styles.tabsDesktop]}>
+              <View style={styles.tabs}>
                 <TouchableOpacity
-                  style={[styles.tab, isDesktop && styles.tabDesktop, selectedTab === 'posts' && styles.activeTab]}
+                  style={[styles.tab, selectedTab === 'posts' && styles.activeTab]}
                   onPress={() => setSelectedTab('posts')}
                 >
-                  <Text style={[styles.tabText, isDesktop && styles.tabTextDesktop, selectedTab === 'posts' && styles.activeTabText]}>
+                  <Text style={[styles.tabText, selectedTab === 'posts' && styles.activeTabText]}>
                     Posts
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.tab, isDesktop && styles.tabDesktop, selectedTab === 'basic-info' && styles.activeTab]}
+                  style={[styles.tab, selectedTab === 'basic-info' && styles.activeTab]}
                   onPress={() => setSelectedTab('basic-info')}
                 >
-                  <Text style={[styles.tabText, isDesktop && styles.tabTextDesktop, selectedTab === 'basic-info' && styles.activeTabText]}>
+                  <Text style={[styles.tabText, selectedTab === 'basic-info' && styles.activeTabText]}>
                     Basic Info
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.tab, isDesktop && styles.tabDesktop, selectedTab === 'achievements' && styles.activeTab]}
+                  style={[styles.tab, selectedTab === 'achievements' && styles.activeTab]}
                   onPress={() => setSelectedTab('achievements')}
                 >
-                  <Text style={[styles.tabText, isDesktop && styles.tabTextDesktop, selectedTab === 'achievements' && styles.activeTabText]}>
+                  <Text style={[styles.tabText, selectedTab === 'achievements' && styles.activeTabText]}>
                     Awards
                   </Text>
                 </TouchableOpacity>
               </View>
 
               {/* Tab Content */}
-              <View style={[styles.tabContent, isDesktop && styles.tabContentDesktop]}>
+              <View style={styles.tabContent}>
                 {renderTabContent()}
               </View>
 
               {/* App Info */}
-              <View style={[styles.appInfo, isDesktop && styles.appInfoDesktop]}>
-                <Text style={[styles.appInfoText, isDesktop && styles.appInfoTextDesktop]}>
+              <View style={styles.appInfo}>
+                <Text style={styles.appInfoText}>
                   Uthutho v1.8.2
                 </Text>
-                <Text style={[styles.motto, isDesktop && styles.mottoDesktop]}>
+                <Text style={styles.motto}>
                   "Izindlela zakho ziqinisekisa impumelelo!"
                 </Text>
               </View>
@@ -736,8 +734,6 @@ export default function ProfileScreen() {
               profile={profile}
               uploading={uploading}
               onImagePicker={handleImagePicker}
-              accountsLoading={accountsLoading}
-              linkedAccounts={linkedAccounts}
               isDesktop={false}
             />
 
@@ -802,101 +798,67 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
-    width: '100%',
   },
   contentContainer: {
-    flexGrow: 1,
-    backgroundColor: '#000000',
-    width: '100%',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 40,
   },
   contentContainerDesktop: {
-    minHeight: '100vh',
-    alignItems: 'center',
+    paddingTop: 60,
   },
   desktopWrapper: {
+    alignItems: 'center',
     width: '100%',
-    backgroundColor: '#000000',
-    flex: 1,
   },
   desktopContentWrapper: {
-    maxWidth: 800,
     width: '100%',
-    alignSelf: 'center',
-    backgroundColor: '#000000',
-    paddingHorizontal: 24,
+    maxWidth: 800,
   },
   tabs: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 20,
-    backgroundColor: '#000000',
-    width: '100%',
-  },
-  tabsDesktop: {
-    marginVertical: 24,
-    justifyContent: 'flex-start',
-    gap: 32,
-    paddingHorizontal: 0,
-    backgroundColor: '#000000',
+    paddingHorizontal: 24,
+    marginBottom: 24,
+    gap: 12,
   },
   tab: {
-    padding: 10,
-    borderRadius: 10,
-    backgroundColor: 'transparent',
-  },
-  tabDesktop: {
-    padding: 12,
-    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#1ea2b1',
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    borderColor: '#1ea2b1',
   },
   tabText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  tabTextDesktop: {
-    fontSize: 15,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#888',
   },
   activeTabText: {
     color: '#1ea2b1',
   },
   tabContent: {
-    backgroundColor: '#000000',
-    width: '100%',
-  },
-  tabContentDesktop: {
-    paddingHorizontal: 0,
+    paddingHorizontal: 24,
   },
   appInfo: {
+    marginTop: 60,
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginTop: 20,
-    marginBottom: 40,
-    backgroundColor: '#000000',
-    width: '100%',
-  },
-  appInfoDesktop: {
-    marginTop: 32,
-    marginBottom: 20,
+    paddingBottom: 40,
+    opacity: 0.5,
   },
   appInfoText: {
-    fontSize: 14,
-    marginBottom: 8,
-    color: '#CCCCCC',
-  },
-  appInfoTextDesktop: {
-    fontSize: 13,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFF',
+    letterSpacing: 1,
   },
   motto: {
-    fontSize: 14,
+    fontSize: 12,
+    color: '#FFF',
+    marginTop: 4,
     fontStyle: 'italic',
-    textAlign: 'center',
-    color: '#1ea2b1',
-  },
-  mottoDesktop: {
-    fontSize: 13,
   },
 });

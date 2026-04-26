@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, ActivityIndicator, StyleSheet } from 'react-native';
-import { Camera } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, Image, ActivityIndicator, StyleSheet, Dimensions } from 'react-native';
+import { Camera, User, Settings } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
-import { LinkedAccountsBadge } from './LinkedAccountsBadge';
-import { Shimmer } from './SkeletonComponents';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 interface ProfileHeaderProps {
   loading: boolean;
@@ -20,351 +21,216 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   profile,
   uploading,
   onImagePicker,
-  accountsLoading,
-  linkedAccounts,
   isDesktop = false
 }) => {
   const { colors } = useTheme();
 
-  // Function to get user's initial
-  const getUserInitial = () => {
-    if (!profile?.first_name) return 'U';
-    
-    const firstName = profile.first_name.trim();
-    if (firstName.length > 0) {
-      return firstName.charAt(0).toUpperCase();
-    }
-    return 'U';
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
   };
-
-  // Function to generate a color based on the user's initial
-  const getInitialColor = (initial: string) => {
-    // Create a consistent color based on the character
-    const colorsList = [
-      '#1ea2b1', // Teal
-      '#10b981', // Green
-      '#f59e0b', // Amber
-      '#ef4444', // Red
-      '#8b5cf6', // Violet
-      '#ec4899', // Pink
-      '#06b6d4', // Cyan
-      '#84cc16', // Lime
-    ];
-    
-    // Use charCode to get a consistent index
-    const index = initial.charCodeAt(0) % colorsList.length;
-    return colorsList[index];
-  };
-
-  // Check if we should show the initial avatar
-  const shouldShowInitial = !profile?.avatar_url || profile.avatar_url === '';
 
   const renderAvatar = () => {
-    if (shouldShowInitial) {
-      const initial = getUserInitial();
-      const backgroundColor = getInitialColor(initial);
-      
+    if (loading) {
+      return <View style={[styles.avatarPlaceholder, { backgroundColor: colors.border }]} />;
+    }
+
+    if (!profile?.avatar_url) {
       return (
-        <View style={[
-          styles.avatar, 
-          isDesktop ? styles.avatarDesktop : {},
-          { backgroundColor }
-        ]}>
-          <Text style={[
-            styles.initialText,
-            isDesktop && styles.initialTextDesktop
-          ]}>
-            {initial}
-          </Text>
+        <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
+          <User size={20} color="#fff" />
         </View>
       );
     }
 
     return (
       <Image
-        source={{
-          uri: profile.avatar_url ||
-            'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=2080&auto=format&fit=crop',
-        }}
-        style={[styles.avatar, isDesktop && styles.avatarDesktop]}
+        source={{ uri: profile.avatar_url }}
+        style={styles.avatarImage}
       />
     );
   };
 
-  const renderLoadingAvatar = () => (
-    <Shimmer colors={colors} isDesktop={isDesktop}>
-      <View style={[
-        styles.avatar, 
-        isDesktop && styles.avatarDesktop, 
-        { backgroundColor: colors.border }
-      ]} />
-    </Shimmer>
-  );
-
-  if (isDesktop) {
-    return (
-      <View style={[styles.header, styles.headerDesktop]}>
-        {/* Linked Accounts Badge at the top */}
-        <View style={styles.desktopBadgeWrapper}>
-          <LinkedAccountsBadge 
-            loading={accountsLoading} 
-            accounts={linkedAccounts} 
-            colors={colors} 
-            isDesktop={isDesktop}
-          />
+  return (
+    <View style={[styles.container, isDesktop && styles.containerDesktop]}>
+      {/* Top Bar Branding */}
+      <View style={styles.topBar}>
+        <View style={styles.brandRow}>
+          <Text style={[styles.brandText, { color: colors.text }]}>Uthutho</Text>
         </View>
-
-        <View style={styles.desktopContent}>
-          {/* Avatar on the left */}
-          <TouchableOpacity
-            style={styles.desktopAvatarContainer}
+        
+        <View style={styles.topActions}>
+          <TouchableOpacity 
+            style={styles.avatarButton}
             onPress={onImagePicker}
             disabled={uploading}
           >
-            {loading ? (
-              renderLoadingAvatar()
-            ) : (
-              <>
-                {renderAvatar()}
-                <View style={[styles.cameraButton, styles.cameraButtonDesktop, { backgroundColor: colors.primary }]}>
-                  <Camera size={16} color="white" />
-                </View>
-                {uploading && (
-                  <View style={[styles.uploadingOverlay, styles.uploadingOverlayDesktop]}>
-                    <ActivityIndicator color="white" />
-                  </View>
-                )}
-              </>
-            )}
-          </TouchableOpacity>
-
-          {/* Text content on the right */}
-          <View style={styles.desktopTextContent}>
-            {loading ? (
-              <>
-                <Shimmer colors={colors} isDesktop={isDesktop}>
-                  <View style={[styles.skeletonName, styles.skeletonNameDesktop, { backgroundColor: colors.border }]} />
-                </Shimmer>
-                <Shimmer colors={colors} isDesktop={isDesktop}>
-                  <View style={[styles.skeletonTitle, styles.skeletonTitleDesktop, { backgroundColor: colors.border }]} />
-                </Shimmer>
-              </>
-            ) : (
-              <>
-                <Text style={[styles.name, styles.nameDesktop]}>
-                  {profile?.first_name} {profile?.last_name}
-                </Text>
-                <Text style={[styles.userTitle, styles.userTitleDesktop]}>
-                  {profile?.selected_title}
-                </Text>
-              </>
-            )}
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  // Mobile layout
-  return (
-    <View style={[styles.header, { backgroundColor: colors.card }]}>
-      <LinkedAccountsBadge 
-        loading={accountsLoading} 
-        accounts={linkedAccounts} 
-        colors={colors} 
-        isDesktop={isDesktop}
-      />
-
-      <TouchableOpacity
-        style={styles.avatarContainer}
-        onPress={onImagePicker}
-        disabled={uploading}
-      >
-        {loading ? (
-          renderLoadingAvatar()
-        ) : (
-          <>
             {renderAvatar()}
-            <View style={[styles.cameraButton, { backgroundColor: colors.primary }]}>
-              <Camera size={16} color="white" />
+            <View style={[styles.cameraBadge, { backgroundColor: colors.primary }]}>
+              <Camera size={10} color="white" />
             </View>
             {uploading && (
               <View style={styles.uploadingOverlay}>
-                <ActivityIndicator color="white" />
+                <ActivityIndicator size="small" color="white" />
               </View>
             )}
-          </>
-        )}
-      </TouchableOpacity>
-      
-      {loading ? (
-        <Shimmer colors={colors} isDesktop={isDesktop}>
-          <View style={[styles.skeletonName, { backgroundColor: colors.border }]} />
-        </Shimmer>
-      ) : (
-        <Text style={[styles.name, { color: colors.text }]}>
-          {profile?.first_name} {profile?.last_name}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Hero Typography Section */}
+      <View style={styles.heroSection}>
+        <Text style={[styles.readyText, { color: colors.primary }]}>
+          PROFILE OVERVIEW
         </Text>
-      )}
-      
-      {loading ? (
-        <Shimmer colors={colors} isDesktop={isDesktop}>
-          <View style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
-        </Shimmer>
-      ) : (
-        <Text style={[styles.userTitle, { color: colors.primary }]}>{profile?.selected_title}</Text>
-      )}
+
+        <Text style={[styles.greetingText, { color: colors.text }]}>
+          {getGreeting()} {profile?.first_name || 'Explorer'},
+        </Text>
+
+        <Text style={[styles.headingText, { color: colors.primary }]}>
+          {profile?.selected_title || 'shaping your journey.'}
+        </Text>
+        
+        <View style={[styles.statsBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: colors.text }]}>{profile?.points || 0}</Text>
+            <Text style={styles.statLabel}>POINTS</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: colors.text }]}>{profile?.level || 1}</Text>
+            <Text style={styles.statLabel}>LEVEL</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: colors.text }]}>
+              {profile?.identities?.length || 1}
+            </Text>
+            <Text style={styles.statLabel}>LINKS</Text>
+          </View>
+        </View>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  // Base styles (mobile)
-  header: {
-    padding: 20,
-    paddingTop: 30,
-    alignItems: 'center',
+  container: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
     backgroundColor: '#000000',
   },
-  avatarContainer: {
+  containerDesktop: {
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
+    paddingTop: 16,
+  },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  brandText: {
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -1,
+  },
+  topActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatarButton: {
     position: 'relative',
   },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 15,
+  avatarPlaceholder: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
   },
-  initialText: {
-    color: 'white',
-    fontSize: 36,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    lineHeight: 36,
+  avatarImage: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: '#333',
   },
-  initialTextDesktop: {
-    fontSize: 50,
-    lineHeight: 50,
-  },
-  cameraButton: {
+  cameraBadge: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#000000',
+    borderColor: '#000',
   },
   uploadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 50,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  name: {
+  heroSection: {
+    marginBottom: 24,
+  },
+  readyText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+  },
+  greetingText: {
+    fontSize: 24,
+    fontWeight: '400',
+    marginBottom: 2,
+    letterSpacing: -0.5,
+  },
+  headingText: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 5,
-    color: '#FFFFFF',
+    fontStyle: 'italic',
+    marginBottom: 28,
+    letterSpacing: -0.5,
   },
-  userTitle: {
-    fontSize: 16,
-    color: '#1ea2b1',
-  },
-  skeletonName: {
-    width: 200,
-    height: 30,
-    borderRadius: 4,
-    marginBottom: 10,
-    backgroundColor: '#333333',
-  },
-  skeletonTitle: {
-    width: 150,
-    height: 20,
-    borderRadius: 4,
-    backgroundColor: '#333333',
-  },
-
-  // Desktop styles
-  headerDesktop: {
-    paddingTop: 40,
-    paddingBottom: 32,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#333333',
-    marginBottom: 24,
-    backgroundColor: '#111111',
-    width: '100%',
-    maxWidth: 800,
-    alignSelf: 'center',
-  },
-  desktopBadgeWrapper: {
-    marginBottom: 24,
-    width: '100%',
-  },
-  desktopContent: {
+  statsBar: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 32,
-    width: '100%',
-  },
-  desktopAvatarContainer: {
-    position: 'relative',
-    flexShrink: 0,
-  },
-  avatarDesktop: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-  },
-  cameraButtonDesktop: {
-    width: 40,
-    height: 40,
+    alignItems: 'center',
+    padding: 16,
     borderRadius: 20,
-    bottom: 5,
-    right: 5,
-    borderWidth: 3,
-    borderColor: '#111111',
+    borderWidth: 1,
+    justifyContent: 'space-around',
   },
-  uploadingOverlayDesktop: {
-    borderRadius: 70,
+  statItem: {
+    alignItems: 'center',
   },
-  desktopTextContent: {
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 140,
-  },
-  nameDesktop: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#FFFFFF',
-    lineHeight: 34,
-  },
-  userTitleDesktop: {
+  statValue: {
     fontSize: 18,
-    color: '#1ea2b1',
-    marginBottom: 4,
+    fontWeight: '800',
   },
-  skeletonNameDesktop: {
-    width: 250,
-    height: 34,
-    borderRadius: 6,
-    marginBottom: 12,
-    backgroundColor: '#333333',
+  statLabel: {
+    fontSize: 10,
+    color: '#888',
+    fontWeight: '700',
+    marginTop: 2,
   },
-  skeletonTitleDesktop: {
-    width: 180,
-    height: 22,
-    borderRadius: 4,
-    backgroundColor: '#333333',
+  statDivider: {
+    width: 1,
+    height: 30,
   },
-});
+});

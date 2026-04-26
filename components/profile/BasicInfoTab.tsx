@@ -6,12 +6,16 @@ import {
   ActivityIndicator, 
   StyleSheet, 
   Modal,
-  TouchableWithoutFeedback
+  TouchableWithoutFeedback,
+  Dimensions
 } from 'react-native';
-import { Edit, Settings, LogOut, Plus, Check, X, Trophy } from 'lucide-react-native';
+import { Edit, Settings, LogOut, Plus, Check, X, Trophy, ChevronRight, Mail, Globe, Facebook, Twitter } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { router } from 'expo-router';
 import { LinkedAccount } from '@/types/profile';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 interface BasicInfoTabProps {
   colors: any;
@@ -19,13 +23,12 @@ interface BasicInfoTabProps {
   linkedAccounts: LinkedAccount[];
   onSignOut: () => void;
   onConnectAccount: (provider: string) => Promise<void>;
+  isDesktop?: boolean;
 }
 
-// Define available social providers
 const AVAILABLE_PROVIDERS = [
-  { id: 'email', name: 'Email', icon: '@', color: '#666', points: 0 },
-  { id: 'google', name: 'Google', icon: 'G', color: '#DB4437', points: 50 },
-  { id: 'facebook', name: 'Facebook', icon: 'f', color: '#1877F2', points: 50 },
+  { id: 'google', name: 'Google', icon: <Globe size={20} color="#DB4437" />, color: '#DB4437', points: 50 },
+  { id: 'facebook', name: 'Facebook', icon: <Facebook size={20} color="#1877F2" />, color: '#1877F2', points: 50 },
 ];
 
 export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
@@ -33,7 +36,8 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   accountsLoading,
   linkedAccounts,
   onSignOut,
-  onConnectAccount
+  onConnectAccount,
+  isDesktop = false
 }) => {
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -48,37 +52,6 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
     message: ''
   });
 
-  const getProviderIcon = (provider: string, size: number = 16) => {
-    const providerConfig = AVAILABLE_PROVIDERS.find(p => p.id === provider);
-    if (!providerConfig) {
-      return (
-        <View style={[styles.providerIcon, { backgroundColor: '#666', width: size, height: size }]}>
-          <Text style={[styles.providerText, { fontSize: size * 0.6 }]}>?</Text>
-        </View>
-      );
-    }
-
-    return (
-      <View style={[styles.providerIcon, { 
-        backgroundColor: providerConfig.color, 
-        width: size, 
-        height: size 
-      }]}>
-        <Text style={[styles.providerText, { fontSize: size * 0.6 }]}>
-          {providerConfig.icon}
-        </Text>
-      </View>
-    );
-  };
-
-  const getProviderName = (provider: string) => {
-    return AVAILABLE_PROVIDERS.find(p => p.id === provider)?.name || provider;
-  };
-
-  const getProviderPoints = (provider: string) => {
-    return AVAILABLE_PROVIDERS.find(p => p.id === provider)?.points || 0;
-  };
-
   const isProviderConnected = (provider: string) => {
     const account = linkedAccounts.find(acc => acc.provider === provider);
     return account?.connected || false;
@@ -89,292 +62,106 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
     return account?.email || null;
   };
 
-  // Check if points have already been awarded for this provider
-  const hasPointsBeenAwarded = (provider: string) => {
-    const account = linkedAccounts.find(acc => acc.provider === provider);
-    return account?.points_awarded || false;
-  };
-
-  const showModal = (type: 'success' | 'error' | 'info', title: string, message: string, points?: number) => {
-    setModalContent({ type, title, message, points });
-    setModalVisible(true);
-  };
-
   const handleConnectAccount = async (provider: string) => {
-    console.log(`Connecting account: ${provider}`);
-    
-    if (isProviderConnected(provider)) {
-      showModal(
-        'info',
-        'Already Connected',
-        `Your account is already connected to ${getProviderName(provider)}`
-      );
-      return;
-    }
+    if (isProviderConnected(provider)) return;
 
     setConnectingProvider(provider);
     try {
-      // Call the provided onConnectAccount function
       await onConnectAccount(provider);
-      
-      // Check if points should be shown (only show if not already awarded)
-      const points = getProviderPoints(provider);
-      const pointsAwarded = hasPointsBeenAwarded(provider);
-      
-      if (points > 0 && !pointsAwarded) {
-        showModal(
-          'success',
-          'Success! 🎉',
-          `You've connected your ${getProviderName(provider)} account and earned points!`,
-          points
-        );
-      } else {
-        showModal(
-          'success',
-          'Success! ✅',
-          `You've connected your ${getProviderName(provider)} account!`
-        );
-      }
     } catch (error) {
       console.error('Error connecting account:', error);
-      showModal(
-        'error',
-        'Connection Failed',
-        'Unable to connect account. Please try again.'
-      );
     } finally {
       setConnectingProvider(null);
     }
   };
 
-  const getConnectedCount = () => {
-    return linkedAccounts.filter(account => account.connected).length;
-  };
-
-  const basicMenuItems = [
-    {
-      icon: <Edit size={24} color={colors.primary} />,
-      title: 'Edit Profile',
-      subtitle: 'Update your profile details',
-      route: '/EditProfileScreen'
-    },
-    {
-      icon: <Settings size={24} color={colors.primary} />,
-      title: 'Settings',
-      subtitle: 'App settings and preferences',
-      route: '/settings'
-    },
-  ];
-
-  const connectedCount = getConnectedCount();
-  const allProviders = AVAILABLE_PROVIDERS;
-
   return (
     <View style={styles.container}>
-      {/* All Accounts in One Section */}
-      <View style={styles.linkedAccountsSection}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Connected Accounts ({connectedCount}/{allProviders.length})
-        </Text>
+      {/* Account Settings */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionHeader, { color: colors.primary }]}>ACCOUNT SETTINGS</Text>
         
-        {accountsLoading ? (
-          <View style={styles.accountsLoading}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.loadingText, { color: colors.text }]}>Loading accounts...</Text>
+        <TouchableOpacity
+          style={[styles.menuItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => router.push('/EditProfileScreen')}
+        >
+          <View style={[styles.iconContainer, { backgroundColor: 'rgba(30, 162, 177, 0.1)' }]}>
+            <Edit size={20} color={colors.primary} />
           </View>
-        ) : (
-          <View style={styles.accountsList}>
-            {allProviders.map((provider) => {
-              const isConnected = isProviderConnected(provider.id);
-              const email = getAccountEmail(provider.id);
-              const points = getProviderPoints(provider.id);
-              const pointsAwarded = hasPointsBeenAwarded(provider.id);
-              
-              return (
-                <View key={provider.id} style={[styles.accountItem, { backgroundColor: colors.card }]}>
-                  <View style={styles.accountRow}>
-                    {/* Provider Info */}
-                    <View style={styles.accountInfo}>
-                      {getProviderIcon(provider.id, 32)}
-                      <View style={styles.accountDetails}>
-                        <Text style={[styles.providerName, { color: colors.text }]}>
-                          {provider.name}
-                        </Text>
-                        {isConnected ? (
-                          <View style={styles.connectedInfo}>
-                            <Check size={14} color="#10B981" />
-                            <Text style={[styles.connectedText, { color: '#10B981' }]}>
-                              Connected
-                            </Text>
-                            {/* Only show points badge if points were recently awarded */}
-                            {points > 0 && !pointsAwarded && (
-                              <Text style={[styles.pointsBadge, { color: colors.primary }]}>
-                                +{points} pts
-                              </Text>
-                            )}
-                          </View>
-                        ) : (
-                          <Text style={[styles.pointsEarnable, { color: colors.primary }]}>
-                            Connect to earn +{points} points
-                          </Text>
-                        )}
-                      </View>
+          <View style={styles.menuContent}>
+            <Text style={[styles.menuTitle, { color: colors.text }]}>Edit Profile</Text>
+            <Text style={styles.menuSubtitle}>Change your name or title</Text>
+          </View>
+          <ChevronRight size={20} color="#666" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.menuItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => router.push('/settings')}
+        >
+          <View style={[styles.iconContainer, { backgroundColor: 'rgba(120, 120, 120, 0.1)' }]}>
+            <Settings size={20} color="#666" />
+          </View>
+          <View style={styles.menuContent}>
+            <Text style={[styles.menuTitle, { color: colors.text }]}>Settings</Text>
+            <Text style={styles.menuSubtitle}>Privacy and notifications</Text>
+          </View>
+          <ChevronRight size={20} color="#666" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Social Connections */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionHeader, { color: colors.primary }]}>SOCIAL CONNECTIONS</Text>
+        
+        <View style={styles.grid}>
+          {AVAILABLE_PROVIDERS.map((provider) => {
+            const isConnected = isProviderConnected(provider.id);
+            return (
+              <TouchableOpacity
+                key={provider.id}
+                style={[
+                  styles.socialCard, 
+                  { backgroundColor: colors.card, borderColor: isConnected ? colors.primary : colors.border }
+                ]}
+                onPress={() => handleConnectAccount(provider.id)}
+                disabled={connectingProvider === provider.id || isConnected}
+              >
+                <View style={styles.socialHeader}>
+                  <View style={[styles.socialIcon, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                    {provider.icon}
+                  </View>
+                  {isConnected ? (
+                    <Check size={18} color={colors.primary} />
+                  ) : (
+                    <View style={[styles.addBadge, { backgroundColor: colors.primary }]}>
+                      <Plus size={12} color="white" />
                     </View>
-
-                    {/* Action Button */}
-                    {isConnected ? (
-                      <View style={[styles.connectedBadge, { backgroundColor: '#1ea2b1' }]}>
-                        <Check size={16} color="white" />
-                        <Text style={styles.connectedBadgeText}>Connected</Text>
-                      </View>
-                    ) : (
-                      <TouchableOpacity
-                        style={[styles.connectButton, { backgroundColor: colors.primary }]}
-                        onPress={() => handleConnectAccount(provider.id)}
-                        disabled={connectingProvider === provider.id}
-                      >
-                        {connectingProvider === provider.id ? (
-                          <ActivityIndicator size="small" color="white" />
-                        ) : (
-                          <>
-                            <Plus size={16} color="white" />
-                            <Text style={styles.connectButtonText}>Connect</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  {/* Email if connected */}
-                  {isConnected && email && (
-                    <Text style={[styles.accountEmail, { color: colors.text }]}>
-                      {email}
-                    </Text>
-                  )}
-
-                  {/* Email provider doesn't need to be connected separately */}
-                  {provider.id === 'email' && !isConnected && (
-                    <Text style={[styles.notConnectedHint, { color: colors.text }]}>
-                      Email is your primary login method
-                    </Text>
                   )}
                 </View>
-              );
-            })}
-          </View>
-        )}
-      </View>
-
-      {/* Menu Items */}
-      <View style={styles.menuContainer}>
-        {basicMenuItems.map((item, index) => (
-          <TouchableOpacity
-            key={index}
-            style={[styles.menuItem, { backgroundColor: colors.card }]}
-            onPress={() => router.push(item.route)}
-          >
-            {item.icon}
-            <View style={styles.menuText}>
-              <Text style={[styles.menuTitle, { color: colors.text }]}>
-                {item.title}
-              </Text>
-              <Text style={[styles.menuSubtitle, { color: colors.text }]}>
-                {item.subtitle}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Sign Out Button */}
-      <TouchableOpacity
-        style={[styles.signOutButton, { borderColor: '#ef4444' }]}
-        onPress={onSignOut}
-      >
-        <LogOut size={24} color="#ef4444" />
-        <Text style={styles.signOutText}>Sign Out</Text>
-      </TouchableOpacity>
-
-      {/* Custom Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-                {/* Modal Header */}
-                <View style={styles.modalHeader}>
-                  <View style={[
-                    styles.modalIconContainer,
-                    { 
-                      backgroundColor: modalContent.type === 'success' ? '#10B981' : 
-                                     modalContent.type === 'error' ? '#EF4444' : 
-                                     '#1ea2b1'
-                    }
-                  ]}>
-                    {modalContent.type === 'success' ? (
-                      <Check size={24} color="white" />
-                    ) : modalContent.type === 'error' ? (
-                      <X size={24} color="white" />
-                    ) : (
-                      <Text style={styles.infoIcon}>i</Text>
-                    )}
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.closeButton}
-                    onPress={() => setModalVisible(false)}
-                  >
-                    <X size={20} color={colors.text} />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Modal Title */}
-                <Text style={[styles.modalTitle, { color: colors.text }]}>
-                  {modalContent.title}
+                <Text style={[styles.socialName, { color: colors.text }]}>{provider.name}</Text>
+                <Text style={styles.socialStatus}>
+                  {isConnected ? 'Connected' : `Earn +${provider.points} pts`}
                 </Text>
-
-                {/* Modal Message */}
-                <Text style={[styles.modalMessage, { color: colors.text }]}>
-                  {modalContent.message}
-                </Text>
-
-                {/* Points Display (only for success with points) */}
-                {modalContent.type === 'success' && modalContent.points && modalContent.points > 0 && (
-                  <View style={styles.pointsContainer}>
-                    <Trophy size={20} color="#FFD700" />
-                    <Text style={[styles.pointsText, { color: colors.primary }]}>
-                      +{modalContent.points} points earned!
-                    </Text>
-                  </View>
+                {connectingProvider === provider.id && (
+                  <ActivityIndicator size="small" color={colors.primary} style={styles.socialLoader} />
                 )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
 
-                {/* Modal Button */}
-                <TouchableOpacity
-                  style={[
-                    styles.modalButton,
-                    { 
-                      backgroundColor: modalContent.type === 'success' ? '#10B981' : 
-                                     modalContent.type === 'error' ? '#EF4444' : 
-                                     '#1ea2b1'
-                    }
-                  ]}
-                  onPress={() => setModalVisible(false)}
-                >
-                  <Text style={styles.modalButtonText}>
-                    {modalContent.type === 'success' ? 'Awesome!' : 
-                     modalContent.type === 'error' ? 'Try Again' : 
-                     'OK'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+      {/* Danger Zone */}
+      <View style={styles.section}>
+        <TouchableOpacity
+          style={[styles.signOutButton, { borderColor: 'rgba(239, 68, 68, 0.3)' }]}
+          onPress={onSignOut}
+        >
+          <LogOut size={20} color="#EF4444" />
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -382,238 +169,105 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: 12,
   },
-  linkedAccountsSection: {
-    padding: 20,
+  section: {
+    marginBottom: 32,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  sectionHeader: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
     marginBottom: 16,
-  },
-  accountsLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    marginLeft: 12,
-    fontSize: 14,
-  },
-  accountsList: {
-    gap: 12,
-  },
-  accountItem: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  accountRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  accountInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  accountDetails: {
-    flex: 1,
-  },
-  providerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  connectedInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  connectedText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  pointsBadge: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  pointsEarnable: {
-    fontSize: 14,
-    fontWeight: '500',
-    opacity: 0.9,
-  },
-  providerIcon: {
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  providerText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  connectedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
-  },
-  connectedBadgeText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  connectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-    minWidth: 100,
-    justifyContent: 'center',
-  },
-  connectButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  accountEmail: {
-    fontSize: 14,
-    opacity: 0.8,
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#333333',
-  },
-  notConnectedHint: {
-    fontSize: 12,
-    opacity: 0.7,
-    fontStyle: 'italic',
-    marginTop: 8,
-  },
-  menuContainer: {
-    padding: 20,
-    gap: 15,
+    paddingHorizontal: 4,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    borderRadius: 10,
-    gap: 15,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 12,
   },
-  menuText: {
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  menuContent: {
     flex: 1,
   },
   menuTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: '700',
+    marginBottom: 2,
   },
   menuSubtitle: {
-    fontSize: 14,
-    opacity: 0.8,
+    fontSize: 13,
+    color: '#888',
+  },
+  grid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  socialCard: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    position: 'relative',
+  },
+  socialHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  socialIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  socialName: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  socialStatus: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '600',
+  },
+  socialLoader: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
   },
   signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 12,
+    padding: 16,
+    borderRadius: 20,
     borderWidth: 1,
-    marginBottom: 30,
+    gap: 12,
+    marginTop: 12,
   },
   signOutText: {
-    color: '#ef4444',
+    color: '#EF4444',
     fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  modalContent: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: 16,
-    padding: 24,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  infoIcon: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  modalMessage: {
-    fontSize: 16,
-    lineHeight: 22,
-    marginBottom: 20,
-    textAlign: 'center',
-    opacity: 0.9,
-  },
-  pointsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 20,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
-  },
-  pointsText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalButton: {
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  modalButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
