@@ -16,8 +16,12 @@ import {
 import {
   ChevronRight,
   ChevronLeft,
+  X,
 } from 'lucide-react-native';
 import LottieView from 'lottie-react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SLIDE_WIDTH = SCREEN_WIDTH - 48;
 
 // Only import web components on web
 let DotLottieReact: any = null;
@@ -36,66 +40,48 @@ interface WelcomeOverlayProps {
   onGetStarted: () => void;
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SLIDE_WIDTH = SCREEN_WIDTH - 40;
-
-/* -------------------------------------------------------------------------- */
-/*                                   SLIDES                                   */
-/* -------------------------------------------------------------------------- */
-
 const slides = [
   {
     id: 1,
-    title: 'Welcome to Uthutho',
-    subtitle: 'Travel doesn’t have to feel lonely',
-    // Mobile Lottie file
+    tagline: 'WELCOME TO UTHUTHO',
+    title: 'Ready to Move Together?',
     lottieSource: require('@/assets/animations/Celebrate.json'),
-    // Web Lottie URL
     lottieUrl: 'https://lottie.host/e298b4d7-ec25-4809-9971-fd981511e67a/rWHuAlLHeZ.lottie',
-    content:
-      'Uthutho is built around people who travel every day. It helps you feel connected, informed, and part of something shared.',
+    content: 'Uthutho is built around commuters. Stay connected, informed, and part of a shared journey every single day.',
   },
   {
     id: 2,
-    title: 'A social transport app',
-    subtitle: 'Built around real journeys',
+    tagline: 'SOCIAL TRANSPORT',
+    title: 'Real People, Real Routes',
     lottieSource: require('@/assets/animations/understand.json'),
     lottieUrl: 'https://lottie.host/6a2179e4-c19b-447f-abf8-ba546671c275/buGwONChJP.lottie',
-    content:
-      'Uthutho is a social transport app. You join communities through the stops, hubs, and routes you actually use.',
+    content: 'Connect with other commuters at your stops, hubs, and on the routes you actually use.',
   },
   {
     id: 3,
-    title: 'Join stops & hubs',
-    subtitle: 'Your travel communities',
+    tagline: 'LIVE COMMUNITIES',
+    title: 'Join Your Local Hubs',
     lottieSource: require('@/assets/animations/intro.json'),
     lottieUrl: 'https://lottie.host/a9aeaf82-2750-44e9-b048-0bc121ed60db/GkljgALnFY.lottie',
-    content:
-      'Every stop and hub is its own community. Save the ones you use and see who else travels through them.',
+    content: 'Save your favorite stops and see activity from other travelers in real-time.',
   },
   {
     id: 4,
-    title: 'Join a journey',
-    subtitle: 'Travel together, stay informed',
+    tagline: 'JOURNEY TRACKING',
+    title: 'Travel Smarter, Faster',
     lottieSource: require('@/assets/animations/travel.json'),
     lottieUrl: 'https://lottie.host/94a02803-32cc-4b11-9147-4b26f8cda9ee/4D5V0Q1cBG.lottie',
-    content:
-      'When you\'re traveling a route, you join a journey. Other commuters on the same route can see activity and help keep everyone informed about when transport is coming.',
+    content: 'Stay updated on transit times and route activity shared by your community.',
   },
   {
     id: 5,
-    title: 'Earn points by traveling',
-    subtitle: 'Your journey matters',
+    tagline: 'TRAVEL REWARDS',
+    title: 'Your Commute, Rewarded',
     lottieSource: require('@/assets/animations/Success.json'),
     lottieUrl: 'https://lottie.host/b6e8a86c-ab25-4d67-a925-3b343636293b/SY1IXt6wHF.lottie',
-    content:
-      'Every journey earns you points. Travel more, contribute more, and unlock levels and titles that reflect how you move.',
+    content: 'Earn points for every journey, unlock exclusive titles, and show the world how you move.',
   },
 ];
-
-/* -------------------------------------------------------------------------- */
-/*                               MAIN COMPONENT                               */
-/* -------------------------------------------------------------------------- */
 
 export default function WelcomeOverlay({
   visible,
@@ -116,12 +102,12 @@ export default function WelcomeOverlay({
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 400,
+          duration: 600,
           useNativeDriver: true,
         }),
         Animated.timing(slideAnim, {
           toValue: 0,
-          duration: 400,
+          duration: 600,
           useNativeDriver: true,
         }),
       ]).start();
@@ -129,9 +115,7 @@ export default function WelcomeOverlay({
   }, [visible]);
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = Math.round(
-      e.nativeEvent.contentOffset.x / SLIDE_WIDTH,
-    );
+    const index = Math.round(e.nativeEvent.contentOffset.x / SLIDE_WIDTH);
     setCurrentSlide(index);
   };
 
@@ -139,55 +123,36 @@ export default function WelcomeOverlay({
     if (currentSlide === slides.length - 1) {
       onGetStarted();
     } else {
-      scrollRef.current?.scrollTo({
-        x: (currentSlide + 1) * SLIDE_WIDTH,
-        animated: true,
-      });
+      scrollRef.current?.scrollTo({ x: (currentSlide + 1) * SLIDE_WIDTH, animated: true });
     }
   };
 
   const goPrev = () => {
-    scrollRef.current?.scrollTo({
-      x: (currentSlide - 1) * SLIDE_WIDTH,
-      animated: true,
-    });
+    scrollRef.current?.scrollTo({ x: (currentSlide - 1) * SLIDE_WIDTH, animated: true });
   };
 
   const Slide = ({ slide }: { slide: typeof slides[0] }) => {
     return (
       <View style={[styles.slide, { width: SLIDE_WIDTH }]}>
-        {/* Lottie Animation */}
-        <View style={styles.animationWrap}>
+        <View style={styles.animationContainer}>
           {Platform.OS === 'ios' || Platform.OS === 'android' ? (
             <LottieView
               source={slide.lottieSource}
               autoPlay
               loop
-              style={styles.lottieAnimation}
+              style={styles.lottie}
               resizeMode="contain"
             />
           ) : Platform.OS === 'web' && DotLottieReact ? (
-            <DotLottieReact
-              src={slide.lottieUrl}
-              loop
-              autoplay
-              style={styles.lottieAnimation}
-            />
+            <DotLottieReact src={slide.lottieUrl} loop autoplay style={styles.lottie} />
           ) : (
-            // Fallback if Lottie is not available
-            <View style={styles.fallbackAnimation}>
-              <Image 
-                source={require('@/assets/logo.png')}
-                style={styles.fallbackImage}
-                resizeMode="contain"
-              />
-            </View>
+            <View style={styles.fallbackBox}><Flame size={40} color="#1ea2b1" /></View>
           )}
         </View>
 
-        <Text style={styles.title}>{slide.title}</Text>
-        <Text style={styles.subtitle}>{slide.subtitle}</Text>
-        <Text style={styles.content}>{slide.content}</Text>
+        <Text style={styles.slideTagline}>{slide.tagline}</Text>
+        <Text style={styles.slideTitle}>{slide.title}</Text>
+        <Text style={styles.slideContent}>{slide.content}</Text>
       </View>
     );
   };
@@ -195,31 +160,18 @@ export default function WelcomeOverlay({
   return (
     <Modal visible={visible} transparent animationType="none">
       <View style={styles.overlay}>
-        <Animated.View
-          style={[
-            styles.container,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
-          {/* HEADER */}
+        <Animated.View style={[styles.container, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          {/* Header */}
           <View style={styles.header}>
-            <View style={styles.logo}>
-              <Image 
-                source={require('@/assets/logo.png')}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-              <Text style={styles.logoText}>Uthutho</Text>
+            <View style={styles.brandRow}>
+              <Text style={styles.brandText}>Uthutho</Text>
             </View>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={styles.skip}>Skip</Text>
+            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+              <X size={20} color="#666" />
             </TouchableOpacity>
           </View>
 
-          {/* SLIDES */}
+          {/* Body */}
           <ScrollView
             ref={scrollRef}
             horizontal
@@ -227,42 +179,35 @@ export default function WelcomeOverlay({
             showsHorizontalScrollIndicator={false}
             onScroll={handleScroll}
             scrollEventThrottle={16}
+            contentContainerStyle={styles.scrollContent}
           >
             {slides.map((slide) => (
               <Slide key={slide.id} slide={slide} />
             ))}
           </ScrollView>
 
-          {/* INDICATORS */}
-          <View style={styles.indicators}>
-            {slides.map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.dot,
-                  currentSlide === i && styles.dotActive,
-                ]}
-              />
-            ))}
-          </View>
+          {/* Footer */}
+          <View style={styles.footer}>
+            <View style={styles.indicatorRow}>
+              {slides.map((_, i) => (
+                <View key={i} style={[styles.dot, currentSlide === i && styles.dotActive]} />
+              ))}
+            </View>
 
-          {/* NAVIGATION */}
-          <View style={styles.nav}>
-            {currentSlide > 0 && (
-              <TouchableOpacity style={styles.prev} onPress={goPrev}>
-                <ChevronLeft size={18} color="#1ea2b1" />
-                <Text style={styles.prevText}>Back</Text>
+            <View style={styles.navActions}>
+              {currentSlide > 0 && (
+                <TouchableOpacity style={styles.backBtn} onPress={goPrev}>
+                  <ChevronLeft size={20} color="#FFF" />
+                </TouchableOpacity>
+              )}
+              
+              <TouchableOpacity style={styles.nextBtn} onPress={goNext}>
+                <Text style={styles.nextBtnText}>
+                  {currentSlide === slides.length - 1 ? 'GET STARTED' : 'NEXT'}
+                </Text>
+                <ChevronRight size={18} color="#000" />
               </TouchableOpacity>
-            )}
-
-            <TouchableOpacity style={styles.next} onPress={goNext}>
-              <Text style={styles.nextText}>
-                {currentSlide === slides.length - 1
-                  ? 'Get Started'
-                  : 'Next'}
-              </Text>
-              <ChevronRight size={18} color="#fff" />
-            </TouchableOpacity>
+            </View>
           </View>
         </Animated.View>
       </View>
@@ -270,138 +215,148 @@ export default function WelcomeOverlay({
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                   STYLES                                   */
-/* -------------------------------------------------------------------------- */
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.95)',
     justifyContent: 'center',
-    padding: 20,
+    alignItems: 'center',
   },
   container: {
     backgroundColor: '#111',
-    borderRadius: 24,
+    borderRadius: 40,
+    width: SCREEN_WIDTH - 32,
+    maxWidth: 450,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#222',
   },
   header: {
-    padding: 20,
+    padding: 24,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottomWidth: 1,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  brandText: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -0.5,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
     borderColor: '#222',
   },
-  logo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  logoImage: {
-    width: 24,
-    height: 24,
-  },
-  logoText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  skip: {
-    color: '#666',
+  scrollContent: {
+    paddingVertical: 12,
   },
   slide: {
-    padding: 32,
+    paddingHorizontal: 32,
     alignItems: 'center',
   },
-  animationWrap: {
-    width: 120,
-    height: 120,
+  animationContainer: {
+    width: 160,
+    height: 160,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
   },
-  lottieAnimation: {
-    width: 120,
-    height: 120,
+  lottie: {
+    width: 160,
+    height: 160,
   },
-  fallbackAnimation: {
+  fallbackBox: {
     width: 80,
     height: 80,
+    borderRadius: 24,
+    backgroundColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(30, 162, 177, 0.1)',
-    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#222',
   },
-  fallbackImage: {
-    width: 60,
-    height: 60,
+  slideTagline: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#1ea2b1',
+    letterSpacing: 2,
+    marginBottom: 12,
+    textTransform: 'uppercase',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#fff',
+  slideTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFF',
     textAlign: 'center',
+    fontStyle: 'italic',
+    letterSpacing: -0.5,
+    marginBottom: 16,
   },
-  subtitle: {
+  slideContent: {
     fontSize: 15,
-    color: '#aaa',
-    marginTop: 6,
+    color: '#666',
     textAlign: 'center',
+    lineHeight: 22,
+    fontWeight: '500',
   },
-  content: {
-    marginTop: 20,
-    fontSize: 16,
-    color: '#ccc',
-    lineHeight: 24,
-    textAlign: 'center',
+  footer: {
+    padding: 24,
+    paddingTop: 0,
   },
-  indicators: {
+  indicatorRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
+    gap: 6,
+    marginBottom: 32,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#333',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#222',
   },
   dotActive: {
-    width: 24,
+    width: 20,
     backgroundColor: '#1ea2b1',
   },
-  nav: {
+  navActions: {
     flexDirection: 'row',
     gap: 12,
-    padding: 20,
   },
-  prev: {
-    flex: 1,
+  backBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 20,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 14,
-    padding: 14,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
+    borderColor: '#222',
   },
-  prevText: {
-    color: '#1ea2b1',
-  },
-  next: {
-    flex: 2,
+  nextBtn: {
+    flex: 1,
+    height: 56,
     backgroundColor: '#1ea2b1',
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 20,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
   },
-  nextText: {
-    color: '#fff',
-    fontWeight: '600',
+  nextBtnText: {
+    color: '#000',
+    fontWeight: '900',
+    fontSize: 14,
+    letterSpacing: 1,
   },
 });

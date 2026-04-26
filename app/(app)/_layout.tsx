@@ -12,9 +12,9 @@ import {
   Linkedin,
   Facebook,
   Instagram,
-  MessageCircle,
   Car,
-  BarChart3
+  BarChart3,
+  X
 } from 'lucide-react-native';
 import {
   Pressable,
@@ -35,12 +35,10 @@ import { useAuth } from '@/hook/useAuth';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-// Fallback icon component
 const FallbackIcon = ({ color, size }) => (
   <View style={{ width: size, height: size, backgroundColor: color, opacity: 0.3, borderRadius: 4 }} />
 );
 
-// Screens visible in drawer
 const VISIBLE_DRAWER_SCREENS = [
   '(tabs)',
   'Leaderboard',
@@ -50,7 +48,8 @@ const VISIBLE_DRAWER_SCREENS = [
   'help'
 ];
 
-// Custom Drawer Content
+const BRAND_COLOR = '#1ea2b1';
+
 const CustomDrawerContent = (props) => {
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -65,7 +64,7 @@ const CustomDrawerContent = (props) => {
   useEffect(() => {
     Animated.timing(slideAnim, {
       toValue: 1,
-      duration: 400,
+      duration: 500,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
@@ -77,34 +76,13 @@ const CustomDrawerContent = (props) => {
         setLoadingRole(false);
         return;
       }
-
       try {
-        // First check user_roles table
-        const { data: userRoles, error: rolesError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (rolesError && rolesError.code !== 'PGRST116') {
-          console.error('Error fetching user roles:', rolesError);
-        }
-
+        const { data: userRoles } = await supabase.from('user_roles').select('role').eq('user_id', user.id).maybeSingle();
         if (userRoles) {
           setUserRole(userRoles.role);
           setIsDriver(userRoles.role === 'driver');
         } else {
-          // Fallback: check if user exists in drivers table
-          const { data: driverData, error: driverError } = await supabase
-            .from('drivers')
-            .select('id')
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-          if (driverError && driverError.code !== 'PGRST116') {
-            console.error('Error checking driver status:', driverError);
-          }
-
+          const { data: driverData } = await supabase.from('drivers').select('id').eq('user_id', user.id).maybeSingle();
           if (driverData) {
             setUserRole('driver');
             setIsDriver(true);
@@ -114,262 +92,102 @@ const CustomDrawerContent = (props) => {
           }
         }
       } catch (error) {
-        console.error('Error fetching user role:', error);
-        setUserRole('user');
-        setIsDriver(false);
+        console.error('Error fetching role:', error);
       } finally {
         setLoadingRole(false);
       }
     };
-
     fetchUserRole();
   }, [user]);
 
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.95,
-      useNativeDriver: true,
-    }).start();
-  };
+  const handlePressIn = () => Animated.spring(scaleAnim, { toValue: 0.98, useNativeDriver: true }).start();
+  const handlePressOut = () => Animated.spring(scaleAnim, { toValue: 1, friction: 5, tension: 40, useNativeDriver: true }).start();
 
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 3,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const visibleRoutes = props.state.routes.filter(route =>
-    VISIBLE_DRAWER_SCREENS.includes(route.name)
-  );
-
-  const handleDriverAction = () => {
-    console.log('Driver action clicked. Is driver:', isDriver);
-    
-    if (isDriver) {
-      // SIMPLE APPROACH: Navigate directly to the dashboard screen
-      console.log('Navigating to driver-dashboard...');
-      
-      // Close drawer first for better UX
-      props.navigation.closeDrawer();
-      
-      // Small delay to ensure drawer is closed
-      setTimeout(() => {
-        // Navigate to the actual screen name
-        props.navigation.navigate('driver-dashboard');
-      }, 100);
-      
-    } else {
-      // Navigate to driver onboarding
-      console.log('Navigating to driver-onboarding...');
-      props.navigation.navigate('driver-onboarding');
-    }
-  };
-
-  const handleNavigation = (routeName) => {
-    console.log('Navigating to:', routeName);
-    props.navigation.navigate(routeName);
-  };
+  const visibleRoutes = props.state.routes.filter(route => VISIBLE_DRAWER_SCREENS.includes(route.name));
 
   return (
-    <View style={[styles.drawerContainer, { backgroundColor: colors.background }]}>
-      {/* Header - Made more compact */}
+    <View style={styles.drawerContainer}>
+      {/* Header */}
       <View style={styles.drawerHeader}>
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('../../assets/uthutho-logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+        <View style={styles.headerTop}>
+          <View style={styles.logoContainer}>
+            <Image source={require('../../assets/uthutho-logo.png')} style={styles.logo} resizeMode="contain" />
+          </View>
+          <TouchableOpacity onPress={() => props.navigation.closeDrawer()} style={styles.closeBtn}>
+            <X size={18} color="#666" />
+          </TouchableOpacity>
         </View>
-        <View>
-          <Text style={[styles.appTitle, { color: colors.text }]}>Uthutho</Text>
-          <Text style={[styles.appSubtitle, { color: `${colors.text}70` }]}>
-            Your Journey Companion
-          </Text>
-        </View>
+        <Text style={styles.appTitle}>Uthutho</Text>
+        <Text style={styles.readyText}>READY TO MOVE</Text>
       </View>
 
-      {/* Drawer Items - Now in a ScrollView */}
-      <ScrollView 
-        style={styles.drawerScrollView}
-        contentContainerStyle={styles.drawerItems}
-        showsVerticalScrollIndicator={false}
-      >
+      {/* Navigation */}
+      <ScrollView style={styles.drawerScrollView} contentContainerStyle={styles.drawerItems} showsVerticalScrollIndicator={false}>
         {visibleRoutes.map((route, index) => {
           const { options } = props.descriptors[route.key];
           const isFocused = props.state.index === index;
           const IconComponent = options.drawerIcon || FallbackIcon;
 
-          const translateX = slideAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [-50, 0],
-          });
-
-          const opacity = slideAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, 1],
-          });
-
           return (
             <AnimatedPressable
               key={route.key}
-              onPress={() => handleNavigation(route.name)}
+              onPress={() => props.navigation.navigate(route.name)}
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
               style={[
                 styles.drawerItem,
-                {
-                  transform: [{ scale: scaleAnim }, { translateX }],
-                  opacity,
-                  backgroundColor: isFocused ? `${colors.primary}15` : 'transparent',
-                  borderLeftWidth: isFocused ? 4 : 0,
-                  borderLeftColor: colors.primary,
-                  height: 52, // Fixed height for consistency
-                },
+                { transform: [{ scale: scaleAnim }], backgroundColor: isFocused ? '#111' : 'transparent' }
               ]}
             >
               <View style={styles.drawerItemContent}>
-                <View
-                  style={[
-                    styles.iconContainer,
-                    { backgroundColor: isFocused ? colors.primary : `${colors.text}20` },
-                  ]}
-                >
-                  <IconComponent
-                    color={isFocused ? colors.background : colors.text}
-                    size={20} // Slightly smaller icons
-                    fill={isFocused ? colors.primary : 'transparent'}
-                  />
+                <View style={[styles.iconContainer, { backgroundColor: isFocused ? BRAND_COLOR : '#111' }]}>
+                  <IconComponent color={isFocused ? '#000' : '#444'} size={18} />
                 </View>
-                <Text
-                  style={[
-                    styles.drawerLabel,
-                    {
-                      color: isFocused ? colors.primary : colors.text,
-                      fontWeight: isFocused ? '600' : '400',
-                      fontSize: 15, // Slightly smaller font
-                    },
-                  ]}
-                  numberOfLines={1}
-                >
+                <Text style={[styles.drawerLabel, { color: isFocused ? '#FFF' : '#666', fontWeight: isFocused ? '900' : '600' }]}>
                   {options.title || route.name}
                 </Text>
               </View>
-              <ChevronRight
-                size={16}
-                color={isFocused ? colors.primary : `${colors.text}50`}
-              />
+              {isFocused && <View style={styles.activeIndicator} />}
             </AnimatedPressable>
           );
         })}
 
-        {/* Driver Section */}
+        {/* Driver Dashboard / Apply Section */}
         {!loadingRole && (
           <AnimatedPressable
-            onPress={handleDriverAction}
+            onPress={() => isDriver ? props.navigation.navigate('driver-dashboard') : props.navigation.navigate('driver-onboarding')}
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
-            style={[
-              styles.drawerItem,
-              styles.driverItem,
-              {
-                transform: [{ scale: scaleAnim }],
-                backgroundColor: isDriver ? 'rgba(30, 162, 177, 0.15)' : 'rgba(139, 92, 246, 0.15)',
-                borderLeftWidth: 4,
-                borderLeftColor: isDriver ? '#1ea2b1' : '#8B5CF6',
-                marginTop: 12,
-                marginBottom: 12,
-                height: 60, // Slightly taller for emphasis
-              },
-            ]}
+            style={[styles.driverItem, { transform: [{ scale: scaleAnim }] }]}
           >
-            <View style={styles.drawerItemContent}>
-              <View
-                style={[
-                  styles.iconContainer,
-                  { backgroundColor: isDriver ? '#1ea2b1' : '#8B5CF6' },
-                ]}
-              >
-                {isDriver ? (
-                  <BarChart3 size={20} color="#FFFFFF" />
-                ) : (
-                  <Car size={20} color="#FFFFFF" />
-                )}
+            <View style={styles.driverContent}>
+              <View style={[styles.driverIconBox, { backgroundColor: isDriver ? BRAND_COLOR : '#8B5CF6' }]}>
+                {isDriver ? <BarChart3 size={18} color="#000" strokeWidth={2.5} /> : <Car size={18} color="#FFF" />}
               </View>
-              <View style={styles.driverTextContainer}>
-                <Text
-                  style={[
-                    styles.drawerLabel,
-                    {
-                      color: isDriver ? '#1ea2b1' : '#8B5CF6',
-                      fontWeight: '600',
-                      fontSize: 15,
-                    },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {isDriver ? 'Driver Dashboard' : 'Apply as Driver'}
-                </Text>
-                <Text 
-                  style={[styles.driverSubtitle, { color: `${colors.text}70` }]}
-                  numberOfLines={1}
-                >
-                  {isDriver ? 'Manage your transport services' : 'Get Clients with Uthutho'}
-                </Text>
+              <View style={styles.driverTexts}>
+                <Text style={styles.driverTitle}>{isDriver ? 'DASHBOARD' : 'BECOME DRIVER'}</Text>
+                <Text style={styles.driverSubtitle}>{isDriver ? 'Manage Services' : 'Earn with Uthutho'}</Text>
               </View>
             </View>
-            <ChevronRight
-              size={16}
-              color={isDriver ? '#1ea2b1' : '#8B5CF6'}
-            />
+            <ChevronRight size={14} color="#333" />
           </AnimatedPressable>
-        )}
-
-        {loadingRole && (
-          <View style={[styles.drawerItem, styles.loadingItem, { height: 52 }]}>
-            <View style={styles.drawerItemContent}>
-              <View style={[styles.iconContainer, { backgroundColor: colors.border }]}>
-                <ActivityIndicator size="small" color={colors.text} />
-              </View>
-              <Text style={[styles.drawerLabel, { color: colors.text, fontSize: 15 }]}>
-                Loading...
-              </Text>
-            </View>
-          </View>
         )}
       </ScrollView>
 
-      {/* Footer - Made more compact */}
+      {/* Footer */}
       <View style={styles.drawerFooter}>
         <View style={styles.socialContainer}>
-          <Pressable 
-            onPress={() => Linking.openURL('https://www.linkedin.com/company/uthutho')} 
-            style={styles.socialIcon}
-          >
-            <Linkedin size={18} color={colors.text} />
+          <Pressable onPress={() => Linking.openURL('https://www.linkedin.com/company/uthutho')} style={styles.socialIcon}>
+            <Linkedin size={16} color="#444" />
           </Pressable>
-
-          <Pressable 
-            onPress={() => Linking.openURL('https://www.facebook.com/uthuthorsa/')} 
-            style={styles.socialIcon}
-          >
-            <Facebook size={18} color={colors.text} />
+          <Pressable onPress={() => Linking.openURL('https://www.facebook.com/uthuthorsa/')} style={styles.socialIcon}>
+            <Facebook size={16} color="#444" />
           </Pressable>
-
-          <Pressable 
-            onPress={() => Linking.openURL('https://www.instagram.com/uthuthorsa/')} 
-            style={styles.socialIcon}
-          >
-            <Instagram size={18} color={colors.text} />
+          <Pressable onPress={() => Linking.openURL('https://www.instagram.com/uthuthorsa/')} style={styles.socialIcon}>
+            <Instagram size={16} color="#444" />
           </Pressable>
         </View>
-
-        <Text style={[styles.footerText, { color: `${colors.text}40` }]}>
-          Version 1.8.2
-        </Text>
+        <Text style={styles.versionText}>v1.8.2 — READY TO MOVE</Text>
       </View>
     </View>
   );
@@ -383,74 +201,22 @@ export default function AppLayout() {
       screenOptions={{
         headerShown: false,
         drawerStyle: { 
-          backgroundColor: colors.background,
-          width: Math.min(300, SCREEN_HEIGHT * 0.8), // Responsive width
+          backgroundColor: '#000',
+          width: 280,
         },
-        drawerType: 'front', // Better for small screens
-        overlayColor: 'rgba(0,0,0,0.5)',
+        drawerType: 'front',
+        overlayColor: 'rgba(0,0,0,0.8)',
       }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
-      {/* Main Screens */}
-      <Drawer.Screen 
-        name="(tabs)" 
-        options={{ 
-          title: 'Home', 
-          drawerIcon: House 
-        }} 
-      />
-      <Drawer.Screen 
-        name="Leaderboard" 
-        options={{ 
-          title: 'Leaderboard', 
-          drawerIcon: Trophy 
-        }} 
-      />
-      <Drawer.Screen 
-        name="trips" 
-        options={{ 
-          title: 'Trip History', 
-          drawerIcon: Clock 
-        }} 
-      />
-      <Drawer.Screen 
-        name="profile" 
-        options={{ 
-          title: 'Profile', 
-          drawerIcon: User 
-        }} 
-      />
-      <Drawer.Screen 
-        name="settings" 
-        options={{ 
-          title: 'Settings', 
-          drawerIcon: Settings 
-        }} 
-      />
-      <Drawer.Screen 
-        name="help" 
-        options={{ 
-          title: 'Help', 
-          drawerIcon: HelpCircle 
-        }} 
-      />
-
-      {/* Driver Screens - Registered as flat screens, NOT nested */}
-      <Drawer.Screen 
-        name="driver-dashboard" 
-        options={{ 
-          title: 'Driver Dashboard', 
-          drawerItemStyle: { display: 'none' }
-        }} 
-      />
-      
-      <Drawer.Screen 
-        name="driver-onboarding" 
-        options={{ 
-          title: 'Become a Driver', 
-          drawerItemStyle: { display: 'none' }
-        }} 
-      />
+      <Drawer.Screen name="(tabs)" options={{ title: 'Home', drawerIcon: House }} />
+      <Drawer.Screen name="Leaderboard" options={{ title: 'Leaderboard', drawerIcon: Trophy }} />
+      <Drawer.Screen name="trips" options={{ title: 'Trip History', drawerIcon: Clock }} />
+      <Drawer.Screen name="profile" options={{ title: 'Profile', drawerIcon: User }} />
+      <Drawer.Screen name="settings" options={{ title: 'Settings', drawerIcon: Settings }} />
+      <Drawer.Screen name="help" options={{ title: 'Help', drawerIcon: HelpCircle }} />
+      <Drawer.Screen name="driver-dashboard" options={{ title: 'Driver Dashboard', drawerItemStyle: { display: 'none' } }} />
+      <Drawer.Screen name="driver-onboarding" options={{ title: 'Become a Driver', drawerItemStyle: { display: 'none' } }} />
     </Drawer>
   );
 };
@@ -458,102 +224,161 @@ export default function AppLayout() {
 const styles = StyleSheet.create({
   drawerContainer: { 
     flex: 1,
+    backgroundColor: '#000',
   },
   drawerHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 40, // Reduced padding
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 32,
+  },
+  headerTop: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
   },
   logoContainer: {
-    width: 40, // Smaller logo
-    height: 40,
-    borderRadius: 10,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     overflow: 'hidden',
-    marginRight: 12,
+    backgroundColor: '#111',
+    borderWidth: 1,
+    borderColor: '#222',
   },
   logo: { 
     width: '100%', 
     height: '100%' 
   },
-  appTitle: { 
-    fontSize: 18, // Smaller font
-    fontWeight: '700',
-    marginBottom: 2,
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#222',
   },
-  appSubtitle: { 
-    fontSize: 12 // Smaller font
+  appTitle: { 
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#FFF',
+    fontStyle: 'italic',
+    letterSpacing: -0.5,
+  },
+  readyText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: BRAND_COLOR,
+    letterSpacing: 2,
+    marginTop: 4,
   },
   drawerScrollView: {
     flex: 1,
   },
   drawerItems: { 
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingHorizontal: 16,
+    gap: 4,
   },
   drawerItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 8, // Reduced padding
-    marginHorizontal: 8,
-    marginVertical: 4,
-    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 20,
+    marginVertical: 2,
   },
   drawerItemContent: { 
     flexDirection: 'row', 
     alignItems: 'center', 
     flex: 1,
+    gap: 16,
   },
   iconContainer: {
-    width: 36, // Smaller container
+    width: 36,
     height: 36,
-    borderRadius: 8,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
   drawerLabel: { 
-    fontSize: 15,
-    flexShrink: 1,
+    fontSize: 14,
+    letterSpacing: 0.5,
   },
-  driverTextContainer: {
-    flex: 1,
+  activeIndicator: {
+    width: 4,
+    height: 16,
+    borderRadius: 2,
+    backgroundColor: BRAND_COLOR,
+  },
+  driverItem: {
+    marginTop: 24,
+    backgroundColor: '#111',
+    borderRadius: 24,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#222',
+    marginHorizontal: 16,
+  },
+  driverContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  driverIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  driverTexts: {
+    gap: 2,
+  },
+  driverTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: 1,
   },
   driverSubtitle: {
-    fontSize: 11, // Smaller font
-    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#444',
   },
   drawerFooter: { 
-    padding: 16, // Reduced padding
-    paddingBottom: 24,
+    padding: 24,
+    paddingBottom: 40,
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
-  },
-  footerText: { 
-    fontSize: 11, // Smaller font
-    marginTop: 8,
+    borderTopColor: '#111',
   },
   socialContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 12,
+    gap: 20,
+    marginBottom: 20,
   },
   socialIcon: {
-    marginHorizontal: 8,
-    padding: 6, // Reduced padding
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#222',
   },
-  driverItem: {
-    borderLeftWidth: 4,
-  },
-  loadingItem: {
-    opacity: 0.7,
+  versionText: { 
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#222',
+    letterSpacing: 1,
   },
 });
+import { TouchableOpacity } from 'react-native-gesture-handler';

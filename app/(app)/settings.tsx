@@ -1,368 +1,177 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Linking, Platform } from 'react-native';
-import { Bell, Lock, Info, Shield, ChevronRight, MessageSquare, FileText, HelpCircle, ExternalLink } from 'lucide-react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Linking, Platform, Alert, Animated } from 'react-native';
+import { Bell, Lock, Info, Shield, ChevronRight, MessageSquare, FileText, HelpCircle, ExternalLink, ArrowLeft } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import * as WebBrowser from 'expo-web-browser';
-import { Alert } from 'react-native';
 import { useAuth } from '@/hook/useAuth';
 import { sendPushNotificationByUserId } from '@/services/pushNotificationService';
 
-// Required for WebBrowser
 WebBrowser.maybeCompleteAuthSession();
+
+const BRAND_COLOR = '#1ea2b1';
+
+const SettingsSkeleton = () => {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.7, duration: 800, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.backBtn} />
+        <View style={styles.headerTitleBox}>
+          <View style={{ width: 100, height: 24, backgroundColor: '#111', borderRadius: 4 }} />
+          <View style={{ width: 80, height: 10, backgroundColor: '#111', borderRadius: 4, marginTop: 4 }} />
+        </View>
+        <View style={{ width: 44 }} />
+      </View>
+      <View style={styles.content}>
+        {[1, 2, 3].map(i => (
+          <View key={i} style={styles.section}>
+            <View style={{ width: 100, height: 10, backgroundColor: '#111', borderRadius: 4, marginBottom: 16 }} />
+            <Animated.View style={[styles.card, { opacity, height: 120 }]} />
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
 
 export default function SettingsScreen() {
   const { colors } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const router = useRouter();
-  const { user } = useAuth();
-
-  const settings = {
-    settings: 'Settings',
-    notifications: 'Notifications',
-    privacy: 'Privacy & Security',
-    privacyPolicy: 'Privacy Policy',
-    securitySettings: 'Security Settings',
-    terms: 'Terms of Service',
-    about: 'About',
-    appVersion: 'App Version 1.8.2',
-    feedback: 'Feedback & Support',
-    help: 'Help & FAQ',
-  };
+  const { user, loading } = useAuth();
 
   const handleTestPush = async () => {
-    if (!user) {
-      Alert.alert('Error', 'You must be logged in to test notifications.');
-      return;
-    }
+    if (!user) { Alert.alert('Error', 'Login required.'); return; }
     const result = await sendPushNotificationByUserId(user.id, {
       title: 'Uthutho says Hello 👋',
       body: 'Your test push notification is working perfectly!',
     });
-    if (result) {
-      Alert.alert('Success', 'Push notification triggered! You should receive it shortly.');
-    } else {
-      Alert.alert('Failed', 'Could not send the notification. Make sure you are on a physical device with permissions granted.');
-    }
+    if (result) Alert.alert('Success', 'Push notification triggered!');
   };
 
-  const handleOpenTerms = async () => {
-    const termsUrl = 'https://uthutho.co.za/terms-and-conditions';
-    
-    try {
-      // Use WebBrowser to open within app (works on iOS/Android)
-      await WebBrowser.openBrowserAsync(termsUrl, {
-        // iOS settings
-        dismissButtonStyle: 'close',
-        preferredBarTintColor: '#1a1a1a',
-        preferredControlTintColor: '#1EA2B1',
-        // Android settings
-        toolbarColor: '#1a1a1a',
-        secondaryToolbarColor: '#000000',
-        enableDefaultShare: false,
-        enableBarCollapsing: false,
-        // Common settings
-        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-        createTask: false,
-      });
-    } catch (error) {
-      console.error('Error opening terms:', error);
-      // Fallback to Linking if WebBrowser fails
-      const supported = await Linking.canOpenURL(termsUrl);
-      if (supported) {
-        await Linking.openURL(termsUrl);
-      }
-    }
-  };
-
-  const handleOpenPrivacy = async () => {
-    const privacyUrl = 'https://uthutho.co.za/privacy-policy';
-    
-    try {
-      await WebBrowser.openBrowserAsync(privacyUrl, {
-        dismissButtonStyle: 'close',
-        preferredBarTintColor: '#1a1a1a',
-        preferredControlTintColor: '#1EA2B1',
-        toolbarColor: '#1a1a1a',
-        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-      });
-    } catch (error) {
-      console.error('Error opening privacy policy:', error);
-      const supported = await Linking.canOpenURL(privacyUrl);
-      if (supported) {
-        await Linking.openURL(privacyUrl);
-      }
-    }
-  };
+  if (loading) return <SettingsSkeleton />;
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>{settings.settings}</Text>
-          <View style={[styles.headerLine, { backgroundColor: '#1EA2B1' }]} />
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <ArrowLeft size={20} color="#FFF" />
+        </TouchableOpacity>
+        <View style={styles.headerTitleBox}>
+          <Text style={styles.headerTitle}>Settings</Text>
+          <Text style={styles.readyText}>READY TO MOVE</Text>
         </View>
-
-        {/* Preferences Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Preferences</Text>
-          
-          {/* Notifications */}
-          <View style={[styles.settingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.settingContent}>
-              <View style={styles.settingIconContainer}>
-                <Bell size={20} color="#1EA2B1" />
-              </View>
-              <View style={styles.settingDetails}>
-                <Text style={[styles.settingText, { color: colors.text }]}>{settings.notifications}</Text>
-                <Text style={[styles.settingSubtext, { color: '#666666' }]}>Alerts and updates</Text>
-              </View>
-            </View>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
-              trackColor={{ false: '#cccccc', true: '#1EA2B1' }}
-              thumbColor={notificationsEnabled ? '#ffffff' : '#f4f3f4'}
-            />
-          </View>
-
-          {/* Test Push Notification */}
-          <TouchableOpacity
-            style={[styles.settingCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={handleTestPush}
-          >
-            <View style={styles.settingContent}>
-              <View style={styles.settingIconContainer}>
-                <Bell size={20} color="#ED67B1" />
-              </View>
-              <View style={styles.settingDetails}>
-                <Text style={[styles.settingText, { color: colors.text }]}>Test Push Notification</Text>
-                <Text style={[styles.settingSubtext, { color: '#666666' }]}>Send a test alert to this device</Text>
-              </View>
-            </View>
-            <ChevronRight size={20} color="#666666" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Privacy & Security Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{settings.privacy}</Text>
-          
-          {/* Privacy Policy */}
-          <TouchableOpacity
-            style={[styles.settingCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => router.push('/PrivacyScreen')}
-          >
-            <View style={styles.settingContent}>
-              <View style={styles.settingIconContainer}>
-                <Lock size={20} color="#1EA2B1" />
-              </View>
-              <Text style={[styles.settingText, { color: colors.text }]}>{settings.privacyPolicy}</Text>
-
-            </View>
-                          <ChevronRight size={20} color="#666666" />
-          </TouchableOpacity>
-
-          {/* Security Settings */}
-          <TouchableOpacity
-            style={[styles.settingCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => router.push('/SecurityScreen')}
-          >
-            <View style={styles.settingContent}>
-              <View style={styles.settingIconContainer}>
-                <Shield size={20} color="#1EA2B1" />
-              </View>
-              <Text style={[styles.settingText, { color: colors.text }]}>{settings.securitySettings}</Text>
-            </View>
-            <ChevronRight size={20} color="#666666" />
-          </TouchableOpacity>
-
-          {/* Terms of Service */}
-          <TouchableOpacity
-            style={[styles.settingCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={handleOpenTerms}
-          >
-            <View style={styles.settingContent}>
-              <View style={styles.settingIconContainer}>
-                <FileText size={20} color="#1EA2B1" />
-              </View>
-              <Text style={[styles.settingText, { color: colors.text }]}>{settings.terms}</Text>
-            </View>
-            <ExternalLink size={20} color="#666666" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Support Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Support</Text>
-          
-          {/* Help & FAQ */}
-          <TouchableOpacity
-            style={[styles.settingCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => router.push('/help')}
-          >
-            <View style={styles.settingContent}>
-              <View style={styles.settingIconContainer}>
-                <HelpCircle size={20} color="#1EA2B1" />
-              </View>
-              <Text style={[styles.settingText, { color: colors.text }]}>{settings.help}</Text>
-            </View>
-            <ChevronRight size={20} color="#666666" />
-          </TouchableOpacity>
-
-          {/* Feedback & Support */}
-          <TouchableOpacity
-            style={[styles.settingCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => router.push('/feedback-support')}
-          >
-            <View style={styles.settingContent}>
-              <View style={styles.settingIconContainer}>
-                <MessageSquare size={20} color="#1EA2B1" />
-              </View>
-              <Text style={[styles.settingText, { color: colors.text }]}>{settings.feedback}</Text>
-            </View>
-            <ChevronRight size={20} color="#666666" />
-          </TouchableOpacity>
-        </View>
-
-        {/* About Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{settings.about}</Text>
-          
-          <View style={[styles.settingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.settingContent}>
-              <View style={styles.settingIconContainer}>
-                <Info size={20} color="#1EA2B1" />
-              </View>
-              <View style={styles.settingDetails}>
-                <Text style={[styles.settingText, { color: colors.text }]}>Uthutho</Text>
-                <Text style={[styles.settingSubtext, { color: '#666666' }]}>{settings.appVersion}</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Tagline with colors */}
-          <View style={styles.taglineContainer}>
-            <Text style={[styles.taglineText, styles.commuteText]}>Commute.</Text>
-            <Text style={[styles.taglineText, styles.connectText]}> Connect.</Text>
-            <Text style={[styles.taglineText, styles.communitiesText]}> Communities.</Text>
-          </View>
-
-          {/* Developer Info */}
-          <View style={[styles.developerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.developerTitle, { color: colors.text }]}>Developed by</Text>
-            <Text style={styles.developerName}>Soft Glitch Solutions</Text>
-          </View>
-        </View>
-
-        {/* Bottom Spacing */}
-        <View style={styles.bottomSpacing} />
+        <View style={{ width: 44 }} />
       </View>
+
+      <View style={styles.content}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>PREFERENCES</Text>
+          <View style={styles.card}>
+            <View style={styles.settingRow}>
+              <View style={styles.iconBox}><Bell size={20} color={BRAND_COLOR} /></View>
+              <View style={styles.settingTexts}>
+                <Text style={styles.settingTitle}>Notifications</Text>
+                <Text style={styles.settingSubtitle}>Alerts and updates</Text>
+              </View>
+              <Switch value={notificationsEnabled} onValueChange={setNotificationsEnabled} trackColor={{ false: '#222', true: BRAND_COLOR }} thumbColor="#FFF" />
+            </View>
+
+            <TouchableOpacity style={styles.settingRow} onPress={handleTestPush}>
+              <View style={[styles.iconBox, { backgroundColor: '#ED67B120' }]}><Bell size={20} color="#ED67B1" /></View>
+              <View style={styles.settingTexts}>
+                <Text style={styles.settingTitle}>Test Push</Text>
+                <Text style={styles.settingSubtitle}>Send a test alert</Text>
+              </View>
+              <ChevronRight size={18} color="#333" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>PRIVACY & SECURITY</Text>
+          <View style={styles.card}>
+            {[
+              { label: 'Privacy Policy', icon: Lock, route: '/PrivacyScreen' },
+              { label: 'Security Settings', icon: Shield, route: '/SecurityScreen' },
+              { label: 'Terms of Service', icon: FileText, action: () => WebBrowser.openBrowserAsync('https://uthutho.co.za/terms-and-conditions') }
+            ].map((item, i) => (
+              <TouchableOpacity key={i} style={[styles.settingRow, i < 2 && styles.borderBottom]} onPress={item.action || (() => router.push(item.route as any))}>
+                <View style={styles.iconBox}><item.icon size={20} color={BRAND_COLOR} /></View>
+                <Text style={styles.settingTitle}>{item.label}</Text>
+                <ChevronRight size={18} color="#333" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>SUPPORT</Text>
+          <View style={styles.card}>
+            {[
+              { label: 'Help & FAQ', icon: HelpCircle, route: '/help' },
+              { label: 'Feedback & Support', icon: MessageSquare, route: '/feedback-support' }
+            ].map((item, i) => (
+              <TouchableOpacity key={i} style={[styles.settingRow, i === 0 && styles.borderBottom]} onPress={() => router.push(item.route as any)}>
+                <View style={styles.iconBox}><item.icon size={20} color={BRAND_COLOR} /></View>
+                <Text style={styles.settingTitle}>{item.label}</Text>
+                <ChevronRight size={18} color="#333" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ABOUT</Text>
+          <View style={styles.card}>
+            <View style={styles.settingRow}>
+              <View style={styles.iconBox}><Info size={20} color={BRAND_COLOR} /></View>
+              <View style={styles.settingTexts}>
+                <Text style={styles.settingTitle}>Uthutho</Text>
+                <Text style={styles.settingSubtitle}>Version 1.8.2 — READY TO MOVE</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.devSection}>
+          <Text style={styles.devLabel}>POWERED BY</Text>
+          <Text style={styles.devName}>Soft Glitch Solutions</Text>
+        </View>
+      </View>
+      <View style={{ height: 60 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-  },
-  header: {
-    marginBottom: 30,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  headerLine: {
-    height: 4,
-    width: 60,
-    borderRadius: 2,
-  },
-  section: {
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-    letterSpacing: 0.5,
-  },
-  settingCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-  },
-  settingContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  settingDetails: {
-    flex: 1,
-  },
-  settingIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#000000ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  settingText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  settingSubtext: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  taglineContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 24,
-  },
-  taglineText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  commuteText: {
-    color: '#1EA2B1',
-  },
-  connectText: {
-    color: '#ED67B1',
-  },
-  communitiesText: {
-    color: '#FD602D',
-  },
-  developerCard: {
-    padding: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderStyle: 'dashed',
-  },
-  developerTitle: {
-    fontSize: 12,
-    fontWeight: '400',
-    marginBottom: 4,
-    opacity: 0.7,
-  },
-  developerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1EA2B1',
-  },
-  bottomSpacing: {
-    height: 40,
-  },
+  container: { flex: 1, backgroundColor: '#000' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 20 },
+  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#222' },
+  headerTitleBox: { alignItems: 'center' },
+  headerTitle: { fontSize: 24, fontWeight: '900', color: '#FFF', fontStyle: 'italic', letterSpacing: -1 },
+  readyText: { fontSize: 10, fontWeight: '900', color: BRAND_COLOR, letterSpacing: 2 },
+  content: { paddingHorizontal: 24, paddingTop: 12 },
+  section: { marginBottom: 32 },
+  sectionTitle: { fontSize: 10, fontWeight: '900', color: '#333', letterSpacing: 2, marginBottom: 16 },
+  card: { backgroundColor: '#111', borderRadius: 24, borderWidth: 1, borderColor: '#222', overflow: 'hidden' },
+  settingRow: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 16 },
+  borderBottom: { borderBottomWidth: 1, borderBottomColor: '#222' },
+  iconBox: { width: 40, height: 40, borderRadius: 14, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#222' },
+  settingTexts: { flex: 1 },
+  settingTitle: { fontSize: 15, fontWeight: 'bold', color: '#FFF', fontStyle: 'italic', flex: 1 },
+  settingSubtitle: { fontSize: 12, fontWeight: '600', color: '#444', marginTop: 2 },
+  devSection: { alignItems: 'center', marginTop: 12 },
+  devLabel: { fontSize: 9, fontWeight: '900', color: '#222', letterSpacing: 1.5 },
+  devName: { fontSize: 14, fontWeight: 'bold', color: BRAND_COLOR, fontStyle: 'italic', marginTop: 4 },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Alert,
   Dimensions,
   Platform,
+  Animated,
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { Plus, CreditCard, Grid3x3, LayoutList } from 'lucide-react-native';
@@ -21,12 +22,21 @@ import { UserCard } from '@/types/tracker';
 import { useTheme } from '@/context/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const isDesktop = SCREEN_WIDTH >= 1024;
 
 // Modern Skeleton Loader
 const CardSkeletonLoader = () => {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.7, duration: 800, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
   return (
-    <View style={styles.skeletonCard}>
+    <Animated.View style={[styles.skeletonCard, { opacity }]}>
       <View style={styles.skeletonHeader}>
         <View style={styles.skeletonBox} />
         <View style={styles.skeletonCircle} />
@@ -37,7 +47,7 @@ const CardSkeletonLoader = () => {
         <View style={[styles.skeletonLine, { width: 60 }]} />
         <View style={[styles.skeletonLine, { width: 40 }]} />
       </View>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -460,7 +470,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
   },
-  summaryItem: {
+  statsSummaryItem: {
     alignItems: 'center',
   },
   summaryValue: {
