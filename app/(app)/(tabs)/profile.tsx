@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
   StyleSheet,
   Platform,
-  Dimensions 
+  Dimensions
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { useProfile } from '@/hook/useProfile';
@@ -22,6 +22,7 @@ import { PostsTab } from '@/components/profile/PostsTab';
 import { BasicInfoTab } from '@/components/profile/BasicInfoTab';
 import { AchievementsTab } from '@/components/profile/AchievementsTab';
 import { DeleteConfirmationModal } from '@/components/profile/DeleteConfirmationModal';
+import { DriverStatsSummary } from '@/components/home/DriverStatsSummary';
 
 // Types
 import { UserPost, LinkedAccount } from '@/types/profile';
@@ -46,10 +47,10 @@ export default function ProfileScreen() {
   const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Delete modal state
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [postToDelete, setPostToDelete] = useState<{id: string; type: 'hub' | 'stop'} | null>(null);
+  const [postToDelete, setPostToDelete] = useState<{ id: string; type: 'hub' | 'stop' } | null>(null);
 
   // Load data effects
   useEffect(() => {
@@ -69,13 +70,13 @@ export default function ProfileScreen() {
     try {
       setAccountsLoading(true);
       const { data: { session }, error } = await supabase.auth.getSession();
-      
+
       if (error) throw error;
-      
+
       if (session?.user) {
         const { user } = session;
         const accounts: LinkedAccount[] = [];
-        
+
         if (user.email) {
           accounts.push({
             provider: 'email',
@@ -83,23 +84,23 @@ export default function ProfileScreen() {
             email: user.email
           });
         }
-        
+
         const identities = user.identities || [];
-        
+
         const hasGoogle = identities.some(identity => identity.provider === 'google');
         accounts.push({
           provider: 'google',
           connected: hasGoogle,
           email: hasGoogle ? user.email : undefined
         });
-        
+
         const hasFacebook = identities.some(identity => identity.provider === 'facebook');
         accounts.push({
           provider: 'facebook',
           connected: hasFacebook,
           email: hasFacebook ? user.email : undefined
         });
-        
+
         // Check for Twitter if you have it configured
         const hasTwitter = identities.some(identity => identity.provider === 'twitter');
         accounts.push({
@@ -107,7 +108,7 @@ export default function ProfileScreen() {
           connected: hasTwitter,
           email: hasTwitter ? user.email : undefined
         });
-        
+
         setLinkedAccounts(accounts);
       }
     } catch (error) {
@@ -121,7 +122,7 @@ export default function ProfileScreen() {
     try {
       setPostsLoading(true);
       console.log('🔄 Loading posts for user:', profile.id);
-      
+
       // First, get the user's profile data
       const { data: userProfile, error: profileError } = await supabase
         .from('profiles')
@@ -229,7 +230,7 @@ export default function ProfileScreen() {
   // Function to handle connecting social accounts with detailed error handling
   const handleConnectAccount = async (provider: string) => {
     console.log(`Starting ${provider} connection...`);
-    
+
     try {
       // First, get the current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -237,20 +238,20 @@ export default function ProfileScreen() {
         console.error('Session error:', sessionError);
         throw new Error(`Session error: ${sessionError.message}`);
       }
-      
+
       if (!session) {
         throw new Error('No active session found. Please sign in again.');
       }
-      
+
       console.log('User session found:', session.user.email);
-      
+
       // Create a deep link URL for the OAuth callback
       const callbackUrl = Linking.createURL('/profile');
       console.log('Callback URL:', callbackUrl);
-      
+
       // Set up OAuth parameters based on provider
       let oauthProvider: 'google' | 'facebook' | 'twitter' | null = null;
-      
+
       switch (provider) {
         case 'google':
           oauthProvider = 'google';
@@ -264,11 +265,11 @@ export default function ProfileScreen() {
         default:
           throw new Error(`Unsupported provider: ${provider}`);
       }
-      
+
       // For web platform
       if (Platform.OS === 'web') {
         console.log('Starting web OAuth for provider:', oauthProvider);
-        
+
         // First, check if we can get an OAuth URL
         const { data, error } = await supabase.auth.linkIdentity({
           provider: oauthProvider,
@@ -277,12 +278,12 @@ export default function ProfileScreen() {
             skipBrowserRedirect: false, // Let Supabase handle redirect
           },
         });
-        
+
         console.log('linkIdentity response:', { data, error });
-        
+
         if (error) {
           console.error('linkIdentity error:', error);
-          
+
           // Check for specific error types
           if (error.message?.includes('already linked')) {
             throw new Error('This social account is already linked to another user.');
@@ -296,70 +297,70 @@ export default function ProfileScreen() {
             throw new Error(`OAuth setup error: ${error.message || 'Unknown error'}`);
           }
         }
-        
+
         if (data?.url) {
           console.log('Opening OAuth URL:', data.url);
-          
+
           // Open the OAuth URL in a new window/tab
           const authWindow = window.open(
-            data.url, 
-            '_blank', 
+            data.url,
+            '_blank',
             'width=600,height=700,scrollbars=yes,resizable=yes'
           );
-          
+
           if (!authWindow) {
             throw new Error('Popup was blocked. Please allow popups for this website and try again.');
           }
-          
+
           // Focus the new window
           authWindow.focus();
-          
+
           // Set up a listener for the OAuth callback
           let checkCount = 0;
           const maxChecks = 120; // 2 minutes at 1-second intervals
-          
+
           const checkOAuthCompletion = setInterval(async () => {
             checkCount++;
-            
+
             try {
               // Check if the auth window is closed
               if (authWindow.closed) {
                 clearInterval(checkOAuthCompletion);
                 throw new Error('Authentication window was closed before completing.');
               }
-              
+
               // Check if user is still in the same session
               const { data: { session: newSession } } = await supabase.auth.getSession();
-              
+
               // Check if the provider is now connected
               if (newSession) {
                 const identities = newSession.user.identities || [];
-                const isNowConnected = identities.some(identity => 
-                  identity.provider === provider || 
+                const isNowConnected = identities.some(identity =>
+                  identity.provider === provider ||
                   identity.provider === oauthProvider
                 );
-                
+
                 if (isNowConnected) {
                   console.log(`${provider} account successfully connected!`);
                   clearInterval(checkOAuthCompletion);
                   authWindow.close();
-                  
+
                   // Reload accounts
                   await loadLinkedAccounts();
-                  
+
                   // Award points
                   await awardPointsForConnection(provider);
                   return;
                 }
               }
-              
+
               // Timeout after max checks
               if (checkCount >= maxChecks) {
                 clearInterval(checkOAuthCompletion);
                 authWindow.close();
                 throw new Error('Connection timed out after 2 minutes. Please try again.');
               }
-              
+
             } catch (checkError) {
               console.error('Error checking OAuth completion:', checkError);
               clearInterval(checkOAuthCompletion);
@@ -367,16 +368,16 @@ export default function ProfileScreen() {
               throw new Error(`Verification failed: ${checkError.message}`);
             }
           }, 1000);
-          
+
         } else {
           console.warn('No OAuth URL returned from linkIdentity');
           throw new Error('Failed to start OAuth flow. No authentication URL was provided.');
         }
-        
+
       } else {
         // For mobile, use Expo WebBrowser
         console.log('Starting mobile OAuth for provider:', oauthProvider);
-        
+
         const { data, error } = await supabase.auth.linkIdentity({
           provider: oauthProvider,
           options: {
@@ -384,35 +385,35 @@ export default function ProfileScreen() {
             skipBrowserRedirect: true,
           },
         });
-        
+
         console.log('Mobile linkIdentity response:', { data, error });
-        
+
         if (error) {
           console.error('Mobile OAuth error:', error);
           throw new Error(`Mobile OAuth error: ${error.message || 'Unknown error'}`);
         }
-        
+
         if (data?.url) {
           console.log('Opening mobile OAuth URL:', data.url);
-          
+
           // Open the OAuth URL in a browser
           const result = await WebBrowser.openAuthSessionAsync(data.url, callbackUrl);
           console.log('WebBrowser result:', result);
-          
+
           if (result.type === 'success') {
             // Parse the URL to get the code
             const url = result.url;
             console.log('OAuth callback URL:', url);
-            
+
             // Extract code from URL
             const urlObj = new URL(url);
             const code = urlObj.searchParams.get('code');
             const errorParam = urlObj.searchParams.get('error');
-            
+
             if (errorParam) {
               throw new Error(`OAuth error: ${errorParam}`);
             }
-            
+
             if (code) {
               console.log('Exchanging code for session...');
               // Exchange the code for a session
@@ -421,11 +422,11 @@ export default function ProfileScreen() {
                 console.error('Session exchange error:', exchangeError);
                 throw new Error(`Session exchange error: ${exchangeError.message}`);
               }
-              
+
               console.log('Session exchange successful');
               // Reload accounts
               await loadLinkedAccounts();
-              
+
               // Award points for connecting
               await awardPointsForConnection(provider);
             } else {
@@ -444,17 +445,17 @@ export default function ProfileScreen() {
           throw new Error('No OAuth URL provided for mobile authentication.');
         }
       }
-      
+
     } catch (error) {
       console.error(`Error connecting ${provider} account:`, error);
-      
+
       // Extract meaningful error message
       let errorMessage = 'Unable to connect account. Please try again.';
-      
+
       if (error instanceof Error) {
         // Show the actual error message
         errorMessage = error.message;
-        
+
         // Add troubleshooting tips for common errors
         if (error.message.includes('already linked')) {
           errorMessage += '\n\nTry: Sign out and sign in with that social account instead.';
@@ -468,7 +469,7 @@ export default function ProfileScreen() {
           errorMessage += '\n\nAdmin: This OAuth provider needs to be configured in Supabase Dashboard.';
         }
       }
-      
+
       throw new Error(errorMessage);
     }
   };
@@ -481,9 +482,9 @@ export default function ProfileScreen() {
         'facebook': 50,
         'twitter': 30,
       };
-      
+
       const points = pointsMap[provider] || 0;
-      
+
       if (points > 0 && profile?.id) {
         // Get current user points
         const { data: profileData, error: profileError } = await supabase
@@ -491,27 +492,27 @@ export default function ProfileScreen() {
           .select('points')
           .eq('id', profile.id)
           .single();
-          
+
         if (profileError) {
           console.error('Error fetching profile points:', profileError);
           return; // Don't throw, points are secondary
         }
-        
+
         const newPoints = (profileData?.points || 0) + points;
-        
+
         // Update points in database
         const { error: updateError } = await supabase
           .from('profiles')
           .update({ points: newPoints })
           .eq('id', profile.id);
-          
+
         if (updateError) {
           console.error('Error updating points:', updateError);
           return; // Don't throw, points are secondary
         }
-        
+
         console.log(`Awarded ${points} points for connecting ${provider}`);
-        
+
         // Try to create a points transaction record if the table exists
         try {
           const { error: transactionError } = await supabase
@@ -523,7 +524,7 @@ export default function ProfileScreen() {
               description: `Connected ${provider} account`,
               provider: provider
             });
-            
+
           if (transactionError) {
             console.error('Error creating transaction record:', transactionError);
             // Don't throw, this is optional
@@ -564,7 +565,7 @@ export default function ProfileScreen() {
         aspect: [1, 1],
         quality: 0.7,
       });
-  
+
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         await uploadAvatar(asset.uri);
@@ -652,7 +653,7 @@ export default function ProfileScreen() {
 
   return (
     <>
-      <ScrollView 
+      <ScrollView
         style={[styles.container, { backgroundColor: '#000000' }]}
         contentContainerStyle={[styles.contentContainer, isDesktop && styles.contentContainerDesktop]}
         showsVerticalScrollIndicator={false}
@@ -680,6 +681,12 @@ export default function ProfileScreen() {
                 onImagePicker={handleImagePicker}
                 isDesktop={isDesktop}
               />
+
+              {profile?.role === 'driver' && profile?.id && (
+                <View style={{ marginBottom: 24 }}>
+                  <DriverStatsSummary userId={profile.id} colors={colors} />
+                </View>
+              )}
 
               {/* Tabs */}
               <View style={styles.tabs}>
@@ -736,6 +743,12 @@ export default function ProfileScreen() {
               onImagePicker={handleImagePicker}
               isDesktop={false}
             />
+
+            {profile?.role === 'driver' && profile?.id && (
+              <View style={{ paddingHorizontal: 24, marginBottom: 24 }}>
+                <DriverStatsSummary userId={profile.id} colors={colors} />
+              </View>
+            )}
 
             {/* Tabs */}
             <View style={styles.tabs}>

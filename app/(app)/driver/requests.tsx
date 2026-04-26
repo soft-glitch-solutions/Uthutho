@@ -1,4 +1,3 @@
-// app/(app)/driver/requests.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -10,8 +9,10 @@ import {
   Alert,
   Modal,
   TextInput,
+  Platform,
+  Linking,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import {
   ArrowLeft,
   Users,
@@ -20,14 +21,13 @@ import {
   Clock,
   MessageSquare,
   Phone,
-  Mail,
   MapPin,
-  Filter,
   Search,
-  ChevronDown,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
+import { useTheme } from '@/context/ThemeContext';
+import { RequestsSkeleton } from '@/components/profile/SkeletonComponents';
 
 interface TransportRequest {
   id: string;
@@ -58,13 +58,13 @@ type FilterType = 'all' | 'pending' | 'approved' | 'declined';
 export default function DriverRequestsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { colors } = useTheme();
   
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [requests, setRequests] = useState<TransportRequest[]>([]);
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<TransportRequest | null>(null);
   const [declineReason, setDeclineReason] = useState('');
   const [showDeclineModal, setShowDeclineModal] = useState(false);
@@ -79,7 +79,6 @@ export default function DriverRequestsScreen() {
     try {
       setLoading(true);
       
-      // Get driver ID
       const { data: driverData, error: driverError } = await supabase
         .from('drivers')
         .select('id')
@@ -90,7 +89,6 @@ export default function DriverRequestsScreen() {
 
       const driverId = driverData.id;
 
-      // Get all transports by this driver
       const { data: transportsData, error: transportsError } = await supabase
         .from('school_transports')
         .select('id')
@@ -105,7 +103,6 @@ export default function DriverRequestsScreen() {
         return;
       }
 
-      // Get requests for these transports
       const { data: requestsData, error: requestsError } = await supabase
         .from('transport_requests')
         .select(`
@@ -196,274 +193,205 @@ export default function DriverRequestsScreen() {
     );
   };
 
-  const handleGoBack = () => {
-    router.back();
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved': return '#10B981';
       case 'declined': return '#EF4444';
       case 'pending': return '#F59E0B';
-      default: return '#888888';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'approved': return <CheckCircle size={16} color="#10B981" />;
-      case 'declined': return <XCircle size={16} color="#EF4444" />;
-      case 'pending': return <Clock size={16} color="#F59E0B" />;
-      default: return null;
+      default: return '#666';
     }
   };
 
   const filteredRequests = requests.filter(request => {
-    // Apply status filter
     if (filter !== 'all' && request.status !== filter) return false;
-    
-    // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
         request.student_name.toLowerCase().includes(query) ||
-        request.transport.school_name.toLowerCase().includes(query) ||
-        request.parent_phone.includes(query)
+        request.transport.school_name.toLowerCase().includes(query)
       );
     }
-    
     return true;
   });
 
-  const getStats = () => {
-    const total = requests.length;
-    const pending = requests.filter(r => r.status === 'pending').length;
-    const approved = requests.filter(r => r.status === 'approved').length;
-    const declined = requests.filter(r => r.status === 'declined').length;
-    
-    return { total, pending, approved, declined };
+  const stats = {
+    total: requests.length,
+    pending: requests.filter(r => r.status === 'pending').length,
+    approved: requests.filter(r => r.status === 'approved').length,
   };
-
-  const stats = getStats();
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Premium Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={handleGoBack}
-        >
-          <ArrowLeft size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Requests</Text>
+        <View style={styles.headerTop}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <ArrowLeft size={24} color="#FFF" />
+          </TouchableOpacity>
+          <Text style={styles.brandText}>Uthutho</Text>
+          <TouchableOpacity style={styles.settingsButton}>
+            <Users size={22} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.headerContent}>
+          <Text style={styles.readyText}>REQUESTS OVERVIEW</Text>
+          <Text style={styles.headingText}>Transport Applications</Text>
+        </View>
       </View>
 
-      {/* Stats */}
-      <View style={styles.statsContainer}>
-        <TouchableOpacity 
-          style={[styles.statItem, filter === 'all' && styles.statItemActive]}
-          onPress={() => setFilter('all')}
-        >
-          <Text style={styles.statNumber}>{stats.total}</Text>
-          <Text style={styles.statLabel}>All</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.statItem, filter === 'pending' && styles.statItemActive]}
-          onPress={() => setFilter('pending')}
-        >
-          <Text style={[styles.statNumber, { color: '#F59E0B' }]}>{stats.pending}</Text>
-          <Text style={styles.statLabel}>Pending</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.statItem, filter === 'approved' && styles.statItemActive]}
-          onPress={() => setFilter('approved')}
-        >
-          <Text style={[styles.statNumber, { color: '#10B981' }]}>{stats.approved}</Text>
-          <Text style={styles.statLabel}>Approved</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.statItem, filter === 'declined' && styles.statItemActive]}
-          onPress={() => setFilter('declined')}
-        >
-          <Text style={[styles.statNumber, { color: '#EF4444' }]}>{stats.declined}</Text>
-          <Text style={styles.statLabel}>Declined</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <Search size={20} color="#888888" style={styles.searchIcon} />
+      <View style={styles.searchSection}>
+        <View style={styles.searchBar}>
+          <Search size={20} color="#666" />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by student name or school..."
-            placeholderTextColor="#888888"
+            placeholder="Search students or schools..."
+            placeholderTextColor="#666"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
         </View>
       </View>
 
+      <View style={styles.filterRow}>
+        {(['all', 'pending', 'approved', 'declined'] as FilterType[]).map((type) => (
+          <TouchableOpacity
+            key={type}
+            style={[styles.filterPill, filter === type && styles.filterPillActive]}
+            onPress={() => setFilter(type)}
+          >
+            <Text style={[styles.filterText, filter === type && styles.filterTextActive]}>
+              {type.toUpperCase()}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <ScrollView 
         style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor="#1ea2b1"
-            colors={["#1ea2b1"]}
           />
         }
       >
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading requests...</Text>
-          </View>
+          <RequestsSkeleton colors={colors} />
         ) : filteredRequests.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Users size={64} color="#888888" />
-            <Text style={styles.emptyText}>
-              {searchQuery || filter !== 'all' 
-                ? 'No matching requests found' 
-                : 'No requests yet'}
-            </Text>
-            <Text style={styles.emptySubtext}>
-              {searchQuery ? 'Try a different search' : 'Requests will appear here when parents apply'}
-            </Text>
+            <Users size={64} color="#222" />
+            <Text style={styles.emptyText}>No requests found</Text>
+            <Text style={styles.emptySubtext}>New applications will appear here</Text>
           </View>
         ) : (
-          <View style={styles.requestsList}>
+          <View style={styles.listContainer}>
             {filteredRequests.map((request) => (
               <View key={request.id} style={styles.requestCard}>
-                <View style={styles.requestHeader}>
+                <View style={styles.cardHeader}>
                   <View>
                     <Text style={styles.studentName}>{request.student_name}</Text>
                     <Text style={styles.schoolName}>{request.transport.school_name}</Text>
                   </View>
-                  <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(request.status)}20` }]}>
-                    {getStatusIcon(request.status)}
+                  <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(request.status)}10` }]}>
                     <Text style={[styles.statusText, { color: getStatusColor(request.status) }]}>
                       {request.status.toUpperCase()}
                     </Text>
                   </View>
                 </View>
-                
-                <View style={styles.requestDetails}>
-                  <View style={styles.detailRow}>
-                    <MapPin size={14} color="#888888" />
-                    <Text style={styles.detailValue} numberOfLines={1}>
-                      {request.pickup_address}
-                    </Text>
+
+                <View style={styles.cardDetails}>
+                  <View style={styles.detailItem}>
+                    <MapPin size={14} color="#666" />
+                    <Text style={styles.detailText} numberOfLines={1}>{request.pickup_address}</Text>
                   </View>
-                  
-                  <View style={styles.detailRow}>
-                    <Phone size={14} color="#888888" />
-                    <Text style={styles.detailValue}>{request.parent_phone}</Text>
-                  </View>
-                  
                   {request.message && (
-                    <View style={styles.messageContainer}>
-                      <MessageSquare size={14} color="#888888" />
-                      <Text style={styles.messageText} numberOfLines={2}>
-                        {request.message}
-                      </Text>
+                    <View style={styles.messageBox}>
+                      <MessageSquare size={14} color="#1ea2b1" />
+                      <Text style={styles.messageText}>{request.message}</Text>
                     </View>
                   )}
-                  
-                  <Text style={styles.dateText}>
-                    Applied on {new Date(request.created_at).toLocaleDateString()}
-                  </Text>
                 </View>
-                
-                {request.status === 'pending' && (
+
+                <View style={styles.cardFooter}>
+                  <Text style={styles.dateText}>
+                    {new Date(request.created_at).toLocaleDateString()}
+                  </Text>
+                  
                   <View style={styles.actionButtons}>
-                    <TouchableOpacity 
-                      style={[styles.actionButton, styles.declineButton]}
-                      onPress={() => {
-                        setSelectedRequest(request);
-                        setShowDeclineModal(true);
-                      }}
-                    >
-                      <XCircle size={16} color="#EF4444" />
-                      <Text style={styles.declineButtonText}>Decline</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={[styles.actionButton, styles.approveButton]}
-                      onPress={() => handleApprove(request.id)}
-                    >
-                      <CheckCircle size={16} color="#10B981" />
-                      <Text style={styles.approveButtonText}>Approve</Text>
-                    </TouchableOpacity>
+                    {request.status === 'pending' ? (
+                      <>
+                        <TouchableOpacity 
+                          style={styles.declineBtn}
+                          onPress={() => {
+                            setSelectedRequest(request);
+                            setShowDeclineModal(true);
+                          }}
+                        >
+                          <XCircle size={20} color="#EF4444" />
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.approveBtn}
+                          onPress={() => handleApprove(request.id)}
+                        >
+                          <CheckCircle size={20} color="#10B981" />
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <TouchableOpacity 
+                        style={styles.contactBtn}
+                        onPress={() => handleContactParent(request.parent_phone)}
+                      >
+                        <Phone size={18} color="#1ea2b1" />
+                        <Text style={styles.contactBtnText}>Contact</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
-                )}
-                
-                {(request.status === 'approved' || request.status === 'declined') && (
-                  <TouchableOpacity 
-                    style={styles.contactButton}
-                    onPress={() => handleContactParent(request.parent_phone)}
-                  >
-                    <Phone size={16} color="#1ea2b1" />
-                    <Text style={styles.contactButtonText}>Contact Parent</Text>
-                  </TouchableOpacity>
-                )}
+                </View>
               </View>
             ))}
           </View>
         )}
-        
-        <View style={styles.bottomPadding} />
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Decline Reason Modal */}
+      {/* Decline Modal */}
       <Modal
         visible={showDeclineModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => {
-          setShowDeclineModal(false);
-          setDeclineReason('');
-          setSelectedRequest(null);
-        }}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeclineModal(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Decline Request</Text>
-            <Text style={styles.modalSubtitle}>
-              Add a reason for declining {selectedRequest?.student_name}'s application
-            </Text>
-            
+            <Text style={styles.modalSubtitle}>Provide a reason for the parent (optional)</Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="Reason for declining (optional)"
-              placeholderTextColor="#666666"
+              placeholder="E.g. Full capacity, route unavailable..."
+              placeholderTextColor="#444"
               value={declineReason}
               onChangeText={setDeclineReason}
               multiline
-              numberOfLines={3}
             />
-            
-            <View style={styles.modalButtons}>
+            <View style={styles.modalActions}>
               <TouchableOpacity 
-                style={[styles.modalButton, styles.modalCancelButton]}
-                onPress={() => {
-                  setShowDeclineModal(false);
-                  setDeclineReason('');
-                  setSelectedRequest(null);
-                }}
+                style={styles.cancelBtn}
+                onPress={() => setShowDeclineModal(false)}
               >
-                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              
               <TouchableOpacity 
-                style={[styles.modalButton, styles.modalDeclineButton]}
+                style={styles.confirmDeclineBtn}
                 onPress={() => selectedRequest && handleDecline(selectedRequest.id, declineReason)}
               >
-                <Text style={styles.modalDeclineButtonText}>Decline</Text>
+                <Text style={styles.confirmDeclineBtnText}>Confirm Decline</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -479,292 +407,293 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   header: {
-    padding: 24,
-    paddingTop: 60,
-    backgroundColor: '#111111',
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    backgroundColor: '#000',
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    marginBottom: 32,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#222222',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+  brandText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -1,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#111111',
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 16,
-    borderRadius: 12,
-    padding: 16,
-  },
-  statItem: {
-    flex: 1,
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
-    padding: 8,
-    borderRadius: 8,
+    justifyContent: 'center',
   },
-  statItemActive: {
-    backgroundColor: '#1a1a1a',
+  headerContent: {
+    marginTop: 0,
   },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  statLabel: {
+  readyText: {
     fontSize: 12,
-    color: '#888888',
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: '#1ea2b1',
+    marginBottom: 12,
+    textTransform: 'uppercase',
   },
-  searchContainer: {
-    paddingHorizontal: 16,
+  headingText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#FFF',
+    fontStyle: 'italic',
+    letterSpacing: -1,
+  },
+  searchSection: {
+    paddingHorizontal: 24,
     marginBottom: 16,
   },
-  searchInputContainer: {
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#333333',
+    backgroundColor: '#111',
+    borderRadius: 20,
     paddingHorizontal: 16,
-  },
-  searchIcon: {
-    marginRight: 12,
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#222',
   },
   searchInput: {
     flex: 1,
-    padding: 16,
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: '#FFF',
+    fontSize: 14,
+    marginLeft: 12,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    marginBottom: 24,
+    gap: 8,
+  },
+  filterPill: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#111',
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  filterPillActive: {
+    borderColor: '#1ea2b1',
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+  },
+  filterText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#444',
+  },
+  filterTextActive: {
+    color: '#1ea2b1',
   },
   scrollContainer: {
     flex: 1,
   },
-  loadingContainer: {
-    padding: 40,
-    alignItems: 'center',
+  listContainer: {
+    paddingHorizontal: 24,
+    gap: 16,
   },
-  loadingText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  requestCard: {
+    backgroundColor: '#111',
+    borderRadius: 32,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  studentName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  schoolName: {
+    fontSize: 13,
+    color: '#1ea2b1',
+    fontWeight: '600',
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  cardDetails: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  detailText: {
+    fontSize: 14,
+    color: '#888',
+    flex: 1,
+  },
+  messageBox: {
+    backgroundColor: 'rgba(30, 162, 177, 0.05)',
+    padding: 12,
+    borderRadius: 16,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  messageText: {
+    fontSize: 13,
+    color: '#CCC',
+    fontStyle: 'italic',
+    flex: 1,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#1a1a1a',
+  },
+  dateText: {
+    fontSize: 11,
+    color: '#444',
+    fontWeight: '600',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  approveBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  declineBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contactBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  contactBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1ea2b1',
   },
   emptyContainer: {
     padding: 60,
     alignItems: 'center',
   },
   emptyText: {
-    color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: '600',
-    marginTop: 24,
-    marginBottom: 8,
+    fontWeight: '800',
+    color: '#FFF',
+    marginTop: 20,
   },
   emptySubtext: {
-    color: '#888888',
     fontSize: 14,
+    color: '#444',
     textAlign: 'center',
-  },
-  requestsList: {
-    paddingHorizontal: 16,
-    gap: 16,
-  },
-  requestCard: {
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  requestHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  studentName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  schoolName: {
-    fontSize: 14,
-    color: '#888888',
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  requestDetails: {
-    gap: 8,
-    marginBottom: 16,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  detailLabel: {
-    color: '#888888',
-    fontSize: 14,
-    minWidth: 40,
-  },
-  detailValue: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    flex: 1,
-  },
-  messageContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
     marginTop: 8,
-  },
-  messageText: {
-    flex: 1,
-    color: '#CCCCCC',
-    fontSize: 14,
-    fontStyle: 'italic',
-  },
-  dateText: {
-    color: '#888888',
-    fontSize: 12,
-    marginTop: 8,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 8,
-  },
-  declineButton: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.2)',
-  },
-  declineButtonText: {
-    color: '#EF4444',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  approveButton: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-  },
-  approveButtonText: {
-    color: '#10B981',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  contactButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(30, 162, 177, 0.1)',
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(30, 162, 177, 0.2)',
-    gap: 8,
-  },
-  contactButtonText: {
-    color: '#1ea2b1',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  bottomPadding: {
-    height: 100,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(0,0,0,0.85)',
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
   modalContent: {
-    backgroundColor: '#111111',
-    borderRadius: 20,
+    backgroundColor: '#111',
+    borderRadius: 32,
     padding: 24,
-    width: '100%',
-    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: '#222',
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontWeight: '800',
+    color: '#FFF',
     marginBottom: 8,
   },
   modalSubtitle: {
     fontSize: 14,
-    color: '#888888',
+    color: '#666',
     marginBottom: 20,
-    lineHeight: 20,
   },
   modalInput: {
-    backgroundColor: '#1a1a1a',
-    color: '#FFFFFF',
-    fontSize: 16,
+    backgroundColor: '#000',
+    borderRadius: 20,
     padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#333333',
-    marginBottom: 20,
+    color: '#FFF',
+    fontSize: 15,
     minHeight: 100,
     textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: '#222',
+    marginBottom: 24,
   },
-  modalButtons: {
+  modalActions: {
     flexDirection: 'row',
     gap: 12,
   },
-  modalButton: {
+  cancelBtn: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 8,
     alignItems: 'center',
   },
-  modalCancelButton: {
-    backgroundColor: '#333333',
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#666',
   },
-  modalCancelButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalDeclineButton: {
+  confirmDeclineBtn: {
+    flex: 2,
     backgroundColor: '#EF4444',
+    paddingVertical: 14,
+    borderRadius: 20,
+    alignItems: 'center',
   },
-  modalDeclineButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+  confirmDeclineBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFF',
   },
 });

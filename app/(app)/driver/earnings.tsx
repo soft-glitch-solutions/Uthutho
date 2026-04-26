@@ -1,4 +1,3 @@
-// app/(app)/driver/earnings.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -8,8 +7,9 @@ import {
   TouchableOpacity,
   RefreshControl,
   Dimensions,
+  Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import {
   ArrowLeft,
   DollarSign,
@@ -19,10 +19,13 @@ import {
   CreditCard,
   History,
   ChevronRight,
+  TrendingDown,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import { LineChart } from 'react-native-chart-kit';
+import { useTheme } from '@/context/ThemeContext';
+import { EarningsSkeleton } from '@/components/profile/SkeletonComponents';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -45,6 +48,7 @@ interface Transaction {
 export default function DriverEarningsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { colors } = useTheme();
   
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -69,7 +73,6 @@ export default function DriverEarningsScreen() {
     try {
       setLoading(true);
       
-      // Get driver ID
       const { data: driverData, error: driverError } = await supabase
         .from('drivers')
         .select('id')
@@ -80,16 +83,14 @@ export default function DriverEarningsScreen() {
 
       const driverId = driverData.id;
 
-      // Get all transports by this driver
       const { data: transportsData, error: transportsError } = await supabase
         .from('school_transports')
         .select('id, price_per_month, current_riders')
         .eq('driver_id', driverId)
-        .eq('is_active', true);
+        .eq('status', 'open');
 
       if (transportsError) throw transportsError;
 
-      // Calculate earnings
       let totalEarnings = 0;
       let thisMonthEarnings = 0;
       let lastMonthEarnings = 0;
@@ -97,13 +98,13 @@ export default function DriverEarningsScreen() {
       let pendingEarnings = 0;
 
       transportsData.forEach(transport => {
-        const monthlyRevenue = transport.price_per_month * transport.current_riders;
-        totalEarnings += monthlyRevenue;
+        const monthlyRevenue = (transport.price_per_month || 0) * (transport.current_riders || 0);
+        totalEarnings += monthlyRevenue * 12; // Approximation for demo
         thisMonthEarnings += monthlyRevenue;
-        availableEarnings += monthlyRevenue;
+        availableEarnings += monthlyRevenue * 0.8; // Approximation
+        pendingEarnings += monthlyRevenue * 0.2; // Approximation
       });
 
-      // For demo purposes, generate monthly data
       const demoMonthlyData: MonthlyEarnings[] = [
         { month: 'Jan', earnings: 8500, rides: 15 },
         { month: 'Feb', earnings: 9200, rides: 18 },
@@ -113,7 +114,6 @@ export default function DriverEarningsScreen() {
         { month: 'Jun', earnings: 11000, rides: 22 },
       ];
 
-      // Demo transactions
       const demoTransactions: Transaction[] = [
         {
           id: '1',
@@ -177,12 +177,8 @@ export default function DriverEarningsScreen() {
     fetchEarningsData();
   };
 
-  const handleGoBack = () => {
-    router.back();
-  };
-
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-ZA', {
       style: 'currency',
       currency: 'ZAR',
       minimumFractionDigits: 0,
@@ -193,30 +189,27 @@ export default function DriverEarningsScreen() {
     labels: monthlyData.map(data => data.month),
     datasets: [
       {
-        data: monthlyData.map(data => data.earnings / 1000), // Convert to thousands
+        data: monthlyData.map(data => data.earnings / 1000),
         color: (opacity = 1) => `rgba(30, 162, 177, ${opacity})`,
-        strokeWidth: 2,
+        strokeWidth: 3,
       },
     ],
   };
 
   const chartConfig = {
-    backgroundColor: '#111111',
-    backgroundGradientFrom: '#111111',
-    backgroundGradientTo: '#111111',
+    backgroundColor: '#000000',
+    backgroundGradientFrom: '#000000',
+    backgroundGradientTo: '#000000',
     decimalPlaces: 1,
-    color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+    color: (opacity = 1) => `rgba(30, 162, 177, ${opacity})`,
     labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
     style: {
-      borderRadius: 16,
+      borderRadius: 24,
     },
     propsForDots: {
-      r: '4',
+      r: '6',
       strokeWidth: '2',
-      stroke: '#1ea2b1',
-    },
-    propsForLabels: {
-      fontSize: 12,
+      stroke: '#000',
     },
   };
 
@@ -225,7 +218,7 @@ export default function DriverEarningsScreen() {
       case 'completed': return '#10B981';
       case 'pending': return '#F59E0B';
       case 'failed': return '#EF4444';
-      default: return '#888888';
+      default: return '#666';
     }
   };
 
@@ -233,206 +226,156 @@ export default function DriverEarningsScreen() {
     switch (type) {
       case 'payment': return <DollarSign size={16} color="#10B981" />;
       case 'payout': return <CreditCard size={16} color="#1ea2b1" />;
-      case 'refund': return <History size={16} color="#EF4444" />;
-      default: return <DollarSign size={16} color="#888888" />;
+      case 'refund': return <TrendingDown size={16} color="#EF4444" />;
+      default: return <DollarSign size={16} color="#666" />;
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Premium Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={handleGoBack}
-        >
-          <ArrowLeft size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Earnings</Text>
+        <View style={styles.headerTop}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <ArrowLeft size={24} color="#FFF" />
+          </TouchableOpacity>
+          <Text style={styles.brandText}>Uthutho</Text>
+          <TouchableOpacity style={styles.settingsButton}>
+            <Calendar size={22} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.headerContent}>
+          <Text style={styles.readyText}>EARNINGS OVERVIEW</Text>
+          <Text style={styles.headingText}>Financial Insights</Text>
+        </View>
       </View>
 
       <ScrollView 
         style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor="#1ea2b1"
-            colors={["#1ea2b1"]}
           />
         }
       >
-        {/* Earnings Summary */}
-        <View style={styles.earningsSummary}>
-          <View style={styles.totalEarnings}>
-            <Text style={styles.totalLabel}>Total Earnings</Text>
-            <Text style={styles.totalAmount}>{formatCurrency(earnings.total)}</Text>
-            <Text style={styles.totalSubtext}>Lifetime earnings</Text>
-          </View>
-          
-          <View style={styles.earningsBreakdown}>
-            <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>This Month</Text>
-              <Text style={styles.breakdownAmount}>{formatCurrency(earnings.thisMonth)}</Text>
+        {loading ? (
+          <EarningsSkeleton colors={colors} />
+        ) : (
+          <>
+            {/* Total Earnings Card */}
+            <View style={styles.totalCard}>
+              <Text style={styles.totalLabel}>LIFETIME REVENUE</Text>
+              <Text style={styles.totalAmount}>{formatCurrency(earnings.total)}</Text>
+              <View style={styles.trendRow}>
+                <TrendingUp size={16} color="#10B981" />
+                <Text style={styles.trendText}>+12.5% from last month</Text>
+              </View>
             </View>
             
-            <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>Available</Text>
-              <Text style={styles.breakdownAmount}>{formatCurrency(earnings.available)}</Text>
+            {/* Breakdown Grid */}
+            <View style={styles.gridContainer}>
+              <View style={styles.gridItem}>
+                <Text style={styles.gridLabel}>THIS MONTH</Text>
+                <Text style={styles.gridValue}>{formatCurrency(earnings.thisMonth)}</Text>
+              </View>
+              <View style={styles.gridItem}>
+                <Text style={styles.gridLabel}>AVAILABLE</Text>
+                <Text style={[styles.gridValue, { color: '#10B981' }]}>{formatCurrency(earnings.available)}</Text>
+              </View>
+              <View style={styles.gridItem}>
+                <Text style={styles.gridLabel}>PENDING</Text>
+                <Text style={[styles.gridValue, { color: '#F59E0B' }]}>{formatCurrency(earnings.pending)}</Text>
+              </View>
             </View>
-            
-            <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>Pending</Text>
-              <Text style={styles.breakdownAmount}>{formatCurrency(earnings.pending)}</Text>
-            </View>
-          </View>
-        </View>
 
-        {/* Period Selector */}
-        <View style={styles.periodSelector}>
-          <TouchableOpacity 
-            style={[styles.periodButton, selectedPeriod === 'week' && styles.periodButtonActive]}
-            onPress={() => setSelectedPeriod('week')}
-          >
-            <Text style={[styles.periodButtonText, selectedPeriod === 'week' && styles.periodButtonTextActive]}>
-              Week
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.periodButton, selectedPeriod === 'month' && styles.periodButtonActive]}
-            onPress={() => setSelectedPeriod('month')}
-          >
-            <Text style={[styles.periodButtonText, selectedPeriod === 'month' && styles.periodButtonTextActive]}>
-              Month
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.periodButton, selectedPeriod === 'year' && styles.periodButtonActive]}
-            onPress={() => setSelectedPeriod('year')}
-          >
-            <Text style={[styles.periodButtonText, selectedPeriod === 'year' && styles.periodButtonTextActive]}>
-              Year
-            </Text>
-          </TouchableOpacity>
-        </View>
+            {/* Chart Section */}
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>PERFORMANCE TREND</Text>
+              <LineChart
+                data={chartData}
+                width={screenWidth - 64}
+                height={200}
+                chartConfig={chartConfig}
+                bezier
+                style={styles.chart}
+                withInnerLines={false}
+                withOuterLines={false}
+              />
+            </View>
 
-        {/* Earnings Chart */}
-        {monthlyData.length > 0 && (
-          <View style={styles.chartContainer}>
-            <Text style={styles.chartTitle}>Earnings Overview</Text>
-            <LineChart
-              data={chartData}
-              width={screenWidth - 32}
-              height={220}
-              chartConfig={chartConfig}
-              bezier
-              style={styles.chart}
-              formatYLabel={(value) => `R${parseFloat(value) * 1000}`}
-            />
-            <Text style={styles.chartSubtitle}>
-              Earnings in thousands (ZAR) per month
-            </Text>
-          </View>
-        )}
+            {/* Quick Actions */}
+            <View style={styles.actionsRow}>
+              <TouchableOpacity style={styles.actionCard}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(30, 162, 177, 0.1)' }]}>
+                  <Download size={20} color="#1ea2b1" />
+                </View>
+                <Text style={styles.actionLabel}>Withdraw</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.actionCard}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                  <TrendingUp size={20} color="#10B981" />
+                </View>
+                <Text style={styles.actionLabel}>Analytic</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.actionCard}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
+                  <History size={20} color="#8B5CF6" />
+                </View>
+                <Text style={styles.actionLabel}>Invoices</Text>
+              </TouchableOpacity>
+            </View>
 
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickAction}>
-            <View style={[styles.quickActionIcon, { backgroundColor: 'rgba(30, 162, 177, 0.1)' }]}>
-              <Download size={24} color="#1ea2b1" />
-            </View>
-            <Text style={styles.quickActionText}>Request Payout</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.quickAction}>
-            <View style={[styles.quickActionIcon, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
-              <TrendingUp size={24} color="#10B981" />
-            </View>
-            <Text style={styles.quickActionText}>View Stats</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.quickAction}>
-            <View style={[styles.quickActionIcon, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
-              <Calendar size={24} color="#8B5CF6" />
-            </View>
-            <Text style={styles.quickActionText}>Reports</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Recent Transactions */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Transactions</Text>
-            <TouchableOpacity style={styles.viewAllButton}>
-              <Text style={styles.viewAllText}>View All</Text>
-              <ChevronRight size={16} color="#1ea2b1" />
-            </TouchableOpacity>
-          </View>
-          
-          {transactions.length === 0 ? (
-            <View style={styles.emptyTransactions}>
-              <Text style={styles.emptyText}>No transactions yet</Text>
-              <Text style={styles.emptySubtext}>
-                Transactions will appear here when you receive payments
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.transactionsList}>
+            {/* Transactions Section */}
+            <View style={styles.transactionsSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>RECENT ACTIVITY</Text>
+                <TouchableOpacity onPress={() => {}}>
+                  <Text style={styles.viewAllText}>View All</Text>
+                </TouchableOpacity>
+              </View>
+              
               {transactions.map((transaction) => (
                 <View key={transaction.id} style={styles.transactionCard}>
-                  <View style={styles.transactionHeader}>
-                    <View style={styles.transactionInfo}>
+                  <View style={styles.transactionLeft}>
+                    <View style={styles.transactionIconBox}>
                       {getTypeIcon(transaction.type)}
-                      <View>
-                        <Text style={styles.transactionDescription}>
-                          {transaction.description}
-                        </Text>
-                        <Text style={styles.transactionReference}>
-                          Ref: {transaction.reference}
-                        </Text>
-                      </View>
                     </View>
-                    
-                    <View style={styles.transactionAmount}>
-                      <Text style={[
-                        styles.amountText,
-                        transaction.type === 'refund' && styles.amountTextNegative
-                      ]}>
-                        {transaction.type === 'refund' ? '-' : '+'}{formatCurrency(transaction.amount)}
+                    <View>
+                      <Text style={styles.transactionTitle}>{transaction.description}</Text>
+                      <Text style={styles.transactionDate}>
+                        {new Date(transaction.created_at).toLocaleDateString('en-ZA', { month: 'short', day: 'numeric' })}
                       </Text>
-                      <View style={[
-                        styles.statusBadge,
-                        { backgroundColor: `${getStatusColor(transaction.status)}20` }
-                      ]}>
-                        <Text style={[
-                          styles.statusText,
-                          { color: getStatusColor(transaction.status) }
-                        ]}>
-                          {transaction.status}
-                        </Text>
-                      </View>
                     </View>
                   </View>
-                  
-                  <Text style={styles.transactionDate}>
-                    {new Date(transaction.created_at).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </Text>
+                  <View style={styles.transactionRight}>
+                    <Text style={[
+                      styles.transactionAmount,
+                      transaction.type === 'payout' && { color: '#EF4444' }
+                    ]}>
+                      {transaction.type === 'payout' ? '-' : '+'}{formatCurrency(transaction.amount)}
+                    </Text>
+                    <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(transaction.status)}10` }]}>
+                      <Text style={[styles.statusText, { color: getStatusColor(transaction.status) }]}>
+                        {transaction.status.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               ))}
             </View>
-          )}
-        </View>
-
-        {/* Bottom Padding */}
-        <View style={styles.bottomPadding} />
+          </>
+        )}
+        <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
@@ -444,255 +387,232 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   header: {
-    padding: 24,
-    paddingTop: 60,
-    backgroundColor: '#111111',
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    backgroundColor: '#000',
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    marginBottom: 32,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#222222',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
   },
-  title: {
-    fontSize: 24,
+  brandText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -1,
+  },
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerContent: {
+    marginTop: 0,
+  },
+  readyText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: '#1ea2b1',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+  },
+  headingText: {
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: '#FFF',
+    fontStyle: 'italic',
+    letterSpacing: -1,
   },
   scrollContainer: {
     flex: 1,
   },
-  earningsSummary: {
-    backgroundColor: '#111111',
-    margin: 16,
-    borderRadius: 16,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  totalEarnings: {
+  totalCard: {
+    marginHorizontal: 24,
+    padding: 32,
+    backgroundColor: '#111',
+    borderRadius: 32,
     alignItems: 'center',
-    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#222',
   },
   totalLabel: {
-    fontSize: 14,
-    color: '#888888',
-    marginBottom: 8,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
+    color: '#666',
+    marginBottom: 16,
   },
   totalAmount: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    fontSize: 42,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -1,
+    marginBottom: 12,
   },
-  totalSubtext: {
-    fontSize: 12,
-    color: '#888888',
-  },
-  earningsBreakdown: {
+  trendRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  breakdownItem: {
     alignItems: 'center',
+    gap: 6,
   },
-  breakdownLabel: {
+  trendText: {
     fontSize: 12,
-    color: '#888888',
-    marginBottom: 4,
-  },
-  breakdownAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  periodSelector: {
-    flexDirection: 'row',
-    backgroundColor: '#111111',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 12,
-    padding: 8,
-  },
-  periodButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  periodButtonActive: {
-    backgroundColor: '#1ea2b1',
-  },
-  periodButtonText: {
-    fontSize: 14,
     fontWeight: '600',
-    color: '#888888',
+    color: '#10B981',
   },
-  periodButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  chartContainer: {
-    backgroundColor: '#111111',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  chartTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 16,
-  },
-  chart: {
-    marginVertical: 8,
-    borderRadius: 16,
-  },
-  chartSubtitle: {
-    fontSize: 12,
-    color: '#888888',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  quickActions: {
+  gridContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    marginHorizontal: 24,
+    marginTop: 16,
     gap: 12,
   },
-  quickAction: {
+  gridItem: {
     flex: 1,
-    backgroundColor: '#111111',
-    borderRadius: 12,
+    backgroundColor: '#111',
+    borderRadius: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#222',
+    alignItems: 'center',
+  },
+  gridLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    color: '#444',
+    marginBottom: 8,
+  },
+  gridValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFF',
+  },
+  sectionCard: {
+    marginHorizontal: 24,
+    marginTop: 24,
+    padding: 24,
+    backgroundColor: '#111',
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
+    color: '#444',
+    marginBottom: 24,
+  },
+  chart: {
+    marginLeft: -16,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    marginHorizontal: 24,
+    marginTop: 24,
+    gap: 12,
+  },
+  actionCard: {
+    flex: 1,
+    backgroundColor: '#111',
+    borderRadius: 24,
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: '#222',
   },
-  quickActionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
-  quickActionText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
+  actionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFF',
   },
-  section: {
-    backgroundColor: '#111111',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#333333',
+  transactionsSection: {
+    marginTop: 32,
+    paddingHorizontal: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  viewAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    marginBottom: 20,
   },
   viewAllText: {
+    fontSize: 12,
+    fontWeight: '700',
     color: '#1ea2b1',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  emptyTransactions: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    color: '#888888',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  transactionsList: {
-    gap: 12,
   },
   transactionCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  transactionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    backgroundColor: '#111',
+    borderRadius: 24,
+    padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#222',
   },
-  transactionInfo: {
+  transactionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    flex: 1,
+    gap: 16,
   },
-  transactionDescription: {
+  transactionIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  transactionTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: '#FFF',
     marginBottom: 2,
   },
-  transactionReference: {
-    fontSize: 12,
-    color: '#888888',
+  transactionDate: {
+    fontSize: 11,
+    color: '#666',
   },
-  transactionAmount: {
+  transactionRight: {
     alignItems: 'flex-end',
   },
-  amountText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  transactionAmount: {
+    fontSize: 15,
+    fontWeight: '800',
     color: '#10B981',
     marginBottom: 4,
-  },
-  amountTextNegative: {
-    color: '#EF4444',
   },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 8,
   },
   statusText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  transactionDate: {
-    fontSize: 12,
-    color: '#888888',
-  },
-  bottomPadding: {
-    height: 100,
+    fontSize: 8,
+    fontWeight: '900',
   },
 });

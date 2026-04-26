@@ -1,4 +1,3 @@
-// app/(app)/driver/create-service/index.tsx
 import React from 'react';
 import {
   View,
@@ -6,8 +5,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import {
   ArrowLeft,
   School,
@@ -16,6 +16,7 @@ import {
   Car,
   MapPin,
   Clock,
+  ChevronRight,
 } from 'lucide-react-native';
 
 export default function CreateServiceSelectionScreen() {
@@ -29,6 +30,7 @@ export default function CreateServiceSelectionScreen() {
       icon: School,
       color: '#1ea2b1',
       route: '/driver/create-service/school',
+      features: ['Fixed Routes', 'Daily Schedule']
     },
     {
       id: 'carpool',
@@ -37,6 +39,7 @@ export default function CreateServiceSelectionScreen() {
       icon: Users,
       color: '#10B981',
       route: '/driver/create-service/carpool',
+      features: ['Shared Rides', 'Cost Splitting']
     },
     {
       id: 'public',
@@ -45,88 +48,72 @@ export default function CreateServiceSelectionScreen() {
       icon: Bus,
       color: '#F59E0B',
       route: '/driver/create-service/public',
+      features: ['Route Listing', 'Fixed Stops']
     },
   ];
 
-  const handleGoBack = () => {
-    router.back();
-  };
-
   return (
     <View style={styles.container}>
-      {/* Header */}
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Premium Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={handleGoBack}
-        >
-          <ArrowLeft size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Create Service</Text>
-        <Text style={styles.subtitle}>Choose service type</Text>
+        <View style={styles.headerTop}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <ArrowLeft size={24} color="#FFF" />
+          </TouchableOpacity>
+          <Text style={styles.brandText}>Uthutho</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.headerContent}>
+          <Text style={styles.readyText}>SERVICE CREATION</Text>
+          <Text style={styles.headingText}>Choose Type</Text>
+        </View>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView 
+        style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.infoText}>
-          Select the type of service you want to create. Each service type has different requirements and features.
+          Expand your fleet by offering different transport solutions. Select a service type to continue.
         </Text>
 
-        <View style={styles.serviceTypesContainer}>
+        <View style={styles.listContainer}>
           {serviceTypes.map((service) => {
             const Icon = service.icon;
             return (
               <TouchableOpacity
                 key={service.id}
-                style={[styles.serviceCard, { borderColor: service.color }]}
+                style={styles.serviceCard}
                 onPress={() => router.push(service.route)}
               >
-                <View style={[styles.iconContainer, { backgroundColor: `${service.color}20` }]}>
-                  <Icon size={32} color={service.color} />
+                <View style={styles.cardTop}>
+                  <View style={[styles.iconBox, { backgroundColor: `${service.color}10` }]}>
+                    <Icon size={24} color={service.color} />
+                  </View>
+                  <View style={styles.titleArea}>
+                    <Text style={styles.serviceTitle}>{service.title}</Text>
+                    <Text style={styles.serviceDescription}>{service.description}</Text>
+                  </View>
+                  <ChevronRight size={18} color="#222" />
                 </View>
-                <Text style={styles.serviceTitle}>{service.title}</Text>
-                <Text style={styles.serviceDescription}>{service.description}</Text>
-                <View style={styles.serviceFeatures}>
-                  {service.id === 'school' && (
-                    <>
-                      <View style={styles.featureItem}>
-                        <MapPin size={14} color="#888888" />
-                        <Text style={styles.featureText}>School Routes</Text>
-                      </View>
-                      <View style={styles.featureItem}>
-                        <Clock size={14} color="#888888" />
-                        <Text style={styles.featureText}>Daily Schedule</Text>
-                      </View>
-                    </>
-                  )}
-                  {service.id === 'carpool' && (
-                    <>
-                      <View style={styles.featureItem}>
-                        <Users size={14} color="#888888" />
-                        <Text style={styles.featureText}>Shared Rides</Text>
-                      </View>
-                      <View style={styles.featureItem}>
-                        <Car size={14} color="#888888" />
-                        <Text style={styles.featureText}>Personal Vehicle</Text>
-                      </View>
-                    </>
-                  )}
-                  {service.id === 'public' && (
-                    <>
-                      <View style={styles.featureItem}>
-                        <Bus size={14} color="#888888" />
-                        <Text style={styles.featureText}>Fixed Routes</Text>
-                      </View>
-                      <View style={styles.featureItem}>
-                        <MapPin size={14} color="#888888" />
-                        <Text style={styles.featureText}>Stations/Stops</Text>
-                      </View>
-                    </>
-                  )}
+                
+                <View style={styles.featuresRow}>
+                  {service.features.map((feature, i) => (
+                    <View key={i} style={styles.featurePill}>
+                      <Text style={styles.featureText}>{feature}</Text>
+                    </View>
+                  ))}
                 </View>
               </TouchableOpacity>
             );
           })}
         </View>
+        <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
@@ -138,82 +125,110 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   header: {
-    padding: 24,
-    paddingTop: 60,
-    backgroundColor: '#111111',
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    backgroundColor: '#000',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    marginBottom: 32,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#222222',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
+  brandText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -1,
   },
-  subtitle: {
-    fontSize: 16,
+  headerContent: {
+    marginTop: 0,
+  },
+  readyText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
     color: '#1ea2b1',
+    marginBottom: 12,
+    textTransform: 'uppercase',
   },
-  content: {
+  headingText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#FFF',
+    fontStyle: 'italic',
+    letterSpacing: -1,
+  },
+  scrollContainer: {
     flex: 1,
-    padding: 20,
   },
   infoText: {
-    fontSize: 16,
-    color: '#888888',
-    textAlign: 'center',
+    fontSize: 14,
+    color: '#666',
+    paddingHorizontal: 24,
     marginBottom: 32,
-    lineHeight: 24,
+    lineHeight: 22,
   },
-  serviceTypesContainer: {
-    gap: 20,
+  listContainer: {
+    paddingHorizontal: 24,
+    gap: 16,
   },
   serviceCard: {
-    backgroundColor: '#111111',
-    borderRadius: 16,
+    backgroundColor: '#111',
+    borderRadius: 32,
     padding: 24,
     borderWidth: 1,
-    borderStyle: 'dashed',
+    borderColor: '#222',
   },
-  iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  iconBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+  },
+  titleArea: {
+    flex: 1,
   },
   serviceTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFF',
+    marginBottom: 4,
   },
   serviceDescription: {
-    fontSize: 14,
-    color: '#888888',
-    marginBottom: 16,
-    lineHeight: 20,
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
   },
-  serviceFeatures: {
+  featuresRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    marginTop: 20,
+    gap: 8,
   },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  featurePill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
   featureText: {
-    fontSize: 12,
-    color: '#888888',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#444',
   },
 });

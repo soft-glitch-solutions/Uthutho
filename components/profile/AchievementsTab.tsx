@@ -1,9 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Badge, Star } from 'lucide-react-native';
+import { Badge, Star, ChevronRight } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { router } from 'expo-router';
-import { AchievementBannerSkeleton, MenuItemSkeleton } from './SkeletonComponents';
 
 interface AchievementsTabProps {
   colors: any;
@@ -16,63 +15,57 @@ export const AchievementsTab: React.FC<AchievementsTabProps> = ({
 }) => {
   const rankMenuItems = [
     {
-      icon: <Badge size={24} color={colors.primary} />,
+      icon: <Badge size={20} color="#1ea2b1" />,
       title: 'Change Title',
       subtitle: 'Change your profile title',
       route: '/changetitle'
     },
   ];
 
-  if (loading) {
-    return (
-      <View style={styles.menuContainer}>
-        <MenuItemSkeleton colors={colors} />
-        <AchievementBannerSkeleton colors={colors} />
-        <AchievementBannerSkeleton colors={colors} />
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.menuContainer}>
+    <View style={styles.container}>
+      <Text style={styles.sectionTitle}>RANK & TITLES</Text>
+      
       {rankMenuItems.map((item, index) => (
         <TouchableOpacity
           key={index}
-          style={[styles.menuItem, { backgroundColor: colors.card }]}
-          onPress={() => {
-            if (item.title === 'Change Title') {
-              router.push('/changetitle');
-            }
-          }}
+          style={styles.menuItem}
+          onPress={() => router.push('/changetitle')}
         >
-          {item.icon}
-          <View style={styles.menuText}>
-            <Text style={[styles.menuTitle, { color: colors.text }]}>
-              {item.title}
-            </Text>
-            <Text style={[styles.menuSubtitle, { color: colors.text }]}>
-              {item.subtitle}
-            </Text>
+          <View style={styles.itemLeft}>
+            <View style={styles.iconBox}>
+              {item.icon}
+            </View>
+            <View>
+              <Text style={styles.menuTitle}>{item.title}</Text>
+              <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+            </View>
           </View>
+          <ChevronRight size={18} color="#333" />
         </TouchableOpacity>
       ))}
       
-      {/* Achievement Banners */}
-      <View style={[styles.achievementBanner, { backgroundColor: colors.card }]}>
-        <Star size={24} color="#fbbf24" />
+      <Text style={[styles.sectionTitle, { marginTop: 40 }]}>ACHIEVEMENTS</Text>
+      
+      <View style={styles.achievementBanner}>
+        <View style={[styles.iconBox, { backgroundColor: 'rgba(251, 191, 36, 0.1)' }]}>
+          <Star size={20} color="#fbbf24" />
+        </View>
         <View style={styles.achievementText}>
-          <Text style={[styles.achievementTitle, { color: colors.text }]}>Eco Warrior</Text>
-          <Text style={[styles.achievementDescription, { color: colors.text }]}>
+          <Text style={styles.achievementTitle}>Eco Warrior</Text>
+          <Text style={styles.achievementDescription}>
             You've helped reduce carbon emissions by using public transport!
           </Text>
         </View>
       </View>
 
-      <View style={[styles.achievementBanner, { backgroundColor: colors.card }]}>
-        <Star size={24} color="#34d399" />
+      <View style={styles.achievementBanner}>
+        <View style={[styles.iconBox, { backgroundColor: 'rgba(52, 211, 153, 0.1)' }]}>
+          <Star size={20} color="#34d399" />
+        </View>
         <View style={styles.achievementText}>
-          <Text style={[styles.achievementTitle, { color: colors.text }]}>Early Adopter</Text>
-          <Text style={[styles.achievementDescription, { color: colors.text }]}>
+          <Text style={styles.achievementTitle}>Early Adopter</Text>
+          <Text style={styles.achievementDescription}>
             Thanks for being one of the first to try Uthutho!
           </Text>
         </View>
@@ -82,49 +75,74 @@ export const AchievementsTab: React.FC<AchievementsTabProps> = ({
 };
 
 const styles = StyleSheet.create({
-  menuContainer: {
-    padding: 20,
-    gap: 15,
+  container: {
+    paddingTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    color: '#444',
+    marginBottom: 20,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    borderRadius: 10,
-    gap: 15,
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#111',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#222',
+    marginBottom: 12,
   },
-  menuText: {
-    flex: 1,
+  itemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 2,
   },
   menuSubtitle: {
-    fontSize: 14,
-    opacity: 0.8,
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
   },
   achievementBanner: {
-    marginBottom: 20,
-    borderRadius: 12,
-    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#111',
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#fbbf2450',
-  },
-  achievementTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  achievementDescription: {
-    fontSize: 14,
-    opacity: 0.8,
+    borderColor: '#222',
+    marginBottom: 12,
+    gap: 16,
   },
   achievementText: {
     flex: 1,
-    marginLeft: 12,
+  },
+  achievementTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  achievementDescription: {
+    fontSize: 13,
+    color: '#888',
+    lineHeight: 18,
   },
 });

@@ -1,35 +1,23 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
 import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  ActivityIndicator, 
-  StyleSheet, 
-  Modal,
-  TouchableWithoutFeedback,
-  Dimensions
-} from 'react-native';
-import { Edit, Settings, LogOut, Plus, Check, X, Trophy, ChevronRight, Mail, Globe, Facebook, Twitter } from 'lucide-react-native';
-import { useTheme } from '@/context/ThemeContext';
-import { router } from 'expo-router';
-import { LinkedAccount } from '@/types/profile';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const isDesktop = SCREEN_WIDTH >= 1024;
+  Mail, 
+  LogOut, 
+  ChevronRight, 
+  ShieldCheck, 
+  Globe, 
+  Facebook, 
+  Twitter 
+} from 'lucide-react-native';
 
 interface BasicInfoTabProps {
   colors: any;
   accountsLoading: boolean;
-  linkedAccounts: LinkedAccount[];
+  linkedAccounts: any[];
   onSignOut: () => void;
-  onConnectAccount: (provider: string) => Promise<void>;
-  isDesktop?: boolean;
+  onConnectAccount: (provider: string) => void;
+  isDesktop: boolean;
 }
-
-const AVAILABLE_PROVIDERS = [
-  { id: 'google', name: 'Google', icon: <Globe size={20} color="#DB4437" />, color: '#DB4437', points: 50 },
-  { id: 'facebook', name: 'Facebook', icon: <Facebook size={20} color="#1877F2" />, color: '#1877F2', points: 50 },
-];
 
 export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   colors,
@@ -37,129 +25,90 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   linkedAccounts,
   onSignOut,
   onConnectAccount,
-  isDesktop = false
+  isDesktop
 }) => {
-  const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [modalContent, setModalContent] = useState<{
-    type: 'success' | 'error' | 'info';
-    title: string;
-    message: string;
-    points?: number;
-  }>({
-    type: 'info',
-    title: '',
-    message: ''
-  });
-
-  const isProviderConnected = (provider: string) => {
-    const account = linkedAccounts.find(acc => acc.provider === provider);
-    return account?.connected || false;
-  };
-
-  const getAccountEmail = (provider: string) => {
-    const account = linkedAccounts.find(acc => acc.provider === provider);
-    return account?.email || null;
-  };
-
-  const handleConnectAccount = async (provider: string) => {
-    if (isProviderConnected(provider)) return;
-
-    setConnectingProvider(provider);
-    try {
-      await onConnectAccount(provider);
-    } catch (error) {
-      console.error('Error connecting account:', error);
-    } finally {
-      setConnectingProvider(null);
+  const getProviderIcon = (provider: string) => {
+    switch (provider) {
+      case 'google': return <Globe size={20} color="#EA4335" />;
+      case 'facebook': return <Facebook size={20} color="#1877F2" />;
+      case 'twitter': return <Twitter size={20} color="#1DA1F2" />;
+      default: return <Mail size={20} color="#888" />;
     }
+  };
+
+  const isConnected = (provider: string) => {
+    return linkedAccounts.some(acc => acc.provider === provider && acc.connected);
   };
 
   return (
     <View style={styles.container}>
-      {/* Account Settings */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionHeader, { color: colors.primary }]}>ACCOUNT SETTINGS</Text>
-        
-        <TouchableOpacity
-          style={[styles.menuItem, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => router.push('/EditProfileScreen')}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: 'rgba(30, 162, 177, 0.1)' }]}>
-            <Edit size={20} color={colors.primary} />
-          </View>
-          <View style={styles.menuContent}>
-            <Text style={[styles.menuTitle, { color: colors.text }]}>Edit Profile</Text>
-            <Text style={styles.menuSubtitle}>Change your name or title</Text>
-          </View>
-          <ChevronRight size={20} color="#666" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.menuItem, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => router.push('/settings')}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: 'rgba(120, 120, 120, 0.1)' }]}>
-            <Settings size={20} color="#666" />
-          </View>
-          <View style={styles.menuContent}>
-            <Text style={[styles.menuTitle, { color: colors.text }]}>Settings</Text>
-            <Text style={styles.menuSubtitle}>Privacy and notifications</Text>
-          </View>
-          <ChevronRight size={20} color="#666" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Social Connections */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionHeader, { color: colors.primary }]}>SOCIAL CONNECTIONS</Text>
-        
-        <View style={styles.grid}>
-          {AVAILABLE_PROVIDERS.map((provider) => {
-            const isConnected = isProviderConnected(provider.id);
-            return (
-              <TouchableOpacity
-                key={provider.id}
-                style={[
-                  styles.socialCard, 
-                  { backgroundColor: colors.card, borderColor: isConnected ? colors.primary : colors.border }
-                ]}
-                onPress={() => handleConnectAccount(provider.id)}
-                disabled={connectingProvider === provider.id || isConnected}
-              >
-                <View style={styles.socialHeader}>
-                  <View style={[styles.socialIcon, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
-                    {provider.icon}
-                  </View>
-                  {isConnected ? (
-                    <Check size={18} color={colors.primary} />
-                  ) : (
-                    <View style={[styles.addBadge, { backgroundColor: colors.primary }]}>
-                      <Plus size={12} color="white" />
-                    </View>
-                  )}
+      <Text style={styles.sectionTitle}>SOCIAL CONNECTIONS</Text>
+      
+      <View style={styles.cardsContainer}>
+        {['google', 'facebook', 'twitter'].map((provider) => (
+          <TouchableOpacity 
+            key={provider}
+            style={styles.connectionCard}
+            onPress={() => onConnectAccount(provider)}
+            disabled={isConnected(provider)}
+          >
+            <View style={styles.cardHeader}>
+              <View style={styles.providerIcon}>
+                {getProviderIcon(provider)}
+              </View>
+              {isConnected(provider) && (
+                <View style={styles.statusBadge}>
+                  <ShieldCheck size={12} color="#1ea2b1" />
+                  <Text style={styles.statusText}>LINKED</Text>
                 </View>
-                <Text style={[styles.socialName, { color: colors.text }]}>{provider.name}</Text>
-                <Text style={styles.socialStatus}>
-                  {isConnected ? 'Connected' : `Earn +${provider.points} pts`}
-                </Text>
-                {connectingProvider === provider.id && (
-                  <ActivityIndicator size="small" color={colors.primary} style={styles.socialLoader} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+              )}
+            </View>
+            
+            <Text style={styles.providerName}>
+              {provider.charAt(0).toUpperCase() + provider.slice(1)}
+            </Text>
+            
+            {!isConnected(provider) && (
+              <Text style={styles.connectLabel}>Connect Account</Text>
+            )}
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {/* Danger Zone */}
-      <View style={styles.section}>
-        <TouchableOpacity
-          style={[styles.signOutButton, { borderColor: 'rgba(239, 68, 68, 0.3)' }]}
+      <Text style={[styles.sectionTitle, { marginTop: 40 }]}>ACCOUNT SETTINGS</Text>
+      
+      <View style={styles.settingsList}>
+        <TouchableOpacity style={styles.settingsItem}>
+          <View style={styles.settingsItemLeft}>
+            <View style={styles.itemIconBox}>
+              <Mail size={18} color="#FFF" />
+            </View>
+            <Text style={styles.settingsItemText}>Email Preferences</Text>
+          </View>
+          <ChevronRight size={18} color="#333" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.settingsItem}>
+          <View style={styles.settingsItemLeft}>
+            <View style={styles.itemIconBox}>
+              <ShieldCheck size={18} color="#FFF" />
+            </View>
+            <Text style={styles.settingsItemText}>Privacy & Security</Text>
+          </View>
+          <ChevronRight size={18} color="#333" />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.settingsItem, { borderBottomWidth: 0 }]} 
           onPress={onSignOut}
         >
-          <LogOut size={20} color="#EF4444" />
-          <Text style={styles.signOutText}>Sign Out</Text>
+          <View style={styles.settingsItemLeft}>
+            <View style={[styles.itemIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+              <LogOut size={18} color="#EF4444" />
+            </View>
+            <Text style={[styles.settingsItemText, { color: '#EF4444' }]}>Sign Out</Text>
+          </View>
+          <ChevronRight size={18} color="#333" />
         </TouchableOpacity>
       </View>
     </View>
@@ -168,106 +117,99 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    paddingTop: 12,
+    paddingTop: 8,
   },
-  section: {
-    marginBottom: 32,
-  },
-  sectionHeader: {
-    fontSize: 12,
+  sectionTitle: {
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 2,
-    marginBottom: 16,
-    paddingHorizontal: 4,
+    letterSpacing: 1.5,
+    color: '#444',
+    marginBottom: 20,
   },
-  menuItem: {
+  cardsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
-  iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  menuContent: {
-    flex: 1,
-  },
-  menuTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  menuSubtitle: {
-    fontSize: 13,
-    color: '#888',
-  },
-  grid: {
-    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
   },
-  socialCard: {
+  connectionCard: {
     flex: 1,
-    padding: 16,
+    minWidth: 100,
+    backgroundColor: '#111',
     borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
-    position: 'relative',
+    borderColor: '#222',
   },
-  socialHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
-  socialIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addBadge: {
-    width: 20,
-    height: 20,
+  providerIcon: {
+    width: 32,
+    height: 32,
     borderRadius: 10,
-    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  socialName: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  socialStatus: {
-    fontSize: 12,
-    color: '#888',
-    fontWeight: '600',
-  },
-  socialLoader: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-  },
-  signOutButton: {
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    gap: 12,
-    marginTop: 12,
+    gap: 4,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  signOutText: {
-    color: '#EF4444',
-    fontSize: 16,
+  statusText: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#1ea2b1',
+  },
+  providerName: {
+    fontSize: 14,
     fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  connectLabel: {
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '500',
+  },
+  settingsList: {
+    backgroundColor: '#111',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#222',
+    overflow: 'hidden',
+  },
+  settingsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a1a',
+  },
+  settingsItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  itemIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingsItemText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#DDD',
   },
 });

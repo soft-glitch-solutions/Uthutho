@@ -1,19 +1,15 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, ActivityIndicator, StyleSheet, Dimensions } from 'react-native';
-import { Camera, User, Settings } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, Image, ActivityIndicator, StyleSheet, Dimensions, Platform } from 'react-native';
+import { Camera, Settings, User } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const isDesktop = SCREEN_WIDTH >= 1024;
+import { router } from 'expo-router';
 
 interface ProfileHeaderProps {
   loading: boolean;
   profile: any;
   uploading: boolean;
   onImagePicker: () => void;
-  accountsLoading: boolean;
-  linkedAccounts: any[];
-  isDesktop?: boolean;
+  isDesktop: boolean;
 }
 
 export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
@@ -21,97 +17,62 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   profile,
   uploading,
   onImagePicker,
-  isDesktop = false
+  isDesktop
 }) => {
   const { colors } = useTheme();
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
+    if (hour < 12) return 'Molo';
+    if (hour < 18) return 'Sawubona';
+    return 'Kunjani';
   };
 
-  const renderAvatar = () => {
-    if (loading) {
-      return <View style={[styles.avatarPlaceholder, { backgroundColor: colors.border }]} />;
-    }
-
-    if (!profile?.avatar_url) {
-      return (
-        <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
-          <User size={20} color="#fff" />
-        </View>
-      );
-    }
-
+  if (loading) {
     return (
-      <Image
-        source={{ uri: profile.avatar_url }}
-        style={styles.avatarImage}
-      />
+      <View style={styles.skeletonContainer}>
+        <ActivityIndicator size="large" color="#1ea2b1" />
+      </View>
     );
-  };
+  }
 
   return (
-    <View style={[styles.container, isDesktop && styles.containerDesktop]}>
+    <View style={styles.container}>
       {/* Top Bar Branding */}
       <View style={styles.topBar}>
-        <View style={styles.brandRow}>
-          <Text style={[styles.brandText, { color: colors.text }]}>Uthutho</Text>
-        </View>
-        
+        <Text style={styles.brandText}>Uthutho</Text>
         <View style={styles.topActions}>
           <TouchableOpacity 
-            style={styles.avatarButton}
+            style={styles.avatarContainer} 
             onPress={onImagePicker}
             disabled={uploading}
           >
-            {renderAvatar()}
-            <View style={[styles.cameraBadge, { backgroundColor: colors.primary }]}>
-              <Camera size={10} color="white" />
-            </View>
-            {uploading && (
-              <View style={styles.uploadingOverlay}>
-                <ActivityIndicator size="small" color="white" />
+            {profile?.avatar_url ? (
+              <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatarPlaceholder, { backgroundColor: '#111' }]}>
+                <User size={20} color="#444" />
               </View>
             )}
+            <View style={styles.cameraBadge}>
+              {uploading ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <Camera size={10} color="#FFF" />
+              )}
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.settingsButton}>
+            <Settings size={22} color="#FFF" />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Hero Typography Section */}
       <View style={styles.heroSection}>
-        <Text style={[styles.readyText, { color: colors.primary }]}>
-          PROFILE OVERVIEW
-        </Text>
-
-        <Text style={[styles.greetingText, { color: colors.text }]}>
-          {getGreeting()} {profile?.first_name || 'Explorer'},
-        </Text>
-
-        <Text style={[styles.headingText, { color: colors.primary }]}>
-          {profile?.selected_title || 'shaping your journey.'}
-        </Text>
-        
-        <View style={[styles.statsBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.text }]}>{profile?.points || 0}</Text>
-            <Text style={styles.statLabel}>POINTS</Text>
-          </View>
-          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.text }]}>{profile?.level || 1}</Text>
-            <Text style={styles.statLabel}>LEVEL</Text>
-          </View>
-          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.text }]}>
-              {profile?.identities?.length || 1}
-            </Text>
-            <Text style={styles.statLabel}>LINKS</Text>
-          </View>
-        </View>
+        <Text style={styles.readyText}>PROFILE OVERVIEW</Text>
+        <Text style={styles.greetingText}>{getGreeting()}, {profile?.first_name || 'User'}</Text>
+        <Text style={styles.headingText}>{profile?.selected_title || 'Community Member'}</Text>
       </View>
     </View>
   );
@@ -120,117 +81,94 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 24,
-    paddingTop: 8,
-    backgroundColor: '#000000',
-  },
-  containerDesktop: {
-    maxWidth: 800,
-    alignSelf: 'center',
-    width: '100%',
-    paddingTop: 16,
+    paddingBottom: 24,
   },
   topBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 32,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginTop: Platform.OS === 'ios' ? 12 : 8,
   },
   brandText: {
     fontSize: 22,
     fontWeight: '900',
+    color: '#FFF',
     letterSpacing: -1,
   },
   topActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
   },
-  avatarButton: {
+  avatarContainer: {
     position: 'relative',
   },
-  avatarPlaceholder: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    justifyContent: 'center',
-    alignItems: 'center',
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#1ea2b1',
   },
-  avatarImage: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+  avatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#222',
   },
   cameraBadge: {
     position: 'absolute',
     bottom: -2,
     right: -2,
+    backgroundColor: '#1ea2b1',
     width: 18,
     height: 18,
     borderRadius: 9,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#000',
   },
-  uploadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 21,
-    justifyContent: 'center',
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   heroSection: {
-    marginBottom: 24,
+    marginTop: 0,
   },
   readyText: {
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 2,
+    color: '#1ea2b1',
     marginBottom: 12,
     textTransform: 'uppercase',
   },
   greetingText: {
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: '400',
+    color: '#FFFFFF',
     marginBottom: 2,
-    letterSpacing: -0.5,
+    letterSpacing: -1,
   },
   headingText: {
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: 'bold',
+    color: '#1ea2b1',
     fontStyle: 'italic',
-    marginBottom: 28,
-    letterSpacing: -0.5,
+    letterSpacing: -1,
   },
-  statsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    justifyContent: 'space-around',
-  },
-  statItem: {
+  skeletonContainer: {
+    height: 180,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  statValue: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  statLabel: {
-    fontSize: 10,
-    color: '#888',
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: 30,
-  },
-});
+});

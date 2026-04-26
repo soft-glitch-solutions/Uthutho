@@ -35,6 +35,7 @@ import LottieView from 'lottie-react-native';
 import RateTripModal from '@/components/home/RateTripModal';
 import SimpleDebugPanel from '@/components/debug/SimpleDebugPanel';
 import WelcomeOverlay from '@/components/home/WelcomeOverlay';
+import { DriverStatsSummary } from '@/components/home/DriverStatsSummary';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -1289,29 +1290,29 @@ export default function HomeScreen() {
               onPress={() => router.push('/journey')}
             >
               <View style={styles.journeyBannerContent}>
-              <View style={styles.journeyIcon}>
-                <Navigation size={20} color="#ffffff" />
-              </View>
-              <View style={styles.journeyInfo}>
-                <Text style={styles.journeyTitle}>Active Journey</Text>
-                <Text style={styles.journeyRoute}>{activeJourney.routes.name}</Text>
-                <Text style={styles.journeyProgress}>
-                  Stop {activeJourney.current_stop_sequence || 0} of {activeJourney.stops?.length || 0}
-                </Text>
-              </View>
-              <View style={styles.journeyStats}>
-                <View style={styles.journeyStatItem}>
-                  <Users size={14} color="#1ea2b1" />
-                  <Text style={styles.journeyStatText}>Live</Text>
+                <View style={styles.journeyIcon}>
+                  <Navigation size={20} color="#ffffff" />
                 </View>
-                <View style={styles.journeyStatItem}>
-                  <Clock size={14} color="#1ea2b1" />
-                  <Text style={styles.journeyStatText}>Active</Text>
+                <View style={styles.journeyInfo}>
+                  <Text style={styles.journeyTitle}>Active Journey</Text>
+                  <Text style={styles.journeyRoute}>{activeJourney.routes.name}</Text>
+                  <Text style={styles.journeyProgress}>
+                    Stop {activeJourney.current_stop_sequence || 0} of {activeJourney.stops?.length || 0}
+                  </Text>
+                </View>
+                <View style={styles.journeyStats}>
+                  <View style={styles.journeyStatItem}>
+                    <Users size={14} color="#1ea2b1" />
+                    <Text style={styles.journeyStatText}>Live</Text>
+                  </View>
+                  <View style={styles.journeyStatItem}>
+                    <Clock size={14} color="#1ea2b1" />
+                    <Text style={styles.journeyStatText}>Active</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-            <View style={styles.journeyArrow}>
-              <Text style={styles.journeyArrowText}>›</Text>
+              <View style={styles.journeyArrow}>
+                <Text style={styles.journeyArrowText}>›</Text>
               </View>
             </Pressable>
           </Animated.View>
@@ -1329,6 +1330,10 @@ export default function HomeScreen() {
           hasActiveJourney={!!activeJourney}
           onMarkAsWaiting={handleMarkAsWaiting}
         />
+
+        {userProfile?.role === 'driver' && user?.id && (
+          <DriverStatsSummary userId={user.id} colors={colors} />
+        )}
 
         <ServicesSection colors={colors} router={router} />
 

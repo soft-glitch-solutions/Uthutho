@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
+  Platform,
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -66,7 +67,7 @@ interface DriverStats {
 export default function DriverDashboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [driverStats, setDriverStats] = useState<DriverStats>({
@@ -88,7 +89,7 @@ export default function DriverDashboardScreen() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch driver info
       const { data: driverData, error: driverError } = await supabase
         .from('drivers')
@@ -117,13 +118,13 @@ export default function DriverDashboardScreen() {
           .eq('driver_id', driverId)
           .eq('is_active', true)
           .order('created_at', { ascending: false }),
-        
+
         supabase
           .from('transport_requests')
           .select('*')
           .eq('status', 'pending')
           .in('transport_id', transportsData?.map(t => t.id) || []),
-        
+
         supabase
           .from('transport_reviews')
           .select('rating')
@@ -132,12 +133,12 @@ export default function DriverDashboardScreen() {
 
       // Calculate stats
       const totalServices = transportsData?.length || 0;
-      const totalRiders = transportsData?.reduce((sum, transport) => 
+      const totalRiders = transportsData?.reduce((sum, transport) =>
         sum + (transport.current_riders || 0), 0) || 0;
-      const totalEarnings = transportsData?.reduce((sum, transport) => 
+      const totalEarnings = transportsData?.reduce((sum, transport) =>
         sum + (transport.price_per_month * (transport.current_riders || 0)), 0) || 0;
       const pendingRequests = requestsData?.length || 0;
-      
+
       // Calculate average rating
       let averageRating = 0;
       if (reviewsData && reviewsData.length > 0) {
@@ -242,18 +243,20 @@ export default function DriverDashboardScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={handleGoBack}
-          >
-            <ArrowLeft size={24} color="#FFFFFF" />
+      <View style={[styles.container, { backgroundColor: '#000' }]}>
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
+            <ArrowLeft size={24} color="#FFF" />
           </TouchableOpacity>
-          <Text style={styles.title}>Driver Dashboard</Text>
+          <Text style={[styles.brandText, { color: '#FFF' }]}>Uthutho</Text>
+          <View style={{ width: 40 }} />
         </View>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading dashboard...</Text>
+        <View style={{ padding: 24 }}>
+          <View style={{ height: 20, width: 120, backgroundColor: '#222', borderRadius: 4, marginBottom: 12 }} />
+          <View style={{ height: 40, width: 240, backgroundColor: '#222', borderRadius: 8, marginBottom: 8 }} />
+          <View style={{ height: 40, width: 200, backgroundColor: '#222', borderRadius: 8, marginBottom: 24 }} />
+          <View style={{ height: 120, width: '100%', backgroundColor: '#111', borderRadius: 20, marginBottom: 24 }} />
+          <View style={{ height: 200, width: '100%', backgroundColor: '#111', borderRadius: 20 }} />
         </View>
       </View>
     );
@@ -261,25 +264,28 @@ export default function DriverDashboardScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
+      {/* Top Bar Branding */}
+      <View style={styles.topBar}>
+        <TouchableOpacity
           style={styles.backButton}
           onPress={handleGoBack}
         >
-          <ArrowLeft size={24} color="#FFFFFF" />
+          <ArrowLeft size={24} color="#FFF" />
         </TouchableOpacity>
-        <Text style={styles.title}>Driver Dashboard</Text>
-        <TouchableOpacity 
+
+        <Text style={[styles.brandText, { color: '#FFF' }]}>Uthutho</Text>
+
+        <TouchableOpacity
           style={styles.notificationButton}
           onPress={() => router.push('/driver/notifications')}
         >
-          <Bell size={24} color="#FFFFFF" />
+          <Bell size={24} color="#FFF" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -290,6 +296,12 @@ export default function DriverDashboardScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
+        {/* Hero Typography Section */}
+        <View style={styles.heroSection}>
+          <Text style={styles.readyText}>DRIVER DASHBOARD</Text>
+          <Text style={styles.greetingText}>Manage your fleet,</Text>
+          <Text style={styles.headingText}>accelerate your growth.</Text>
+        </View>
         {/* Quick Stats */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
@@ -321,7 +333,7 @@ export default function DriverDashboardScreen() {
 
         {/* Pending Requests */}
         {driverStats.pending_requests > 0 && (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.pendingRequestsBanner}
             onPress={handleViewRequests}
           >
@@ -346,7 +358,7 @@ export default function DriverDashboardScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActionsGrid}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.quickAction}
               onPress={handleCreateService}
             >
@@ -356,7 +368,7 @@ export default function DriverDashboardScreen() {
               <Text style={styles.quickActionText}>New Service</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.quickAction}
               onPress={handleViewRequests}
             >
@@ -366,7 +378,7 @@ export default function DriverDashboardScreen() {
               <Text style={styles.quickActionText}>Requests</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.quickAction}
               onPress={handleViewEarnings}
             >
@@ -376,7 +388,7 @@ export default function DriverDashboardScreen() {
               <Text style={styles.quickActionText}>Earnings</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.quickAction}
               onPress={handleViewReviews}
             >
@@ -396,7 +408,7 @@ export default function DriverDashboardScreen() {
               <Text style={styles.viewAllText}>Manage All</Text>
             </TouchableOpacity>
           </View>
-          
+
           {transports.length === 0 ? (
             <View style={styles.emptyServices}>
               <Car size={48} color="#888888" />
@@ -404,7 +416,7 @@ export default function DriverDashboardScreen() {
               <Text style={styles.emptyServicesSubtext}>
                 Create your first transport service to get started
               </Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.createServiceButton}
                 onPress={handleCreateService}
               >
@@ -435,7 +447,7 @@ export default function DriverDashboardScreen() {
                       </View>
                     )}
                   </View>
-                  
+
                   <View style={styles.serviceDetails}>
                     <View style={styles.serviceDetail}>
                       <Users size={14} color="#888888" />
@@ -443,14 +455,14 @@ export default function DriverDashboardScreen() {
                         {service.current_riders}/{service.capacity} riders
                       </Text>
                     </View>
-                    
+
                     <View style={styles.serviceDetail}>
                       <DollarSign size={14} color="#888888" />
                       <Text style={styles.serviceDetailText}>
                         {formatCurrency(service.price_per_month)}/month
                       </Text>
                     </View>
-                    
+
                     <View style={styles.serviceDetail}>
                       <Clock size={14} color="#888888" />
                       <Text style={styles.serviceDetailText}>
@@ -478,7 +490,7 @@ export default function DriverDashboardScreen() {
                     <Text style={styles.requestName}>{request.student_name}</Text>
                     <Text style={styles.requestGrade}>Grade {request.student_grade}</Text>
                   </View>
-                  
+
                   <View style={styles.requestDetails}>
                     <View style={styles.requestDetail}>
                       <MapPin size={14} color="#888888" />
@@ -486,7 +498,7 @@ export default function DriverDashboardScreen() {
                         {request.pickup_address}
                       </Text>
                     </View>
-                    
+
                     <View style={styles.requestDetail}>
                       <Clock size={14} color="#888888" />
                       <Text style={styles.requestDetailText}>
@@ -494,16 +506,16 @@ export default function DriverDashboardScreen() {
                       </Text>
                     </View>
                   </View>
-                  
+
                   <View style={styles.requestActions}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.requestButton, styles.declineButton]}
                       onPress={() => handleDeclineRequest(request.id)}
                     >
                       <Text style={styles.declineButtonText}>Decline</Text>
                     </TouchableOpacity>
-                    
-                    <TouchableOpacity 
+
+                    <TouchableOpacity
                       style={[styles.requestButton, styles.approveButton]}
                       onPress={() => handleApproveRequest(request.id)}
                     >
@@ -512,9 +524,9 @@ export default function DriverDashboardScreen() {
                   </View>
                 </View>
               ))}
-              
+
               {pendingRequests.length > 2 && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.viewAllRequests}
                   onPress={handleViewRequests}
                 >
@@ -542,7 +554,7 @@ export default function DriverDashboardScreen() {
                   <Text style={styles.ratingLabel}>Average Rating</Text>
                 </View>
               </View>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.viewReviewsButton}
                 onPress={handleViewReviews}
               >
@@ -564,83 +576,103 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
-  header: {
-    position: 'absolute',
-    top: 40,
-    left: 0,
-    right: 0,
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    zIndex: 10,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 20,
+    backgroundColor: '#000000',
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+  brandText: {
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -1,
   },
   notificationButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#FFFFFF',
-    fontSize: 16,
   },
   scrollContainer: {
     flex: 1,
-    paddingTop: 80,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  heroSection: {
+    paddingHorizontal: 24,
+    marginBottom: 32,
+    marginTop: 8,
+  },
+  readyText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: '#1ea2b1',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+  },
+  greetingText: {
+    fontSize: 28,
+    fontWeight: '400',
+    color: '#FFFFFF',
+    marginBottom: 2,
+    letterSpacing: -0.5,
+  },
+  headingText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1ea2b1',
+    fontStyle: 'italic',
+    letterSpacing: -0.5,
   },
   statsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginBottom: 20,
+    paddingHorizontal: 24,
+    marginBottom: 24,
     gap: 12,
   },
   statCard: {
     flex: 1,
     backgroundColor: '#111111',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 20,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: '#222222',
   },
   statIcon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   statNumber: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '900',
     color: '#FFFFFF',
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#888888',
+    fontWeight: '700',
+    textTransform: 'uppercase',
     textAlign: 'center',
   },
   pendingRequestsBanner: {
@@ -648,10 +680,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    marginHorizontal: 16,
-    marginBottom: 20,
-    padding: 16,
-    borderRadius: 12,
+    marginHorizontal: 24,
+    marginBottom: 32,
+    padding: 20,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.2)',
   },
@@ -663,11 +695,11 @@ const styles = StyleSheet.create({
   pendingRequestsIcon: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 16,
     backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   pendingRequestsText: {
     flex: 1,
@@ -680,16 +712,12 @@ const styles = StyleSheet.create({
   },
   pendingRequestsSubtitle: {
     fontSize: 12,
-    color: '#888888',
+    color: '#EF4444',
+    fontWeight: '600',
   },
   section: {
-    backgroundColor: '#111111',
-    marginHorizontal: 16,
-    marginBottom: 20,
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#333333',
+    paddingHorizontal: 24,
+    marginBottom: 32,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -698,15 +726,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 1,
     color: '#FFFFFF',
-    marginBottom: 16,
+    textTransform: 'uppercase',
   },
   viewAllText: {
     color: '#1ea2b1',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
   quickActionsGrid: {
     flexDirection: 'row',
@@ -716,16 +745,16 @@ const styles = StyleSheet.create({
   quickAction: {
     width: '48%',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: '#1a1a1a',
+    padding: 20,
+    borderRadius: 24,
+    backgroundColor: '#111111',
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: '#222222',
   },
   quickActionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -733,17 +762,21 @@ const styles = StyleSheet.create({
   quickActionText: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'center',
   },
   emptyServices: {
     alignItems: 'center',
     paddingVertical: 40,
+    backgroundColor: '#111111',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#222222',
   },
   emptyServicesText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     marginTop: 16,
     marginBottom: 8,
   },
@@ -751,57 +784,58 @@ const styles = StyleSheet.create({
     color: '#888888',
     fontSize: 14,
     textAlign: 'center',
-    marginBottom: 20,
+    paddingHorizontal: 40,
+    marginBottom: 24,
   },
   createServiceButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1ea2b1',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 16,
     gap: 8,
   },
   createServiceText: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   servicesList: {
     gap: 12,
   },
   serviceCard: {
-    backgroundColor: '#1a1a1a',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: '#111111',
+    padding: 20,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: '#222222',
   },
   serviceHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   serviceIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     backgroundColor: 'rgba(30, 162, 177, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   serviceInfo: {
     flex: 1,
   },
   serviceName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 2,
   },
   serviceArea: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#888888',
   },
   verifiedBadge: {
@@ -810,18 +844,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 8,
     gap: 4,
   },
   verifiedText: {
+    fontSize: 11,
     color: '#10B981',
-    fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   serviceDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#222222',
   },
   serviceDetail: {
     flexDirection: 'row',
@@ -829,18 +865,19 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   serviceDetailText: {
-    color: '#888888',
     fontSize: 12,
+    color: '#888888',
+    fontWeight: '600',
   },
   requestsList: {
     gap: 12,
   },
   requestCard: {
-    backgroundColor: '#1a1a1a',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: '#111111',
+    padding: 20,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: '#222222',
   },
   requestHeader: {
     flexDirection: 'row',
@@ -849,17 +886,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   requestName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
     color: '#FFFFFF',
   },
   requestGrade: {
-    fontSize: 14,
-    color: '#888888',
+    fontSize: 13,
+    color: '#1ea2b1',
+    fontWeight: '700',
   },
   requestDetails: {
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   requestDetail: {
     flexDirection: 'row',
@@ -867,9 +905,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   requestDetailText: {
+    fontSize: 13,
     color: '#888888',
-    fontSize: 14,
-    flex: 1,
   },
   requestActions: {
     flexDirection: 'row',
@@ -877,19 +914,18 @@ const styles = StyleSheet.create({
   },
   requestButton: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   declineButton: {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.2)',
   },
   declineButtonText: {
     color: '#EF4444',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   approveButton: {
     backgroundColor: '#1ea2b1',
@@ -897,61 +933,60 @@ const styles = StyleSheet.create({
   approveButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   viewAllRequests: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 12,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#333333',
     gap: 8,
   },
   viewAllRequestsText: {
     color: '#1ea2b1',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   ratingCard: {
-    backgroundColor: '#1a1a1a',
-    padding: 20,
-    borderRadius: 12,
+    backgroundColor: '#111111',
+    padding: 24,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: '#222222',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   ratingContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    gap: 16,
   },
   ratingInfo: {
-    marginLeft: 12,
+    justifyContent: 'center',
   },
   ratingValue: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '900',
     color: '#FFFFFF',
   },
   ratingLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#888888',
+    fontWeight: '600',
   },
   viewReviewsButton: {
-    backgroundColor: '#1ea2b1',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   viewReviewsText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
   bottomPadding: {
-    height: 100,
+    height: 40,
   },
 });
