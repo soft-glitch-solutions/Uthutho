@@ -28,7 +28,6 @@ import FavoritesSection from '@/components/home/FavoritesSection';
 import GamificationSection from '@/components/home/GamificationSection';
 import ScreenTransition from '@/components/ScreenTransition';
 import SearchOverlay from '@/components/home/SearchOverlay';
-import SuggestedRoutesSection from '@/components/home/SuggestedRoutesSection';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 import LottieView from 'lottie-react-native';
@@ -1112,13 +1111,6 @@ export default function HomeScreen() {
 
 
 
-              <SuggestedRoutesSection
-                colors={colors}
-                router={router}
-                routes={suggestedRoutes}
-                loading={isSuggestedLoading}
-              />
-
               <NearbySection
                 locationError={locationError}
                 isNearestLoading={isNearestLoading}
@@ -1274,13 +1266,6 @@ export default function HomeScreen() {
             setSearchBarY(y);
             setIsSearchOverlayVisible(true);
           }}
-        />
-
-        <SuggestedRoutesSection
-          colors={colors}
-          router={router}
-          routes={suggestedRoutes}
-          loading={isSuggestedLoading}
         />
 
         {!journeyLoading && activeJourney && (

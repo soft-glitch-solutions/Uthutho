@@ -1,4 +1,3 @@
-// app/(app)/driver/create-service/school.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -11,19 +10,16 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import {
   ArrowLeft,
-  Car,
   MapPin,
   Clock,
-  DollarSign,
-  Users,
-  CheckCircle,
   Plus,
   Minus,
   School,
-  FileText,
+  DollarSign,
+  Users,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
@@ -36,7 +32,6 @@ export default function CreateSchoolServiceScreen() {
   const [loading, setLoading] = useState(false);
   const [driverId, setDriverId] = useState<string | null>(null);
   
-  // Form state
   const [formData, setFormData] = useState({
     schoolName: '',
     schoolArea: '',
@@ -44,11 +39,6 @@ export default function CreateSchoolServiceScreen() {
     pickupTimes: [new Date()],
     capacity: '10',
     pricePerMonth: '',
-    pricePerWeek: '',
-    vehicleType: 'Sedan',
-    vehicleInfo: '',
-    features: ['Safe Driver', 'GPS Tracking'],
-    description: '',
   });
   
   const [showTimePicker, setShowTimePicker] = useState<number | null>(null);
@@ -56,7 +46,6 @@ export default function CreateSchoolServiceScreen() {
   useEffect(() => {
     const fetchDriverId = async () => {
       if (!user) return;
-      
       try {
         const { data, error } = await supabase
           .from('drivers')
@@ -65,7 +54,6 @@ export default function CreateSchoolServiceScreen() {
           .single();
 
         if (error) throw error;
-        
         setDriverId(data.id);
       } catch (error) {
         console.error('Error fetching driver ID:', error);
@@ -73,15 +61,11 @@ export default function CreateSchoolServiceScreen() {
         router.back();
       }
     };
-
     fetchDriverId();
   }, [user]);
 
   const handleAddPickupArea = () => {
-    setFormData(prev => ({
-      ...prev,
-      pickupAreas: [...prev.pickupAreas, '']
-    }));
+    setFormData(prev => ({ ...prev, pickupAreas: [...prev.pickupAreas, ''] }));
   };
 
   const handleRemovePickupArea = (index: number) => {
@@ -99,22 +83,6 @@ export default function CreateSchoolServiceScreen() {
     setFormData(prev => ({ ...prev, pickupAreas: newPickupAreas }));
   };
 
-  const handleAddPickupTime = () => {
-    setFormData(prev => ({
-      ...prev,
-      pickupTimes: [...prev.pickupTimes, new Date()]
-    }));
-  };
-
-  const handleRemovePickupTime = (index: number) => {
-    if (formData.pickupTimes.length > 1) {
-      setFormData(prev => ({
-        ...prev,
-        pickupTimes: prev.pickupTimes.filter((_, i) => i !== index)
-      }));
-    }
-  };
-
   const handleTimeChange = (index: number, event: any, selectedTime?: Date) => {
     setShowTimePicker(null);
     if (selectedTime) {
@@ -122,26 +90,6 @@ export default function CreateSchoolServiceScreen() {
       newPickupTimes[index] = selectedTime;
       setFormData(prev => ({ ...prev, pickupTimes: newPickupTimes }));
     }
-  };
-
-  const handleAddFeature = () => {
-    setFormData(prev => ({
-      ...prev,
-      features: [...prev.features, '']
-    }));
-  };
-
-  const handleRemoveFeature = (index: number) => {
-    if (formData.features.length > 0) {
-      const newFeatures = formData.features.filter((_, i) => i !== index);
-      setFormData(prev => ({ ...prev, features: newFeatures }));
-    }
-  };
-
-  const handleFeatureChange = (index: number, value: string) => {
-    const newFeatures = [...formData.features];
-    newFeatures[index] = value;
-    setFormData(prev => ({ ...prev, features: newFeatures }));
   };
 
   const formatTime = (date: Date) => {
@@ -153,34 +101,12 @@ export default function CreateSchoolServiceScreen() {
   };
 
   const handleSubmit = async () => {
-    // Validation
-    if (!formData.schoolName.trim()) {
-      Alert.alert('Error', 'Please enter school name');
+    if (!formData.schoolName.trim() || !formData.schoolArea.trim() || !formData.pricePerMonth) {
+      Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
     
-    if (!formData.schoolArea.trim()) {
-      Alert.alert('Error', 'Please enter school area');
-      return;
-    }
-    
-    if (formData.pickupAreas.some(area => !area.trim())) {
-      Alert.alert('Error', 'Please fill all pickup areas');
-      return;
-    }
-    
-    if (!formData.pricePerMonth) {
-      Alert.alert('Error', 'Please enter monthly price');
-      return;
-    }
-    
-    if (!driverId) {
-      Alert.alert('Error', 'Driver information not found');
-      return;
-    }
-
     setLoading(true);
-
     try {
       const { error } = await supabase
         .from('school_transports')
@@ -191,488 +117,308 @@ export default function CreateSchoolServiceScreen() {
           pickup_areas: formData.pickupAreas.filter(area => area.trim()),
           pickup_times: formData.pickupTimes.map(time => formatTime(time)),
           capacity: parseInt(formData.capacity),
-          current_riders: 0,
           price_per_month: parseFloat(formData.pricePerMonth),
-          price_per_week: formData.pricePerWeek ? parseFloat(formData.pricePerWeek) : null,
-          vehicle_type: formData.vehicleType,
-          vehicle_info: formData.vehicleInfo,
-          features: formData.features.filter(feature => feature.trim()),
-          description: formData.description,
           is_active: true,
           is_verified: false,
         });
 
       if (error) throw error;
 
-      Alert.alert(
-        'Success!',
-        'School transport service created successfully. It will be reviewed for verification.',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.replace('/driver/dashboard')
-          }
-        ]
-      );
-      
+      Alert.alert('Success!', 'Service created successfully.', [
+        { text: 'OK', onPress: () => router.replace('/driver-dashboard') }
+      ]);
     } catch (error: any) {
-      console.error('Error creating service:', error);
       Alert.alert('Error', error.message || 'Failed to create service');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoBack = () => {
-    router.back();
-  };
-
-  const vehicleTypes = ['Sedan', 'SUV', 'Minivan', 'Bus', 'Taxi', 'Other'];
-
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView style={styles.scrollContainer}>
-        {/* Header */}
-        <View style={styles.header}>
+    <View style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Premium Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
           <TouchableOpacity 
-            style={styles.backButton}
-            onPress={handleGoBack}
+            style={styles.backButton} 
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/driver/create-service');
+              }
+            }}
           >
-            <ArrowLeft size={24} color="#FFFFFF" />
+            <ArrowLeft size={24} color="#FFF" />
           </TouchableOpacity>
-          <Text style={styles.title}>School Transport Service</Text>
-          <Text style={styles.subtitle}>Create a new school transport route</Text>
+          <Text style={styles.brandText}>Uthutho</Text>
+          <View style={{ width: 40 }} />
         </View>
+        <View style={styles.headerContent}>
+          <Text style={styles.readyText}>SERVICE CREATION</Text>
+          <Text style={styles.headingText}>School Transport</Text>
+        </View>
+      </View>
 
-        <View style={styles.formContainer}>
-          {/* School Information */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>
-              <School size={16} color="#1ea2b1" /> School Information
-            </Text>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.formContainer}>
             
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="School Name *"
-                placeholderTextColor="#666666"
-                value={formData.schoolName}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, schoolName: text }))}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="School Area/Suburb *"
-                placeholderTextColor="#666666"
-                value={formData.schoolArea}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, schoolArea: text }))}
-              />
-            </View>
-          </View>
-
-          {/* Pickup Areas */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>
-              <MapPin size={16} color="#1ea2b1" /> Pickup Areas
-            </Text>
-            
-            {formData.pickupAreas.map((area, index) => (
-              <View key={index} style={styles.arrayInputContainer}>
-                <TextInput
-                  style={styles.input}
-                  placeholder={`Pickup area ${index + 1} *`}
-                  placeholderTextColor="#666666"
-                  value={area}
-                  onChangeText={(text) => handlePickupAreaChange(index, text)}
-                />
-                {formData.pickupAreas.length > 1 && (
-                  <TouchableOpacity 
-                    style={styles.removeButton}
-                    onPress={() => handleRemovePickupArea(index)}
-                  >
-                    <Minus size={20} color="#EF4444" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
-            
-            <TouchableOpacity 
-              style={styles.addButton}
-              onPress={handleAddPickupArea}
-            >
-              <Plus size={20} color="#1ea2b1" />
-              <Text style={styles.addButtonText}>Add Pickup Area</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Pickup Times */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>
-              <Clock size={16} color="#1ea2b1" /> Pickup Times
-            </Text>
-            
-            {formData.pickupTimes.map((time, index) => (
-              <View key={index} style={styles.arrayInputContainer}>
-                <TouchableOpacity 
-                  style={styles.timeButton}
-                  onPress={() => setShowTimePicker(index)}
-                >
-                  <Text style={styles.timeButtonText}>
-                    {formatTime(time)}
-                  </Text>
-                </TouchableOpacity>
-                
-                {formData.pickupTimes.length > 1 && (
-                  <TouchableOpacity 
-                    style={styles.removeButton}
-                    onPress={() => handleRemovePickupTime(index)}
-                  >
-                    <Minus size={20} color="#EF4444" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
-            
-            {showTimePicker !== null && (
-              <DateTimePicker
-                value={formData.pickupTimes[showTimePicker]}
-                mode="time"
-                is24Hour={false}
-                display="default"
-                onChange={(event, selectedTime) => handleTimeChange(showTimePicker, event, selectedTime)}
-              />
-            )}
-            
-            <TouchableOpacity 
-              style={styles.addButton}
-              onPress={handleAddPickupTime}
-            >
-              <Plus size={20} color="#1ea2b1" />
-              <Text style={styles.addButtonText}>Add Pickup Time</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Capacity & Pricing */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>
-              <Users size={16} color="#1ea2b1" /> Capacity & Pricing
-            </Text>
-            
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Vehicle Capacity (students) *"
-                placeholderTextColor="#666666"
-                value={formData.capacity}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, capacity: text }))}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Price per Month (ZAR) *"
-                placeholderTextColor="#666666"
-                value={formData.pricePerMonth}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, pricePerMonth: text }))}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Price per Week (ZAR) - Optional"
-                placeholderTextColor="#666666"
-                value={formData.pricePerWeek}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, pricePerWeek: text }))}
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-
-          {/* Vehicle Information */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>
-              <Car size={16} color="#1ea2b1" /> Vehicle Information
-            </Text>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Vehicle Type</Text>
-              <View style={styles.vehicleTypeGrid}>
-                {vehicleTypes.map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[
-                      styles.vehicleTypeButton,
-                      formData.vehicleType === type && styles.vehicleTypeButtonSelected
-                    ]}
-                    onPress={() => setFormData(prev => ({ ...prev, vehicleType: type }))}
-                  >
-                    <Text style={[
-                      styles.vehicleTypeText,
-                      formData.vehicleType === type && styles.vehicleTypeTextSelected
-                    ]}>
-                      {type}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            {/* School Info Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>SCHOOL DETAILS</Text>
+              <View style={styles.inputCard}>
+                <View style={styles.inputRow}>
+                  <School size={18} color="#1ea2b1" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="School Name"
+                    placeholderTextColor="#444"
+                    value={formData.schoolName}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, schoolName: text }))}
+                  />
+                </View>
+                <View style={[styles.inputRow, { borderTopWidth: 1, borderTopColor: '#1a1a1a' }]}>
+                  <MapPin size={18} color="#1ea2b1" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="School Area / Suburb"
+                    placeholderTextColor="#444"
+                    value={formData.schoolArea}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, schoolArea: text }))}
+                  />
+                </View>
               </View>
             </View>
 
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Vehicle Info (model, year, color, registration) - Optional"
-                placeholderTextColor="#666666"
-                value={formData.vehicleInfo}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, vehicleInfo: text }))}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-          </View>
-
-          {/* Features */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>
-              <CheckCircle size={16} color="#1ea2b1" /> Features
-            </Text>
-            
-            {formData.features.map((feature, index) => (
-              <View key={index} style={styles.arrayInputContainer}>
-                <TextInput
-                  style={styles.input}
-                  placeholder={`Feature ${index + 1}`}
-                  placeholderTextColor="#666666"
-                  value={feature}
-                  onChangeText={(text) => handleFeatureChange(index, text)}
-                />
-                <TouchableOpacity 
-                  style={styles.removeButton}
-                  onPress={() => handleRemoveFeature(index)}
-                >
-                  <Minus size={20} color="#EF4444" />
+            {/* Pickup Areas Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionLabel}>PICKUP AREAS</Text>
+                <TouchableOpacity onPress={handleAddPickupArea}>
+                  <Plus size={18} color="#1ea2b1" />
                 </TouchableOpacity>
               </View>
-            ))}
-            
-            <TouchableOpacity 
-              style={styles.addButton}
-              onPress={handleAddFeature}
-            >
-              <Plus size={20} color="#1ea2b1" />
-              <Text style={styles.addButtonText}>Add Feature</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Description */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>
-              <FileText size={16} color="#1ea2b1" /> Description
-            </Text>
-            
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Describe your service, safety measures, special requirements, etc. - Optional"
-                placeholderTextColor="#666666"
-                value={formData.description}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
+              {formData.pickupAreas.map((area, index) => (
+                <View key={index} style={styles.arrayInputRow}>
+                  <View style={styles.arrayInputCard}>
+                    <MapPin size={16} color="#666" />
+                    <TextInput
+                      style={styles.input}
+                      placeholder={`Area ${index + 1}`}
+                      placeholderTextColor="#444"
+                      value={area}
+                      onChangeText={(text) => handlePickupAreaChange(index, text)}
+                    />
+                  </View>
+                  {formData.pickupAreas.length > 1 && (
+                    <TouchableOpacity onPress={() => handleRemovePickupArea(index)} style={styles.removeBtn}>
+                      <Minus size={18} color="#EF4444" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
             </View>
-          </View>
 
-          {/* Submit Button */}
-          <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            <Text style={styles.submitButtonText}>
-              {loading ? 'Creating...' : 'Create School Transport Service'}
+            {/* Capacity & Pricing */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>CAPACITY & PRICING</Text>
+              <View style={styles.inputCard}>
+                <View style={styles.inputRow}>
+                  <Users size={18} color="#1ea2b1" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Capacity (Seats)"
+                    placeholderTextColor="#444"
+                    keyboardType="numeric"
+                    value={formData.capacity}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, capacity: text }))}
+                  />
+                </View>
+                <View style={[styles.inputRow, { borderTopWidth: 1, borderTopColor: '#1a1a1a' }]}>
+                  <DollarSign size={18} color="#1ea2b1" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Monthly Price (ZAR)"
+                    placeholderTextColor="#444"
+                    keyboardType="numeric"
+                    value={formData.pricePerMonth}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, pricePerMonth: text }))}
+                  />
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.submitButton, loading && { opacity: 0.7 }]}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              <Text style={styles.submitButtonText}>
+                {loading ? 'CREATING...' : 'CREATE SERVICE'}
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={styles.disclaimer}>
+              By creating this service, you agree to our driver terms and safety guidelines.
             </Text>
-          </TouchableOpacity>
+          </View>
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-          <Text style={styles.note}>
-            * Required fields
-            {'\n\n'}
-            Your service will be reviewed for verification before being listed publicly.
-            {'\n\n'}
-            By creating this service, you agree to provide safe and reliable transportation for students.
-          </Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      {showTimePicker !== null && (
+        <DateTimePicker
+          value={formData.pickupTimes[showTimePicker]}
+          mode="time"
+          onChange={(event, time) => handleTimeChange(showTimePicker, event, time)}
+        />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
-  },
-  scrollContainer: {
-    flex: 1,
+    backgroundColor: '#000',
   },
   header: {
-    padding: 24,
-    paddingTop: 60,
-    backgroundColor: '#111111',
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    backgroundColor: '#000',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    marginBottom: 32,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#222222',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
+  brandText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -1,
   },
-  subtitle: {
-    fontSize: 16,
+  headerContent: {
+    marginTop: 0,
+  },
+  readyText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
     color: '#1ea2b1',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+  },
+  headingText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#FFF',
+    fontStyle: 'italic',
+    letterSpacing: -1,
+  },
+  scrollContainer: {
+    flex: 1,
   },
   formContainer: {
-    padding: 20,
+    paddingHorizontal: 24,
   },
-  formSection: {
-    marginBottom: 24,
+  section: {
+    marginBottom: 32,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 16,
+  },
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
+    color: '#444',
+    marginBottom: 16,
+  },
+  inputCard: {
+    backgroundColor: '#111',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#222',
+    overflow: 'hidden',
+  },
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  inputContainer: {
-    marginBottom: 12,
-  },
-  arrayInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    paddingHorizontal: 20,
+    height: 64,
+    gap: 16,
   },
   input: {
     flex: 1,
-    backgroundColor: '#111111',
-    color: '#FFFFFF',
-    fontSize: 16,
-    padding: 16,
-    borderRadius: 8,
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  arrayInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  arrayInputCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    height: 56,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: '#222',
+    gap: 12,
   },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  label: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  removeButton: {
+  removeBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    backgroundColor: 'rgba(239, 68, 68, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.2)',
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(30, 162, 177, 0.1)',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(30, 162, 177, 0.2)',
-    gap: 8,
-  },
-  addButtonText: {
-    color: '#1ea2b1',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  timeButton: {
-    flex: 1,
-    backgroundColor: '#111111',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  timeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-  },
-  vehicleTypeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  vehicleTypeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: '#111111',
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  vehicleTypeButtonSelected: {
-    backgroundColor: '#1ea2b1',
-    borderColor: '#1ea2b1',
-  },
-  vehicleTypeText: {
-    color: '#888888',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  vehicleTypeTextSelected: {
-    color: '#FFFFFF',
   },
   submitButton: {
     backgroundColor: '#1ea2b1',
-    paddingVertical: 18,
-    borderRadius: 12,
+    height: 64,
+    borderRadius: 24,
     alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 20,
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#1ea2b180',
+    justifyContent: 'center',
+    marginTop: 16,
   },
   submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
-  note: {
-    fontSize: 14,
-    color: '#888888',
+  disclaimer: {
+    fontSize: 12,
+    color: '#444',
     textAlign: 'center',
-    lineHeight: 20,
+    marginTop: 24,
+    lineHeight: 18,
   },
 });

@@ -6,11 +6,14 @@ import {
   TouchableOpacity, 
   Modal, 
   Animated,
-  Platform 
+  Platform,
+  Dimensions
 } from 'react-native';
-import { Trophy, Star, X, Check, Circle } from 'lucide-react-native';
+import { Trophy, Star, X, Check, Circle, Flame } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import LottieView from 'lottie-react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Only import web components on web
 let DotLottieReact: any = null;
@@ -42,6 +45,7 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
 
   const [isLoading, setIsLoading] = useState(true);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const flameAnimationRef = useRef<any>(null);
 
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -54,11 +58,19 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
 
   useEffect(() => {
     if (visible && !isLoading) {
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 50,
+          friction: 7,
+          useNativeDriver: true,
+        })
+      ]).start();
       
       if (flameAnimationRef.current) {
         if (Platform.OS === 'ios' || Platform.OS === 'android') {
@@ -67,20 +79,18 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
       }
     } else {
       fadeAnim.setValue(0);
+      scaleAnim.setValue(0.9);
     }
   }, [visible, isLoading]);
 
   const updateLoginStreak = async () => {
     if (!userId) return;
-    
     setIsLoading(true);
     try {
       const today = new Date();
       const todayDate = today.toISOString().split('T')[0];
       const dayOfWeek = today.toLocaleDateString('en-US', { weekday: 'long' });
-      const currentDayIndex = today.getDay(); // 0 = Sunday, 6 = Saturday
-
-      console.log('Updating streak for user:', userId, 'Date:', todayDate);
+      const currentDayIndex = today.getDay();
 
       let { data: streakRecord, error } = await supabase
         .from('login_streaks')
@@ -88,19 +98,15 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
         .eq('user_id', userId)
         .single();
 
-      console.log('Existing streak record:', streakRecord);
-
       let currentStreak = 1;
       let maxStreak = 1;
       let pointsEarned = 10;
       let isNewRecord = false;
       let message = 'Welcome back!';
-      let completedDays: number[] = [currentDayIndex]; // Start with today as completed
+      let completedDays: number[] = [currentDayIndex];
 
       if (error && error.code === 'PGRST116') {
-        // No existing record, create new one
-        console.log('Creating new streak record');
-        const { data: newRecord, error: insertError } = await supabase
+        const { data: newRecord } = await supabase
           .from('login_streaks')
           .insert([{
             user_id: userId,
@@ -108,62 +114,36 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
             current_streak: 1,
             max_streak: 1,
             completed_days: completedDays,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           }])
           .select()
           .single();
-
-        if (insertError) {
-          console.error('Error creating streak record:', insertError);
-          throw insertError;
-        }
-
         streakRecord = newRecord;
-        message = 'Welcome! Start your journey!';
-        
+        message = 'Ready to move? Start your journey!';
       } else if (streakRecord) {
         const lastLogin = new Date(streakRecord.last_login);
         const lastLoginDate = lastLogin.toISOString().split('T')[0];
         
-        console.log('Last login date:', lastLoginDate, 'Today:', todayDate);
-
         if (lastLoginDate === todayDate) {
-          // Already logged in today - use existing data
-          console.log('Already logged in today');
           currentStreak = streakRecord.current_streak;
           maxStreak = streakRecord.max_streak;
           pointsEarned = 0;
           completedDays = streakRecord.completed_days || [currentDayIndex];
-          message = 'Welcome back! You already logged in today.';
+          message = 'You are already on fire today!';
         } else {
           const yesterday = new Date(today);
           yesterday.setDate(yesterday.getDate() - 1);
           const yesterdayDate = yesterday.toISOString().split('T')[0];
-
-          console.log('Yesterday date:', yesterdayDate);
-
-          // Get previous completed days
           const previousDays = streakRecord.completed_days || [];
           
           if (lastLoginDate === yesterdayDate) {
-            // Consecutive day login
-            console.log('Consecutive day login - continuing streak');
             currentStreak = streakRecord.current_streak + 1;
             maxStreak = Math.max(currentStreak, streakRecord.max_streak);
             pointsEarned = 10 + (currentStreak * 2);
             isNewRecord = currentStreak > streakRecord.max_streak;
-            message = `Amazing! ${currentStreak} day streak!`;
-            
-            // Add today to completed days if not already there
-            if (!previousDays.includes(currentDayIndex)) {
-              completedDays = [...previousDays, currentDayIndex];
-            } else {
-              completedDays = previousDays;
-            }
+            message = `${currentStreak} DAYS IN A ROW!`;
+            completedDays = !previousDays.includes(currentDayIndex) ? [...previousDays, currentDayIndex] : previousDays;
 
-            // Update streak record
-            const { error: updateError } = await supabase
+            await supabase
               .from('login_streaks')
               .update({
                 last_login: todayDate,
@@ -173,21 +153,14 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
                 updated_at: new Date().toISOString(),
               })
               .eq('user_id', userId);
-
-            if (updateError) {
-              console.error('Error updating streak:', updateError);
-              throw updateError;
-            }
           } else {
-            // Streak broken - start fresh with today
-            console.log('Streak broken - resetting to 1');
             currentStreak = 1;
             maxStreak = streakRecord.max_streak;
             pointsEarned = 10;
-            message = 'Welcome back! New streak started.';
+            message = 'Welcome back! Let\'s build a new streak.';
             completedDays = [currentDayIndex];
 
-            const { error: updateError } = await supabase
+            await supabase
               .from('login_streaks')
               .update({
                 last_login: todayDate,
@@ -196,78 +169,25 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
                 updated_at: new Date().toISOString(),
               })
               .eq('user_id', userId);
-
-            if (updateError) {
-              console.error('Error resetting streak:', updateError);
-              throw updateError;
-            }
           }
         }
       }
 
-      // Award points to user profile if points were earned
       if (pointsEarned > 0) {
-        console.log('Awarding points:', pointsEarned);
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('points')
-          .eq('id', userId)
-          .single();
-
-        if (profileError) {
-          console.error('Error fetching profile:', profileError);
-        } else if (profile) {
-          const newPoints = (profile.points || 0) + pointsEarned;
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ points: newPoints })
-            .eq('id', userId);
-
-          if (updateError) {
-            console.error('Error updating points:', updateError);
-          } else {
-            console.log('Points updated successfully');
-          }
+        const { data: profile } = await supabase.from('profiles').select('points').eq('id', userId).single();
+        if (profile) {
+          await supabase.from('profiles').update({ points: (profile.points || 0) + pointsEarned }).eq('id', userId);
         }
       }
 
-      setStreakData({
-        currentStreak,
-        maxStreak,
-        pointsEarned,
-        dayOfWeek,
-        isNewRecord,
-        message,
-        completedDays,
-      });
-
-      console.log('Streak update completed:', {
-        currentStreak,
-        maxStreak,
-        pointsEarned,
-        isNewRecord,
-        message,
-        completedDays
-      });
-
+      setStreakData({ currentStreak, maxStreak, pointsEarned, dayOfWeek, isNewRecord, message, completedDays });
     } catch (error) {
-      console.error('Error updating login streak:', error);
-      const today = new Date();
-      setStreakData({
-        currentStreak: 1,
-        maxStreak: 1,
-        pointsEarned: 10,
-        dayOfWeek: today.toLocaleDateString('en-US', { weekday: 'long' }),
-        isNewRecord: false,
-        message: 'Welcome! Daily login bonus awarded.',
-        completedDays: [today.getDay()],
-      });
+      console.error('Streak update failed:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Lottie flame animation component
   const FlameAnimation = () => {
     if (Platform.OS === 'ios' || Platform.OS === 'android') {
       return (
@@ -292,35 +212,22 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
     } else {
       return (
         <View style={styles.fallbackFlame}>
-          <Text style={styles.fallbackFlameText}>🔥</Text>
+          <Flame size={40} color="#1ea2b1" />
         </View>
       );
     }
   };
 
-  // Render day circles with ticks
   const renderDayCircles = () => {
     const currentDayIndex = new Date().getDay();
-    
     return daysOfWeek.map((day, index) => {
       const isToday = index === currentDayIndex;
       const isCompleted = streakData.completedDays?.includes(index) || false;
-      
       return (
         <View key={day} style={styles.dayCircleContainer}>
-          <Text style={[styles.dayLabel, isToday && styles.todayLabel]}>
-            {day}
-          </Text>
-          <View style={[
-            styles.dayCircle,
-            isToday && styles.todayCircle,
-            isCompleted && styles.completedCircle
-          ]}>
-            {isCompleted ? (
-              <Check size={16} color="#ffffff" />
-            ) : (
-              <Circle size={16} color={isToday ? "#1ea2b1" : "#666666"} />
-            )}
+          <Text style={[styles.dayLabel, isToday && styles.todayLabel]}>{day}</Text>
+          <View style={[styles.dayCircle, isToday && styles.todayCircle, isCompleted && styles.completedCircle]}>
+            {isCompleted ? <Check size={14} color="#000" strokeWidth={3} /> : <View style={styles.dot} />}
           </View>
         </View>
       );
@@ -328,21 +235,11 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <Animated.View 
-          style={[
-            styles.container,
-            { opacity: fadeAnim }
-          ]}
-        >
+        <Animated.View style={[styles.container, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <X size={24} color="#ffffff" />
+            <X size={20} color="#666" />
           </TouchableOpacity>
 
           <View style={styles.content}>
@@ -350,39 +247,28 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
               <FlameAnimation />
             </View>
 
-            <Text style={styles.title}>
-              {streakData.isNewRecord ? 'New Record!' : streakData.message}
-            </Text>
-
+            <Text style={styles.title}>{streakData.message}</Text>
             <Text style={styles.dayText}>Happy {streakData.dayOfWeek}!</Text>
 
-            {/* Streak counter */}
-            <View style={styles.streakContainer}>
+            <View style={styles.streakBadge}>
               <Text style={styles.streakNumber}>{streakData.currentStreak}</Text>
               <Text style={styles.streakLabel}>Day Streak</Text>
             </View>
 
-            {/* Weekly progress tracker - single row */}
-            <View style={styles.weekProgressContainer}>
-              <Text style={styles.weekProgressLabel}>Weekly Progress</Text>
-              <View style={styles.daysRow}>
-                {renderDayCircles()}
-              </View>
-              <Text style={styles.progressText}>
-                {streakData.completedDays?.length || 0} of {daysOfWeek.length} days completed
-              </Text>
+            <View style={styles.progressCard}>
+              <Text style={styles.progressTitle}>WEEKLY PROGRESS</Text>
+              <View style={styles.daysRow}>{renderDayCircles()}</View>
             </View>
 
-            {streakData.isNewRecord && (
-              <View style={styles.recordBadge}>
-                <Trophy size={20} color="#fbbf24" />
-                <Text style={styles.recordText}>Personal Best! 🏆</Text>
+            {streakData.pointsEarned > 0 && (
+              <View style={styles.rewardBanner}>
+                <Star size={16} color="#000" fill="#000" />
+                <Text style={styles.rewardText}>+{streakData.pointsEarned} Points Added</Text>
               </View>
             )}
 
-
             <TouchableOpacity style={styles.continueButton} onPress={onClose}>
-              <Text style={styles.continueButtonText}>Continue</Text>
+              <Text style={styles.continueButtonText}>CONTINUE</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -394,187 +280,167 @@ export default function StreakOverlay({ visible, onClose, userId }: StreakOverla
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   container: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    padding: 30,
-    marginHorizontal: 20,
+    backgroundColor: '#111',
+    borderRadius: 32,
+    padding: 32,
+    width: SCREEN_WIDTH - 48,
+    maxWidth: 400,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#333333',
-    minWidth: 300,
-    maxWidth: 400,
+    borderColor: '#222',
   },
   closeButton: {
     position: 'absolute',
-    top: 15,
-    right: 15,
-    padding: 5,
+    top: 24,
+    right: 24,
+    zIndex: 10,
   },
   content: {
     alignItems: 'center',
     width: '100%',
   },
   iconContainer: {
-    marginBottom: 20,
-    width: 100,
-    height: 100,
+    width: 120,
+    height: 120,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 16,
   },
   flameAnimation: {
-    width: 100,
-    height: 100,
+    width: 120,
+    height: 120,
   },
   fallbackFlame: {
     width: 80,
     height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    borderRadius: 40,
-  },
-  fallbackFlameText: {
-    fontSize: 40,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 8,
+    fontWeight: '900',
+    color: '#FFF',
     textAlign: 'center',
-  },
-  dayText: {
-    fontSize: 16,
-    color: '#1ea2b1',
-    marginBottom: 20,
-  },
-  streakContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  streakNumber: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#ff6b35',
+    fontStyle: 'italic',
     marginBottom: 4,
   },
-  streakLabel: {
-    fontSize: 16,
-    color: '#cccccc',
-  },
-  weekProgressContainer: {
-    backgroundColor: '#0a0a0a',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    width: '100%',
-    alignItems: 'center',
-  },
-  weekProgressLabel: {
+  dayText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#cccccc',
-    marginBottom: 12,
+    color: '#1ea2b1',
+    marginBottom: 32,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  streakBadge: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  streakNumber: {
+    fontSize: 72,
+    fontWeight: '900',
+    color: '#FFF',
+    lineHeight: 72,
+    letterSpacing: -2,
+  },
+  streakLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#444',
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    marginTop: -4,
+  },
+  progressCard: {
+    backgroundColor: '#000',
+    width: '100%',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 32,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  progressTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#444',
+    letterSpacing: 1,
+    marginBottom: 16,
+    textAlign: 'center',
   },
   daysRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
-    marginBottom: 12,
   },
   dayCircleContainer: {
     alignItems: 'center',
-    width: 40,
   },
   dayLabel: {
-    fontSize: 12,
-    color: '#666666',
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#444',
     marginBottom: 8,
   },
   todayLabel: {
     color: '#1ea2b1',
-    fontWeight: 'bold',
   },
   dayCircle: {
     width: 32,
     height: 32,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#222',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    borderWidth: 2,
-    borderColor: '#333333',
   },
   todayCircle: {
     borderColor: '#1ea2b1',
+    borderWidth: 2,
   },
   completedCircle: {
-    backgroundColor: '#ff6b35',
-    borderColor: '#ff6b35',
+    backgroundColor: '#1ea2b1',
+    borderColor: '#1ea2b1',
   },
-  progressText: {
-    fontSize: 12,
-    color: '#666666',
-    textAlign: 'center',
+  dot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#222',
   },
-  recordBadge: {
+  rewardBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fbbf2420',
-    borderRadius: 20,
+    backgroundColor: '#fbbf24',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    marginBottom: 20,
-  },
-  recordText: {
-    color: '#fbbf24',
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 6,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 20,
-    marginBottom: 30,
-    width: '100%',
-  },
-  statItem: {
-    alignItems: 'center',
-    backgroundColor: '#0a0a0a',
     borderRadius: 12,
-    padding: 16,
-    minWidth: 100,
-    flex: 1,
+    marginBottom: 32,
+    gap: 8,
   },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  statLabel: {
+  rewardText: {
+    color: '#000',
+    fontWeight: '900',
     fontSize: 12,
-    color: '#666666',
-    textAlign: 'center',
   },
   continueButton: {
     backgroundColor: '#1ea2b1',
-    borderRadius: 12,
-    paddingHorizontal: 30,
-    paddingVertical: 12,
-    minWidth: 150,
+    width: '100%',
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: 'center',
   },
   continueButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });

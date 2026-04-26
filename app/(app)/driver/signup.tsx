@@ -54,7 +54,11 @@ export default function DriverOnboardingScreen() {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     } else {
-      router.back();
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)/profile');
+      }
     }
   };
 

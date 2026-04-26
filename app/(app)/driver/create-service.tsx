@@ -61,7 +61,13 @@ export default function CreateServiceSelectionScreen() {
         <View style={styles.headerTop}>
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/driver-dashboard');
+              }
+            }}
           >
             <ArrowLeft size={24} color="#FFF" />
           </TouchableOpacity>

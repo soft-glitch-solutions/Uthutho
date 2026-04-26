@@ -1,4 +1,3 @@
-// app/(app)/driver/create-service/public.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -11,15 +10,13 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import {
   ArrowLeft,
   Bus,
   MapPin,
-  DollarSign,
   Navigation,
-  Building,
-  FileText,
+  DollarSign,
   ChevronDown,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
@@ -33,60 +30,36 @@ export default function CreatePublicTransportScreen() {
   const [loading, setLoading] = useState(false);
   const [driverId, setDriverId] = useState<string | null>(null);
   const [routes, setRoutes] = useState<any[]>([]);
-  const [hubs, setHubs] = useState<any[]>([]);
   
-  // Form state
   const [formData, setFormData] = useState({
     name: '',
     transportType: 'bus',
     routeId: '',
-    hubId: '',
     cost: '',
     startPoint: '',
     endPoint: '',
-    instructions: '',
   });
 
   useEffect(() => {
     const fetchData = async () => {
       if (!user) return;
-      
       try {
-        // Fetch driver ID
-        const { data: driverData, error: driverError } = await supabase
+        const { data: driverData } = await supabase
           .from('drivers')
           .select('id')
           .eq('user_id', user.id)
           .single();
+        setDriverId(driverData?.id);
 
-        if (driverError) throw driverError;
-        setDriverId(driverData.id);
-
-        // Fetch available routes
-        const { data: routesData, error: routesError } = await supabase
+        const { data: routesData } = await supabase
           .from('routes')
-          .select('id, name, transport_type, start_point, end_point')
+          .select('id, name, start_point, end_point')
           .order('name');
-
-        if (routesError) throw routesError;
         setRoutes(routesData || []);
-
-        // Fetch hubs
-        const { data: hubsData, error: hubsError } = await supabase
-          .from('hubs')
-          .select('id, name, location')
-          .order('name');
-
-        if (hubsError) throw hubsError;
-        setHubs(hubsData || []);
-
       } catch (error) {
         console.error('Error fetching data:', error);
-        Alert.alert('Error', 'Failed to load required information');
-        router.back();
       }
     };
-
     fetchData();
   }, [user]);
 
@@ -95,54 +68,19 @@ export default function CreatePublicTransportScreen() {
     { label: 'Minibus Taxi', value: 'minibus' },
     { label: 'Train', value: 'train' },
     { label: 'Shuttle', value: 'shuttle' },
-    { label: 'Taxi', value: 'taxi' },
   ];
 
   const handleSubmit = async () => {
-    // Validation
-    if (!formData.name.trim()) {
-      Alert.alert('Error', 'Please enter service name');
-      return;
-    }
-    
-    if (!formData.transportType) {
-      Alert.alert('Error', 'Please select transport type');
-      return;
-    }
-    
-    if (!formData.routeId) {
-      Alert.alert('Error', 'Please select a route');
-      return;
-    }
-    
-    if (!formData.cost) {
-      Alert.alert('Error', 'Please enter cost');
-      return;
-    }
-    
-    if (!formData.startPoint.trim()) {
-      Alert.alert('Error', 'Please enter start point');
-      return;
-    }
-    
-    if (!formData.endPoint.trim()) {
-      Alert.alert('Error', 'Please enter end point');
-      return;
-    }
-    
-    if (!driverId) {
-      Alert.alert('Error', 'Driver information not found');
+    if (!formData.name.trim() || !formData.cost) {
+      Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
     setLoading(true);
-
     try {
-      // First, create or get the route
-      let routeId = formData.routeId;
+      let finalRouteId = formData.routeId;
       
-      if (routeId === 'new') {
-        // Create new route
+      if (finalRouteId === 'new') {
         const { data: newRoute, error: routeError } = await supabase
           .from('routes')
           .insert({
@@ -151,383 +89,311 @@ export default function CreatePublicTransportScreen() {
             cost: parseFloat(formData.cost),
             start_point: formData.startPoint,
             end_point: formData.endPoint,
-            hub_id: formData.hubId || null,
-            instructions: formData.instructions || null,
           })
           .select('id')
           .single();
-
         if (routeError) throw routeError;
-        routeId = newRoute.id;
+        finalRouteId = newRoute.id;
       }
 
-      // Create public transport service
       const { error } = await supabase
         .from('public_transports')
         .insert({
           driver_id: driverId,
-          route_id: routeId,
+          route_id: finalRouteId,
           transport_type: formData.transportType,
           cost: parseFloat(formData.cost),
-          current_passengers: 0,
-          max_capacity: 50, // Default for public transport
           is_active: true,
-          is_verified: false,
         });
 
       if (error) throw error;
 
-      Alert.alert(
-        'Success!',
-        'Public transport service created successfully.',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.replace('/driver/dashboard')
-          }
-        ]
-      );
-      
+      Alert.alert('Success!', 'Service created successfully.', [
+        { text: 'OK', onPress: () => router.replace('/driver-dashboard') }
+      ]);
     } catch (error: any) {
-      console.error('Error creating service:', error);
       Alert.alert('Error', error.message || 'Failed to create service');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoBack = () => {
-    router.back();
-  };
-
-  const pickerSelectStyles = {
-    inputIOS: {
-      backgroundColor: '#111111',
-      color: '#FFFFFF',
-      fontSize: 16,
-      padding: 16,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: '#333333',
-      minHeight: 50,
-    },
-    inputAndroid: {
-      backgroundColor: '#111111',
-      color: '#FFFFFF',
-      fontSize: 16,
-      padding: 16,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: '#333333',
-      minHeight: 50,
-    },
-    placeholder: {
-      color: '#666666',
-    },
-  };
-
   const routeOptions = [
-    { label: 'Create New Route', value: 'new' },
+    { label: '+ Create New Route', value: 'new' },
     ...(routes.map(route => ({
       label: `${route.name} (${route.start_point} → ${route.end_point})`,
       value: route.id,
     }))),
   ];
 
-  const hubOptions = [
-    { label: 'No Hub/Station', value: '' },
-    ...(hubs.map(hub => ({
-      label: `${hub.name} - ${hub.location}`,
-      value: hub.id,
-    }))),
-  ];
+  const pickerStyles = {
+    inputIOS: styles.pickerInput,
+    inputAndroid: styles.pickerInput,
+    placeholder: { color: '#444' },
+  };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView style={styles.scrollContainer}>
-        {/* Header */}
-        <View style={styles.header}>
+    <View style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Premium Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
           <TouchableOpacity 
-            style={styles.backButton}
-            onPress={handleGoBack}
+            style={styles.backButton} 
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/driver/create-service');
+              }
+            }}
           >
-            <ArrowLeft size={24} color="#FFFFFF" />
+            <ArrowLeft size={24} color="#FFF" />
           </TouchableOpacity>
-          <Text style={styles.title}>Public Transport Service</Text>
-          <Text style={styles.subtitle}>Create a new public transport route</Text>
+          <Text style={styles.brandText}>Uthutho</Text>
+          <View style={{ width: 40 }} />
         </View>
+        <View style={styles.headerContent}>
+          <Text style={styles.readyText}>SERVICE CREATION</Text>
+          <Text style={styles.headingText}>Public Transport</Text>
+        </View>
+      </View>
 
-        <View style={styles.formContainer}>
-          {/* Service Information */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>
-              <Bus size={16} color="#F59E0B" /> Service Information
-            </Text>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.formContainer}>
             
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Service Name *"
-                placeholderTextColor="#666666"
-                value={formData.name}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Transport Type *</Text>
-              <View style={styles.typeGrid}>
-                {transportTypes.map((type) => (
-                  <TouchableOpacity
-                    key={type.value}
-                    style={[
-                      styles.typeButton,
-                      formData.transportType === type.value && styles.typeButtonSelected
-                    ]}
-                    onPress={() => setFormData(prev => ({ ...prev, transportType: type.value }))}
-                  >
-                    <Text style={[
-                      styles.typeText,
-                      formData.transportType === type.value && styles.typeTextSelected
-                    ]}>
-                      {type.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            {/* Service Details Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>SERVICE DETAILS</Text>
+              <View style={styles.inputCard}>
+                <View style={styles.inputRow}>
+                  <Bus size={18} color="#F59E0B" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Service Name (e.g. Route A Express)"
+                    placeholderTextColor="#444"
+                    value={formData.name}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
+                  />
+                </View>
+                <View style={[styles.inputRow, { borderTopWidth: 1, borderTopColor: '#1a1a1a' }]}>
+                  <Navigation size={18} color="#F59E0B" />
+                  <View style={{ flex: 1 }}>
+                    <RNPickerSelect
+                      placeholder={{ label: 'Select Vehicle Type', value: null }}
+                      items={transportTypes}
+                      onValueChange={(val) => setFormData(prev => ({ ...prev, transportType: val }))}
+                      value={formData.transportType}
+                      style={pickerStyles}
+                    />
+                  </View>
+                </View>
               </View>
             </View>
-          </View>
 
-          {/* Route Selection */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>
-              <Navigation size={16} color="#F59E0B" /> Route
-            </Text>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Select Route *</Text>
-              <RNPickerSelect
-                placeholder={{ label: 'Select a route or create new...', value: '' }}
-                items={routeOptions}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, routeId: value }))}
-                value={formData.routeId}
-                style={pickerSelectStyles}
-                Icon={() => <ChevronDown size={20} color="#888888" />}
-              />
-            </View>
-          </View>
-
-          {/* Route Details (show when creating new route or for reference) */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>
-              <MapPin size={16} color="#F59E0B" /> Route Details
-            </Text>
-            
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Start Point (Station/Stop) *"
-                placeholderTextColor="#666666"
-                value={formData.startPoint}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, startPoint: text }))}
-              />
+            {/* Route Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>ROUTE SELECTION</Text>
+              <View style={styles.inputCard}>
+                <View style={styles.inputRow}>
+                  <MapPin size={18} color="#F59E0B" />
+                  <View style={{ flex: 1 }}>
+                    <RNPickerSelect
+                      placeholder={{ label: 'Choose a Route', value: null }}
+                      items={routeOptions}
+                      onValueChange={(val) => setFormData(prev => ({ ...prev, routeId: val }))}
+                      value={formData.routeId}
+                      style={pickerStyles}
+                    />
+                  </View>
+                </View>
+              </View>
             </View>
 
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="End Point (Station/Stop) *"
-                placeholderTextColor="#666666"
-                value={formData.endPoint}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, endPoint: text }))}
-              />
+            {/* New Route Details - Conditional */}
+            {formData.routeId === 'new' && (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>NEW ROUTE DETAILS</Text>
+                <View style={styles.inputCard}>
+                  <View style={styles.inputRow}>
+                    <MapPin size={18} color="#F59E0B" />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Start Point / Station"
+                      placeholderTextColor="#444"
+                      value={formData.startPoint}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, startPoint: text }))}
+                    />
+                  </View>
+                  <View style={[styles.inputRow, { borderTopWidth: 1, borderTopColor: '#1a1a1a' }]}>
+                    <Navigation size={18} color="#F59E0B" />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="End Point / Destination"
+                      placeholderTextColor="#444"
+                      value={formData.endPoint}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, endPoint: text }))}
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Pricing Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>COST</Text>
+              <View style={styles.inputCard}>
+                <View style={styles.inputRow}>
+                  <DollarSign size={18} color="#F59E0B" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Ticket Price (ZAR)"
+                    placeholderTextColor="#444"
+                    keyboardType="numeric"
+                    value={formData.cost}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, cost: text }))}
+                  />
+                </View>
+              </View>
             </View>
 
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Cost (ZAR) *"
-                placeholderTextColor="#666666"
-                value={formData.cost}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, cost: text }))}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Associated Hub/Station (Optional)</Text>
-              <RNPickerSelect
-                placeholder={{ label: 'Select a hub...', value: '' }}
-                items={hubOptions}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, hubId: value }))}
-                value={formData.hubId}
-                style={pickerSelectStyles}
-                Icon={() => <ChevronDown size={20} color="#888888" />}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Special Instructions (optional)"
-                placeholderTextColor="#666666"
-                value={formData.instructions}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, instructions: text }))}
-                multiline
-                numberOfLines={3}
-              />
-              <Text style={styles.helperText}>
-                Operating hours, special schedules, accessibility info, etc.
+            <TouchableOpacity
+              style={[styles.submitButton, loading && { opacity: 0.7 }]}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              <Text style={styles.submitButtonText}>
+                {loading ? 'CREATING...' : 'PUBLISH SERVICE'}
               </Text>
-            </View>
-          </View>
+            </TouchableOpacity>
 
-          {/* Submit Button */}
-          <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            <Text style={styles.submitButtonText}>
-              {loading ? 'Creating...' : 'Create Public Transport Service'}
+            <Text style={styles.disclaimer}>
+              Providing reliable public transport helps build a more connected community.
             </Text>
-          </TouchableOpacity>
-
-          <Text style={styles.note}>
-            * Required fields
-            {'\n\n'}
-            Your service will be listed on public transport routes.
-            {'\n\n'}
-            Ensure all information is accurate for passengers.
-          </Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          </View>
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
-  },
-  scrollContainer: {
-    flex: 1,
+    backgroundColor: '#000',
   },
   header: {
-    padding: 24,
-    paddingTop: 60,
-    backgroundColor: '#111111',
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    backgroundColor: '#000',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    marginBottom: 32,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#222222',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
+  brandText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -1,
   },
-  subtitle: {
-    fontSize: 16,
+  headerContent: {
+    marginTop: 0,
+  },
+  readyText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
     color: '#F59E0B',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+  },
+  headingText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#FFF',
+    fontStyle: 'italic',
+    letterSpacing: -1,
+  },
+  scrollContainer: {
+    flex: 1,
   },
   formContainer: {
-    padding: 20,
+    paddingHorizontal: 24,
   },
-  formSection: {
-    marginBottom: 24,
+  section: {
+    marginBottom: 32,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
+    color: '#444',
     marginBottom: 16,
+  },
+  inputCard: {
+    backgroundColor: '#111',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#222',
+    overflow: 'hidden',
+  },
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  inputContainer: {
-    marginBottom: 12,
+    paddingHorizontal: 20,
+    height: 64,
+    gap: 16,
   },
   input: {
-    backgroundColor: '#111111',
-    color: '#FFFFFF',
-    fontSize: 16,
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  label: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  helperText: {
-    color: '#666666',
-    fontSize: 12,
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  typeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  typeButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: '#111111',
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  typeButtonSelected: {
-    backgroundColor: '#F59E0B',
-    borderColor: '#F59E0B',
-  },
-  typeText: {
-    color: '#888888',
-    fontSize: 14,
+    flex: 1,
+    color: '#FFF',
+    fontSize: 15,
     fontWeight: '600',
   },
-  typeTextSelected: {
-    color: '#000000',
+  pickerInput: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '600',
+    height: 64,
+    paddingRight: 30, // to avoid overlap with icon
   },
   submitButton: {
     backgroundColor: '#F59E0B',
-    paddingVertical: 18,
-    borderRadius: 12,
+    height: 64,
+    borderRadius: 24,
     alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 20,
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#F59E0B80',
+    justifyContent: 'center',
+    marginTop: 16,
   },
   submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
-  note: {
-    fontSize: 14,
-    color: '#888888',
+  disclaimer: {
+    fontSize: 12,
+    color: '#444',
     textAlign: 'center',
-    lineHeight: 20,
+    marginTop: 24,
+    lineHeight: 18,
   },
 });
