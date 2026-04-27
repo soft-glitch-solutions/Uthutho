@@ -34,11 +34,12 @@ import LottieView from 'lottie-react-native';
 import RateTripModal from '@/components/home/RateTripModal';
 import SimpleDebugPanel from '@/components/debug/SimpleDebugPanel';
 import WelcomeOverlay from '@/components/home/WelcomeOverlay';
-import AppTutorial, { shouldShowTutorial } from '@/components/AppTutorial';
+import { useTutorial } from '@/context/TutorialContext';
 import { DriverStatsSummary } from '@/components/home/DriverStatsSummary';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
+const IS_SMALL_SCREEN = SCREEN_HEIGHT < 700;
 
 interface FavoriteItem {
   id: string;
@@ -321,19 +322,48 @@ export default function HomeScreen() {
   const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(false);
+  // Removed local showTutorial state
   const [isSearchOverlayVisible, setIsSearchOverlayVisible] = useState(false);
   const [searchBarY, setSearchBarY] = useState(160);
   const [suggestedRoutes, setSuggestedRoutes] = useState<any[]>([]);
   const [isSuggestedLoading, setIsSuggestedLoading] = useState(false);
   const hasCheckedWelcome = useRef(false);
 
-  // Tutorial spotlight refs — attached to real home-screen elements
-  const tutHeaderRef = useRef<View>(null);
-  const tutNearbyRef = useRef<View>(null);
-  const tutServicesRef = useRef<View>(null);
-  const tutFavoritesRef = useRef<View>(null);
-  const tutGamificationRef = useRef<View>(null);
+  const { refs, setOnStepChange, setShowTutorial } = useTutorial();
+
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const handleStepChange = useCallback((stepId: string) => {
+    if (!scrollViewRef.current) {
+      console.log('ScrollView ref not ready for scroll to:', stepId);
+      return;
+    }
+
+    let scrollToY = 0;
+    const scrollOptions = { animated: true };
+
+    switch (stepId) {
+      case 'favorites':
+        scrollToY = IS_SMALL_SCREEN ? 780 : 850;
+        break;
+      case 'gamification':
+        scrollToY = IS_SMALL_SCREEN ? 1000 : 1100;
+        break;
+      case 'finish':
+        scrollToY = 0;
+        break;
+      default:
+        return;
+    }
+
+    console.log('Tutorial scrolling to:', stepId, '@', scrollToY);
+    scrollViewRef.current.scrollTo({ x: 0, y: scrollToY, animated: true });
+  }, []);
+
+  useEffect(() => {
+    setOnStepChange(handleStepChange);
+    return () => setOnStepChange(null);
+  }, [handleStepChange, setOnStepChange]);
 
   // FIXED: Properly memoized fetchNearestLocations
   const fetchNearestLocations = useCallback(async () => {
@@ -1225,6 +1255,7 @@ export default function HomeScreen() {
   return (
     <ScreenTransition>
       <ScrollView
+        ref={scrollViewRef}
         style={[styles.container, { backgroundColor: colors.background }]}
         refreshControl={
           <RefreshControl
@@ -1235,7 +1266,7 @@ export default function HomeScreen() {
           />
         }
       >
-        <View style={styles.topHeader} ref={tutHeaderRef}>
+        <View style={styles.topHeader} ref={refs.headerRef}>
           <AnimatedHamburgerMenu
             onPress={openSidebar}
             onLongPress={() => setShowDebugPanel(true)}
@@ -1319,7 +1350,7 @@ export default function HomeScreen() {
           </Animated.View>
         )}
 
-        <View ref={tutNearbyRef} collapsable={false}>
+        <View ref={refs.nearbyRef} collapsable={false} renderToHardwareTextureAndroid style={{ minHeight: 1 }}>
         <NearbySection
           locationError={locationError}
           isNearestLoading={isNearestLoading}
@@ -1339,13 +1370,13 @@ export default function HomeScreen() {
           <DriverStatsSummary userId={user.id} colors={colors} />
         )}
 
-        <View ref={tutServicesRef} collapsable={false}>
+        <View ref={refs.servicesRef} collapsable={false} renderToHardwareTextureAndroid style={{ minHeight: 1 }}>
         <ServicesSection colors={colors} router={router} />
         </View>
 
 
         {isProfileLoading || isFavoritesLoading ? (
-          <View ref={tutFavoritesRef} collapsable={false}>
+          <View ref={refs.favoritesRef} collapsable={false} renderToHardwareTextureAndroid style={{ minHeight: 1 }}>
           <FavoritesSection
             favorites={favorites}
             favoriteDetails={favoriteDetails}
@@ -1366,7 +1397,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View ref={tutFavoritesRef} collapsable={false}>
+          <View ref={refs.favoritesRef} collapsable={false} renderToHardwareTextureAndroid style={{ minHeight: 1 }}>
           <FavoritesSection
             favorites={favorites}
             favoriteDetails={favoriteDetails}
@@ -1378,7 +1409,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        <View ref={tutGamificationRef} collapsable={false}>
+        <View ref={refs.gamificationRef} collapsable={false}>
         <GamificationSection
           isStatsLoading={isStatsLoading}
           userStats={userStats}
@@ -1401,18 +1432,6 @@ export default function HomeScreen() {
         onShowStreakOverlay={() => setStreakVisible(true)}
         onHideStreakOverlay={() => setStreakVisible(false)}
         onShowTutorial={() => { setShowDebugPanel(false); setShowTutorial(true); }}
-      />
-
-      <AppTutorial
-        visible={showTutorial}
-        onClose={() => setShowTutorial(false)}
-        refs={{
-          headerRef: tutHeaderRef,
-          nearbyRef: tutNearbyRef,
-          servicesRef: tutServicesRef,
-          favoritesRef: tutFavoritesRef,
-          gamificationRef: tutGamificationRef,
-        }}
       />
 
       <RateTripModal
@@ -1481,8 +1500,8 @@ const styles = StyleSheet.create({
   // Profile Card
   profileCard: {
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    padding: IS_SMALL_SCREEN ? 12 : 20,
+    marginBottom: IS_SMALL_SCREEN ? 12 : 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -1621,7 +1640,7 @@ const styles = StyleSheet.create({
   },
   mapPlaceholder: {
     width: '100%',
-    height: 300,
+    height: IS_SMALL_SCREEN ? 200 : 300,
     backgroundColor: 'rgba(30, 162, 177, 0.05)',
     borderRadius: 12,
     borderWidth: 2,
@@ -1863,10 +1882,10 @@ const styles = StyleSheet.create({
   // Mobile-only styles
   topHeader: {
     flexDirection: 'row',
-    paddingTop: 30,
+    paddingTop: IS_SMALL_SCREEN ? 10 : 30,
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: IS_SMALL_SCREEN ? 12 : 20,
   },
   logoContainer: {
     flexDirection: 'row',

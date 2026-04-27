@@ -23,6 +23,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import StreakOverlay from '@/components/StreakOverlay';
 import { useRouter, useNavigation } from 'expo-router';
 import { gifPrefetchService } from '@/services/gifPrefetchService';
+import { TutorialProvider, useTutorial } from '@/context/TutorialContext';
+import AppTutorial, { shouldShowTutorial } from '@/components/AppTutorial';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const TAB_COUNT = 4;
@@ -367,6 +369,7 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
 
 // Custom Floating Tab Bar for Mobile
 const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount }) => {
+  const { refs } = useTutorial();
   return (
     <AnimatedView
       style={{
@@ -401,6 +404,13 @@ const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount })
         if (options.href === null || !options.tabBarIcon) return null;
 
         const isFocused = state.index === index;
+        
+        // Match refs to tab names
+        let tabRef = null;
+        if (route.name === 'home') tabRef = refs.homeTabRef;
+        if (route.name === 'feeds') tabRef = refs.feedsTabRef;
+        if (route.name === 'tracker') tabRef = refs.trackerTabRef;
+        if (route.name === 'routes') tabRef = refs.plannerTabRef;
 
         const onPress = () => {
           const event = navigation.emit({
@@ -429,6 +439,7 @@ const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount })
         return (
           <Pressable
             key={route.key}
+            ref={tabRef}
             onPress={onPress}
             onLongPress={onLongPress}
             style={{
@@ -486,13 +497,24 @@ export default function EnhancedTabLayout() {
   const { colors } = useTheme();
   const [userId, setUserId] = useState<string | null>(null);
   const [showStreakOverlay, setShowStreakOverlay] = useState(false);
+  const { showTutorial, setShowTutorial } = useTutorial();
 
   // ========== START GIF PREFETCHING WHEN APP LOADS ==========
   useEffect(() => {
     // Start prefetching GIFs immediately when the tab layout mounts
     // This ensures GIFs are downloading while user navigates
     gifPrefetchService.startPrefetching();
-  }, []); // Empty dependency array = runs once when component mounts
+    
+    // Check for first time tutorial
+    checkTutorial();
+  }, []); 
+
+  const checkTutorial = async () => {
+    const needsTutorial = await shouldShowTutorial();
+    if (needsTutorial) {
+      setTimeout(() => setShowTutorial(true), 2500);
+    }
+  };
   // ========== END GIF PREFETCHING ==========
 
   // Check for streak overlay when component mounts
@@ -610,6 +632,19 @@ export default function EnhancedTabLayout() {
         onClose={() => setShowStreakOverlay(false)}
       />
 
+      <AppTutorial
+        visible={showTutorial}
+        onClose={() => setShowTutorial(false)}
+      />
+
     </View>
+  );
+}
+
+export default function TabLayoutWrapper() {
+  return (
+    <TutorialProvider>
+      <EnhancedTabLayout />
+    </TutorialProvider>
   );
 }

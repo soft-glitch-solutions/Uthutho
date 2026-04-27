@@ -20,6 +20,7 @@ import AddEntryModal from '@/components/tracker/AddEntryModal';
 import EditCardModal from '@/components/tracker/EditCardModal';
 import { UserCard } from '@/types/tracker';
 import { useTheme } from '@/context/ThemeContext';
+import { useTutorial } from '@/context/TutorialContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -55,6 +56,7 @@ export default function TrackerScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
+  const { refs } = useTutorial();
   
   const [userCards, setUserCards] = useState<UserCard[]>([]);
   const [showAddCardModal, setShowAddCardModal] = useState(false);
@@ -213,7 +215,7 @@ export default function TrackerScreen() {
             </View>
 
             {/* Quick Actions Card */}
-            <View style={styles.quickActionsSection}>
+            <View style={styles.quickActionsSection} ref={refs.trackerActionsRef}>
               <Text style={styles.sectionLabel}>QUICK ACTIONS</Text>
               <View style={styles.actionsGrid}>
                 <TouchableOpacity 

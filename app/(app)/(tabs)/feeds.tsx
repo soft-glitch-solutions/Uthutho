@@ -20,6 +20,7 @@ import { useAuth } from '@/hook/useAuth';
 import * as FileSystem from 'expo-file-system';
 import { captureRef } from 'react-native-view-shot';
 import { Animated } from 'react-native';
+import { useTutorial } from '@/context/TutorialContext';
 
 
 // Import components (Remove AddCommunityScreen import)
@@ -32,8 +33,17 @@ import PostCard from '@/components/feeds/PostCard';
 import EmptyPosts from '@/components/feeds/EmptyPosts';
 import CommunityHero from '@/components/feeds/CommunityHero';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
+const IS_SMALL_SCREEN = SCREEN_HEIGHT < 700;
+
+const ALL_COMMUNITY: Community = {
+  id: 'all_communities',
+  name: 'All Section',
+  type: 'hub', // dummy
+  latitude: 0,
+  longitude: 0,
+};
 
 // Define basic types locally to avoid import issues
 interface Community {
@@ -130,6 +140,7 @@ const WeekRangeHeader: React.FC<{
 
 export default function FeedsScreen() {
   const { user } = useAuth();
+  const { refs } = useTutorial();
   const userId = user?.id ?? '';
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -291,19 +302,19 @@ export default function FeedsScreen() {
       ]);
 
       const allFavorites: Community[] = [
+        ALL_COMMUNITY,
         ...(hubs || []).map((hub) => ({ ...hub, type: 'hub' as const })),
         ...(stops || []).map((stop) => ({ ...stop, type: 'stop' as const, image: stop.image_url })),
       ];
 
-      allFavorites.sort((a, b) => a.name.localeCompare(b.name));
       setCommunities(allFavorites);
 
-      // Set selected community if it exists in the new list, otherwise use first
+      // Set selected community if it exists in the new list, otherwise use ALL
       setSelectedCommunity(current => {
         if (current && allFavorites.find(c => c.id === current.id)) {
           return current;
         }
-        return allFavorites[0] || null;
+        return ALL_COMMUNITY;
       });
 
     } catch (error) {
@@ -384,31 +395,50 @@ export default function FeedsScreen() {
         post_comments(*, profiles(*))
       `;
 
-      const table = community.type === 'hub' ? 'hub_posts' : 'stop_posts';
-      const communityIdField = community.type === 'hub' ? 'hub_id' : 'stop_id';
+      let postsWithProfiles: any[] = [];
 
-      let query = supabase.from(table).select(baseSelect).eq(communityIdField, community.id);
+      if (community.id === 'all_communities') {
+        // Fetch from both tables
+        const realCommunityIds = communities.filter(c => c.id !== 'all_communities').map(c => c.id);
+        
+        const [hubRes, stopRes] = await Promise.all([
+          supabase.from('hub_posts').select(baseSelect).in('hub_id', realCommunityIds).order('created_at', { ascending: false }).limit(20),
+          supabase.from('stop_posts').select(baseSelect).in('stop_id', realCommunityIds).order('created_at', { ascending: false }).limit(20)
+        ]);
 
-      if (postFilter === 'week' && monday && sunday) {
-        query = query.gte('created_at', monday.toISOString()).lte('created_at', sunday.toISOString());
-      } else if (postFilter === 'today' && todayStart && todayEnd) {
-        query = query.gte('created_at', todayStart.toISOString()).lte('created_at', todayEnd.toISOString());
+        const combined = [...(hubRes.data || []), ...(stopRes.data || [])];
+        combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        
+        postsWithProfiles = combined.map((post: any) => ({
+          ...post,
+          profiles: post.profiles || { first_name: 'Unknown', last_name: '', avatar_url: 'https://via.placeholder.com/40x40/333333/ffffff?text=U' },
+        }));
+      } else {
+        const table = community.type === 'hub' ? 'hub_posts' : 'stop_posts';
+        const communityIdField = community.type === 'hub' ? 'hub_id' : 'stop_id';
+
+        let query = supabase.from(table).select(baseSelect).eq(communityIdField, community.id);
+
+        if (postFilter === 'week' && monday && sunday) {
+          query = query.gte('created_at', monday.toISOString()).lte('created_at', sunday.toISOString());
+        } else if (postFilter === 'today' && todayStart && todayEnd) {
+          query = query.gte('created_at', todayStart.toISOString()).lte('created_at', todayEnd.toISOString());
+        }
+
+        query = query.order('created_at', { ascending: false });
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        postsWithProfiles = (data || []).map((post: any) => ({
+          ...post,
+          profiles: post.profiles || { first_name: 'Unknown', last_name: '', avatar_url: 'https://via.placeholder.com/40x40/333333/ffffff?text=U' },
+        }));
       }
 
-      query = query.order('created_at', { ascending: false });
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      const postsWithProfiles = (data || []).map((post: any) => ({
+      // Format reactions and comments for all posts
+      const finalPosts = postsWithProfiles.map(post => ({
         ...post,
-        profiles: post.profiles || {
-          first_name: 'Unknown',
-          last_name: '',
-          selected_title: '',
-          avatar_url: 'https://via.placeholder.com/40x40/333333/ffffff?text=U',
-        },
         post_reactions: (post.post_reactions || []).map((reaction: any) => ({
           id: reaction.id,
           reaction_type: reaction.reaction_type,
@@ -418,15 +448,11 @@ export default function FeedsScreen() {
         })),
         post_comments: (post.post_comments || []).map((comment: any) => ({
           ...comment,
-          profiles: comment.profiles || {
-            first_name: 'Unknown',
-            last_name: '',
-            avatar_url: 'https://via.placeholder.com/40x40/333333/ffffff?text=U',
-          },
+          profiles: comment.profiles || { first_name: 'Unknown', last_name: '', avatar_url: 'https://via.placeholder.com/40x40/333333/ffffff?text=U' },
         })),
       }));
 
-      setPosts(postsWithProfiles);
+      setPosts(finalPosts);
     } catch (error) {
       console.error('Error loading posts:', error);
       setPosts([]);
@@ -707,19 +733,16 @@ export default function FeedsScreen() {
       );
     }
 
-    if (selectedCommunity && (!previewMode || isFollowingPreview)) {
-      return (
-        <PostCreation
-          newPost={newPost}
-          setNewPost={setNewPost}
-          createPost={createPost}
-          selectedCommunity={selectedCommunity}
-          isDesktop={isDesktop}
-        />
-      );
-    }
-
-    return null;
+    if (selectedCommunity?.id === 'all_communities') return null;
+    return (
+      <PostCreation
+        newPost={newPost}
+        setNewPost={setNewPost}
+        createPost={createPost}
+        selectedCommunity={selectedCommunity}
+        isDesktop={isDesktop}
+      />
+    );
   };
 
   const renderMobileHeader = () => {
@@ -900,7 +923,7 @@ export default function FeedsScreen() {
       ) : (
         // Mobile layout
         <>
-          <View style={styles.mobileHeaderWrapper}>
+          <View style={styles.mobileHeaderWrapper} ref={refs.feedsContentRef}>
             <Header
               unreadNotifications={unreadNotifications}
               router={router}
@@ -992,8 +1015,8 @@ const styles = StyleSheet.create({
   desktopHeaderContainer: {
     width: '100%',
     backgroundColor: '#000000',
-    paddingTop: 20,
-    paddingBottom: 16,
+    paddingTop: IS_SMALL_SCREEN ? 10 : 20,
+    paddingBottom: IS_SMALL_SCREEN ? 8 : 16,
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
   },
@@ -1052,8 +1075,8 @@ const styles = StyleSheet.create({
   communityStats: {
     backgroundColor: '#111111',
     borderRadius: 12,
-    padding: 16,
-    marginTop: 24,
+    padding: IS_SMALL_SCREEN ? 10 : 16,
+    marginTop: IS_SMALL_SCREEN ? 12 : 24,
     borderWidth: 1,
     borderColor: '#333333',
   },
