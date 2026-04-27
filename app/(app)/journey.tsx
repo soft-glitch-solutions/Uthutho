@@ -11,7 +11,8 @@ import {
   Animated,
   Image,
   Pressable,
-  Easing
+  Easing,
+  Dimensions
 } from 'react-native';
 import { useRef } from 'react';
 import { useTheme } from '@/context/ThemeContext';
@@ -32,26 +33,37 @@ import { useJourneyActions } from '@/components/journey/hooks/useJourneyActions'
 import { useLocationUpdates } from '@/components/journey/hooks/useLocationUpdates';
 import { useChat } from '@/components/journey/hooks/useChat';
 
-// Animated Hamburger Menu Component
-const AnimatedHamburgerMenu = ({ onPress, color, textColor }: any) => {
-  const rotation = useRef(new Animated.Value(0)).current;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-  const handlePress = () => {
-    Animated.sequence([
-      Animated.timing(rotation, { toValue: 1, duration: 150, easing: Easing.linear, useNativeDriver: true }),
-      Animated.timing(rotation, { toValue: 0, duration: 150, easing: Easing.linear, useNativeDriver: true })
-    ]).start();
-    if (onPress) onPress();
-  };
-
-  const rotateInterpolation = rotation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '90deg']
-  });
-
+// Premium Header Component
+const PremiumHeader = ({ onBack, userProfile, colors }: any) => {
   return (
-    <Pressable onPress={handlePress} style={styles.logoContainer}>
-    </Pressable>
+    <View style={styles.headerTop}>
+      <TouchableOpacity 
+        onPress={onBack} 
+        style={styles.backBtn}
+      >
+        <ArrowLeft size={24} color="#FFF" />
+      </TouchableOpacity>
+      
+      <Text style={styles.brandText}>Uthutho</Text>
+      
+      <TouchableOpacity 
+        onPress={() => router.push('/profile')}
+        style={styles.profileBtn}
+      >
+        {userProfile?.avatar_url ? (
+          <Image
+            source={{ uri: userProfile.avatar_url }}
+            style={styles.avatarImage}
+          />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <User color="#FFF" size={20} />
+          </View>
+        )}
+      </TouchableOpacity>
+    </View>
   );
 };
 
@@ -60,17 +72,14 @@ export default function JourneyScreen() {
   const router = useRouter();
   const { activeJourney, loading, refreshActiveJourney } = useJourney();
 
-  // Add state for showing arrived animation
   const [showArrivedAnimation, setShowArrivedAnimation] = useState(false);
   const [isProcessingArrival, setIsProcessingArrival] = useState(false);
 
-  // Use custom hooks
   const journeyData = useJourneyData();
   const {
     locationPermission,
     setLocationPermission,
     isUpdatingLocation,
-    checkLocationPermission
   } = useLocationUpdates(
     journeyData.participantStatus,
     activeJourney?.id,
@@ -81,7 +90,6 @@ export default function JourneyScreen() {
     chatMessages,
     newMessage,
     setNewMessage,
-    unreadMessages,
     loadChatMessages,
     subscribeToChat,
     sendChatMessage
@@ -90,7 +98,6 @@ export default function JourneyScreen() {
     journeyData.currentUserId
   );
 
-  // Modified useJourneyActions hook to handle animation
   const actions = useJourneyActions(
     journeyData.currentUserId,
     journeyData.participantStatus,
@@ -101,16 +108,14 @@ export default function JourneyScreen() {
     journeyData.refreshActiveJourney,
     journeyData.loadOtherPassengers,
     journeyData.loadJourneyStops,
-    () => { } // setUserStopName - handle this if needed
+    () => { }
   );
 
   const [selectedStop, setSelectedStop] = useState<JourneyStop | null>(null);
   const [showStopDetails, setShowStopDetails] = useState(false);
 
   const { userProfile } = journeyData;
-
-  // Simple animation
-  const fadeAnim = useState(new Animated.Value(0))[0];
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -124,9 +129,7 @@ export default function JourneyScreen() {
     if (activeJourney) {
       loadChatMessages();
       const unsubscribe = subscribeToChat();
-      return () => {
-        if (unsubscribe) unsubscribe();
-      };
+      return () => { if (unsubscribe) unsubscribe(); };
     }
   }, [activeJourney]);
 
@@ -135,55 +138,34 @@ export default function JourneyScreen() {
     setShowStopDetails(true);
   };
 
-  // Custom handler for arrival that shows animation
   const handleArrived = async () => {
     if (isProcessingArrival) return;
-
     try {
       setIsProcessingArrival(true);
       setShowArrivedAnimation(true);
-
-      // Update participant status to arrived
       await actions.updateParticipantStatus('arrived');
-
-      // Note: The navigation will happen inside updateParticipantStatus
-      // The animation will be on screen while that's processing
-
     } catch (error) {
-      console.error('Error in arrival process:', error);
+      console.error(error);
       setIsProcessingArrival(false);
       setShowArrivedAnimation(false);
       Alert.alert('Error', 'Failed to process arrival');
     }
   };
 
-  // Handle animation completion (optional)
-  const handleAnimationComplete = () => {
-    // You can keep animation visible until navigation happens
-    // or hide it after a certain time
-    console.log('Animation completed');
-  };
-
-  // Add retry mechanism
   const renderContent = () => {
-    if (loading) {
-      return <JourneySkeleton />;
-    }
+    if (loading) return <JourneySkeleton />;
 
     if (!activeJourney) {
       return (
         <View style={styles.noJourneyContainer}>
           <NoActiveJourney />
           <TouchableOpacity
-            style={styles.retryButton}
+            style={styles.retryBtn}
             onPress={async () => {
-              console.log('Manual retry...');
-              if (refreshActiveJourney) {
-                await refreshActiveJourney();
-              }
+              if (refreshActiveJourney) await refreshActiveJourney();
             }}
           >
-            <Text style={styles.retryButtonText}>Retry Loading</Text>
+            <Text style={styles.retryBtnText}>RETRY LOADING</Text>
           </TouchableOpacity>
         </View>
       );
@@ -202,7 +184,7 @@ export default function JourneyScreen() {
           participantStatus={journeyData.participantStatus}
           onStopPress={handleStopPress}
           onPickedUp={() => actions.updateParticipantStatus('picked_up')}
-          onArrived={handleArrived} // Use custom handler
+          onArrived={handleArrived}
           onNotifyAhead={actions.pingPassengersAhead}
           onShare={actions.shareJourney}
           userProfile={journeyData.userProfile}
@@ -224,57 +206,33 @@ export default function JourneyScreen() {
 
         <ArrivedAnimation
           isVisible={showArrivedAnimation}
-          onAnimationComplete={handleAnimationComplete}
-          duration={0} // Set to 0 to not auto-hide, or set a longer duration
+          onAnimationComplete={() => {}}
+          duration={0}
           message="Processing your arrival and awarding points..."
         />
       </>
     );
   };
 
-  if (loading && !activeJourney) {
-    return <JourneySkeleton />;
-  }
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" />
 
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <View style={styles.topHeader}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 10 }}>
-              <ArrowLeft size={24} color={colors.text} />
-            </TouchableOpacity>
-            <AnimatedHamburgerMenu
-              onPress={() => { }}
-              color={colors.primary}
-              textColor={colors.text}
-            />
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <TouchableOpacity onPress={() => router.push('/profile')}>
-              {userProfile?.avatar_url ? (
-                <Image
-                  source={{ uri: userProfile.avatar_url }}
-                  style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.primary }}
-                />
-              ) : (
-                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
-                  <User color="#fff" size={20} />
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
+        <PremiumHeader 
+          onBack={() => router.back()} 
+          userProfile={userProfile} 
+          colors={colors} 
+        />
 
-        <View style={styles.greetingHeader}>
-          <Text style={[styles.greetingText, { color: colors.primary }]}>Let's get moving on your Journey</Text>
+        <View style={styles.greetingSection}>
+          <Text style={styles.readyText}>READY TO MOVE</Text>
+          <Text style={styles.headingText}>My Journey</Text>
         </View>
 
         {renderContent()}
@@ -291,59 +249,82 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -1,
+  },
+  profileBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#111',
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  greetingSection: {
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  readyText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: '#1ea2b1',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  headingText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#FFF',
+    fontStyle: 'italic',
+    letterSpacing: -1,
+  },
   noJourneyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 32,
   },
-  retryButton: {
+  retryBtn: {
     backgroundColor: '#1ea2b1',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 16,
+    marginTop: 32,
   },
-  retryButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  topHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  uthuthoText: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  pointsContainer: {
-    backgroundColor: 'rgba(30, 162, 177, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(30, 162, 177, 0.2)',
-  },
-  pointsText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  greetingHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginBottom: 5,
-  },
-  greetingText: {
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.5,
+  retryBtnText: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });

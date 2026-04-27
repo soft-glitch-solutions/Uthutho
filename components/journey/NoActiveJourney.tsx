@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native'
 import { AlertCircle, MessageCircle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
-const WHATSAPP_NUMBER = '+27698826640'; // Your WhatsApp number
+const WHATSAPP_NUMBER = '+27698826640';
 
 const contactUsOnWhatsApp = () => {
   const message = 'Hi! I need help with my journey in the Uthutho app. Something seems wrong or missing.';
@@ -16,7 +16,10 @@ export const NoActiveJourney = () => {
 
   return (
     <View style={styles.container}>
-      <AlertCircle size={48} color="#ef4444" />
+      <View style={styles.iconBox}>
+        <AlertCircle size={48} color="#ef4444" />
+      </View>
+      
       <Text style={styles.errorTitle}>No Active Journey</Text>
       <Text style={styles.errorText}>
         You don't have an active journey. Mark yourself as waiting at a stop to start tracking your journey.
@@ -26,7 +29,7 @@ export const NoActiveJourney = () => {
         style={styles.primaryButton} 
         onPress={() => router.replace('/(tabs)')}
       >
-        <Text style={styles.primaryButtonText}>Go to Home</Text>
+        <Text style={styles.primaryButtonText}>GO TO HOME</Text>
       </TouchableOpacity>
 
       <View style={styles.divider}>
@@ -39,9 +42,11 @@ export const NoActiveJourney = () => {
         style={styles.whatsappButton} 
         onPress={contactUsOnWhatsApp}
       >
-        <MessageCircle size={20} color="#25D366" />
+        <View style={styles.whatsappIconBox}>
+          <MessageCircle size={20} color="#25D366" />
+        </View>
         <Text style={styles.whatsappButtonText}>
-          Something wrong? Message us on WhatsApp
+          MESSAGE US ON WHATSAPP
         </Text>
       </TouchableOpacity>
 
@@ -54,80 +59,105 @@ export const NoActiveJourney = () => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
+    paddingHorizontal: 24,
     alignItems: 'center',
-    paddingHorizontal: 32,
+    backgroundColor: '#000',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  iconBox: {
+    width: 100,
+    height: 100,
+    borderRadius: 40,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
   },
   errorTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginTop: 20,
     marginBottom: 12,
     textAlign: 'center',
+    fontStyle: 'italic',
+    letterSpacing: -0.5,
   },
   errorText: {
     fontSize: 15,
-    color: '#cccccc',
+    color: '#666',
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 30,
+    marginBottom: 40,
   },
   primaryButton: {
     backgroundColor: '#1ea2b1',
-    borderRadius: 10,
+    borderRadius: 20,
     paddingHorizontal: 24,
-    paddingVertical: 14,
+    paddingVertical: 18,
     width: '100%',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: '#000',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: 24,
     width: '100%',
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#333333',
+    backgroundColor: '#222',
   },
   dividerText: {
-    color: '#666666',
-    fontSize: 12,
-    fontWeight: '600',
-    paddingHorizontal: 12,
+    color: '#444',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+    paddingHorizontal: 16,
   },
   whatsappButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#075E54',
-    borderRadius: 10,
+    backgroundColor: '#111',
+    borderRadius: 20,
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 18,
     width: '100%',
     justifyContent: 'center',
-    gap: 10,
-    marginBottom: 12,
+    gap: 12,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  whatsappIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(37, 211, 102, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   whatsappButtonText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '600',
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   helpText: {
     fontSize: 12,
-    color: '#666666',
+    color: '#444',
     textAlign: 'center',
     lineHeight: 18,
-    maxWidth: 300,
+    maxWidth: 260,
   },
 });

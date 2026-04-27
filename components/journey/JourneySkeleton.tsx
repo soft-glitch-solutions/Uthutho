@@ -1,49 +1,64 @@
 // components/journey/JourneySkeleton.tsx
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, Animated, Dimensions } from 'react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const JourneySkeleton = () => {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.7,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header Area */}
       <View style={styles.header}>
-        <View style={[styles.skeleton, styles.headerSkeleton]} />
+        <Animated.View style={[styles.skeleton, styles.headerText, { opacity }]} />
       </View>
       
-      {/* Tabs */}
-      <View style={styles.tabs}>
-        <View style={[styles.skeleton, styles.tabSkeleton]} />
-        <View style={[styles.skeleton, styles.tabSkeleton]} />
-      </View>
-      
-      {/* Content */}
+      {/* Main Content */}
       <View style={styles.content}>
-        {/* Route Header */}
-        <View style={[styles.skeleton, styles.routeHeader]} />
+        {/* Status Card */}
+        <Animated.View style={[styles.skeleton, styles.statusCard, { opacity }]} />
         
-        {/* Your Stop */}
-        <View style={styles.yourStop}>
-          <View style={[styles.skeleton, styles.profile]} />
-          <View style={styles.stopInfo}>
-            <View style={[styles.skeleton, styles.stopName]} />
-            <View style={[styles.skeleton, styles.stopStatus]} />
+        {/* Profile/Stop Info Row */}
+        <View style={styles.profileRow}>
+          <Animated.View style={[styles.skeleton, styles.profileCircle, { opacity }]} />
+          <View style={styles.textStack}>
+            <Animated.View style={[styles.skeleton, styles.shortLine, { opacity }]} />
+            <Animated.View style={[styles.skeleton, styles.tinyLine, { opacity }]} />
           </View>
         </View>
         
-        {/* Stats */}
-        <View style={styles.stats}>
-          <View style={[styles.skeleton, styles.stat]} />
-          <View style={[styles.skeleton, styles.stat]} />
-          <View style={[styles.skeleton, styles.stat]} />
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          <Animated.View style={[styles.skeleton, styles.statBox, { opacity }]} />
+          <Animated.View style={[styles.skeleton, styles.statBox, { opacity }]} />
+          <Animated.View style={[styles.skeleton, styles.statBox, { opacity }]} />
         </View>
         
-        {/* Route Slider */}
-        <View style={[styles.skeleton, styles.routeSlider]} />
+        {/* Timeline Area */}
+        <Animated.View style={[styles.skeleton, styles.timelineCard, { opacity }]} />
         
-        {/* Buttons */}
-        <View style={styles.buttons}>
-          <View style={[styles.skeleton, styles.button]} />
-          <View style={[styles.skeleton, styles.button]} />
+        {/* Large Action Buttons */}
+        <View style={styles.buttonRow}>
+          <Animated.View style={[styles.skeleton, styles.largeButton, { opacity }]} />
+          <Animated.View style={[styles.skeleton, styles.largeButton, { opacity }]} />
         </View>
       </View>
     </View>
@@ -56,83 +71,75 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   header: {
-    paddingTop: 50,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingTop: 60,
+    paddingHorizontal: 24,
+    marginBottom: 32,
   },
-  headerSkeleton: {
+  headerText: {
     height: 32,
-    borderRadius: 8,
-  },
-  tabs: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    gap: 8,
-  },
-  tabSkeleton: {
-    flex: 1,
-    height: 48,
+    width: '70%',
     borderRadius: 8,
   },
   content: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
   },
-  routeHeader: {
-    height: 72,
-    borderRadius: 8,
-    marginBottom: 12,
+  statusCard: {
+    height: 80,
+    borderRadius: 24,
+    marginBottom: 24,
   },
-  yourStop: {
+  profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 32,
   },
-  profile: {
+  profileCircle: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    marginRight: 12,
+    marginRight: 16,
   },
-  stopInfo: {
+  textStack: {
+    gap: 8,
     flex: 1,
   },
-  stopName: {
+  shortLine: {
     height: 16,
     width: '60%',
     borderRadius: 4,
-    marginBottom: 8,
   },
-  stopStatus: {
+  tinyLine: {
     height: 12,
     width: '40%',
     borderRadius: 4,
   },
-  stats: {
+  statsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 32,
   },
-  stat: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
+  statBox: {
+    width: (SCREEN_WIDTH - 64) / 3,
+    height: 80,
+    borderRadius: 20,
   },
-  routeSlider: {
-    height: 120,
-    borderRadius: 8,
-    marginBottom: 12,
+  timelineCard: {
+    height: 200,
+    borderRadius: 32,
+    marginBottom: 32,
   },
-  buttons: {
+  buttonRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
-  button: {
+  largeButton: {
     flex: 1,
-    height: 48,
-    borderRadius: 8,
+    height: 60,
+    borderRadius: 20,
   },
   skeleton: {
-    backgroundColor: '#333333',
+    backgroundColor: '#111',
+    borderWidth: 1,
+    borderColor: '#222',
   },
 });
