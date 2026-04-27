@@ -7,9 +7,11 @@ import {
   Modal,
   Alert,
   ScrollView,
+  Platform,
 } from 'react-native';
-import { Bug, X, Bus, MapPin } from 'lucide-react-native';
+import { Bug, X, Bus, MapPin, Flame, BookOpen, Eye, EyeOff, RotateCcw } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resetTutorial } from '@/components/AppTutorial';
 
 interface SimpleDebugPanelProps {
   visible: boolean;
@@ -17,6 +19,9 @@ interface SimpleDebugPanelProps {
   onShowWelcomeOverlay: () => void;
   onHideWelcomeOverlay: () => void;
   onShowWaitingDrawer?: () => void;
+  onShowStreakOverlay?: () => void;
+  onHideStreakOverlay?: () => void;
+  onShowTutorial?: () => void;
 }
 
 export default function SimpleDebugPanel({
@@ -25,138 +30,161 @@ export default function SimpleDebugPanel({
   onShowWelcomeOverlay,
   onHideWelcomeOverlay,
   onShowWaitingDrawer,
+  onShowStreakOverlay,
+  onHideStreakOverlay,
+  onShowTutorial,
 }: SimpleDebugPanelProps) {
-  const [drawerState, setDrawerState] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleResetWelcome = async () => {
     Alert.alert(
       'Reset Welcome Overlay',
-      'Are you sure you want to reset the welcome overlay?',
+      'This will show the welcome screen on next launch.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Reset',
+          style: 'destructive',
           onPress: async () => {
             await AsyncStorage.removeItem('hasSeenWelcome');
-            Alert.alert('Success', 'Welcome overlay has been reset.');
+            Alert.alert('Done', 'Welcome overlay has been reset.');
           },
         },
       ]
     );
   };
 
-  const handleTestWaitingDrawer = () => {
-    setDrawerState(true);
-    if (onShowWaitingDrawer) {
-      onShowWaitingDrawer();
-    }
-  };
-
-  const handleDrawerStateChange = (isVisible: boolean) => {
-    setDrawerState(isVisible);
+  const handleResetTutorial = async () => {
+    Alert.alert(
+      'Reset Tutorial',
+      'The journey tutorial will be shown on next launch.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            await resetTutorial();
+            Alert.alert('Done', 'Tutorial has been reset.');
+          },
+        },
+      ]
+    );
   };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.container}>
+
           {/* Header */}
           <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <Bug size={24} color="#1ea2b1" />
-              <Text style={styles.title}>Debug Panel</Text>
+            <View style={styles.handle} />
+            <View style={styles.headerRow}>
+              <View style={styles.headerLeft}>
+                <View style={styles.iconBox}>
+                  <Bug size={20} color="#1ea2b1" />
+                </View>
+                <View>
+                  <Text style={styles.readyText}>DEVELOPER</Text>
+                  <Text style={styles.title}>Debug Panel</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <X size={20} color="#666" />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={24} color="#999999" />
-            </TouchableOpacity>
           </View>
 
-          {/* Content with ScrollView */}
-          <ScrollView 
-            style={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContentContainer}
-          >
-            <View style={styles.content}>
-              <Text style={styles.sectionTitle}>Welcome Overlay Controls</Text>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
-              <TouchableOpacity
-                style={[styles.actionButton, styles.actionButtonPrimary]}
-                onPress={onShowWelcomeOverlay}
-              >
-                <Text style={styles.actionButtonTextPrimary}>Show Welcome Now</Text>
-              </TouchableOpacity>
+            {/* ─── WELCOME OVERLAY ─── */}
+            <Text style={styles.sectionTitle}>Welcome Overlay</Text>
 
-              <TouchableOpacity
-                style={[styles.actionButton, styles.actionButtonSecondary]}
-                onPress={onHideWelcomeOverlay}
-              >
-                <Text style={styles.actionButtonTextSecondary}>Hide Welcome Now</Text>
-              </TouchableOpacity>
+            <TouchableOpacity style={[styles.btn, styles.btnTeal]} onPress={onShowWelcomeOverlay}>
+              <Eye size={16} color="#000" />
+              <Text style={styles.btnTextDark}>Show Welcome</Text>
+            </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.actionButton, styles.actionButtonWarning]}
-                onPress={handleResetWelcome}
-              >
-                <Text style={styles.actionButtonTextWarning}>Reset Welcome State</Text>
-              </TouchableOpacity>
+            <TouchableOpacity style={[styles.btn, styles.btnOutline]} onPress={onHideWelcomeOverlay}>
+              <EyeOff size={16} color="#1ea2b1" />
+              <Text style={styles.btnTextTeal}>Hide Welcome</Text>
+            </TouchableOpacity>
 
-              {/* Waiting Drawer Section */}
-              <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Waiting Drawer</Text>
-              
-              {onShowWaitingDrawer && (
+            <TouchableOpacity style={[styles.btn, styles.btnDanger]} onPress={handleResetWelcome}>
+              <RotateCcw size={16} color="#ef4444" />
+              <Text style={styles.btnTextDanger}>Reset Welcome State</Text>
+            </TouchableOpacity>
+
+            {/* ─── STREAK OVERLAY ─── */}
+            <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Streak Overlay</Text>
+
+            <TouchableOpacity
+              style={[styles.btn, styles.btnAmber]}
+              onPress={() => onShowStreakOverlay?.()}
+            >
+              <Flame size={16} color="#000" />
+              <Text style={styles.btnTextDark}>Show Streak Overlay</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.btn, styles.btnOutlineAmber]}
+              onPress={() => onHideStreakOverlay?.()}
+            >
+              <X size={16} color="#fbbf24" />
+              <Text style={styles.btnTextAmber}>Hide Streak Overlay</Text>
+            </TouchableOpacity>
+
+            {/* ─── JOURNEY TUTORIAL ─── */}
+            <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Journey Tutorial</Text>
+
+            <TouchableOpacity
+              style={[styles.btn, styles.btnPurple]}
+              onPress={() => onShowTutorial?.()}
+            >
+              <BookOpen size={16} color="#000" />
+              <Text style={styles.btnTextDark}>Show Tutorial Now</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.btn, styles.btnDanger]} onPress={handleResetTutorial}>
+              <RotateCcw size={16} color="#ef4444" />
+              <Text style={styles.btnTextDanger}>Reset Tutorial State</Text>
+            </TouchableOpacity>
+
+            {/* ─── WAITING DRAWER ─── */}
+            {onShowWaitingDrawer && (
+              <>
+                <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Waiting Drawer</Text>
+
                 <TouchableOpacity
-                  style={[styles.actionButton, styles.actionButtonTertiary]}
-                  onPress={handleTestWaitingDrawer}
+                  style={[styles.btn, styles.btnGreen]}
+                  onPress={() => {
+                    setDrawerOpen(true);
+                    onShowWaitingDrawer();
+                  }}
                 >
-                  <Bus size={20} color="#ffffff" style={{ marginRight: 8 }} />
-                  <Text style={styles.actionButtonTextTertiary}>Old Trigger Method</Text>
+                  <Bus size={16} color="#000" />
+                  <Text style={styles.btnTextDark}>Open Waiting Drawer</Text>
                 </TouchableOpacity>
-              )}
 
+                {/* Status pill */}
+                <View style={[styles.statusPill, drawerOpen && styles.statusPillActive]}>
+                  <View style={[styles.statusDot, drawerOpen && styles.statusDotActive]} />
+                  <Text style={styles.statusText}>
+                    Drawer is {drawerOpen ? 'OPEN' : 'CLOSED'}
+                  </Text>
+                </View>
+              </>
+            )}
 
-              <TouchableOpacity
-                style={[styles.actionButton, styles.actionButtonQuaternary]}
-                onPress={() => {
-                  Alert.alert(
-                    'How to Test',
-                    'Tap "Test Waiting Drawer" to open the drawer.',
-                    [{ text: 'Got it' }]
-                  );
-                }}
-              >
-                <MapPin size={20} color="#10b981" style={{ marginRight: 8 }} />
-                <Text style={styles.actionButtonTextQuaternary}>How to Use</Text>
-              </TouchableOpacity>
-
-              {/* Drawer Status Indicator */}
-              <View style={[
-                styles.statusIndicator,
-                drawerState && styles.statusIndicatorActive
-              ]}>
-                <View style={[
-                  styles.statusDot,
-                  drawerState && styles.statusDotActive
-                ]} />
-                <Text style={styles.statusText}>
-                  {drawerState ? 'Drawer is OPEN' : 'Drawer is CLOSED'}
-                </Text>
-              </View>
-
-              {/* Debug Info */}
-              <View style={styles.infoBox}>
-                <Text style={styles.infoTitle}>Debug Info</Text>
-                <Text style={styles.infoText}>
-                  • Test the waiting drawer UI
-                </Text>
-                <Text style={styles.infoText}>
-                  • Works without location
-                </Text>
-                <Text style={styles.infoText}>
-                  • Shows routes and filters
-                </Text>
-              </View>
+            {/* ─── INFO BOX ─── */}
+            <View style={styles.infoBox}>
+              <Text style={styles.infoTitle}>ℹ️ Debug Info</Text>
+              <Text style={styles.infoText}>• Streak overlay requires a valid userId to fetch data</Text>
+              <Text style={styles.infoText}>• Tutorial resets via AsyncStorage — restart may be needed</Text>
+              <Text style={styles.infoText}>• Use "Reset" actions to re-trigger first-launch flows</Text>
             </View>
+
           </ScrollView>
         </View>
       </View>
@@ -167,157 +195,165 @@ export default function SimpleDebugPanel({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'flex-end',
   },
   container: {
-    backgroundColor: '#000000',
-    borderRadius: 16,
-    width: '90%',
-    maxWidth: 400,
-    maxHeight: '80%',
-    padding: 20,
-    borderWidth: 1,
+    backgroundColor: '#000',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    maxHeight: '90%',
+    borderTopWidth: 1,
     borderColor: '#222',
   },
-  scrollContent: {
-    flex: 1,
-  },
-  scrollContentContainer: {
-    flexGrow: 1,
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#333',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 16,
   },
   header: {
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#111',
+  },
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
+  },
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    backgroundColor: 'rgba(30,162,177,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(30,162,177,0.2)',
+  },
+  readyText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#1ea2b1',
+    letterSpacing: 2,
   },
   title: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#FFF',
+    fontStyle: 'italic',
+    letterSpacing: -0.5,
   },
   closeButton: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#222',
   },
-  content: {
-    gap: 12,
-    paddingBottom: 20,
-  },
-  debugTriggerContainer: {
-    marginVertical: 4,
+  scrollContent: {
+    padding: 24,
+    paddingBottom: 40,
+    gap: 10,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 8,
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#444',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
-  actionButton: {
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
+  sectionSpacing: {
+    marginTop: 12,
   },
-  actionButtonPrimary: {
-    backgroundColor: '#1ea2b1',
-  },
-  actionButtonSecondary: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#1ea2b1',
-  },
-  actionButtonWarning: {
-    backgroundColor: '#ff6b3520',
-    borderWidth: 1,
-    borderColor: '#ff6b35',
-  },
-  actionButtonTertiary: {
-    backgroundColor: '#10b981',
-  },
-  actionButtonQuaternary: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#10b981',
-  },
-  actionButtonTextPrimary: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  actionButtonTextSecondary: {
-    color: '#1ea2b1',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  actionButtonTextWarning: {
-    color: '#ff6b35',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  actionButtonTextTertiary: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  actionButtonTextQuaternary: {
-    color: '#10b981',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  statusIndicator: {
+
+  // ─── BUTTONS ───
+  btn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1a1a1a',
-    borderRadius: 8,
+    paddingVertical: 16,
+    borderRadius: 20,
+    gap: 10,
+  },
+  btnTeal: { backgroundColor: '#1ea2b1' },
+  btnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#1ea2b1' },
+  btnDanger: { backgroundColor: 'rgba(239,68,68,0.08)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)' },
+  btnAmber: { backgroundColor: '#fbbf24' },
+  btnOutlineAmber: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#fbbf24' },
+  btnPurple: { backgroundColor: '#8B5CF6' },
+  btnGreen: { backgroundColor: '#10b981' },
+
+  btnTextDark: { color: '#000', fontWeight: '800', fontSize: 14 },
+  btnTextTeal: { color: '#1ea2b1', fontWeight: '800', fontSize: 14 },
+  btnTextDanger: { color: '#ef4444', fontWeight: '800', fontSize: 14 },
+  btnTextAmber: { color: '#fbbf24', fontWeight: '800', fontSize: 14 },
+
+  // ─── STATUS ───
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0d0d0d',
+    borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: '#1a1a1a',
     gap: 8,
   },
-  statusIndicatorActive: {
-    backgroundColor: '#1ea2b110',
+  statusPillActive: {
+    backgroundColor: 'rgba(30,162,177,0.05)',
     borderColor: '#1ea2b1',
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#666666',
+    backgroundColor: '#333',
   },
   statusDotActive: {
     backgroundColor: '#4ade80',
   },
   statusText: {
-    color: '#cccccc',
-    fontSize: 13,
-    fontWeight: '500',
+    color: '#555',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
+
+  // ─── INFO BOX ───
   infoBox: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
+    backgroundColor: '#0d0d0d',
+    borderRadius: 20,
     padding: 16,
-    marginTop: 12,
+    marginTop: 8,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: '#1a1a1a',
+    gap: 6,
   },
   infoTitle: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
   },
   infoText: {
-    color: '#cccccc',
+    color: '#555',
     fontSize: 12,
-    marginBottom: 4,
+    lineHeight: 18,
   },
 });

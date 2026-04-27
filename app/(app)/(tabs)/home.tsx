@@ -34,6 +34,7 @@ import LottieView from 'lottie-react-native';
 import RateTripModal from '@/components/home/RateTripModal';
 import SimpleDebugPanel from '@/components/debug/SimpleDebugPanel';
 import WelcomeOverlay from '@/components/home/WelcomeOverlay';
+import AppTutorial, { shouldShowTutorial } from '@/components/AppTutorial';
 import { DriverStatsSummary } from '@/components/home/DriverStatsSummary';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -320,11 +321,19 @@ export default function HomeScreen() {
   const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [isSearchOverlayVisible, setIsSearchOverlayVisible] = useState(false);
   const [searchBarY, setSearchBarY] = useState(160);
   const [suggestedRoutes, setSuggestedRoutes] = useState<any[]>([]);
   const [isSuggestedLoading, setIsSuggestedLoading] = useState(false);
   const hasCheckedWelcome = useRef(false);
+
+  // Tutorial spotlight refs — attached to real home-screen elements
+  const tutHeaderRef = useRef<View>(null);
+  const tutNearbyRef = useRef<View>(null);
+  const tutServicesRef = useRef<View>(null);
+  const tutFavoritesRef = useRef<View>(null);
+  const tutGamificationRef = useRef<View>(null);
 
   // FIXED: Properly memoized fetchNearestLocations
   const fetchNearestLocations = useCallback(async () => {
@@ -414,6 +423,13 @@ export default function HomeScreen() {
 
           const count = await AsyncStorage.getItem('welcomeShownCount') || '0';
           await AsyncStorage.setItem('welcomeShownCount', (parseInt(count) + 1).toString());
+        } else {
+          // Show journey tutorial on second+ launch if not yet seen
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          const needsTutorial = await shouldShowTutorial();
+          if (needsTutorial) {
+            setShowTutorial(true);
+          }
         }
       } catch (error) {
         console.error('Error checking welcome overlay:', error);
@@ -1219,7 +1235,7 @@ export default function HomeScreen() {
           />
         }
       >
-        <View style={styles.topHeader}>
+        <View style={styles.topHeader} ref={tutHeaderRef}>
           <AnimatedHamburgerMenu
             onPress={openSidebar}
             onLongPress={() => setShowDebugPanel(true)}
@@ -1303,6 +1319,7 @@ export default function HomeScreen() {
           </Animated.View>
         )}
 
+        <View ref={tutNearbyRef} collapsable={false}>
         <NearbySection
           locationError={locationError}
           isNearestLoading={isNearestLoading}
@@ -1316,14 +1333,19 @@ export default function HomeScreen() {
           onMarkAsWaiting={handleMarkAsWaiting}
         />
 
+        </View>
+
         {userProfile?.role === 'driver' && user?.id && (
           <DriverStatsSummary userId={user.id} colors={colors} />
         )}
 
+        <View ref={tutServicesRef} collapsable={false}>
         <ServicesSection colors={colors} router={router} />
+        </View>
 
 
         {isProfileLoading || isFavoritesLoading ? (
+          <View ref={tutFavoritesRef} collapsable={false}>
           <FavoritesSection
             favorites={favorites}
             favoriteDetails={favoriteDetails}
@@ -1332,6 +1354,7 @@ export default function HomeScreen() {
             toggleFavorite={toggleFavorite}
             favoritesCountMap={favoritesCountMap}
           />
+          </View>
         ) : favorites.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyText, { color: colors.text }]}>
@@ -1343,6 +1366,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         ) : (
+          <View ref={tutFavoritesRef} collapsable={false}>
           <FavoritesSection
             favorites={favorites}
             favoriteDetails={favoriteDetails}
@@ -1351,13 +1375,16 @@ export default function HomeScreen() {
             toggleFavorite={toggleFavorite}
             favoritesCountMap={favoritesCountMap}
           />
+          </View>
         )}
 
+        <View ref={tutGamificationRef} collapsable={false}>
         <GamificationSection
           isStatsLoading={isStatsLoading}
           userStats={userStats}
           colors={colors}
         />
+        </View>
 
       </ScrollView>
 
@@ -1373,6 +1400,19 @@ export default function HomeScreen() {
         onHideWelcomeOverlay={handleHideWelcomeOverlay}
         onShowStreakOverlay={() => setStreakVisible(true)}
         onHideStreakOverlay={() => setStreakVisible(false)}
+        onShowTutorial={() => { setShowDebugPanel(false); setShowTutorial(true); }}
+      />
+
+      <AppTutorial
+        visible={showTutorial}
+        onClose={() => setShowTutorial(false)}
+        refs={{
+          headerRef: tutHeaderRef,
+          nearbyRef: tutNearbyRef,
+          servicesRef: tutServicesRef,
+          favoritesRef: tutFavoritesRef,
+          gamificationRef: tutGamificationRef,
+        }}
       />
 
       <RateTripModal
