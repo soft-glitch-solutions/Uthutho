@@ -294,28 +294,33 @@ export default function SchoolTransportScreen() {
 
   const renderHeader = () => (
     <View>
+      {/* Added marginTop to create space between header image and search bar */}
       <View style={{ height: HEADER_MAX_HEIGHT - 30 }} />
       <View style={[styles.searchWrapper, { backgroundColor: colors.background }]}>
-        <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Search size={18} color={colors.primary} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search schools or areas..."
-            placeholderTextColor="#888"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          <TouchableOpacity
-            style={[styles.filterIcon, { backgroundColor: colors.primary }]}
-            onPress={() => setShowFilters(true)}
-          >
-            <Filter size={18} color="#FFF" />
-          </TouchableOpacity>
+        {/* Added marginTop to the search bar container for extra spacing */}
+        <View style={{ marginTop: 16 }}>
+          <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Search size={18} color={colors.primary} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder="Search schools or areas..."
+              placeholderTextColor="#888"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            <TouchableOpacity
+              style={[styles.filterIcon, { backgroundColor: colors.primary }]}
+              onPress={() => setShowFilters(true)}
+            >
+              <Filter size={18} color="#FFF" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
       {loading && renderSkeleton()}
     </View>
   );
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Animated Header */}
