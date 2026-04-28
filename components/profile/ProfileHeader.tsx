@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, ActivityIndicator, StyleSheet, Dimensions, Platform } from 'react-native';
-import { Camera, Settings, User } from 'lucide-react-native';
+import { Camera, Settings, User, Star, MapPin, Clock } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { router } from 'expo-router';
 
@@ -28,6 +28,12 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     return 'Kunjani';
   };
 
+  const formatRideTime = (minutes: number) => {
+    if (!minutes) return '0h';
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h`;
+  };
+
   if (loading) {
     return (
       <View style={styles.skeletonContainer}>
@@ -42,8 +48,8 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       <View style={styles.topBar}>
         <Text style={styles.brandText}>Uthutho</Text>
         <View style={styles.topActions}>
-          <TouchableOpacity 
-            style={styles.avatarContainer} 
+          <TouchableOpacity
+            style={styles.avatarContainer}
             onPress={onImagePicker}
             disabled={uploading}
           >
@@ -73,6 +79,20 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         <Text style={styles.readyText}>PROFILE OVERVIEW</Text>
         <Text style={styles.greetingText}>{getGreeting()}, {profile?.first_name || 'User'}</Text>
         <Text style={styles.headingText}>{profile?.selected_title || 'Community Member'}</Text>
+      </View>
+
+      {/* Stats Section */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statPill}>
+          <Star size={14} color="#fbbf24" fill="#fbbf24" />
+          <Text style={styles.statValue}>{profile?.points || 0}</Text>
+          <Text style={styles.statLabel}>Points</Text>
+        </View>
+        <View style={styles.statPill}>
+          <MapPin size={14} color="#1ea2b1" />
+          <Text style={styles.statValue}>{profile?.trips || 0}</Text>
+          <Text style={styles.statLabel}>Trips</Text>
+        </View>
       </View>
     </View>
   );
@@ -143,6 +163,7 @@ const styles = StyleSheet.create({
   },
   heroSection: {
     marginTop: 0,
+    marginBottom: 24,
   },
   readyText: {
     fontSize: 12,
@@ -165,6 +186,32 @@ const styles = StyleSheet.create({
     color: '#1ea2b1',
     fontStyle: 'italic',
     letterSpacing: -1,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statPill: {
+    flex: 1,
+    backgroundColor: '#111',
+    borderRadius: 16,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#666',
+    textTransform: 'uppercase',
   },
   skeletonContainer: {
     height: 180,

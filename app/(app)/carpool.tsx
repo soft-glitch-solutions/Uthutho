@@ -1,15 +1,43 @@
 // app/carpool.tsx
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  RefreshControl,
+  Animated,
+  Platform,
+  Image,
+  Dimensions,
+  SafeAreaView
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { Search, MapPin, Users, Clock, Star, Shield, Car, Filter, Users as UsersIcon } from 'lucide-react-native';
+import {
+  Search,
+  MapPin,
+  Users,
+  Clock,
+  Star,
+  Shield,
+  Car,
+  Filter,
+  ArrowLeft,
+  Users as UsersIcon,
+  ChevronRight,
+  TrendingUp
+} from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
+import { useTheme } from '@/context/ThemeContext';
 
-import SchoolTransportCard from '@/components/school-transport/SchoolTransportCard';
 import TransportFilters from '@/components/school-transport/TransportFilters';
 import ApplyModal from '@/components/modals/ApplyModal';
 import StatusModal from '@/components/modals/StatusModal';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface CarpoolClub {
   id: string;
@@ -17,27 +45,16 @@ interface CarpoolClub {
   description: string | null;
   from_location: string;
   to_location: string;
-  from_latitude: number | null;
-  from_longitude: number | null;
-  to_latitude: number | null;
-  to_longitude: number | null;
   pickup_time: string;
   return_time: string | null;
   days_of_week: string[];
   max_members: number;
   current_members: number;
   price_per_trip: number | null;
-  price_range: string | null;
   vehicle_info: string | null;
-  rules: string | null;
-  is_active: boolean | null;
-  is_full: boolean | null;
   creator_id: string;
-  created_at: string;
-  updated_at: string;
   creator: {
     id: string;
-    user_id: string;
     profiles: {
       first_name: string;
       last_name: string;
@@ -47,12 +64,71 @@ interface CarpoolClub {
   };
 }
 
+// Sub-component for Grid Item to match school transport style
+const CarpoolGridCard = ({ carpool, onViewDetails }: { carpool: any, onViewDetails: () => void }) => {
+  const { colors } = useTheme();
+  const isFull = carpool.current_members >= carpool.max_members;
+  const spotsLeft = carpool.max_members - carpool.current_members;
+
+  return (
+    <TouchableOpacity
+      style={[styles.gridCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      onPress={onViewDetails}
+      activeOpacity={0.9}
+    >
+      <View style={styles.cardHeader}>
+        <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+          {carpool.name}
+        </Text>
+        <View style={styles.cardLocation}>
+          <MapPin size={10} color={colors.primary} />
+          <Text style={[styles.cardLocationText, { color: colors.text }]} numberOfLines={1}>
+            {carpool.to_location}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.cardStats}>
+        <View style={styles.cardStat}>
+          <Users size={12} color={isFull ? '#EF4444' : '#10B981'} />
+          <Text style={[styles.cardStatText, { color: isFull ? '#EF4444' : '#10B981' }]}>
+            {isFull ? 'FULL' : `${spotsLeft} SPOTS`}
+          </Text>
+        </View>
+        <View style={styles.cardRating}>
+          <Star size={12} color="#FFD700" fill="#FFD700" />
+          <Text style={[styles.cardRatingText, { color: colors.text }]}>
+            {carpool.driver.profiles.rating?.toFixed(1) || 'N/A'}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.cardFooter}>
+        <View style={styles.timeInfo}>
+          <Clock size={12} color={colors.primary} />
+          <Text style={[styles.timeText, { color: colors.text }]}>{carpool.pickup_time}</Text>
+        </View>
+        <View style={styles.priceInfo}>
+          <Text style={[styles.priceText, { color: colors.text }]}>R{carpool.price_per_trip || '0'}</Text>
+          <Text style={styles.priceSubText}>/trip</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
 export default function CarpoolScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  
+  const { colors } = useTheme();
+
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const HEADER_MAX_HEIGHT = 160;
+  const HEADER_MIN_HEIGHT = Platform.OS === 'ios' ? 100 : 80;
+  const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
+
   // State
-  const [carpools, setCarpools] = useState<CarpoolClub[]>([]);
+  const [carpools, setCarpools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,164 +163,60 @@ export default function CarpoolScreen() {
   }, [filters]);
 
   const fetchCarpools = async () => {
-    console.log('📡 fetchCarpools called');
     try {
-      console.log('🔍 Building Supabase query...');
-      
-      // Start with base query
+      setLoading(true);
       let query = supabase
         .from('carpool_clubs')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      // Apply filters
-      if (filters.fromLocation) {
-        query = query.ilike('from_location', `%${filters.fromLocation}%`);
-      }
-      if (filters.toLocation) {
-        query = query.ilike('to_location', `%${filters.toLocation}%`);
-      }
-      if (filters.pickupTime) {
-        query = query.ilike('pickup_time', `%${filters.pickupTime}%`);
-      }
-      if (filters.minPrice && filters.priceRange) {
-        const min = parseFloat(filters.minPrice);
-        query = query.or(`price_per_trip.gte.${min},price_range.ilike.%${filters.minPrice}%`);
-      }
-      if (filters.maxPrice) {
-        const max = parseFloat(filters.maxPrice);
-        query = query.or(`price_per_trip.lte.${max},price_range.ilike.%${filters.maxPrice}%`);
-      }
-      if (filters.daysOfWeek.length > 0) {
-        // Filter by days of week (array overlap)
-        query = query.contains('days_of_week', filters.daysOfWeek);
-      }
+      if (filters.fromLocation) query = query.ilike('from_location', `%${filters.fromLocation}%`);
+      if (filters.toLocation) query = query.ilike('to_location', `%${filters.toLocation}%`);
+      if (filters.pickupTime) query = query.ilike('pickup_time', `%${filters.pickupTime}%`);
 
-      console.log('🚀 Executing carpools query...');
       const { data: carpoolsData, error: carpoolsError } = await query;
-
-      if (carpoolsError) {
-        console.error('❌ Error fetching carpools:', carpoolsError);
-        throw carpoolsError;
-      }
-
-      console.log('📦 Carpools fetched:', carpoolsData?.length || 0);
+      if (carpoolsError) throw carpoolsError;
 
       if (!carpoolsData || carpoolsData.length === 0) {
-        console.log('📭 No carpool data found');
         setCarpools([]);
         return;
       }
 
-      // Get all creator IDs from carpools
-      const creatorIds = carpoolsData
-        .map(c => c.creator_id)
-        .filter(id => id) as string[];
-
-      console.log('👥 Creator IDs to fetch:', creatorIds);
-
+      const creatorIds = carpoolsData.map(c => c.creator_id).filter(id => id);
       let creatorsMap = new Map();
-      
+
       if (creatorIds.length > 0) {
-        // Fetch creators with their profiles
-        const { data: creatorsData, error: creatorsError } = await supabase
+        const { data: creatorsData } = await supabase
           .from('profiles')
-          .select(`
-            id,
-            user_id,
-            first_name,
-            last_name,
-            rating,
-            total_trips
-          `)
+          .select('id, user_id, first_name, last_name, rating, total_trips')
           .in('id', creatorIds);
 
-        if (creatorsError) {
-          console.error('❌ Error fetching creators:', creatorsError);
-        } else if (creatorsData) {
-          console.log('👤 Creators fetched:', creatorsData.length);
-          
-          // Create a map for easy lookup
+        if (creatorsData) {
           creatorsData.forEach(creator => {
-            creatorsMap.set(creator.id, {
-              id: creator.id,
-              user_id: creator.user_id,
-              profiles: {
-                first_name: creator.first_name || 'Unknown',
-                last_name: creator.last_name || 'User',
-                rating: creator.rating || 0,
-                total_trips: creator.total_trips || 0
-              }
-            });
+            creatorsMap.set(creator.id, creator);
           });
         }
       }
 
-      // Format the combined data
       const formattedData = carpoolsData.map(carpool => {
         const creatorData = creatorsMap.get(carpool.creator_id) || {
-          id: carpool.creator_id || '',
-          user_id: '',
-          profiles: {
-            first_name: 'Unknown',
-            last_name: 'User',
-            rating: 0,
-            total_trips: 0
-          }
+          first_name: 'Unknown', last_name: 'User', rating: 0, total_trips: 0
         };
 
         return {
           ...carpool,
           days_of_week: Array.isArray(carpool.days_of_week) ? carpool.days_of_week : [],
-          // Transform carpool data to match SchoolTransportCard interface
-          school_name: carpool.name,
-          school_area: carpool.to_location,
-          pickup_areas: [carpool.from_location],
-          pickup_times: [carpool.pickup_time],
-          capacity: carpool.max_members,
-          current_riders: carpool.current_members,
-          price_per_month: carpool.price_per_trip ? carpool.price_per_trip * 20 : 0, // Approximate monthly
-          price_per_week: carpool.price_per_trip ? carpool.price_per_trip * 5 : 0, // Approximate weekly
-          vehicle_info: carpool.vehicle_info || 'Not specified',
-          vehicle_type: carpool.vehicle_info?.includes('SUV') ? 'SUV' : 
-                       carpool.vehicle_info?.includes('Van') ? 'Van' : 
-                       carpool.vehicle_info?.includes('Sedan') ? 'Sedan' : 'Car',
-          features: [
-            ...carpool.days_of_week,
-            carpool.return_time ? 'Round Trip' : 'One Way',
-            carpool.rules ? 'Rules Apply' : 'Flexible'
-          ].filter(Boolean),
-          description: carpool.description || 'Join this carpool club!',
-          is_verified: false, // Carpool clubs don't have verification yet
-          driver_id: carpool.creator_id,
           driver: {
-            id: creatorData.id,
-            user_id: creatorData.user_id,
-            is_verified: false, // Carpool creators aren't verified drivers
-            profiles: creatorData.profiles
+            profiles: creatorData
           }
         };
-      }).filter(Boolean) as any[];
-
-      console.log('🎉 Formatted data:', {
-        length: formattedData.length,
-        firstItem: formattedData[0]
       });
-      
+
       setCarpools(formattedData);
-    } catch (error: any) {
-      console.error('💥 Critical error fetching carpools:', error);
-      
-      if (error.message?.includes('No rows returned') || 
-          error.message?.includes('no rows')) {
-        console.log('📭 No data available - showing empty state');
-        setCarpools([]);
-      } else {
-        showErrorModal('Failed to load carpool listings. Please try again.');
-      }
+    } catch (error) {
+      console.error('Error fetching carpools:', error);
     } finally {
-      console.log('🏁 fetchCarpools completed');
       setLoading(false);
       setRefreshing(false);
     }
@@ -255,299 +227,157 @@ export default function CarpoolScreen() {
     fetchCarpools();
   };
 
-  // Modal handlers
-  const showErrorModal = (message: string) => {
-    setModalStatus({
-      type: 'error',
-      title: 'Error',
-      message,
-    });
-    setShowStatusModal(true);
-  };
-
-  const showSuccessModal = (message: string) => {
-    setModalStatus({
-      type: 'success',
-      title: 'Success',
-      message,
-    });
-    setShowStatusModal(true);
-  };
-
-  const showWarningModal = (title: string, message: string) => {
-    setModalStatus({
-      type: 'warning',
-      title,
-      message,
-    });
-    setShowStatusModal(true);
-  };
-
-  // Application handler
-  const handleApply = async (carpoolId: string) => {
-    if (!user) {
-      showErrorModal('Please sign in to join a carpool');
-      return;
-    }
-    
-    const carpool = carpools.find(c => c.id === carpoolId);
-    if (!carpool) {
-      showErrorModal('Carpool club not found');
-      return;
-    }
-
-    if (carpool.is_full || carpool.current_members >= carpool.max_members) {
-      showWarningModal('Full Capacity', 'This carpool club has reached its maximum capacity');
-      return;
-    }
-
-    try {
-      // Check if user is already a member or has pending request
-      // We'll need a carpool_members or carpool_requests table
-      // For now, just show the apply modal
-      setSelectedCarpool(carpoolId);
-      setShowApplyModal(true);
-    } catch (error) {
-      console.error('Error checking membership:', error);
-      showErrorModal('Failed to check membership status');
-    }
-  };
-
-  const handleSubmitApplication = async (applicationData: {
-    studentName: string;
-    grade: string;
-    pickupAddress: string;
-    parentPhone: string;
-    parentEmail: string;
-  }) => {
-    if (!selectedCarpool || !user) {
-      showErrorModal('Please sign in to apply');
-      return;
-    }
-
-    setApplyLoading(true);
-    try {
-      // Since we don't have a carpool_requests table yet,
-      // we'll update the carpool's current_members directly
-      // In production, you should create a proper join request system
-      const carpool = carpools.find(c => c.id === selectedCarpool);
-      if (!carpool) {
-        showErrorModal('Carpool not found');
-        return;
-      }
-
-      const { error } = await supabase
-        .from('carpool_clubs')
-        .update({
-          current_members: carpool.current_members + 1,
-          is_full: carpool.current_members + 1 >= carpool.max_members
-        })
-        .eq('id', selectedCarpool);
-
-      if (error) throw error;
-
-      showSuccessModal('Successfully joined the carpool club! The creator will contact you with details.');
-      setShowApplyModal(false);
-      
-      // Refresh carpools to get updated counts
-      fetchCarpools();
-      
-    } catch (error: any) {
-      console.error('Error joining carpool:', error);
-      showErrorModal('Failed to join carpool. Please try again.');
-    } finally {
-      setApplyLoading(false);
-    }
-  };
-
-  const handleViewDetails = (carpoolId: string) => {
-    router.push(`/carpool/${carpoolId}`);
-  };
-
-  const handleCreateCarpool = () => {
-    router.push('/create-carpool');
-  };
-
-  // Filtered carpools
   const filteredCarpools = carpools.filter(carpool => {
     if (!searchQuery.trim()) return true;
-    
     const query = searchQuery.toLowerCase();
     return (
       carpool.name.toLowerCase().includes(query) ||
       carpool.from_location.toLowerCase().includes(query) ||
       carpool.to_location.toLowerCase().includes(query) ||
-      carpool.description?.toLowerCase().includes(query) ||
-      carpool.driver.profiles.first_name.toLowerCase().includes(query) ||
-      carpool.driver.profiles.last_name.toLowerCase().includes(query)
+      carpool.driver.profiles.first_name.toLowerCase().includes(query)
     );
   });
 
-  // Loading state
-  if (loading && carpools.length === 0) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.skeletonHeader} />
-        <View style={styles.skeletonCard} />
-        <View style={styles.skeletonCard} />
+  const headerImageHeight = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE],
+    outputRange: [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT],
+    extrapolate: 'clamp',
+  });
+
+  const imageOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE / 2, HEADER_SCROLL_DISTANCE],
+    outputRange: [1, 0.5, 0],
+    extrapolate: 'clamp',
+  });
+
+  const headerTitleScale = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE],
+    outputRange: [1, 0.75],
+    extrapolate: 'clamp',
+  });
+
+  const headerTitleTranslateY = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE],
+    outputRange: [0, -10],
+    extrapolate: 'clamp',
+  });
+
+  const renderSkeleton = () => (
+    <View style={styles.skeletonGrid}>
+      {[1, 2, 3, 4].map(i => (
+        <View key={i} style={[styles.skeletonGridCard, { backgroundColor: colors.card, borderColor: colors.border }]} />
+      ))}
+    </View>
+  );
+
+  const renderHeader = () => (
+    <View>
+      <View style={{ height: HEADER_MAX_HEIGHT - 30 }} />
+
+      {/* Stats Bar */}
+      <View style={styles.statsBar}>
+
       </View>
-    );
-  }
+
+      <View style={[styles.searchWrapper, { backgroundColor: colors.background }]}>
+        <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Search size={18} color={colors.primary} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search destination or creator..."
+            placeholderTextColor="#888"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          <TouchableOpacity
+            style={[styles.filterIcon, { backgroundColor: colors.primary }]}
+            onPress={() => setShowFilters(true)}
+          >
+            <Filter size={18} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {loading && renderSkeleton()}
+    </View>
+  );
 
   return (
-    <>
-      <ScrollView 
-        style={styles.container}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Animated Header */}
+      <Animated.View style={[styles.imageHeader, { height: headerImageHeight, backgroundColor: colors.background }]}>
+        <Animated.Image
+          source={require('@/assets/images/carpool-header.jpg')}
+          style={[styles.headerImage, { opacity: imageOpacity }]}
+          resizeMode="cover"
+        />
+        <View style={styles.imageOverlay} />
+
+        <View style={styles.headerContent}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ArrowLeft size={24} color="#FFF" />
+          </TouchableOpacity>
+
+          <Animated.View style={{
+            transform: [
+              { scale: headerTitleScale },
+              { translateY: headerTitleTranslateY }
+            ]
+          }}>
+            <Text style={styles.heroTitle}>Carpool Clubs</Text>
+            <Animated.Text style={[styles.heroSubtitle, { opacity: imageOpacity }]}>
+              Share rides and save on commuting
+            </Animated.Text>
+          </Animated.View>
+        </View>
+      </Animated.View>
+
+      <Animated.FlatList
+        data={filteredCarpools}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.columnWrapper}
+        renderItem={({ item }) => (
+          <CarpoolGridCard
+            carpool={item}
+            onViewDetails={() => router.push(`/carpool/${item.id}`)}
+          />
+        )}
+        ListHeaderComponent={renderHeader()}
+        ListEmptyComponent={
+          !loading ? (
+            <View style={styles.emptyState}>
+              <UsersIcon size={64} color={colors.border} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>No clubs found</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.text, opacity: 0.5 }]}>
+                Try adjusting your search or filters
+              </Text>
+            </View>
+          ) : null
+        }
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#1ea2b1"
-            colors={["#1ea2b1"]}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressViewOffset={HEADER_MAX_HEIGHT}
           />
         }
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Carpool Clubs</Text>
-          <Text style={styles.subtitle}>Share rides and save on commuting</Text>
-        </View>
+        contentContainerStyle={styles.flatListContent}
+        showsVerticalScrollIndicator={false}
+      />
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchInputContainer}>
-            <Search size={20} color="#888888" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search by location, destination, or creator..."
-              placeholderTextColor="#888888"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              returnKeyType="search"
-            />
-          </View>
-          <TouchableOpacity 
-            style={styles.filterButton}
-            onPress={() => setShowFilters(!showFilters)}
-          >
-            <Filter size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Filters */}
-        {showFilters && (
-          <TransportFilters
-            filters={filters}
-            onFiltersChange={setFilters}
-            onClose={() => setShowFilters(false)}
-            // Override filter labels for carpool
-            filterConfig={{
-              schoolArea: { label: 'Destination', icon: MapPin },
-              pickupArea: { label: 'Pickup Location', icon: MapPin },
-              minPrice: { label: 'Min Price per Trip', icon: '$' },
-              maxPrice: { label: 'Max Price per Trip', icon: '$' },
-              vehicleType: { label: 'Vehicle Type', icon: Car },
-            }}
-          />
-        )}
-
-        {/* Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Car size={20} color="#1ea2b1" />
-            <Text style={styles.statNumber}>{carpools.length}</Text>
-            <Text style={styles.statLabel}>Clubs</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <UsersIcon size={20} color="#10B981" />
-            <Text style={styles.statNumber}>
-              {carpools.reduce((sum, c) => sum + c.current_members, 0)}
-            </Text>
-            <Text style={styles.statLabel}>Members</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Clock size={20} color="#F59E0B" />
-            <Text style={styles.statNumber}>
-              {carpools.filter(c => !c.is_full).length}
-            </Text>
-            <Text style={styles.statLabel}>Open</Text>
-          </View>
-        </View>
-
-        {/* Carpool Listings */}
-        <View style={styles.carpoolsContainer}>
-          {filteredCarpools.length === 0 ? (
-            <View style={styles.emptyState}>
-              <UsersIcon size={48} color="#888888" />
-              <Text style={styles.emptyStateText}>
-                {searchQuery || Object.values(filters).some(f => 
-                  Array.isArray(f) ? f.length > 0 : f !== '' && f !== false
-                ) 
-                  ? 'No matching carpool clubs found' 
-                  : 'No carpool clubs available yet'}
-              </Text>
-              <Text style={styles.emptyStateSubtext}>
-                {searchQuery ? 'Try a different search term' : 'Be the first to create a carpool club'}
-              </Text>
-              <TouchableOpacity 
-                style={styles.createCarpoolButton}
-                onPress={handleCreateCarpool}
-              >
-                <Text style={styles.createCarpoolText}>Create Carpool Club</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            filteredCarpools.map((carpool) => (
-              <SchoolTransportCard
-                key={carpool.id}
-                transport={carpool}
-                onApply={() => handleApply(carpool.id)}
-                onViewDetails={() => handleViewDetails(carpool.id)}
-                // Override button text for carpool
-                applyButtonText="Join Club"
-                detailsButtonText="View Details"
-              />
-            ))
-          )}
-        </View>
-      </ScrollView>
-
-      {/* Modals */}
-      <ApplyModal
-        visible={showApplyModal}
-        onClose={() => {
-          setShowApplyModal(false);
-          setSelectedCarpool(null);
-        }}
-        onSubmit={handleSubmitApplication}
-        loading={applyLoading}
-        // Customize modal for carpool
-        title="Join Carpool Club"
-        submitButtonText="Join Club"
-        fields={[
-          {
-            label: 'Your Name',
-            placeholder: 'Enter your full name',
-            key: 'studentName'
-          },
-          {
-            label: 'Pickup Address',
-            placeholder: 'Your exact pickup location',
-            key: 'pickupAddress'
-          },
-          {
-            label: 'Phone Number',
-            placeholder: 'Your contact number',
-            key: 'parentPhone'
-          },
-          {
-            label: 'Email',
-            placeholder: 'Your email address',
-            key: 'parentEmail'
-          }
-        ]}
+      <TransportFilters
+        visible={showFilters}
+        filters={filters}
+        onFiltersChange={setFilters}
+        onClose={() => setShowFilters(false)}
       />
 
       <StatusModal
@@ -557,131 +387,232 @@ export default function CarpoolScreen() {
         message={modalStatus.message}
         onClose={() => setShowStatusModal(false)}
       />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
   },
-  header: {
-    padding: 24,
-    paddingTop: 40,
+  imageHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
+    zIndex: 10,
   },
-  title: {
+  headerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  headerContent: {
+    position: 'absolute',
+    bottom: 15,
+    left: 24,
+    right: 24,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  heroTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontWeight: '800',
+    color: '#FFF',
+    letterSpacing: -0.5,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#888888',
+  heroSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.8)',
     marginTop: 4,
   },
-  searchContainer: {
+  statsBar: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    gap: 12,
+    paddingHorizontal: 24,
+    marginTop: 20,
+    marginBottom: 8,
   },
-  searchInputContainer: {
+  statPill: {
     flex: 1,
+    borderRadius: 16,
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111111',
-    borderRadius: 12,
+    gap: 8,
     borderWidth: 1,
-    borderColor: '#333333',
-    marginRight: 12,
   },
-  searchIcon: {
-    marginLeft: 16,
+  statValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#666',
+    textTransform: 'uppercase',
+  },
+  searchWrapper: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    paddingTop: 12,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    paddingLeft: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 12,
   },
   searchInput: {
     flex: 1,
-    padding: 16,
-    color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
+    fontWeight: '500',
   },
-  filterButton: {
-    backgroundColor: '#1ea2b1',
-    width: 50,
-    height: 50,
+  filterIcon: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#111111',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 12,
-    padding: 16,
-  },
-  statItem: {
-    flex: 1,
     alignItems: 'center',
   },
-  statDivider: {
-    width: 1,
-    backgroundColor: '#333333',
+  columnWrapper: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
   },
-  statNumber: {
-    color: '#FFFFFF',
-    fontSize: 20,
+  flatListContent: {
+    paddingBottom: 40,
+  },
+  gridCard: {
+    width: '48%',
+    borderRadius: 24,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  cardHeader: {
+    marginBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 16,
     fontWeight: 'bold',
-    marginTop: 8,
+    marginBottom: 4,
   },
-  statLabel: {
-    color: '#888888',
-    fontSize: 12,
-    marginTop: 4,
+  cardLocation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  carpoolsContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 100,
+  cardLocationText: {
+    fontSize: 11,
+    fontWeight: '500',
+    opacity: 0.6,
+  },
+  cardStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  cardStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cardStatText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  cardRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cardRatingText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+  },
+  timeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  timeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  priceInfo: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 2,
+  },
+  priceText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  priceSubText: {
+    fontSize: 9,
+    color: '#666',
+    fontWeight: '600',
   },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
+    paddingHorizontal: 24,
   },
-  emptyStateText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
-  },
-  emptyStateSubtext: {
-    color: '#888888',
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  createCarpoolButton: {
-    backgroundColor: '#1ea2b1',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
     marginTop: 20,
   },
-  createCarpoolText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+  emptySubtitle: {
+    fontSize: 14,
+    marginTop: 4,
+    textAlign: 'center',
   },
-  skeletonHeader: {
-    height: 120,
-    backgroundColor: '#111111',
-    margin: 16,
-    borderRadius: 12,
+  loadingBox: {
+    padding: 20,
+    alignItems: 'center',
   },
-  skeletonCard: {
+  skeletonGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 24,
+    justifyContent: 'space-between',
+  },
+  skeletonGridCard: {
+    width: '48%',
     height: 180,
-    backgroundColor: '#111111',
-    marginHorizontal: 16,
+    borderRadius: 24,
+    borderWidth: 1,
     marginBottom: 16,
-    borderRadius: 12,
   },
 });

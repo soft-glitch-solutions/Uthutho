@@ -86,8 +86,8 @@ const TrackerDemo = () => (
       </View>
     </View>
     <View style={stt.demoCardFooter}>
-      <View style={stt.demoPill}><Text style={stt.demoPillText}>R 20.00 / ride</Text></View>
-      <TouchableOpacity style={stt.demoActionBtn}><Text style={stt.demoActionBtnText}>LOG RIDE</Text></TouchableOpacity>
+      <Text style={stt.demoPillText}>R 20.00 / ride</Text>
+      <View style={stt.demoActionBtn}><Text style={stt.demoActionBtnText}>LOG RIDE</Text></View>
     </View>
   </View>
 );
@@ -101,7 +101,7 @@ const FeedsDemo = () => (
         <Text style={stt.demoMeta}>Gardens Stop · 2m ago</Text>
       </View>
     </View>
-    <Text style={stt.demoContent}>"The Century City Express is running 5 minutes late today, but it's not too full!"</Text>
+    <Text style={stt.demoContent} numberOfLines={2}>"Century City Express is 5 mins late, but not too full!"</Text>
     <View style={stt.demoActions}>
       <View style={stt.demoAction}><Heart size={16} color="#ef4444" /><Text style={stt.demoActionText}>12</Text></View>
       <View style={stt.demoAction}><MessageSquare size={16} color="#888" /><Text style={stt.demoActionText}>4</Text></View>
@@ -111,8 +111,8 @@ const FeedsDemo = () => (
 );
 
 // ─── Tooltip ──────────────────────────────────────────────────────────────────
-const CARD_MAX_H = Math.min(SH * 0.45, 360);
-const MARGIN = 14;
+const CARD_MAX_H = Math.min(SH * 0.52, 380);
+const MARGIN = 10;
 
 function calcTop(rect: Rect, pad: number, pos: Step['position']): number {
   const spotBot = rect.y + rect.height + pad * 2 + MARGIN;
@@ -339,19 +339,19 @@ const stt = StyleSheet.create({
   iconBox: { width: IS_SMALL_SCREEN ? 36 : 48, height: IS_SMALL_SCREEN ? 36 : 48, borderRadius: IS_SMALL_SCREEN ? 12 : 16, alignItems: 'center', justifyContent: 'center' },
   tag: { fontSize: 9, fontWeight: '900', letterSpacing: 2, flex: 1, textTransform: 'uppercase' },
   title: { 
-    fontSize: IS_SMALL_SCREEN ? 17 : 20, 
+    fontSize: IS_SMALL_SCREEN ? 16 : 20, 
     fontWeight: 'bold', 
     color: '#FFF', 
     fontStyle: 'italic', 
     letterSpacing: -0.3, 
-    marginBottom: IS_SMALL_SCREEN ? 4 : 8, 
-    lineHeight: IS_SMALL_SCREEN ? 22 : 26 
+    marginBottom: IS_SMALL_SCREEN ? 2 : 8, 
+    lineHeight: IS_SMALL_SCREEN ? 20 : 26 
   },
   body: { 
-    fontSize: IS_SMALL_SCREEN ? 12 : 13, 
+    fontSize: IS_SMALL_SCREEN ? 11 : 13, 
     color: '#888', 
-    lineHeight: IS_SMALL_SCREEN ? 18 : 20, 
-    marginBottom: IS_SMALL_SCREEN ? 8 : 12 
+    lineHeight: IS_SMALL_SCREEN ? 16 : 20, 
+    marginBottom: IS_SMALL_SCREEN ? 6 : 12 
   },
   demoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: IS_SMALL_SCREEN ? 40 : 48, borderRadius: IS_SMALL_SCREEN ? 12 : 16, marginBottom: 4 },
   demoBtnText: { color: '#000', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 },
@@ -359,10 +359,10 @@ const stt = StyleSheet.create({
     flexDirection: 'row', 
     alignItems: 'center', 
     justifyContent: 'space-between', 
-    marginTop: IS_SMALL_SCREEN ? 12 : 16, 
+    marginTop: IS_SMALL_SCREEN ? 8 : 16, 
     borderTopWidth: 1, 
     borderTopColor: '#1a1a1a', 
-    paddingTop: IS_SMALL_SCREEN ? 12 : 16 
+    paddingTop: IS_SMALL_SCREEN ? 10 : 16 
   },
   skipBtn: { paddingVertical: 6, paddingHorizontal: 4 },
   skipText: { color: '#444', fontSize: 13, fontWeight: '600' },
@@ -377,16 +377,16 @@ const stt = StyleSheet.create({
   },
 
   // Demo Specific Styles
-  demoCard: { backgroundColor: '#000', borderRadius: 20, padding: IS_SMALL_SCREEN ? 10 : 16, borderWidth: 1, borderColor: '#1a1a1a', marginTop: IS_SMALL_SCREEN ? 6 : 8 },
-  demoCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: IS_SMALL_SCREEN ? 8 : 16 },
-  demoIconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  demoCardTitle: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
-  demoCardStats: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: IS_SMALL_SCREEN ? 8 : 16 },
-  demoStatLabel: { color: '#444', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-  demoStatValue: { color: '#FFF', fontSize: 18, fontWeight: '900' },
-  demoCardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  demoPill: { backgroundColor: '#111', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  demoPillText: { color: '#8B5CF6', fontSize: 11, fontWeight: 'bold' },
+  demoCard: { backgroundColor: '#000', borderRadius: 16, padding: IS_SMALL_SCREEN ? 8 : 16, borderWidth: 1, borderColor: '#1a1a1a', marginTop: IS_SMALL_SCREEN ? 4 : 8 },
+  demoCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: IS_SMALL_SCREEN ? 6 : 16 },
+  demoIconBox: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  demoCardTitle: { color: '#FFF', fontWeight: 'bold', fontSize: 13 },
+  demoCardStats: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: IS_SMALL_SCREEN ? 6 : 16 },
+  demoStatLabel: { color: '#444', fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  demoStatValue: { color: '#FFF', fontSize: 16, fontWeight: '900' },
+  demoCardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: IS_SMALL_SCREEN ? 2 : 0 },
+  demoPill: { backgroundColor: '#111', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  demoPillText: { color: '#8B5CF6', fontSize: 10, fontWeight: 'bold' },
   demoActionBtn: { backgroundColor: '#8B5CF6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   demoActionBtnText: { color: '#000', fontSize: 11, fontWeight: '900' },
 
@@ -396,6 +396,6 @@ const stt = StyleSheet.create({
   demoMeta: { color: '#444', fontSize: 10 },
   demoContent: { color: '#CCC', fontSize: 12, lineHeight: 16, marginBottom: IS_SMALL_SCREEN ? 6 : 12 },
   demoActions: { flexDirection: 'row', gap: 20, borderTopWidth: 1, borderTopColor: '#111', paddingTop: IS_SMALL_SCREEN ? 4 : 10 },
-  demoAction: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  demoActionText: { color: '#666', fontSize: 11, fontWeight: '600' },
+  demoAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  demoActionText: { color: '#666', fontSize: 10, fontWeight: '600' },
 });

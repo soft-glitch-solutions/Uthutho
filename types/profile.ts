@@ -9,6 +9,14 @@ export interface Profile {
   points: number;
   titles: string[];
   selected_title: string | null;
+  favorites?: any;
+  home?: string | null;
+  preferred_language?: string | null;
+  fire_count?: number | null;
+  trips?: number;
+  total_ride_time?: number;
+  favorites_count?: number;
+  total_trips?: number | null;
   updated_at?: string | null;
 }
 

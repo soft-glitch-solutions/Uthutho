@@ -22,6 +22,8 @@ interface TutorialContextType {
   registerRef: (key: keyof TutorialRefs, ref: React.RefObject<View>) => void;
   showTutorial: boolean;
   setShowTutorial: (show: boolean) => void;
+  showStreakOverlay: boolean;
+  setShowStreakOverlay: (show: boolean) => void;
   onStepChange: ((stepId: string) => void) | null;
   setOnStepChange: (fn: ((stepId: string) => void) | null) => void;
 }
@@ -30,6 +32,7 @@ const TutorialContext = createContext<TutorialContextType | undefined>(undefined
 
 export function TutorialProvider({ children }: { children: ReactNode }) {
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showStreakOverlay, setShowStreakOverlay] = useState(false);
 
   // Use a ref to store the callback to avoid React's special handling of
   // setState(fn) which treats function arguments as updater functions.
@@ -61,9 +64,11 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
     registerRef,
     showTutorial,
     setShowTutorial,
+    showStreakOverlay,
+    setShowStreakOverlay,
     get onStepChange() { return onStepChangeRef.current; },
     setOnStepChange,
-  }), [refs, showTutorial]);
+  }), [refs, showTutorial, showStreakOverlay]);
 
   return (
     <TutorialContext.Provider value={contextValue}>

@@ -53,7 +53,25 @@ export function useProfile() {
 
       const { data, error, status } = await supabase
         .from('profiles')
-        .select(`id, first_name, last_name, avatar_url, preferred_transport, points, titles, selected_title, favorites, updated_at, role`)
+        .select(`
+          id, 
+          first_name, 
+          last_name, 
+          avatar_url, 
+          preferred_transport, 
+          points, 
+          titles, 
+          selected_title, 
+          favorites, 
+          home,
+          preferred_language,
+          fire_count,
+          trips,
+          total_ride_time,
+          favorites_count,
+          total_trips,
+          updated_at
+        `)
         .eq('id', userId)
         .single();
 

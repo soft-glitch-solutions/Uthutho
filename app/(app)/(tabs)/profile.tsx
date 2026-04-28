@@ -101,14 +101,6 @@ export default function ProfileScreen() {
           email: hasFacebook ? user.email : undefined
         });
 
-        // Check for Twitter if you have it configured
-        const hasTwitter = identities.some(identity => identity.provider === 'twitter');
-        accounts.push({
-          provider: 'twitter',
-          connected: hasTwitter,
-          email: hasTwitter ? user.email : undefined
-        });
-
         setLinkedAccounts(accounts);
       }
     } catch (error) {
@@ -250,7 +242,7 @@ export default function ProfileScreen() {
       console.log('Callback URL:', callbackUrl);
 
       // Set up OAuth parameters based on provider
-      let oauthProvider: 'google' | 'facebook' | 'twitter' | null = null;
+      let oauthProvider: 'google' | 'facebook' | null = null;
 
       switch (provider) {
         case 'google':
@@ -258,9 +250,6 @@ export default function ProfileScreen() {
           break;
         case 'facebook':
           oauthProvider = 'facebook';
-          break;
-        case 'twitter':
-          oauthProvider = 'twitter';
           break;
         default:
           throw new Error(`Unsupported provider: ${provider}`);
@@ -480,7 +469,6 @@ export default function ProfileScreen() {
       const pointsMap: Record<string, number> = {
         'google': 50,
         'facebook': 50,
-        'twitter': 30,
       };
 
       const points = pointsMap[provider] || 0;
@@ -636,6 +624,7 @@ export default function ProfileScreen() {
             onSignOut={handleSignOut}
             onConnectAccount={handleConnectAccount}
             isDesktop={isDesktop}
+            profile={profile}
           />
         );
       case 'achievements':

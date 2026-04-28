@@ -328,8 +328,8 @@ export default function HomeScreen() {
   const [suggestedRoutes, setSuggestedRoutes] = useState<any[]>([]);
   const [isSuggestedLoading, setIsSuggestedLoading] = useState(false);
   const hasCheckedWelcome = useRef(false);
-
-  const { refs, setOnStepChange, setShowTutorial } = useTutorial();
+  const prevShowTutorial = useRef(false);
+  const { showTutorial, refs, setOnStepChange, setShowTutorial, setShowStreakOverlay } = useTutorial();
 
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -364,6 +364,15 @@ export default function HomeScreen() {
     setOnStepChange(handleStepChange);
     return () => setOnStepChange(null);
   }, [handleStepChange, setOnStepChange]);
+
+  // Handle transition from Tutorial to StreakOverlay
+  useEffect(() => {
+    if (prevShowTutorial.current === true && showTutorial === false) {
+      console.log('Tutorial finished, checking for streak overlay...');
+      checkAndShowStreakOverlay();
+    }
+    prevShowTutorial.current = showTutorial;
+  }, [showTutorial]);
 
   // FIXED: Properly memoized fetchNearestLocations
   const fetchNearestLocations = useCallback(async () => {
@@ -419,10 +428,39 @@ export default function HomeScreen() {
 
   const handleWelcomeClose = () => {
     setShowWelcomeOverlay(false);
+    startTutorialIfFirstTime();
   };
 
   const handleGetStarted = () => {
     setShowWelcomeOverlay(false);
+    startTutorialIfFirstTime();
+  };
+
+  const startTutorialIfFirstTime = async () => {
+    const needsTutorial = await shouldShowTutorial();
+    if (needsTutorial) {
+      setTimeout(() => setShowTutorial(true), 500);
+    } else {
+      checkAndShowStreakOverlay();
+    }
+  };
+
+  const checkAndShowStreakOverlay = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const today = new Date().toISOString().split('T')[0];
+      const shownKey = `streakOverlayShown_${user.id}_${today}`;
+      const hasShownToday = await AsyncStorage.getItem(shownKey);
+
+      if (!hasShownToday) {
+        setShowStreakOverlay(true);
+        await AsyncStorage.setItem(shownKey, 'true');
+      }
+    } catch (error) {
+      console.error('Error checking streak overlay:', error);
+    }
   };
 
   const handleShowWelcomeOverlay = () => {
@@ -436,7 +474,7 @@ export default function HomeScreen() {
   const [streakVisible, setStreakVisible] = useState(false);
 
   useEffect(() => {
-    const checkFirstTimeUser = async () => {
+    const checkOnboardingSequence = async () => {
       if (hasCheckedWelcome.current) return;
       hasCheckedWelcome.current = true;
 
@@ -450,24 +488,22 @@ export default function HomeScreen() {
           await new Promise(resolve => setTimeout(resolve, 1000));
           setShowWelcomeOverlay(true);
           await AsyncStorage.setItem('hasSeenWelcome', 'true');
-
-          const count = await AsyncStorage.getItem('welcomeShownCount') || '0';
-          await AsyncStorage.setItem('welcomeShownCount', (parseInt(count) + 1).toString());
         } else {
-          // Show journey tutorial on second+ launch if not yet seen
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          // For regular users, check if they need tutorial or just show streak
           const needsTutorial = await shouldShowTutorial();
           if (needsTutorial) {
-            setShowTutorial(true);
+            setTimeout(() => setShowTutorial(true), 1500);
+          } else {
+            setTimeout(() => checkAndShowStreakOverlay(), 1500);
           }
         }
       } catch (error) {
-        console.error('Error checking welcome overlay:', error);
+        console.error('Error in onboarding sequence:', error);
       }
     };
 
     if (!isProfileLoading && userProfile) {
-      checkFirstTimeUser();
+      checkOnboardingSequence();
     }
   }, [isProfileLoading, userProfile]);
 

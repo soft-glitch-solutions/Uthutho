@@ -8,18 +8,21 @@ import {
   FlatList,
   Dimensions,
   Modal,
-  Animated
+  Animated,
+  Platform,
+  ActivityIndicator
 } from 'react-native';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from '@/context/ThemeContext';
 import { 
   Check, Lock, Star, Crown, Award, Target, Zap, Trophy, Shield, 
-  X, Info, Sparkles, Gem, TrendingUp
+  X, Info, Sparkles, Gem, TrendingUp, MapPin, ChevronLeft
 } from 'lucide-react-native';
 import { useProfile } from '@/hook/useProfile';
+import { router } from 'expo-router';
 
 const { width: screenWidth } = Dimensions.get('window');
 const CARD_MARGIN = 8;
-const CARD_WIDTH = (screenWidth - 40 - CARD_MARGIN) / 2;
+const CARD_WIDTH = (screenWidth - 48 - CARD_MARGIN) / 2;
 
 const TitleChangeScreen = () => {
   const { colors } = useTheme();
@@ -36,20 +39,20 @@ const TitleChangeScreen = () => {
     }
   }, [profile]);
 
-  const getRarityConfig = (rarity) => {
-    const configs = {
-      common: { color: '#6B7280', icon: '⭐', name: 'Common', bgOpacity: 0.1 },
-      uncommon: { color: '#10B981', icon: '🌿', name: 'Uncommon', bgOpacity: 0.15 },
-      rare: { color: '#3B82F6', icon: '💎', name: 'Rare', bgOpacity: 0.2 },
-      epic: { color: '#8B5CF6', icon: '⚡', name: 'Epic', bgOpacity: 0.25 },
-      legendary: { color: '#F59E0B', icon: '👑', name: 'Legendary', bgOpacity: 0.3 },
-      mythic: { color: '#EF4444', icon: '🔥', name: 'Mythic', bgOpacity: 0.35 }
+  const getRarityConfig = (rarity: string) => {
+    const configs: any = {
+      common: { color: '#6B7280', icon: '⭐', name: 'Common' },
+      uncommon: { color: '#10B981', icon: '🌿', name: 'Uncommon' },
+      rare: { color: '#3B82F6', icon: '💎', name: 'Rare' },
+      epic: { color: '#8B5CF6', icon: '⚡', name: 'Epic' },
+      legendary: { color: '#F59E0B', icon: '👑', name: 'Legendary' },
+      mythic: { color: '#EF4444', icon: '🔥', name: 'Mythic' }
     };
-    return configs[rarity] || configs.common;
+    return configs[rarity.toLowerCase()] || configs.common;
   };
 
   const getTitleIcon = (title: string) => {
-    const iconProps = { size: 24, color: colors.primary };
+    const iconProps = { size: 24, color: '#1ea2b1' };
     if (title.includes('Master') || title.includes('Legend') || title.includes('King') || title.includes('Queen')) 
       return <Crown {...iconProps} />;
     if (title.includes('Expert') || title.includes('Champion') || title.includes('Pro')) 
@@ -63,7 +66,7 @@ const TitleChangeScreen = () => {
     return <Award {...iconProps} />;
   };
 
-  const showTitleDetails = (title) => {
+  const showTitleDetails = (title: any) => {
     setSelectedTitleDetail(title);
     setModalVisible(true);
     Animated.timing(fadeAnim, {
@@ -84,90 +87,16 @@ const TitleChangeScreen = () => {
     });
   };
 
-  const SkeletonLoader = () => {
-    const { colors } = useTheme();
-    
+  if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Header Skeleton */}
-        <View style={styles.header}>
-          <View style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
-          <View style={[styles.skeletonSubtitle, { backgroundColor: colors.border }]} />
-          
-          {/* Stats Bar Skeleton */}
-          <View style={[styles.statsBar, { backgroundColor: colors.card }]}>
-            {[1, 2, 3].map((item) => (
-              <View key={item} style={styles.stat}>
-                <View style={[styles.skeletonStatValue, { backgroundColor: colors.border }]} />
-                <View style={[styles.skeletonStatLabel, { backgroundColor: colors.border }]} />
-              </View>
-            ))}
-          </View>
-
-          {/* Current Title Skeleton */}
-          <View style={[styles.currentContainer, { backgroundColor: colors.primary }]}>
-            <View style={[styles.skeletonCurrentLabel, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
-            <View style={styles.currentTitle}>
-              <View style={[styles.skeletonIconSmall, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
-              <View style={[styles.skeletonCurrentTitle, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
-            </View>
-          </View>
-        </View>
-
-        {/* Tabs Skeleton */}
-        <View style={[styles.tabsContainer, { backgroundColor: colors.card }]}>
-          {[1, 2, 3].map((item) => (
-            <View key={item} style={[styles.skeletonTab, { backgroundColor: colors.border }]} />
-          ))}
-        </View>
-
-        {/* Grid Skeleton - Fixed for 2 columns */}
-        <View style={styles.gridContainer}>
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((item) => (
-            <View 
-              key={item} 
-              style={[
-                styles.skeletonTitleCard, 
-                { 
-                  backgroundColor: colors.card,
-                  borderColor: colors.border
-                }
-              ]}
-            >
-              {/* Rarity Badge Skeleton */}
-              <View style={[styles.skeletonRarityBadge, { backgroundColor: colors.border }]} />
-              
-              {/* Status Badge Skeleton */}
-              <View style={[styles.skeletonStatusBadge, { backgroundColor: colors.border }]} />
-              
-              {/* Icon Skeleton */}
-              <View style={[styles.skeletonIcon, { backgroundColor: colors.border }]} />
-              
-              {/* Title Info Skeleton */}
-              <View style={styles.skeletonTitleInfo}>
-                <View style={[styles.skeletonTitleName, { backgroundColor: colors.border }]} />
-                <View style={[styles.skeletonRarity, { backgroundColor: colors.border }]} />
-                <View style={[styles.skeletonPoints, { backgroundColor: colors.border }]} />
-              </View>
-              
-              {/* Progress Bar Skeleton */}
-              <View style={styles.skeletonProgressContainer}>
-                <View style={[styles.skeletonProgressBar, { backgroundColor: colors.border }]} />
-                <View style={[styles.skeletonProgressText, { backgroundColor: colors.border }]} />
-              </View>
-            </View>
-          ))}
-        </View>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#1ea2b1" />
       </View>
     );
-  };
-
-  if (loading) {
-    return <SkeletonLoader />;
   }
 
-  const unlockedTitles = titles.filter((title) => profile?.titles?.includes(title.title));
-  const lockedTitles = titles.filter((title) => !profile?.titles?.includes(title.title));
+  const unlockedTitles = titles.filter((title: any) => profile?.titles?.includes(title.title));
+  const lockedTitles = titles.filter((title: any) => !profile?.titles?.includes(title.title));
 
   const filteredTitles = activeTab === 'unlocked' 
     ? unlockedTitles 
@@ -175,7 +104,7 @@ const TitleChangeScreen = () => {
     ? lockedTitles 
     : titles;
 
-  const TitleCard = ({ title, isUnlocked, isSelected }) => {
+  const TitleCard = ({ title, isUnlocked, isSelected }: { title: any, isUnlocked: boolean, isSelected: boolean }) => {
     const rarityConfig = getRarityConfig(title.rarity);
     
     return (
@@ -183,16 +112,11 @@ const TitleChangeScreen = () => {
         style={[
           styles.titleCard,
           { 
-            backgroundColor: colors.card,
-            borderColor: isSelected ? colors.primary : rarityConfig.color,
-            opacity: isUnlocked ? 1 : 0.6,
+            borderColor: isSelected ? '#1ea2b1' : '#222',
+            opacity: isUnlocked ? 1 : 0.7,
           }
         ]}
-        onPress={() => {
-          if (isUnlocked) {
-            showTitleDetails(title);
-          }
-        }}
+        onPress={() => isUnlocked ? showTitleDetails(title) : null}
         onLongPress={() => {
           if (isUnlocked) {
             setSelectedTitle(title.title);
@@ -201,326 +125,194 @@ const TitleChangeScreen = () => {
         }}
         disabled={!isUnlocked}
       >
-        {/* Rarity Badge */}
-        <View style={[styles.rarityBadge, { backgroundColor: rarityConfig.color }]}>
-          <Text style={styles.rarityText}>{rarityConfig.icon}</Text>
-        </View>
-
-        {/* Status Badge */}
-        <View style={[styles.statusBadge, { 
-          backgroundColor: isSelected 
-            ? colors.primary 
-            : isUnlocked 
-            ? `${colors.primary}20` 
-            : colors.border 
-        }]}>
+        {/* Selection / Lock Badge */}
+        <View style={styles.cardStatusBadge}>
           {isSelected ? (
-            <Check size={12} color="#fff" />
-          ) : isUnlocked ? (
-            <Text style={[styles.statusText, { color: colors.primary }]}>✓</Text>
-          ) : (
-            <Lock size={12} color={colors.text} />
-          )}
+            <View style={styles.selectedBadge}>
+              <Check size={10} color="#FFF" />
+            </View>
+          ) : !isUnlocked ? (
+            <Lock size={12} color="#444" />
+          ) : null}
         </View>
 
         {/* Title Icon */}
         <View style={[
-          styles.iconContainer,
+          styles.iconCircle,
           { 
-            backgroundColor: isUnlocked 
-              ? `${rarityConfig.color}${Math.round(rarityConfig.bgOpacity * 255).toString(16).padStart(2, '0')}`
-              : colors.border,
-            borderColor: rarityConfig.color
+            backgroundColor: isUnlocked ? 'rgba(30, 162, 177, 0.1)' : 'rgba(255, 255, 255, 0.05)',
           }
         ]}>
           {getTitleIcon(title.title)}
         </View>
 
         {/* Title Info */}
-        <View style={styles.titleInfo}>
-          <Text 
-            style={[
-              styles.titleName, 
-              { 
-                color: colors.text,
-                textAlign: 'center'
-              }
-            ]}
-            numberOfLines={2}
-          >
-            {title.title}
+        <Text style={styles.cardTitleName} numberOfLines={1}>
+          {title.title}
+        </Text>
+        
+        <View style={[styles.rarityPill, { backgroundColor: `${rarityConfig.color}15` }]}>
+          <Text style={[styles.rarityLabel, { color: rarityConfig.color }]}>
+            {rarityConfig.name}
           </Text>
-          
-          <View style={[styles.rarityContainer, { backgroundColor: `${rarityConfig.color}20` }]}>
-            <Text style={[styles.rarityName, { color: rarityConfig.color }]}>
-              {rarityConfig.name}
-            </Text>
-          </View>
-
-          <View style={styles.pointsContainer}>
-            <TrendingUp size={12} color={colors.text} />
-            <Text style={[styles.pointsText, { color: colors.text }]}>
-              {title.points_required} pts
-            </Text>
-          </View>
         </View>
 
-        {/* Progress Bar for Locked Titles */}
         {!isUnlocked && (
-          <View style={styles.progressContainer}>
-            <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+          <View style={styles.cardProgressContainer}>
+            <View style={styles.cardProgressBar}>
               <View 
                 style={[
-                  styles.progressFill,
-                  { 
-                    width: `${Math.min((profile?.points || 0) / title.points_required * 100, 100)}%`,
-                    backgroundColor: rarityConfig.color
-                  }
+                  styles.cardProgressFill,
+                  { width: `${Math.min((profile?.points || 0) / title.points_required * 100, 100)}%` }
                 ]} 
               />
             </View>
-            <Text style={[styles.progressText, { color: colors.text }]}>
-              {Math.round((profile?.points || 0) / title.points_required * 100)}%
+            <Text style={styles.cardProgressText}>
+              {title.points_required} pts
             </Text>
           </View>
         )}
-
-        {/* Locked Overlay */}
-        {!isUnlocked && (
-          <View style={[styles.lockedOverlay, { backgroundColor: `${colors.background}99` }]}>
-            <Lock size={24} color={colors.text} />
-            <Text style={[styles.lockedText, { color: colors.text }]}>
-              Locked
-            </Text>
-          </View>
-        )}
-
-        {/* Info Button */}
-        <TouchableOpacity 
-          style={styles.infoButton}
-          onPress={() => showTitleDetails(title)}
-        >
-          <Info size={14} color={colors.text} />
-        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
 
-  const TitleDetailModal = () => (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={modalVisible}
-      onRequestClose={hideTitleDetails}
-    >
-      <View style={styles.modalOverlay}>
-        <Animated.View 
-          style={[
-            styles.modalContent,
-            { backgroundColor: colors.card },
-            { opacity: fadeAnim }
-          ]}
-        >
-          {selectedTitleDetail && (
-            <>
-              <View style={styles.modalHeader}>
-                <View style={styles.modalTitleSection}>
-                  <View style={[
-                    styles.modalIcon,
-                    { backgroundColor: `${getRarityConfig(selectedTitleDetail.rarity).color}20` }
-                  ]}>
-                    {getTitleIcon(selectedTitleDetail.title)}
-                  </View>
-                  <View>
-                    <Text style={[styles.modalTitle, { color: colors.text }]}>
-                      {selectedTitleDetail.title}
-                    </Text>
-                    <View style={[
-                      styles.modalRarity,
-                      { backgroundColor: `${getRarityConfig(selectedTitleDetail.rarity).color}20` }
-                    ]}>
-                      <Text style={[
-                        styles.modalRarityText,
-                        { color: getRarityConfig(selectedTitleDetail.rarity).color }
-                      ]}>
-                        {getRarityConfig(selectedTitleDetail.rarity).icon} {getRarityConfig(selectedTitleDetail.rarity).name}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                <TouchableOpacity onPress={hideTitleDetails} style={styles.closeButton}>
-                  <X size={24} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.modalBody}>
-                <View style={styles.descriptionSection}>
-                  <Text style={[styles.sectionLabel, { color: colors.text }]}>Description</Text>
-                  <Text style={[styles.descriptionText, { color: colors.text }]}>
-                    {selectedTitleDetail.description}
-                  </Text>
-                </View>
-
-                <View style={styles.backstorySection}>
-                  <Text style={[styles.sectionLabel, { color: colors.text }]}>Backstory</Text>
-                  <Text style={[styles.backstoryText, { color: colors.text }]}>
-                    {selectedTitleDetail.backstory}
-                  </Text>
-                </View>
-
-                <View style={styles.requirementsSection}>
-                  <Text style={[styles.sectionLabel, { color: colors.text }]}>Requirements</Text>
-                  <View style={styles.requirementsRow}>
-                    <TrendingUp size={16} color={colors.text} />
-                    <Text style={[styles.requirementsText, { color: colors.text }]}>
-                      {selectedTitleDetail.points_required} points required
-                    </Text>
-                  </View>
-                  <View style={styles.progressRow}>
-                    <Text style={[styles.progressLabel, { color: colors.text }]}>
-                      Your progress: {profile?.points || 0} / {selectedTitleDetail.points_required}
-                    </Text>
-                    <View style={[styles.modalProgressBar, { backgroundColor: colors.border }]}>
-                      <View 
-                        style={[
-                          styles.modalProgressFill,
-                          { 
-                            width: `${Math.min((profile?.points || 0) / selectedTitleDetail.points_required * 100, 100)}%`,
-                            backgroundColor: getRarityConfig(selectedTitleDetail.rarity).color
-                          }
-                        ]} 
-                      />
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.modalFooter}>
-                {profile?.titles?.includes(selectedTitleDetail.title) ? (
-                  <TouchableOpacity
-                    style={[
-                      styles.selectButton,
-                      { 
-                        backgroundColor: selectedTitle === selectedTitleDetail.title ? colors.primary : `${colors.primary}20`
-                      }
-                    ]}
-                    onPress={() => {
-                      setSelectedTitle(selectedTitleDetail.title);
-                      handleSelectTitle(selectedTitleDetail.title);
-                      hideTitleDetails();
-                    }}
-                  >
-                    {selectedTitle === selectedTitleDetail.title ? (
-                      <>
-                        <Check size={16} color="#fff" />
-                        <Text style={styles.selectButtonTextActive}>Selected</Text>
-                      </>
-                    ) : (
-                      <Text style={[styles.selectButtonText, { color: colors.primary }]}>
-                        Select Title
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                ) : (
-                  <View style={[styles.lockedButton, { backgroundColor: colors.border }]}>
-                    <Lock size={16} color={colors.text} />
-                    <Text style={[styles.lockedButtonText, { color: colors.text }]}>
-                      Locked - Need {selectedTitleDetail.points_required - (profile?.points || 0)} more points
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </>
-          )}
-        </Animated.View>
-      </View>
-    </Modal>
-  );
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Achievements</Text>
-        <Text style={[styles.subtitle, { color: colors.text }]}>
-          Collect titles and show off your progress
-        </Text>
-        
-        {/* Stats Bar */}
-        <View style={[styles.statsBar, { backgroundColor: colors.card }]}>
-          <View style={styles.stat}>
-            <Text style={[styles.statValue, { color: colors.primary }]}>
-              {unlockedTitles.length}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.text }]}>Unlocked</Text>
+    <View style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Header Navigation */}
+        <View style={styles.navHeader}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ChevronLeft size={24} color="#FFF" />
+          </TouchableOpacity>
+          <Text style={styles.brandText}>Uthutho</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <Text style={styles.readyText}>TITLES & RANKS</Text>
+          <Text style={styles.greetingText}>Uthutho Awards</Text>
+          <Text style={styles.headingText}>Achievements</Text>
+        </View>
+
+        {/* Stats Section */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statPill}>
+            <Star size={14} color="#fbbf24" fill="#fbbf24" />
+            <Text style={styles.statValue}>{unlockedTitles.length}</Text>
+            <Text style={styles.statLabel}>Unlocked</Text>
           </View>
-          <View style={styles.stat}>
-            <Text style={[styles.statValue, { color: colors.text }]}>
-              {lockedTitles.length}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.text }]}>Locked</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={[styles.statValue, { color: colors.text }]}>
-              {profile?.points || 0}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.text }]}>Points</Text>
+          <View style={styles.statPill}>
+            <TrendingUp size={14} color="#1ea2b1" />
+            <Text style={styles.statValue}>{profile?.points || 0}</Text>
+            <Text style={styles.statLabel}>Total Points</Text>
           </View>
         </View>
 
-        {/* Current Title */}
+        {/* Active Title Highlight */}
         {selectedTitle && (
-          <View style={[styles.currentContainer, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.currentLabel, { color: '#fff' }]}>ACTIVE TITLE</Text>
-            <View style={styles.currentTitle}>
-              {getTitleIcon(selectedTitle)}
-              <Text style={[styles.currentTitleText, { color: '#fff' }]}>
-                {selectedTitle}
-              </Text>
+          <View style={styles.activeTitleContainer}>
+            <Text style={styles.activeTitleLabel}>CURRENTLY EQUIPPED</Text>
+            <View style={styles.activeTitleCard}>
+              <Crown size={20} color="#fbbf24" />
+              <Text style={styles.activeTitleText}>{selectedTitle}</Text>
+              <Sparkles size={16} color="#fbbf24" />
             </View>
           </View>
         )}
-      </View>
 
-      {/* Tabs */}
-      <View style={[styles.tabsContainer, { backgroundColor: colors.card }]}>
-        {['all', 'unlocked', 'locked'].map((tab) => (
+        {/* Tabs */}
+        <View style={styles.tabs}>
           <TouchableOpacity
-            key={tab}
-            style={[
-              styles.tab,
-              activeTab === tab && [styles.activeTab, { backgroundColor: colors.primary }]
-            ]}
-            onPress={() => setActiveTab(tab)}
+            style={[styles.tab, activeTab === 'all' && styles.activeTab]}
+            onPress={() => setActiveTab('all')}
           >
-            <Text style={[
-              styles.tabText,
-              { color: activeTab === tab ? '#fff' : colors.text }
-            ]}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </Text>
+            <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>All</Text>
           </TouchableOpacity>
-        ))}
-      </View>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'unlocked' && styles.activeTab]}
+            onPress={() => setActiveTab('unlocked')}
+          >
+            <Text style={[styles.tabText, activeTab === 'unlocked' && styles.activeTabText]}>Unlocked</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'locked' && styles.activeTab]}
+            onPress={() => setActiveTab('locked')}
+          >
+            <Text style={[styles.tabText, activeTab === 'locked' && styles.activeTabText]}>Locked</Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Titles Grid */}
-      <FlatList
-        data={filteredTitles}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={2}
-        contentContainerStyle={styles.grid}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <TitleCard
-            title={item}
-            isUnlocked={profile?.titles?.includes(item.title)}
-            isSelected={selectedTitle === item.title}
-          />
-        )}
-      />
+        {/* Grid View */}
+        <View style={styles.gridContainer}>
+          {filteredTitles.map((item: any) => (
+            <TitleCard 
+              key={item.id} 
+              title={item} 
+              isUnlocked={profile?.titles?.includes(item.title)}
+              isSelected={selectedTitle === item.title}
+            />
+          ))}
+        </View>
 
-      {/* Title Detail Modal */}
-      <TitleDetailModal />
+        <View style={styles.footerSpace} />
+      </ScrollView>
+
+      {/* Detail Modal */}
+      <Modal visible={modalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Animated.View style={[styles.modalContent, { opacity: fadeAnim }]}>
+            {selectedTitleDetail && (
+              <View style={styles.modalInner}>
+                <TouchableOpacity onPress={hideTitleDetails} style={styles.modalClose}>
+                  <X size={20} color="#666" />
+                </TouchableOpacity>
+
+                <View style={styles.modalHeaderInfo}>
+                  <View style={styles.modalIconBox}>
+                    {getTitleIcon(selectedTitleDetail.title)}
+                  </View>
+                  <Text style={styles.modalTitleText}>{selectedTitleDetail.title}</Text>
+                  <View style={[styles.modalRarityBadge, { backgroundColor: `${getRarityConfig(selectedTitleDetail.rarity).color}15` }]}>
+                    <Text style={[styles.modalRarityText, { color: getRarityConfig(selectedTitleDetail.rarity).color }]}>
+                      {getRarityConfig(selectedTitleDetail.rarity).name} Rank
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.modalDivider} />
+
+                <Text style={styles.modalSectionLabel}>ABOUT THIS TITLE</Text>
+                <Text style={styles.modalDescription}>{selectedTitleDetail.description || 'No description available.'}</Text>
+
+                {selectedTitleDetail.backstory && (
+                  <>
+                    <Text style={[styles.modalSectionLabel, { marginTop: 16 }]}>BACKSTORY</Text>
+                    <Text style={styles.modalBackstory}>{selectedTitleDetail.backstory}</Text>
+                  </>
+                )}
+
+                <TouchableOpacity
+                  style={[
+                    styles.equipButton,
+                    { backgroundColor: selectedTitle === selectedTitleDetail.title ? 'rgba(30, 162, 177, 0.2)' : '#1ea2b1' }
+                  ]}
+                  onPress={() => {
+                    setSelectedTitle(selectedTitleDetail.title);
+                    handleSelectTitle(selectedTitleDetail.title);
+                    hideTitleDetails();
+                  }}
+                  disabled={selectedTitle === selectedTitleDetail.title}
+                >
+                  <Text style={[styles.equipButtonText, { color: selectedTitle === selectedTitleDetail.title ? '#1ea2b1' : '#FFF' }]}>
+                    {selectedTitle === selectedTitleDetail.title ? 'CURRENTLY EQUIPPED' : 'EQUIP TITLE'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -528,473 +320,319 @@ const TitleChangeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
   },
-  header: {
-    padding: 20,
-    paddingBottom: 12,
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 4,
-    textAlign: 'center',
+  scrollContent: {
+    paddingBottom: 40,
   },
-  subtitle: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  statsBar: {
+  navHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  stat: {
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    marginBottom: 24,
   },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  statLabel: {
+  brandText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -1,
+  },
+  heroSection: {
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  readyText: {
     fontSize: 12,
-    opacity: 0.7,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: '#1ea2b1',
+    marginBottom: 12,
+    textTransform: 'uppercase',
   },
-  currentContainer: {
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
+  greetingText: {
+    fontSize: 32,
+    fontWeight: '400',
+    color: '#FFFFFF',
+    marginBottom: 2,
+    letterSpacing: -1,
   },
-  currentLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    opacity: 0.9,
-    marginBottom: 8,
-    letterSpacing: 1,
+  headingText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#1ea2b1',
+    fontStyle: 'italic',
+    letterSpacing: -1,
   },
-  currentTitle: {
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  statPill: {
+    flex: 1,
+    backgroundColor: '#111',
+    borderRadius: 16,
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    borderWidth: 1,
+    borderColor: '#222',
   },
-  currentTitleText: {
+  statValue: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    color: '#FFF',
   },
-  tabsContainer: {
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#666',
+    textTransform: 'uppercase',
+  },
+  activeTitleContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
+  activeTitleLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#444',
+    letterSpacing: 1.5,
+    marginBottom: 12,
+  },
+  activeTitleCard: {
     flexDirection: 'row',
-    marginHorizontal: 20,
-    marginBottom: 8,
-    borderRadius: 12,
-    padding: 4,
+    alignItems: 'center',
+    backgroundColor: 'rgba(251, 191, 36, 0.05)',
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.2)',
+    gap: 12,
+  },
+  activeTitleText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fbbf24',
+    fontStyle: 'italic',
+    flex: 1,
+  },
+  tabs: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    marginBottom: 24,
+    gap: 12,
   },
   tab: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   activeTab: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    borderColor: '#1ea2b1',
   },
   tabText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#888',
   },
-  grid: {
-    padding: 12,
+  activeTabText: {
+    color: '#1ea2b1',
   },
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 12,
-    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    gap: 0,
   },
   titleCard: {
     width: CARD_WIDTH,
-    margin: CARD_MARGIN,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 2,
+    marginHorizontal: CARD_MARGIN,
+    marginBottom: 16,
+    padding: 20,
+    backgroundColor: '#111',
+    borderRadius: 24,
+    borderWidth: 1,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  rarityBadge: {
+  cardStatusBadge: {
     position: 'absolute',
-    top: 8,
-    left: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
+    top: 12,
+    right: 12,
+  },
+  selectedBadge: {
+    backgroundColor: '#1ea2b1',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
-  },
-  rarityText: {
-    fontSize: 10,
-  },
-  statusBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
     justifyContent: 'center',
+  },
+  iconCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     alignItems: 'center',
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  iconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
     justifyContent: 'center',
-    alignItems: 'center',
     marginBottom: 12,
-    borderWidth: 2,
   },
-  titleInfo: {
-    alignItems: 'center',
-    flex: 1,
-    width: '100%',
-  },
-  titleName: {
+  cardTitleName: {
     fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-    flexShrink: 1,
-  },
-  rarityContainer: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginBottom: 6,
-  },
-  rarityName: {
-    fontSize: 10,
     fontWeight: '700',
-  },
-  pointsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  pointsText: {
-    fontSize: 10,
-    fontWeight: '600',
-    opacity: 0.8,
-  },
-  progressContainer: {
-    width: '100%',
-    marginTop: 12,
-  },
-  progressBar: {
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginBottom: 4,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  progressText: {
-    fontSize: 10,
-    opacity: 0.7,
+    color: '#FFF',
+    marginBottom: 6,
     textAlign: 'center',
   },
-  lockedOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 16,
-    justifyContent: 'center',
+  rarityPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  rarityLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  cardProgressContainer: {
+    width: '100%',
     alignItems: 'center',
   },
-  lockedText: {
-    fontSize: 12,
+  cardProgressBar: {
+    width: '80%',
+    height: 3,
+    backgroundColor: '#222',
+    borderRadius: 1.5,
+    marginBottom: 6,
+    overflow: 'hidden',
+  },
+  cardProgressFill: {
+    height: '100%',
+    backgroundColor: '#1ea2b1',
+  },
+  cardProgressText: {
+    fontSize: 10,
     fontWeight: '600',
-    marginTop: 4,
+    color: '#444',
   },
-  infoButton: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    padding: 4,
+  footerSpace: {
+    height: 40,
   },
-  // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.85)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
   modalContent: {
     width: '100%',
-    borderRadius: 20,
-    padding: 0,
-    maxHeight: '80%',
+    maxWidth: 400,
+    backgroundColor: '#111',
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: '#222',
+    overflow: 'hidden',
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
+  modalInner: {
+    padding: 32,
   },
-  modalTitleSection: {
-    flexDirection: 'row',
+  modalClose: {
+    position: 'absolute',
+    top: 24,
+    right: 24,
+    zIndex: 10,
+  },
+  modalHeaderInfo: {
     alignItems: 'center',
-    flex: 1,
+    marginBottom: 24,
   },
-  modalIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  modalIconBox: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+    marginBottom: 16,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
+  modalTitleText: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#FFF',
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
-  modalRarity: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
+  modalRarityBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
   modalRarityText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
-  closeButton: {
-    padding: 4,
+  modalDivider: {
+    height: 1,
+    backgroundColor: '#222',
+    width: '100%',
+    marginBottom: 24,
   },
-  modalBody: {
-    padding: 20,
-  },
-  descriptionSection: {
-    marginBottom: 20,
-  },
-  backstorySection: {
-    marginBottom: 20,
-  },
-  requirementsSection: {
-    marginBottom: 10,
-  },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+  modalSectionLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#444',
+    letterSpacing: 1.5,
     marginBottom: 8,
-    opacity: 0.8,
   },
-  descriptionText: {
-    fontSize: 16,
+  modalDescription: {
+    fontSize: 15,
+    color: '#BBB',
     lineHeight: 22,
+    marginBottom: 24,
   },
-  backstoryText: {
+  modalBackstory: {
     fontSize: 14,
+    color: '#888',
     lineHeight: 20,
     fontStyle: 'italic',
-    opacity: 0.9,
+    marginBottom: 32,
   },
-  requirementsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  requirementsText: {
-    fontSize: 14,
-  },
-  progressRow: {
-    marginTop: 8,
-  },
-  progressLabel: {
-    fontSize: 12,
-    marginBottom: 4,
-    opacity: 0.8,
-  },
-  modalProgressBar: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  modalProgressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  modalFooter: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
-  },
-  selectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 16,
-    borderRadius: 12,
-  },
-  selectButtonTextActive: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  selectButtonText: {
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  lockedButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 16,
-    borderRadius: 12,
-  },
-  lockedButtonText: {
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  // Skeleton Loader Styles
-  skeletonTitle: {
-    height: 32,
-    borderRadius: 8,
-    marginBottom: 8,
-    width: '40%',
-    alignSelf: 'center',
-  },
-  skeletonSubtitle: {
-    height: 16,
-    borderRadius: 6,
-    marginBottom: 16,
-    width: '60%',
-    alignSelf: 'center',
-  },
-  skeletonStatValue: {
-    height: 24,
-    borderRadius: 6,
-    width: 30,
-    marginBottom: 6,
-  },
-  skeletonStatLabel: {
-    height: 12,
-    borderRadius: 4,
-    width: 40,
-  },
-  skeletonCurrentLabel: {
-    height: 12,
-    borderRadius: 4,
-    width: 80,
-    marginBottom: 8,
-  },
-  skeletonCurrentTitle: {
-    height: 18,
-    borderRadius: 6,
-    width: 120,
-    marginLeft: 8,
-    flex: 1,
-  },
-  skeletonIconSmall: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-  },
-  skeletonTab: {
-    flex: 1,
-    height: 32,
-    borderRadius: 8,
-    marginHorizontal: 2,
-  },
-  skeletonTitleCard: {
-    width: CARD_WIDTH,
-    marginBottom: 16,
-    padding: 16,
+  equipButton: {
+    width: '100%',
+    paddingVertical: 18,
     borderRadius: 16,
-    borderWidth: 2,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  skeletonRarityBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  skeletonStatusBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  skeletonIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginBottom: 12,
-    borderWidth: 2,
-  },
-  skeletonTitleInfo: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  skeletonTitleName: {
-    height: 16,
-    borderRadius: 4,
-    width: '80%',
-    marginBottom: 8,
-  },
-  skeletonRarity: {
-    height: 14,
-    borderRadius: 6,
-    width: 60,
-    marginBottom: 6,
-  },
-  skeletonPoints: {
-    height: 12,
-    borderRadius: 4,
-    width: 50,
-  },
-  skeletonProgressContainer: {
-    width: '100%',
-    marginTop: 12,
-  },
-  skeletonProgressBar: {
-    height: 4,
-    borderRadius: 2,
-    marginBottom: 4,
-  },
-  skeletonProgressText: {
-    height: 10,
-    borderRadius: 3,
-    width: 30,
-    alignSelf: 'center',
+  equipButtonText: {
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });
 

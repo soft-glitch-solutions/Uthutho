@@ -1,13 +1,16 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
-import { 
-  Mail, 
-  LogOut, 
-  ChevronRight, 
-  ShieldCheck, 
-  Globe, 
-  Facebook, 
-  Twitter 
+import {
+  Mail,
+  LogOut,
+  ChevronRight,
+  ShieldCheck,
+  Globe,
+  Facebook,
+  Twitter,
+  MapPin,
+  Bus,
+  Languages
 } from 'lucide-react-native';
 
 interface BasicInfoTabProps {
@@ -17,6 +20,7 @@ interface BasicInfoTabProps {
   onSignOut: () => void;
   onConnectAccount: (provider: string) => void;
   isDesktop: boolean;
+  profile: any;
 }
 
 export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
@@ -25,13 +29,13 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   linkedAccounts,
   onSignOut,
   onConnectAccount,
-  isDesktop
+  isDesktop,
+  profile
 }) => {
   const getProviderIcon = (provider: string) => {
     switch (provider) {
       case 'google': return <Globe size={20} color="#EA4335" />;
       case 'facebook': return <Facebook size={20} color="#1877F2" />;
-      case 'twitter': return <Twitter size={20} color="#1DA1F2" />;
       default: return <Mail size={20} color="#888" />;
     }
   };
@@ -43,10 +47,10 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>SOCIAL CONNECTIONS</Text>
-      
+
       <View style={styles.cardsContainer}>
-        {['google', 'facebook', 'twitter'].map((provider) => (
-          <TouchableOpacity 
+        {['google', 'facebook'].map((provider) => (
+          <TouchableOpacity
             key={provider}
             style={styles.connectionCard}
             onPress={() => onConnectAccount(provider)}
@@ -63,11 +67,11 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
                 </View>
               )}
             </View>
-            
+
             <Text style={styles.providerName}>
               {provider.charAt(0).toUpperCase() + provider.slice(1)}
             </Text>
-            
+
             {!isConnected(provider) && (
               <Text style={styles.connectLabel}>Connect Account</Text>
             )}
@@ -75,8 +79,48 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
         ))}
       </View>
 
+      <Text style={[styles.sectionTitle, { marginTop: 40 }]}>PERSONAL DETAILS</Text>
+
+      <View style={styles.settingsList}>
+        <View style={styles.settingsItem}>
+          <View style={styles.settingsItemLeft}>
+            <View style={styles.itemIconBox}>
+              <MapPin size={18} color="#FFF" />
+            </View>
+            <View>
+              <Text style={styles.settingsItemText}>Home Address</Text>
+              <Text style={styles.itemSubtitle}>{profile?.home || 'Not set'}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.settingsItem}>
+          <View style={styles.settingsItemLeft}>
+            <View style={styles.itemIconBox}>
+              <Bus size={18} color="#FFF" />
+            </View>
+            <View>
+              <Text style={styles.settingsItemText}>Preferred Transport</Text>
+              <Text style={styles.itemSubtitle}>{profile?.preferred_transport || 'Not set'}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.settingsItem, { borderBottomWidth: 0 }]}>
+          <View style={styles.settingsItemLeft}>
+            <View style={styles.itemIconBox}>
+              <Languages size={18} color="#FFF" />
+            </View>
+            <View>
+              <Text style={styles.settingsItemText}>Language</Text>
+              <Text style={styles.itemSubtitle}>{profile?.preferred_language || 'English (South Africa)'}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
       <Text style={[styles.sectionTitle, { marginTop: 40 }]}>ACCOUNT SETTINGS</Text>
-      
+
       <View style={styles.settingsList}>
         <TouchableOpacity style={styles.settingsItem}>
           <View style={styles.settingsItemLeft}>
@@ -98,8 +142,8 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           <ChevronRight size={18} color="#333" />
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.settingsItem, { borderBottomWidth: 0 }]} 
+        <TouchableOpacity
+          style={[styles.settingsItem, { borderBottomWidth: 0 }]}
           onPress={onSignOut}
         >
           <View style={styles.settingsItemLeft}>
@@ -211,5 +255,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#DDD',
+  },
+  itemSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
 });

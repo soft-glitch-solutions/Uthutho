@@ -20,7 +20,7 @@ import { useNotifications } from '../../../hook/useNotifications';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import StreakOverlay from '@/components/StreakOverlay';
+import { LoginStreakPopup } from '@/components/LoginStreakTracker';
 import { useRouter, useNavigation } from 'expo-router';
 import { gifPrefetchService } from '@/services/gifPrefetchService';
 import { TutorialProvider, useTutorial } from '@/context/TutorialContext';
@@ -496,17 +496,13 @@ export default function EnhancedTabLayout() {
   const { unreadCount } = useNotifications();
   const { colors } = useTheme();
   const [userId, setUserId] = useState<string | null>(null);
-  const [showStreakOverlay, setShowStreakOverlay] = useState(false);
-  const { showTutorial, setShowTutorial } = useTutorial();
+  const { showTutorial, setShowTutorial, showStreakOverlay, setShowStreakOverlay } = useTutorial();
 
   // ========== START GIF PREFETCHING WHEN APP LOADS ==========
   useEffect(() => {
     // Start prefetching GIFs immediately when the tab layout mounts
     // This ensures GIFs are downloading while user navigates
     gifPrefetchService.startPrefetching();
-    
-    // Check for first time tutorial
-    checkTutorial();
   }, []); 
 
   const checkTutorial = async () => {
@@ -517,10 +513,8 @@ export default function EnhancedTabLayout() {
   };
   // ========== END GIF PREFETCHING ==========
 
-  // Check for streak overlay when component mounts
-  useEffect(() => {
-    checkAndShowStreakOverlay();
-  }, []);
+  // checkAndShowStreakOverlay is now called from home.tsx sequence
+
 
   const checkAndShowStreakOverlay = async () => {
     try {
@@ -625,10 +619,9 @@ export default function EnhancedTabLayout() {
         />
       </Tabs>
 
-      {/* Streak Overlay - Shows across all tabs */}
-      <StreakOverlay
-        visible={showStreakOverlay}
-        userId={userId}
+      {/* Login Streak Tracker - Shows across all tabs */}
+      <LoginStreakPopup
+        open={showStreakOverlay}
         onClose={() => setShowStreakOverlay(false)}
       />
 
