@@ -1,12 +1,12 @@
 import React from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ImageBackground, 
-  TouchableOpacity, 
-  Dimensions, 
-  Platform 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ImageBackground,
+  TouchableOpacity,
+  Dimensions,
+  Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -26,8 +26,8 @@ interface CommunityHeroProps {
   compact?: boolean;
 }
 
-const DEFAULT_HUB_IMAGE = 'https://images.theconversation.com/files/347103/original/file-20200713-42-1scm7g7.jpg?ixlib=rb-4.1.0&q=45&auto=format&w=1356&h=668&fit=crop';
-const DEFAULT_STOP_IMAGE = 'https://images.caxton.co.za/wp-content/uploads/sites/10/2023/03/IMG_9281_07602-e1680074626338-780x470.jpg';
+const DEFAULT_HUB_IMAGE = '@/assets/images/Community.jpg';
+const DEFAULT_STOP_IMAGE = '@/assets/images/Community.jpg';
 
 const CommunityHero: React.FC<CommunityHeroProps> = ({
   community,
@@ -38,12 +38,24 @@ const CommunityHero: React.FC<CommunityHeroProps> = ({
   reactionCount,
   compact = false
 }) => {
-  const imageUrl = community.image || (community.type === 'hub' ? DEFAULT_HUB_IMAGE : DEFAULT_STOP_IMAGE);
+  const getHeaderImage = () => {
+    if (community.id === 'all_communities') {
+      return require('@/assets/images/Community.jpg');
+    }
+
+    if (community.image) {
+      return { uri: community.image };
+    }
+
+    return community.type === 'hub'
+      ? require('@/assets/images/school-transport.jpg')
+      : require('@/assets/images/Community.jpg');
+  };
 
   return (
     <View style={[styles.container, compact && styles.containerCompact]}>
       <ImageBackground
-        source={{ uri: imageUrl }}
+        source={getHeaderImage()}
         style={[styles.heroImage, compact && styles.heroImageCompact]}
         imageStyle={styles.imageStyle}
       >
@@ -62,7 +74,7 @@ const CommunityHero: React.FC<CommunityHeroProps> = ({
                   )}
                   <Text style={styles.typeText}>{community.type.toUpperCase()}</Text>
                 </View>
-                
+
                 <TouchableOpacity style={styles.iconButton}>
                   <Share2 size={18} color="#FFFFFF" />
                 </TouchableOpacity>
@@ -102,7 +114,7 @@ const CommunityHero: React.FC<CommunityHeroProps> = ({
               >
                 {!isFollowing && <Users size={compact ? 12 : 16} color="#FFFFFF" style={{ marginRight: compact ? 4 : 6 }} />}
                 <Text style={[
-                  styles.followButtonText, 
+                  styles.followButtonText,
                   isFollowing && styles.followingButtonText,
                   compact && styles.followButtonTextCompact
                 ]}>

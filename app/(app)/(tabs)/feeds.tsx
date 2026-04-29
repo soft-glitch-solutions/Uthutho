@@ -20,6 +20,7 @@ import { useAuth } from '@/hook/useAuth';
 import * as FileSystem from 'expo-file-system';
 import { captureRef } from 'react-native-view-shot';
 import { Animated } from 'react-native';
+import Reanimated, { FadeInUp, SlideInUp } from 'react-native-reanimated';
 import { useTutorial } from '@/context/TutorialContext';
 
 
@@ -856,22 +857,26 @@ export default function FeedsScreen() {
                   showsVerticalScrollIndicator={false}
                 >
                   {posts.length > 0 ? (
-                    posts.map((item) => (
-                      <PostCard
+                    posts.map((item, index) => (
+                      <Reanimated.View
                         key={item.id}
-                        post={item}
-                        userId={userId}
-                        toggleReaction={toggleReaction}
-                        sharePost={sharePost}
-                        downloadPost={downloadPost}
-                        sharingPost={sharingPost}
-                        router={router}
-                        viewShotRef={(ref: any) => {
-                          viewShotRefs.current[item.id] = ref;
-                        }}
-                        disabled={previewMode && !isFollowingPreview}
-                        isDesktop={isDesktop}
-                      />
+                        entering={FadeInUp.delay(index * 100).duration(500)}
+                      >
+                        <PostCard
+                          post={item}
+                          userId={userId}
+                          toggleReaction={toggleReaction}
+                          sharePost={sharePost}
+                          downloadPost={downloadPost}
+                          sharingPost={sharingPost}
+                          router={router}
+                          viewShotRef={(ref: any) => {
+                            viewShotRefs.current[item.id] = ref;
+                          }}
+                          disabled={previewMode && !isFollowingPreview}
+                          isDesktop={isDesktop}
+                        />
+                      </Reanimated.View>
                     ))
                   ) : (
                     <EmptyPosts
@@ -941,21 +946,25 @@ export default function FeedsScreen() {
           <Animated.FlatList
             data={posts}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <PostCard
-                post={item}
-                userId={userId}
-                toggleReaction={toggleReaction}
-                sharePost={sharePost}
-                downloadPost={downloadPost}
-                sharingPost={sharingPost}
-                router={router}
-                viewShotRef={(ref: any) => {
-                  viewShotRefs.current[item.id] = ref;
-                }}
-                disabled={previewMode && !isFollowingPreview}
-                isDesktop={false}
-              />
+            renderItem={({ item, index }) => (
+              <Reanimated.View
+                entering={FadeInUp.delay(index * 100).duration(500)}
+              >
+                <PostCard
+                  post={item}
+                  userId={userId}
+                  toggleReaction={toggleReaction}
+                  sharePost={sharePost}
+                  downloadPost={downloadPost}
+                  sharingPost={sharingPost}
+                  router={router}
+                  viewShotRef={(ref: any) => {
+                    viewShotRefs.current[item.id] = ref;
+                  }}
+                  disabled={previewMode && !isFollowingPreview}
+                  isDesktop={false}
+                />
+              </Reanimated.View>
             )}
             ListHeaderComponent={renderMobileHeader()}
             ListEmptyComponent={

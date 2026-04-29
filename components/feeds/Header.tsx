@@ -6,8 +6,8 @@ import { Community } from '@/types/feeds';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const DEFAULT_HUB_IMAGE = 'https://images.theconversation.com/files/347103/original/file-20200713-42-1scm7g7.jpg?ixlib=rb-4.1.0&q=45&auto=format&w=1356&h=668&fit=crop';
-const DEFAULT_STOP_IMAGE = 'https://images.caxton.co.za/wp-content/uploads/sites/10/2023/03/IMG_9281_07602-e1680074626338-780x470.jpg';
+const DEFAULT_HUB_IMAGE = '@/assets/images/Community.jpg';
+const DEFAULT_STOP_IMAGE = '@/assets/images/Community.jpg';
 
 interface HeaderProps {
   unreadNotifications: number;

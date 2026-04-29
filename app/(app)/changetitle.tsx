@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
   FlatList,
   Dimensions,
   Modal,
@@ -13,16 +13,16 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
-import { 
-  Check, Lock, Star, Crown, Award, Target, Zap, Trophy, Shield, 
+import {
+  Check, Lock, Star, Crown, Award, Target, Zap, Trophy, Shield,
   X, Info, Sparkles, Gem, TrendingUp, MapPin, ChevronLeft
 } from 'lucide-react-native';
 import { useProfile } from '@/hook/useProfile';
 import { router } from 'expo-router';
 
 const { width: screenWidth } = Dimensions.get('window');
-const CARD_MARGIN = 8;
-const CARD_WIDTH = (screenWidth - 48 - CARD_MARGIN) / 2;
+const CARD_GAP = 12;
+const CARD_WIDTH = (screenWidth - 48 - CARD_GAP) / 2; // 48 = padding left+right (24*2)
 
 const TitleChangeScreen = () => {
   const { colors } = useTheme();
@@ -53,15 +53,15 @@ const TitleChangeScreen = () => {
 
   const getTitleIcon = (title: string) => {
     const iconProps = { size: 24, color: '#1ea2b1' };
-    if (title.includes('Master') || title.includes('Legend') || title.includes('King') || title.includes('Queen')) 
+    if (title.includes('Master') || title.includes('Legend') || title.includes('King') || title.includes('Queen'))
       return <Crown {...iconProps} />;
-    if (title.includes('Expert') || title.includes('Champion') || title.includes('Pro')) 
+    if (title.includes('Expert') || title.includes('Champion') || title.includes('Pro'))
       return <Trophy {...iconProps} />;
-    if (title.includes('Star') || title.includes('Boss') || title.includes('Guru')) 
+    if (title.includes('Star') || title.includes('Boss') || title.includes('Guru'))
       return <Star {...iconProps} />;
-    if (title.includes('Saver') || title.includes('Guard')) 
+    if (title.includes('Saver') || title.includes('Guard'))
       return <Shield {...iconProps} />;
-    if (title.includes('Explorer') || title.includes('Scout') || title.includes('Navigator')) 
+    if (title.includes('Explorer') || title.includes('Scout') || title.includes('Navigator'))
       return <Zap {...iconProps} />;
     return <Award {...iconProps} />;
   };
@@ -98,32 +98,81 @@ const TitleChangeScreen = () => {
   const unlockedTitles = titles.filter((title: any) => profile?.titles?.includes(title.title));
   const lockedTitles = titles.filter((title: any) => !profile?.titles?.includes(title.title));
 
-  const filteredTitles = activeTab === 'unlocked' 
-    ? unlockedTitles 
-    : activeTab === 'locked' 
-    ? lockedTitles 
-    : titles;
+  const filteredTitles = activeTab === 'unlocked'
+    ? unlockedTitles
+    : activeTab === 'locked'
+      ? lockedTitles
+      : titles;
 
-  const TitleCard = ({ title, isUnlocked, isSelected }: { title: any, isUnlocked: boolean, isSelected: boolean }) => {
+  // Split into rows for two-column layout
+  const renderTitleCards = () => {
+    const rows = [];
+    for (let i = 0; i < filteredTitles.length; i += 2) {
+      const firstTitle = filteredTitles[i];
+      const secondTitle = filteredTitles[i + 1];
+
+      rows.push(
+        <View key={`row-${i}`} style={styles.rowContainer}>
+          <View style={styles.columnWrapper}>
+            <View style={styles.leftColumn}>
+              <TitleCard
+                title={firstTitle}
+                isUnlocked={profile?.titles?.includes(firstTitle.title)}
+                isSelected={selectedTitle === firstTitle.title}
+                onPress={() => showTitleDetails(firstTitle)}
+                onLongPress={() => {
+                  if (profile?.titles?.includes(firstTitle.title)) {
+                    setSelectedTitle(firstTitle.title);
+                    handleSelectTitle(firstTitle.title);
+                  }
+                }}
+              />
+            </View>
+            {secondTitle && (
+              <View style={styles.rightColumn}>
+                <TitleCard
+                  title={secondTitle}
+                  isUnlocked={profile?.titles?.includes(secondTitle.title)}
+                  isSelected={selectedTitle === secondTitle.title}
+                  onPress={() => showTitleDetails(secondTitle)}
+                  onLongPress={() => {
+                    if (profile?.titles?.includes(secondTitle.title)) {
+                      setSelectedTitle(secondTitle.title);
+                      handleSelectTitle(secondTitle.title);
+                    }
+                  }}
+                />
+              </View>
+            )}
+          </View>
+        </View>
+      );
+    }
+    return rows;
+  };
+
+  const TitleCard = ({ title, isUnlocked, isSelected, onPress, onLongPress }: {
+    title: any,
+    isUnlocked: boolean,
+    isSelected: boolean,
+    onPress: () => void,
+    onLongPress: () => void
+  }) => {
     const rarityConfig = getRarityConfig(title.rarity);
-    
+
     return (
       <TouchableOpacity
         style={[
           styles.titleCard,
-          { 
+          {
             borderColor: isSelected ? '#1ea2b1' : '#222',
             opacity: isUnlocked ? 1 : 0.7,
           }
         ]}
-        onPress={() => isUnlocked ? showTitleDetails(title) : null}
-        onLongPress={() => {
-          if (isUnlocked) {
-            setSelectedTitle(title.title);
-            handleSelectTitle(title.title);
-          }
-        }}
+        onPress={onPress}
+        onLongPress={onLongPress}
         disabled={!isUnlocked}
+        activeOpacity={0.7}
       >
         {/* Selection / Lock Badge */}
         <View style={styles.cardStatusBadge}>
@@ -139,7 +188,7 @@ const TitleChangeScreen = () => {
         {/* Title Icon */}
         <View style={[
           styles.iconCircle,
-          { 
+          {
             backgroundColor: isUnlocked ? 'rgba(30, 162, 177, 0.1)' : 'rgba(255, 255, 255, 0.05)',
           }
         ]}>
@@ -150,7 +199,7 @@ const TitleChangeScreen = () => {
         <Text style={styles.cardTitleName} numberOfLines={1}>
           {title.title}
         </Text>
-        
+
         <View style={[styles.rarityPill, { backgroundColor: `${rarityConfig.color}15` }]}>
           <Text style={[styles.rarityLabel, { color: rarityConfig.color }]}>
             {rarityConfig.name}
@@ -160,11 +209,11 @@ const TitleChangeScreen = () => {
         {!isUnlocked && (
           <View style={styles.cardProgressContainer}>
             <View style={styles.cardProgressBar}>
-              <View 
+              <View
                 style={[
                   styles.cardProgressFill,
                   { width: `${Math.min((profile?.points || 0) / title.points_required * 100, 100)}%` }
-                ]} 
+                ]}
               />
             </View>
             <Text style={styles.cardProgressText}>
@@ -243,16 +292,9 @@ const TitleChangeScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Grid View */}
+        {/* Two-Column Grid View */}
         <View style={styles.gridContainer}>
-          {filteredTitles.map((item: any) => (
-            <TitleCard 
-              key={item.id} 
-              title={item} 
-              isUnlocked={profile?.titles?.includes(item.title)}
-              isSelected={selectedTitle === item.title}
-            />
-          ))}
+          {renderTitleCards()}
         </View>
 
         <View style={styles.footerSpace} />
@@ -462,25 +504,37 @@ const styles = StyleSheet.create({
     color: '#1ea2b1',
   },
   gridContainer: {
+    paddingHorizontal: 20,
+  },
+  rowContainer: {
+    marginBottom: 16,
+  },
+  columnWrapper: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    gap: 0,
+    justifyContent: 'space-between',
+  },
+  leftColumn: {
+    flex: 1,
+    marginRight: 8,
+  },
+  rightColumn: {
+    flex: 1,
+    marginLeft: 8,
   },
   titleCard: {
-    width: CARD_WIDTH,
-    marginHorizontal: CARD_MARGIN,
-    marginBottom: 16,
-    padding: 20,
+    width: '100%',
+    padding: 16,
     backgroundColor: '#111',
-    borderRadius: 24,
-    borderWidth: 1,
+    borderRadius: 20,
+    borderWidth: 1.5,
     alignItems: 'center',
+    position: 'relative',
   },
   cardStatusBadge: {
     position: 'absolute',
     top: 12,
     right: 12,
+    zIndex: 1,
   },
   selectedBadge: {
     backgroundColor: '#1ea2b1',

@@ -11,8 +11,8 @@ interface HubItemProps {
   distance?: string;
 }
 
-export default function HubItem({ 
-  hub, 
+export default function HubItem({
+  hub,
   followerCount = 0,
   showDistance = false,
   distance = '0 km'
@@ -23,7 +23,7 @@ export default function HubItem({
     router.push(`/hub/${hubId}`);
   };
 
-  const imageUrl = hub.image || 'https://images.theconversation.com/files/347103/original/file-20200713-42-1scm7g7.jpg?ixlib=rb-4.1.0&q=45&auto=format&w=1356&h=668&fit=crop';
+  const imageUrl = hub.image || '@/assets/images/Community.jpg';
 
   return (
     <TouchableOpacity
@@ -33,8 +33,8 @@ export default function HubItem({
     >
       {/* Side Image */}
       <View style={styles.imageContainerSide}>
-        <Image 
-          source={{ uri: imageUrl }} 
+        <Image
+          source={{ uri: imageUrl }}
           style={styles.hubImageSide}
           resizeMode="cover"
         />
@@ -63,7 +63,7 @@ export default function HubItem({
             <Users size={12} color="#1ea2b1" />
             <Text style={styles.detailText}>{followerCount} followers</Text>
           </View>
-          
+
           {hub.transport_type && (
             <View style={styles.detailItem}>
               <Text style={[styles.detailText, styles.transportType]}>
@@ -71,7 +71,7 @@ export default function HubItem({
               </Text>
             </View>
           )}
-          
+
           {showDistance && (
             <View style={styles.detailItem}>
               <Navigation size={12} color="#fbbf24" />

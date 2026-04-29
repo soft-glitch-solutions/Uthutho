@@ -149,7 +149,7 @@ const FavoritesSection = ({
 
     switch (favorite?.type) {
       case 'hub':
-        return 'https://images.theconversation.com/files/347103/original/file-20200713-42-1scm7g7.jpg?ixlib=rb-4.1.0&q=45&auto=format&w=1356&h=668&fit=crop';
+        return '@/assets/images/Community.jpg';
       case 'stop':
         return 'https://ygkhmcnpjjvmbrbyybik.supabase.co/storage/v1/object/public/stops/stop_default.png';
       default:

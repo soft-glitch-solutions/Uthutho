@@ -93,7 +93,7 @@ const FloatingBackground = ({ activeIndex, colors }) => {
 const FloatingTabIcon = ({ color, size, focused, children, notificationCount = 0, index, colors }) => {
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
-  const opacity = useSharedValue(0);
+  const opacity = useSharedValue(1);
 
   const iconAnimatedStyle = useAnimatedStyle(() => {
     return {
@@ -121,34 +121,29 @@ const FloatingTabIcon = ({ color, size, focused, children, notificationCount = 0
   });
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (focused) {
-        translateY.value = withSpring(-8, {
-          damping: 12,
-          stiffness: 140,
-          mass: 0.7,
-        });
-        scale.value = withSpring(1.2, {
-          damping: 12,
-          stiffness: 140,
-          mass: 0.7,
-        });
-      } else {
-        translateY.value = withSpring(0, {
-          damping: 12,
-          stiffness: 140,
-          mass: 0.7,
-        });
-        scale.value = withSpring(1, {
-          damping: 12,
-          stiffness: 140,
-          mass: 0.7,
-        });
-      }
-      opacity.value = withTiming(1, { duration: 300 });
-    }, index * 100);
-
-    return () => clearTimeout(timer);
+    if (focused) {
+      translateY.value = withSpring(-8, {
+        damping: 12,
+        stiffness: 140,
+        mass: 0.7,
+      });
+      scale.value = withSpring(1.2, {
+        damping: 12,
+        stiffness: 140,
+        mass: 0.7,
+      });
+    } else {
+      translateY.value = withSpring(0, {
+        damping: 12,
+        stiffness: 140,
+        mass: 0.7,
+      });
+      scale.value = withSpring(1, {
+        damping: 12,
+        stiffness: 140,
+        mass: 0.7,
+      });
+    }
   }, [focused, index]);
 
   return (
@@ -181,7 +176,6 @@ const FloatingTabIcon = ({ color, size, focused, children, notificationCount = 0
             },
             badgeAnimatedStyle
           ]}
-          entering={BounceIn.duration(600).delay(800 + index * 100)}
         >
           <Text style={{ color: 'white', fontSize: 9, fontWeight: 'bold' }}>
             {notificationCount > 9 ? '9+' : notificationCount}
@@ -223,7 +217,6 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
         borderBottomColor: colors.border || 'rgba(255, 255, 255, 0.1)',
         zIndex: 1000,
       }}
-      entering={FadeIn.duration(500)}
     >
       {/* App Logo/Brand */}
       <View style={{
@@ -394,7 +387,6 @@ const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount })
         borderColor: colors.border || 'rgba(255, 255, 255, 0.1)',
         overflow: 'hidden',
       }}
-      entering={FadeInUp.duration(800)}
     >
       {/* Floating Background Indicator */}
       <FloatingBackground activeIndex={state.index} colors={colors} />
@@ -450,7 +442,6 @@ const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount })
             }}
           >
             <AnimatedView
-              entering={SlideInLeft.delay(index * 120).duration(500)}
               style={{
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -480,7 +471,6 @@ const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount })
                   marginTop: 4,
                   color: isFocused ? '#ffffff' : colors.text,
                 }}
-                entering={FadeIn.delay(400 + index * 100).duration(400)}
               >
                 {options.title || route.name}
               </AnimatedText>
