@@ -32,7 +32,8 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const isSmallMobile = SCREEN_HEIGHT < 700;
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const FallbackIcon = ({ color, size }) => (
@@ -53,7 +54,7 @@ const BRAND_COLOR = '#1ea2b1';
 const CustomDrawerContent = (props) => {
   const { colors } = useTheme();
   const { user } = useAuth();
-  
+
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isDriver, setIsDriver] = useState(false);
   const [loadingRole, setLoadingRole] = useState(true);
@@ -108,17 +109,17 @@ const CustomDrawerContent = (props) => {
   return (
     <View style={styles.drawerContainer}>
       {/* Header */}
-      <View style={styles.drawerHeader}>
-        <View style={styles.headerTop}>
-          <View style={styles.logoContainer}>
+      <View style={[styles.drawerHeader, isSmallMobile && styles.drawerHeaderSmall]}>
+        <View style={[styles.headerTop, isSmallMobile && styles.headerTopSmall]}>
+          <View style={[styles.logoContainer, isSmallMobile && styles.logoContainerSmall]}>
             <Image source={require('../../assets/uthutho-logo.png')} style={styles.logo} resizeMode="contain" />
           </View>
           <TouchableOpacity onPress={() => props.navigation.closeDrawer()} style={styles.closeBtn}>
-            <X size={18} color="#666" />
+            <X size={16} color="#666" />
           </TouchableOpacity>
         </View>
-        <Text style={styles.appTitle}>Uthutho</Text>
-        <Text style={styles.readyText}>READY TO MOVE</Text>
+        <Text style={[styles.appTitle, isSmallMobile && styles.appTitleSmall]}>Uthutho</Text>
+        <Text style={styles.readyText}>Move Smarter</Text>
       </View>
 
       {/* Navigation */}
@@ -136,14 +137,15 @@ const CustomDrawerContent = (props) => {
               onPressOut={handlePressOut}
               style={[
                 styles.drawerItem,
-                { transform: [{ scale: scaleAnim }], backgroundColor: isFocused ? '#111' : 'transparent' }
+                { transform: [{ scale: scaleAnim }], backgroundColor: isFocused ? '#111' : 'transparent' },
+                isSmallMobile && styles.drawerItemSmall
               ]}
             >
               <View style={styles.drawerItemContent}>
-                <View style={[styles.iconContainer, { backgroundColor: isFocused ? BRAND_COLOR : '#111' }]}>
-                  <IconComponent color={isFocused ? '#000' : '#444'} size={18} />
+                <View style={[styles.iconContainer, { backgroundColor: isFocused ? BRAND_COLOR : '#111' }, isSmallMobile && styles.iconContainerSmall]}>
+                  <IconComponent color={isFocused ? '#000' : '#444'} size={16} />
                 </View>
-                <Text style={[styles.drawerLabel, { color: isFocused ? '#FFF' : '#666', fontWeight: isFocused ? '900' : '600' }]}>
+                <Text style={[styles.drawerLabel, { color: isFocused ? '#FFF' : '#666', fontWeight: isFocused ? '900' : '600' }, isSmallMobile && styles.drawerLabelSmall]}>
                   {options.title || route.name}
                 </Text>
               </View>
@@ -158,11 +160,11 @@ const CustomDrawerContent = (props) => {
             onPress={() => isDriver ? props.navigation.navigate('driver-dashboard') : props.navigation.navigate('driver-onboarding')}
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
-            style={[styles.driverItem, { transform: [{ scale: scaleAnim }] }]}
+            style={[styles.driverItem, { transform: [{ scale: scaleAnim }] }, isSmallMobile && styles.driverItemSmall]}
           >
             <View style={styles.driverContent}>
-              <View style={[styles.driverIconBox, { backgroundColor: isDriver ? BRAND_COLOR : '#8B5CF6' }]}>
-                {isDriver ? <BarChart3 size={18} color="#000" strokeWidth={2.5} /> : <Car size={18} color="#FFF" />}
+              <View style={[styles.driverIconBox, { backgroundColor: isDriver ? BRAND_COLOR : '#8B5CF6' }, isSmallMobile && styles.driverIconBoxSmall]}>
+                {isDriver ? <BarChart3 size={16} color="#000" strokeWidth={2.5} /> : <Car size={16} color="#FFF" />}
               </View>
               <View style={styles.driverTexts}>
                 <Text style={styles.driverTitle}>{isDriver ? 'DASHBOARD' : 'BECOME DRIVER'}</Text>
@@ -175,16 +177,16 @@ const CustomDrawerContent = (props) => {
       </ScrollView>
 
       {/* Footer */}
-      <View style={styles.drawerFooter}>
-        <View style={styles.socialContainer}>
+      <View style={[styles.drawerFooter, isSmallMobile && styles.drawerFooterSmall]}>
+        <View style={[styles.socialContainer, isSmallMobile && styles.socialContainerSmall]}>
           <Pressable onPress={() => Linking.openURL('https://www.linkedin.com/company/uthutho')} style={styles.socialIcon}>
-            <Linkedin size={16} color="#444" />
+            <Linkedin size={14} color="#444" />
           </Pressable>
           <Pressable onPress={() => Linking.openURL('https://www.facebook.com/uthuthorsa/')} style={styles.socialIcon}>
-            <Facebook size={16} color="#444" />
+            <Facebook size={14} color="#444" />
           </Pressable>
           <Pressable onPress={() => Linking.openURL('https://www.instagram.com/uthuthorsa/')} style={styles.socialIcon}>
-            <Instagram size={16} color="#444" />
+            <Instagram size={14} color="#444" />
           </Pressable>
         </View>
         <Text style={styles.versionText}>v1.8.2 — READY TO MOVE</Text>
@@ -200,7 +202,7 @@ export default function AppLayout() {
     <Drawer
       screenOptions={{
         headerShown: false,
-        drawerStyle: { 
+        drawerStyle: {
           backgroundColor: '#000',
           width: 280,
         },
@@ -222,7 +224,7 @@ export default function AppLayout() {
 };
 
 const styles = StyleSheet.create({
-  drawerContainer: { 
+  drawerContainer: {
     flex: 1,
     backgroundColor: '#000',
   },
@@ -231,11 +233,18 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 32,
   },
+  drawerHeaderSmall: {
+    paddingTop: 40,
+    paddingBottom: 20,
+  },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 20,
+  },
+  headerTopSmall: {
+    marginBottom: 12,
   },
   logoContainer: {
     width: 48,
@@ -246,9 +255,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#222',
   },
-  logo: { 
-    width: '100%', 
-    height: '100%' 
+  logoContainerSmall: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+  },
+  logo: {
+    width: '100%',
+    height: '100%'
   },
   closeBtn: {
     width: 36,
@@ -260,12 +274,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#222',
   },
-  appTitle: { 
+  appTitle: {
     fontSize: 24,
     fontWeight: '900',
     color: '#FFF',
     fontStyle: 'italic',
     letterSpacing: -0.5,
+  },
+  appTitleSmall: {
+    fontSize: 20,
   },
   readyText: {
     fontSize: 10,
@@ -277,7 +294,7 @@ const styles = StyleSheet.create({
   drawerScrollView: {
     flex: 1,
   },
-  drawerItems: { 
+  drawerItems: {
     paddingHorizontal: 16,
     gap: 4,
   },
@@ -290,9 +307,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginVertical: 2,
   },
-  drawerItemContent: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  drawerItemSmall: {
+    paddingVertical: 10,
+    borderRadius: 16,
+  },
+  drawerItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
     gap: 16,
   },
@@ -303,9 +324,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  drawerLabel: { 
+  iconContainerSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+  },
+  drawerLabel: {
     fontSize: 14,
     letterSpacing: 0.5,
+  },
+  drawerLabelSmall: {
+    fontSize: 13,
   },
   activeIndicator: {
     width: 4,
@@ -325,6 +354,11 @@ const styles = StyleSheet.create({
     borderColor: '#222',
     marginHorizontal: 16,
   },
+  driverItemSmall: {
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 20,
+  },
   driverContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -336,6 +370,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  driverIconBoxSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
   },
   driverTexts: {
     gap: 2,
@@ -351,18 +390,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#444',
   },
-  drawerFooter: { 
+  drawerFooter: {
     padding: 24,
     paddingBottom: 40,
     alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: '#111',
   },
+  drawerFooterSmall: {
+    padding: 16,
+    paddingBottom: 24,
+  },
   socialContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 20,
     marginBottom: 20,
+  },
+  socialContainerSmall: {
+    marginBottom: 12,
+    gap: 12,
   },
   socialIcon: {
     width: 32,
@@ -374,7 +421,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#222',
   },
-  versionText: { 
+  versionText: {
     fontSize: 10,
     fontWeight: '900',
     color: '#222',
