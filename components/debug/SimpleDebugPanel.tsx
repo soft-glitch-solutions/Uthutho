@@ -16,8 +16,6 @@ import { resetTutorial } from '@/components/AppTutorial';
 interface SimpleDebugPanelProps {
   visible: boolean;
   onClose: () => void;
-  onShowWelcomeOverlay: () => void;
-  onHideWelcomeOverlay: () => void;
   onShowWaitingDrawer?: () => void;
   onShowStreakOverlay?: () => void;
   onHideStreakOverlay?: () => void;
@@ -27,32 +25,12 @@ interface SimpleDebugPanelProps {
 export default function SimpleDebugPanel({
   visible,
   onClose,
-  onShowWelcomeOverlay,
-  onHideWelcomeOverlay,
   onShowWaitingDrawer,
   onShowStreakOverlay,
   onHideStreakOverlay,
   onShowTutorial,
 }: SimpleDebugPanelProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-
-  const handleResetWelcome = async () => {
-    Alert.alert(
-      'Reset Welcome Overlay',
-      'This will show the welcome screen on next launch.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: async () => {
-            await AsyncStorage.removeItem('hasSeenWelcome');
-            Alert.alert('Done', 'Welcome overlay has been reset.');
-          },
-        },
-      ]
-    );
-  };
 
   const handleResetTutorial = async () => {
     Alert.alert(
@@ -98,26 +76,8 @@ export default function SimpleDebugPanel({
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
-            {/* ─── WELCOME OVERLAY ─── */}
-            <Text style={styles.sectionTitle}>Welcome Overlay</Text>
-
-            <TouchableOpacity style={[styles.btn, styles.btnTeal]} onPress={onShowWelcomeOverlay}>
-              <Eye size={16} color="#000" />
-              <Text style={styles.btnTextDark}>Show Welcome</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.btn, styles.btnOutline]} onPress={onHideWelcomeOverlay}>
-              <EyeOff size={16} color="#1ea2b1" />
-              <Text style={styles.btnTextTeal}>Hide Welcome</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.btn, styles.btnDanger]} onPress={handleResetWelcome}>
-              <RotateCcw size={16} color="#ef4444" />
-              <Text style={styles.btnTextDanger}>Reset Welcome State</Text>
-            </TouchableOpacity>
-
             {/* ─── STREAK OVERLAY ─── */}
-            <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Streak Overlay</Text>
+            <Text style={styles.sectionTitle}>Streak Overlay</Text>
 
             <TouchableOpacity
               style={[styles.btn, styles.btnAmber]}

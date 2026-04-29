@@ -33,7 +33,6 @@ import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import LottieView from 'lottie-react-native';
 import RateTripModal from '@/components/home/RateTripModal';
 import SimpleDebugPanel from '@/components/debug/SimpleDebugPanel';
-import WelcomeOverlay from '@/components/home/WelcomeOverlay';
 import { useTutorial } from '@/context/TutorialContext';
 import { DriverStatsSummary } from '@/components/home/DriverStatsSummary';
 
@@ -321,13 +320,13 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
   const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(false);
   // Removed local showTutorial state
   const [isSearchOverlayVisible, setIsSearchOverlayVisible] = useState(false);
   const [searchBarY, setSearchBarY] = useState(160);
   const [suggestedRoutes, setSuggestedRoutes] = useState<any[]>([]);
   const [isSuggestedLoading, setIsSuggestedLoading] = useState(false);
-  const hasCheckedWelcome = useRef(false);
+  const isInitialMount = useRef(true);
+  const hasCheckedOnboarding = useRef(false);
   const prevShowTutorial = useRef(false);
   const { showTutorial, refs, setOnStepChange, setShowTutorial, setShowStreakOverlay } = useTutorial();
 
@@ -426,15 +425,7 @@ export default function HomeScreen() {
     }
   }, [userLocation]); // Only depends on userLocation
 
-  const handleWelcomeClose = () => {
-    setShowWelcomeOverlay(false);
-    startTutorialIfFirstTime();
-  };
 
-  const handleGetStarted = () => {
-    setShowWelcomeOverlay(false);
-    startTutorialIfFirstTime();
-  };
 
   const startTutorialIfFirstTime = async () => {
     const needsTutorial = await shouldShowTutorial();
@@ -463,39 +454,20 @@ export default function HomeScreen() {
     }
   };
 
-  const handleShowWelcomeOverlay = () => {
-    setShowWelcomeOverlay(true);
-  };
-
-  const handleHideWelcomeOverlay = () => {
-    setShowWelcomeOverlay(false);
-  };
-
-  const [streakVisible, setStreakVisible] = useState(false);
-
   useEffect(() => {
     const checkOnboardingSequence = async () => {
-      if (hasCheckedWelcome.current) return;
-      hasCheckedWelcome.current = true;
+      if (hasCheckedOnboarding.current) return;
+      hasCheckedOnboarding.current = true;
 
       try {
         const session = await supabase.auth.getSession();
         if (!session.data.session?.user.id) return;
 
-        const hasSeenWelcome = await AsyncStorage.getItem('hasSeenWelcome');
-
-        if (!hasSeenWelcome) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          setShowWelcomeOverlay(true);
-          await AsyncStorage.setItem('hasSeenWelcome', 'true');
+        const needsTutorial = await shouldShowTutorial();
+        if (needsTutorial) {
+          setTimeout(() => setShowTutorial(true), 1500);
         } else {
-          // For regular users, check if they need tutorial or just show streak
-          const needsTutorial = await shouldShowTutorial();
-          if (needsTutorial) {
-            setTimeout(() => setShowTutorial(true), 1500);
-          } else {
-            setTimeout(() => checkAndShowStreakOverlay(), 1500);
-          }
+          setTimeout(() => checkAndShowStreakOverlay(), 1500);
         }
       } catch (error) {
         console.error('Error in onboarding sequence:', error);
@@ -1387,18 +1359,18 @@ export default function HomeScreen() {
         )}
 
         <View ref={refs.nearbyRef} collapsable={false} renderToHardwareTextureAndroid style={{ minHeight: 1 }}>
-        <NearbySection
-          locationError={locationError}
-          isNearestLoading={isNearestLoading}
-          userLocation={userLocation}
-          nearestLocations={nearestLocations}
-          colors={colors}
-          handleNearestStopPress={handleNearestStopPress}
-          handleNearestHubPress={handleNearestHubPress}
-          calculateWalkingTime={calculateWalkingTime}
-          hasActiveJourney={!!activeJourney}
-          onMarkAsWaiting={handleMarkAsWaiting}
-        />
+          <NearbySection
+            locationError={locationError}
+            isNearestLoading={isNearestLoading}
+            userLocation={userLocation}
+            nearestLocations={nearestLocations}
+            colors={colors}
+            handleNearestStopPress={handleNearestStopPress}
+            handleNearestHubPress={handleNearestHubPress}
+            calculateWalkingTime={calculateWalkingTime}
+            hasActiveJourney={!!activeJourney}
+            onMarkAsWaiting={handleMarkAsWaiting}
+          />
 
         </View>
 
@@ -1407,20 +1379,20 @@ export default function HomeScreen() {
         )}
 
         <View ref={refs.servicesRef} collapsable={false} renderToHardwareTextureAndroid style={{ minHeight: 1 }}>
-        <ServicesSection colors={colors} router={router} />
+          <ServicesSection colors={colors} router={router} />
         </View>
 
 
         {isProfileLoading || isFavoritesLoading ? (
           <View ref={refs.favoritesRef} collapsable={false} renderToHardwareTextureAndroid style={{ minHeight: 1 }}>
-          <FavoritesSection
-            favorites={favorites}
-            favoriteDetails={favoriteDetails}
-            colors={colors}
-            router={router}
-            toggleFavorite={toggleFavorite}
-            favoritesCountMap={favoritesCountMap}
-          />
+            <FavoritesSection
+              favorites={favorites}
+              favoriteDetails={favoriteDetails}
+              colors={colors}
+              router={router}
+              toggleFavorite={toggleFavorite}
+              favoritesCountMap={favoritesCountMap}
+            />
           </View>
         ) : favorites.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -1434,39 +1406,31 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View ref={refs.favoritesRef} collapsable={false} renderToHardwareTextureAndroid style={{ minHeight: 1 }}>
-          <FavoritesSection
-            favorites={favorites}
-            favoriteDetails={favoriteDetails}
-            colors={colors}
-            router={router}
-            toggleFavorite={toggleFavorite}
-            favoritesCountMap={favoritesCountMap}
-          />
+            <FavoritesSection
+              favorites={favorites}
+              favoriteDetails={favoriteDetails}
+              colors={colors}
+              router={router}
+              toggleFavorite={toggleFavorite}
+              favoritesCountMap={favoritesCountMap}
+            />
           </View>
         )}
 
         <View ref={refs.gamificationRef} collapsable={false}>
-        <GamificationSection
-          isStatsLoading={isStatsLoading}
-          userStats={userStats}
-          colors={colors}
-        />
+          <GamificationSection
+            isStatsLoading={isStatsLoading}
+            userStats={userStats}
+            colors={colors}
+          />
         </View>
 
       </ScrollView>
 
-      <WelcomeOverlay
-        visible={showWelcomeOverlay}
-        onClose={handleWelcomeClose}
-        onGetStarted={handleGetStarted}
-      />
+
       <SimpleDebugPanel
         visible={showDebugPanel}
         onClose={() => setShowDebugPanel(false)}
-        onShowWelcomeOverlay={handleShowWelcomeOverlay}
-        onHideWelcomeOverlay={handleHideWelcomeOverlay}
-        onShowStreakOverlay={() => setStreakVisible(true)}
-        onHideStreakOverlay={() => setStreakVisible(false)}
         onShowTutorial={() => { setShowDebugPanel(false); setShowTutorial(true); }}
       />
 

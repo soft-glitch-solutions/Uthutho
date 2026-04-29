@@ -712,14 +712,6 @@ const StopBlock = ({
       <SimpleDebugPanel
         visible={debugPanelVisible}
         onClose={() => setDebugPanelVisible(false)}
-        onShowWelcomeOverlay={() => {
-          setDebugWelcomeVisible(true);
-          console.log('Debug: Show welcome overlay');
-        }}
-        onHideWelcomeOverlay={() => {
-          setDebugWelcomeVisible(false);
-          console.log('Debug: Hide welcome overlay');
-        }}
         onShowWaitingDrawer={() => {
           setDebugPanelVisible(false);
           setTimeout(() => {

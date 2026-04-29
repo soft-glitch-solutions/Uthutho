@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ActivityIndicator, Animated, Easing, TouchableOpacity, Dimensions, Modal, StyleSheet, Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,9 +24,10 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
   const [spinResult, setSpinResult] = useState<number | null>(null);
   const [hasSpunToday, setHasSpunToday] = useState(false);
 
-  const spinValue = new Animated.Value(0);
-  const scaleValue = new Animated.Value(1);
-  const fadeValue = new Animated.Value(0);
+  const spinValue = useRef(new Animated.Value(0)).current;
+  const scaleValue = useRef(new Animated.Value(1)).current;
+  const fadeValue = useRef(new Animated.Value(0)).current;
+  const idleAnim = useRef<Animated.CompositeAnimation | null>(null);
 
   const wheelSections = [
     { points: 10, color: '#111', icon: '⭐', text: '10' },
@@ -54,6 +55,28 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
       }).start();
     }
   }, [showSpinResult]);
+
+  useEffect(() => {
+    if (open && !spinning && !showSpinResult && !hasSpunToday) {
+      startIdleSpin();
+    } else {
+      idleAnim.current?.stop();
+    }
+    return () => idleAnim.current?.stop();
+  }, [open, spinning, showSpinResult, hasSpunToday]);
+
+  const startIdleSpin = () => {
+    spinValue.setValue(0);
+    idleAnim.current = Animated.loop(
+      Animated.timing(spinValue, {
+        toValue: 360,
+        duration: 15000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    idleAnim.current.start();
+  };
 
   const fetchLoginStreak = async () => {
     try {
