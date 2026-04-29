@@ -44,9 +44,9 @@ export function useProfile() {
   }, [session]);
 
   // Fetch user profile
-  const getProfile = useCallback(async () => {
+  const getProfile = useCallback(async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading && !profile) setLoading(true);
       if (!session?.user) throw new Error('No user on the session!');
 
       const userId = session.user.id;
@@ -75,8 +75,6 @@ export function useProfile() {
         .eq('id', userId)
         .single();
 
-      console.log('Fetched profile data:', data);
-      console.log('Profile fetch error:', error);
       if (error && status !== 406) {
         throw error;
       }
@@ -84,11 +82,11 @@ export function useProfile() {
         setProfile(data);
       }
     } catch (error: any) {
-      throw error;
+      console.error('Error in getProfile:', error);
     } finally {
       setLoading(false);
     }
-  }, [session]);
+  }, [session, profile]);
 
   // Fetch titles and check for newly unlocked titles
   const fetchTitles = useCallback(async () => {

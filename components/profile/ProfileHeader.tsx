@@ -12,6 +12,34 @@ interface ProfileHeaderProps {
   isDesktop: boolean;
 }
 
+const ProfileSkeleton = () => {
+  return (
+    <View style={styles.container}>
+      {/* Top Bar Skeleton */}
+      <View style={styles.topBar}>
+        <View style={[styles.skeleton, { width: 100, height: 28, borderRadius: 8 }]} />
+        <View style={styles.topActions}>
+          <View style={[styles.skeleton, { width: 40, height: 40, borderRadius: 20 }]} />
+          <View style={[styles.skeleton, { width: 40, height: 40, borderRadius: 20 }]} />
+        </View>
+      </View>
+
+      {/* Hero Typography Skeleton */}
+      <View style={styles.heroSection}>
+        <View style={[styles.skeleton, { width: 120, height: 14, marginBottom: 12, borderRadius: 4 }]} />
+        <View style={[styles.skeleton, { width: '70%', height: 38, marginBottom: 8, borderRadius: 8 }]} />
+        <View style={[styles.skeleton, { width: '50%', height: 38, borderRadius: 8 }]} />
+      </View>
+
+      {/* Stats Section Skeleton */}
+      <View style={styles.statsContainer}>
+        <View style={[styles.skeleton, { flex: 1, height: 48, borderRadius: 16 }]} />
+        <View style={[styles.skeleton, { flex: 1, height: 48, borderRadius: 16 }]} />
+      </View>
+    </View>
+  );
+};
+
 export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   loading,
   profile,
@@ -34,12 +62,8 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     return `${hours}h`;
   };
 
-  if (loading) {
-    return (
-      <View style={styles.skeletonContainer}>
-        <ActivityIndicator size="large" color="#1ea2b1" />
-      </View>
-    );
+  if (loading && !profile) {
+    return <ProfileSkeleton />;
   }
 
   return (
@@ -213,9 +237,8 @@ const styles = StyleSheet.create({
     color: '#666',
     textTransform: 'uppercase',
   },
-  skeletonContainer: {
-    height: 180,
-    justifyContent: 'center',
-    alignItems: 'center',
+  skeleton: {
+    backgroundColor: '#111',
+    overflow: 'hidden',
   },
 });
