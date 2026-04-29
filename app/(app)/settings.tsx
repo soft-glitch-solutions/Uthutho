@@ -7,9 +7,13 @@ import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@/hook/useAuth';
 import { sendPushNotificationByUserId } from '@/services/pushNotificationService';
 
+import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 WebBrowser.maybeCompleteAuthSession();
 
 const BRAND_COLOR = '#1ea2b1';
+const NOTIFICATIONS_KEY = '@uthutho_notifications_enabled';
 
 const SettingsSkeleton = () => {
   const opacity = useRef(new Animated.Value(0.3)).current;
@@ -50,14 +54,31 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { user, loading } = useAuth();
 
-  const handleTestPush = async () => {
-    if (!user) { Alert.alert('Error', 'Login required.'); return; }
-    const result = await sendPushNotificationByUserId(user.id, {
-      title: 'Uthutho says Hello 👋',
-      body: 'Your test push notification is working perfectly!',
-    });
-    if (result) Alert.alert('Success', 'Push notification triggered!');
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(NOTIFICATIONS_KEY);
+      if (saved !== null) {
+        setNotificationsEnabled(saved === 'true');
+      }
+    } catch (e) {
+      console.error('Error loading settings:', e);
+    }
   };
+
+  const toggleNotifications = async (value: boolean) => {
+    setNotificationsEnabled(value);
+    try {
+      await AsyncStorage.setItem(NOTIFICATIONS_KEY, value.toString());
+    } catch (e) {
+      console.error('Error saving notification setting:', e);
+    }
+  };
+
+
 
   if (loading) return <SettingsSkeleton />;
 
@@ -84,17 +105,13 @@ export default function SettingsScreen() {
                 <Text style={styles.settingTitle}>Notifications</Text>
                 <Text style={styles.settingSubtitle}>Alerts and updates</Text>
               </View>
-              <Switch value={notificationsEnabled} onValueChange={setNotificationsEnabled} trackColor={{ false: '#222', true: BRAND_COLOR }} thumbColor="#FFF" />
+              <Switch 
+                value={notificationsEnabled} 
+                onValueChange={toggleNotifications} 
+                trackColor={{ false: '#222', true: BRAND_COLOR }} 
+                thumbColor="#FFF" 
+              />
             </View>
-
-            <TouchableOpacity style={styles.settingRow} onPress={handleTestPush}>
-              <View style={[styles.iconBox, { backgroundColor: '#ED67B120' }]}><Bell size={20} color="#ED67B1" /></View>
-              <View style={styles.settingTexts}>
-                <Text style={styles.settingTitle}>Test Push</Text>
-                <Text style={styles.settingSubtitle}>Send a test alert</Text>
-              </View>
-              <ChevronRight size={18} color="#333" />
-            </TouchableOpacity>
           </View>
         </View>
 

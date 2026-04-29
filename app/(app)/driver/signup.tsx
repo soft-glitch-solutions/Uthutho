@@ -134,9 +134,9 @@ export default function DriverOnboardingScreen() {
             <FileText size={48} color="#1ea2b1" />
             <Text style={styles.stepTitle}>Driver License</Text>
             <Text style={styles.stepDescription}>
-              Enter your valid South African driver license number
+              Enter your valid driver license number
             </Text>
-            
+
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
@@ -159,7 +159,7 @@ export default function DriverOnboardingScreen() {
             <Text style={styles.stepDescription}>
               What type of vehicle will you be driving?
             </Text>
-            
+
             <View style={styles.optionsContainer}>
               {vehicleTypes.map((type) => (
                 <TouchableOpacity
@@ -190,7 +190,7 @@ export default function DriverOnboardingScreen() {
             <Text style={styles.stepDescription}>
               Enter your vehicle registration number
             </Text>
-            
+
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
@@ -213,7 +213,7 @@ export default function DriverOnboardingScreen() {
             <Text style={styles.stepDescription}>
               Please review your information before submitting
             </Text>
-            
+
             <View style={styles.reviewContainer}>
               <View style={styles.reviewItem}>
                 <Text style={styles.reviewLabel}>License Number:</Text>
@@ -228,7 +228,7 @@ export default function DriverOnboardingScreen() {
                 <Text style={styles.reviewValue}>{vehicleRegistration}</Text>
               </View>
             </View>
-            
+
             <View style={styles.verificationNote}>
               <CheckCircle size={20} color="#fbbf24" />
               <Text style={styles.verificationText}>
@@ -247,7 +247,7 @@ export default function DriverOnboardingScreen() {
     <ScrollView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" backgroundColor="#000000" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>

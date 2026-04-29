@@ -9,7 +9,7 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
-import { Bug, X, Bus, MapPin, Flame, BookOpen, Eye, EyeOff, RotateCcw } from 'lucide-react-native';
+import { Bug, X, Bus, MapPin, Flame, BookOpen, Eye, EyeOff, RotateCcw, Bell } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resetTutorial } from '@/components/AppTutorial';
 
@@ -109,6 +109,28 @@ export default function SimpleDebugPanel({
             <TouchableOpacity style={[styles.btn, styles.btnDanger]} onPress={handleResetTutorial}>
               <RotateCcw size={16} color="#ef4444" />
               <Text style={styles.btnTextDanger}>Reset Tutorial State</Text>
+            </TouchableOpacity>
+
+            {/* ─── SYSTEM ─── */}
+            <Text style={[styles.sectionTitle, styles.sectionSpacing]}>System</Text>
+
+            <TouchableOpacity
+              style={[styles.btn, styles.btnTeal]}
+              onPress={async () => {
+                if (Platform.OS !== 'web') {
+                  try {
+                    const { Audio } = require('expo-av');
+                    const { sound } = await Audio.Sound.createAsync(
+                      require('../../assets/sounds/notification.wav')
+                    );
+                    await sound.playAsync();
+                  } catch (e) {}
+                }
+                Alert.alert('Test Notification', 'Notification sound triggered!');
+              }}
+            >
+              <Bell size={16} color="#000" />
+              <Text style={styles.btnTextDark}>Test Notification Sound</Text>
             </TouchableOpacity>
 
             {/* ─── WAITING DRAWER ─── */}

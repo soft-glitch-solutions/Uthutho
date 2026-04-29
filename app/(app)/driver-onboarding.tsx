@@ -301,6 +301,21 @@ export default function DriverOnboardingScreen() {
 
       const uploadedPaths = await Promise.all(uploadPromises);
 
+      // Play notification sound
+      if (Platform.OS !== 'web') {
+        try {
+          const { Audio } = require('expo-av');
+          if (Audio && Audio.Sound) {
+            const { sound } = await Audio.Sound.createAsync(
+              require('../../assets/sounds/notification.wav')
+            );
+            await sound.playAsync();
+          }
+        } catch (soundError) {
+          // Silent catch for web/native compatibility
+        }
+      }
+
       // Create driver record
       const { error } = await supabase
         .from('drivers')
@@ -354,7 +369,7 @@ export default function DriverOnboardingScreen() {
               </View>
               <View>
                 <Text style={styles.cardTitle}>Driver License</Text>
-                <Text style={styles.cardSubtitle}>South African valid license</Text>
+                <Text style={styles.cardSubtitle}>Valid license</Text>
               </View>
             </View>
 
@@ -480,7 +495,7 @@ export default function DriverOnboardingScreen() {
             <View style={styles.glassInfo}>
               <Info size={16} color="#1ea2b1" />
               <Text style={styles.infoText}>
-                A valid PrDP is required by law for public transport services in South Africa.
+                A valid PrDP is required by law for public transport services.
               </Text>
             </View>
           </View>
@@ -531,10 +546,79 @@ export default function DriverOnboardingScreen() {
     }
   };
 
+  const shimmerOpacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (checkingStatus) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmerOpacity, {
+            toValue: 0.7,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shimmerOpacity, {
+            toValue: 0.3,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [checkingStatus]);
+
   if (checkingStatus) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#1ea2b1" />
+      <View style={styles.container}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <StatusBar style="light" />
+        <View style={styles.glowTop} />
+        <View style={styles.scrollContent}>
+          {/* Header Skeleton */}
+          <View style={styles.header}>
+            <Animated.View style={[styles.backBtn, { opacity: shimmerOpacity }]} />
+            <View style={styles.headerTitles}>
+              <Animated.View style={{ height: 18, width: 80, backgroundColor: '#111', borderRadius: 4, marginBottom: 4, opacity: shimmerOpacity }} />
+              <Animated.View style={{ height: 10, width: 100, backgroundColor: '#111', borderRadius: 2, opacity: shimmerOpacity }} />
+            </View>
+          </View>
+
+          {/* Hero Skeleton */}
+          <View style={styles.heroSection}>
+            <Animated.View style={{ height: 32, width: '70%', backgroundColor: '#111', borderRadius: 8, marginBottom: 8, opacity: shimmerOpacity }} />
+            <Animated.View style={{ height: 14, width: '50%', backgroundColor: '#111', borderRadius: 4, opacity: shimmerOpacity }} />
+          </View>
+
+          {/* Progress Skeleton */}
+          <View style={styles.progressWrapper}>
+            <Animated.View style={[styles.barBackground, { opacity: shimmerOpacity }]} />
+            <View style={styles.stepIndicatorRow}>
+              {[1, 2, 3, 4].map(i => (
+                <View key={i} style={styles.stepPoint}>
+                  <Animated.View style={[styles.dot, { opacity: shimmerOpacity }]} />
+                  <Animated.View style={{ height: 8, width: 40, backgroundColor: '#111', borderRadius: 2, opacity: shimmerOpacity }} />
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Card Skeleton */}
+          <Animated.View style={[styles.mainCard, { opacity: shimmerOpacity, height: 400 }]}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.iconCircle, { backgroundColor: '#111' }]} />
+              <View>
+                <View style={{ height: 20, width: 120, backgroundColor: '#000', borderRadius: 4, marginBottom: 6 }} />
+                <View style={{ height: 12, width: 80, backgroundColor: '#000', borderRadius: 2 }} />
+              </View>
+            </View>
+            <View style={{ height: 10, width: 80, backgroundColor: '#000', borderRadius: 2, marginBottom: 8 }} />
+            <View style={{ height: 56, width: '100%', backgroundColor: '#000', borderRadius: 16, marginBottom: 24 }} />
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+              <View style={{ flex: 1, height: 120, backgroundColor: '#000', borderRadius: 20 }} />
+              <View style={{ flex: 1, height: 120, backgroundColor: '#000', borderRadius: 20 }} />
+            </View>
+          </Animated.View>
+        </View>
       </View>
     );
   }
@@ -922,10 +1006,11 @@ const styles = StyleSheet.create({
   typeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
     gap: 12,
   },
   typeCard: {
-    width: (SCREEN_WIDTH - 96 - 12) / 2,
+    width: '48%',
     backgroundColor: '#000',
     borderRadius: 20,
     padding: 16,
@@ -933,6 +1018,7 @@ const styles = StyleSheet.create({
     borderColor: '#222',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 4,
   },
   typeCardActive: {
     backgroundColor: '#1ea2b1',
