@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform, Alert, Image } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Platform, Alert, Image, Animated, Dimensions } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { MapPin, Clock, Users, Heart, HeartOff, ArrowLeft, Navigation, MessageSquare, Route as RouteIcon } from 'lucide-react-native';
@@ -41,7 +41,7 @@ const SkeletonLoader = () => {
     <ScrollView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" backgroundColor="#000000" />
-      
+
       {/* Header Skeleton */}
       <View style={styles.header}>
         <View style={[styles.backButton, styles.skeleton]} />
@@ -94,6 +94,11 @@ export default function HubDetailScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(true);
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  const HEADER_MAX_HEIGHT = 300;
+  const HEADER_MIN_HEIGHT = Platform.OS === 'ios' ? 100 : 80;
+  const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
 
   useEffect(() => {
     if (id) {
@@ -217,75 +222,63 @@ export default function HubDetailScreen() {
   };
 
 
-const openInMaps = () => {
-  if (!hub) {
-    console.log("No hub available, skipping openInMaps.");
-    return;
-  }
-
-  const lat = hub.latitude;
-  const lng = hub.longitude;
-  const label = encodeURIComponent(hub.name);
-
-  // Native deep links
-  const iosUrl = `comgooglemaps://?q=${lat},${lng}`;
-  const androidUrl = `geo:${lat},${lng}?q=${lat},${lng}(${label})`;
-
-  // Web fallback
-  const webUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-
-  console.log("openInMaps called with hub:", hub);
-  console.log("Generated URLs:", { iosUrl, androidUrl, webUrl });
-
-  if (Platform.OS === "web") {
-    const confirm = window.confirm(`Would you like to open ${hub.name} in Google Maps?`);
-    if (confirm) {
-      console.log("Opening in browser:", webUrl);
-      window.open(webUrl, "_blank");
-    } else {
-      console.log("User cancelled on web.");
+  const openInMaps = () => {
+    if (!hub) {
+      console.log("No hub available, skipping openInMaps.");
+      return;
     }
-    return;
-  }
 
-  // Native platforms
-  Alert.alert(
-    "Open in Maps",
-    `Would you like to open ${hub.name} in Google Maps?`,
-    [
-      { text: "Cancel", style: "cancel", onPress: () => console.log("User cancelled openInMaps") },
-      {
-        text: "Open",
-        onPress: async () => {
-          try {
-            let url =
-              Platform.OS === "ios"
-                ? iosUrl
-                : Platform.OS === "android"
-                ? androidUrl
-                : webUrl;
+    const lat = hub.latitude;
+    const lng = hub.longitude;
+    const label = encodeURIComponent(hub.name);
 
-            console.log("Trying URL:", url);
+    // Native deep links
+    const iosUrl = `comgooglemaps://?q=${lat},${lng}`;
+    const androidUrl = `geo:${lat},${lng}?q=${lat},${lng}(${label})`;
 
-            const supported = await Linking.canOpenURL(url);
-            console.log("canOpenURL result:", supported);
+    // Web fallback
+    const webUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 
-            if (!supported) {
-              console.log("Deep link not supported, falling back to webUrl:", webUrl);
-              url = webUrl;
+    if (Platform.OS === "web") {
+      const confirm = window.confirm(`Would you like to open ${hub.name} in Google Maps?`);
+      if (confirm) {
+        window.open(webUrl, "_blank");
+      }
+      return;
+    }
+
+    // Native platforms
+    Alert.alert(
+      "Open in Maps",
+      `Would you like to open ${hub.name} in Google Maps?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Open",
+          onPress: async () => {
+            try {
+              let url =
+                Platform.OS === "ios"
+                  ? iosUrl
+                  : Platform.OS === "android"
+                    ? androidUrl
+                    : webUrl;
+
+              const supported = await Linking.canOpenURL(url);
+              if (!supported) {
+                url = webUrl;
+              }
+
+              await Linking.openURL(url);
+            } catch (err) {
+              console.error("Error opening maps:", err);
+              Alert.alert("Error", "Unable to open Google Maps.");
             }
-
-            await Linking.openURL(url);
-            console.log("Successfully opened URL:", url);
-          } catch (err) {
-            console.error("Error opening maps:", err);
-            Alert.alert("Error", "Unable to open Google Maps.");
-          }
+          },
         },
-      },
-    ]
-  );
-};
+      ]
+    );
+  };
 
 
 
@@ -308,134 +301,183 @@ const openInMaps = () => {
     );
   }
 
+  const headerTranslateY = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE],
+    outputRange: [0, -HEADER_SCROLL_DISTANCE],
+    extrapolate: 'clamp',
+  });
+
+  const imageScale = scrollY.interpolate({
+    inputRange: [-HEADER_MAX_HEIGHT, 0],
+    outputRange: [2, 1],
+    extrapolateLeft: 'extend',
+    extrapolateRight: 'clamp',
+  });
+
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE / 2, HEADER_SCROLL_DISTANCE],
+    outputRange: [0, 0, 1],
+    extrapolate: 'clamp',
+  });
+
+  const brandOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE / 2],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="light" backgroundColor="#000000" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
-          {isFavorite ? (
-            <Heart size={24} color="#1ea2b1" fill="#1ea2b1" />
-          ) : (
-            <HeartOff size={24} color="#ffffff" />
-          )}
-        </TouchableOpacity>
-      </View>
+      <StatusBar style="light" />
 
-      {/* Hub Image */}
-      <View style={styles.imageContainer}>
-        {hub.image ? (
-          <Image
-            source={{ uri: hub.image }}
-            style={styles.hubImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.imagePlaceholder}>
-            <Text style={styles.hubName}>{hub.name}</Text>
-          </View>
+      <Animated.ScrollView
+        style={styles.container}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
         )}
-      </View>
+      >
+        <View style={{ marginTop: HEADER_MAX_HEIGHT }}>
+          {/* Hub Info */}
+          <View style={styles.infoSection}>
+            <Text style={styles.readyText}>Move Smarter</Text>
+            <Text style={styles.headingText}>{hub.name}</Text>
+            {hub.address && (
+              <Text style={styles.hubAddress}>{hub.address}</Text>
+            )}
 
-      {/* Hub Info */}
-      <View style={styles.infoSection}>
-        <Text style={styles.hubName}>{hub.name}</Text>
-        {hub.address && (
-          <Text style={styles.hubAddress}>{hub.address}</Text>
-        )}
-        
-        {/* <View style={styles.coordinates}>
-          <Text style={styles.coordinatesText}>
-            {hub.latitude.toFixed(6)}, {hub.longitude.toFixed(6)}
-          </Text>
-        </View> */}
-        
-        {hub.transport_type && (
-          <View style={styles.transportBadge}>
-            <Text style={styles.transportType}>{hub.transport_type}</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Action Buttons */}
-      <View style={styles.actionButtons}>
-        <TouchableOpacity style={styles.actionButton} onPress={openInMaps}>
-          <Navigation size={20} color="#ffffff" />
-          <Text style={styles.actionButtonText}>Directions</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(tabs)/feeds')}>
-          <MessageSquare size={20} color="#ffffff" />
-          <Text style={styles.actionButtonText}>View Posts</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Routes from this Hub */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Routes from this Hub ({routes.length})</Text>
-        {routes.length === 0 ? (
-          <View style={styles.emptyState}>
-            <RouteIcon size={24} color="#666666" />
-            <Text style={styles.emptyStateText}>No routes available from this hub</Text>
-          </View>
-        ) : (
-          routes.map((route) => (
-            <TouchableOpacity
-              key={route.id}
-              style={styles.routeItem}
-              onPress={() => navigateToRoute(route.id)}
-            >
-              <View style={styles.routeInfo}>
-                <Text style={styles.routeName}>{route.name}</Text>
-                <Text style={styles.routeDestination}>
-                  {route.start_point} → {route.end_point}
-                </Text>
-                <View style={styles.routeDetails}>
-                  <Text style={styles.routeType}>{route.transport_type}</Text>
-                  <Text style={styles.routeCost}>R {route.cost}</Text>
-                </View>
+            {hub.transport_type && (
+              <View style={styles.transportBadge}>
+                <Text style={styles.transportType}>{hub.transport_type}</Text>
               </View>
-              
-              <View style={styles.routeArrow}>
-                <Text style={styles.routeArrowText}>›</Text>
-              </View>
+            )}
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity style={styles.actionButton} onPress={openInMaps}>
+              <Navigation size={20} color="#ffffff" />
+              <Text style={styles.actionButtonText}>Directions</Text>
             </TouchableOpacity>
-          ))
-        )}
-      </View>
 
-      {/* Recent Posts */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent Posts ({posts.length})</Text>
-        {posts.length === 0 ? (
-          <View style={styles.emptyState}>
-            <MessageSquare size={24} color="#666666" />
-            <Text style={styles.emptyStateText}>No posts yet from this hub</Text>
+            <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(tabs)/feeds')}>
+              <MessageSquare size={20} color="#ffffff" />
+              <Text style={styles.actionButtonText}>View Posts</Text>
+            </TouchableOpacity>
           </View>
-        ) : (
-          posts.map((post) => (
-            <View key={post.id} style={styles.postItem}>
-              <View style={styles.postHeader}>
-                <Text style={styles.postAuthor}>
-                  {post.profiles.first_name} {post.profiles.last_name}
-                </Text>
-                <Text style={styles.postTime}>
-                  {new Date(post.created_at).toLocaleDateString()}
-                </Text>
-              </View>
-              <Text style={styles.postContent}>{post.content}</Text>
-            </View>
-          ))
-        )}
-      </View>
 
-      <View style={styles.bottomSpace} />
-    </ScrollView>
+          {/* Routes from this Hub */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Routes from this Hub ({routes.length})</Text>
+            {routes.length === 0 ? (
+              <View style={styles.emptyState}>
+                <RouteIcon size={24} color="#666666" />
+                <Text style={styles.emptyStateText}>No routes available from this hub</Text>
+              </View>
+            ) : (
+              routes.map((route) => (
+                <TouchableOpacity
+                  key={route.id}
+                  style={styles.routeItem}
+                  onPress={() => navigateToRoute(route.id)}
+                >
+                  <View style={styles.routeInfo}>
+                    <Text style={styles.routeName}>{route.name}</Text>
+                    <Text style={styles.routeDestination}>
+                      {route.start_point} → {route.end_point}
+                    </Text>
+                    <View style={styles.routeDetails}>
+                      <Text style={styles.routeType}>{route.transport_type}</Text>
+                      <Text style={styles.routeCost}>R {route.cost}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.routeArrow}>
+                    <Text style={styles.routeArrowText}>›</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+
+          {/* Recent Posts */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recent Posts ({posts.length})</Text>
+            {posts.length === 0 ? (
+              <View style={styles.emptyState}>
+                <MessageSquare size={24} color="#666666" />
+                <Text style={styles.emptyStateText}>No posts yet from this hub</Text>
+              </View>
+            ) : (
+              posts.map((post) => (
+                <View key={post.id} style={styles.postItem}>
+                  <View style={styles.postHeader}>
+                    <Text style={styles.postAuthor}>
+                      {post.profiles.first_name} {post.profiles.last_name}
+                    </Text>
+                    <Text style={styles.postTime}>
+                      {new Date(post.created_at).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <Text style={styles.postContent}>{post.content}</Text>
+                </View>
+              ))
+            )}
+          </View>
+
+          <View style={styles.bottomSpace} />
+        </View>
+      </Animated.ScrollView>
+
+      {/* Animated Sticky Header Image */}
+      <Animated.View
+        style={[
+          styles.animatedHeader,
+          {
+            height: HEADER_MAX_HEIGHT,
+            transform: [{ translateY: headerTranslateY }],
+          },
+        ]}
+      >
+        <Animated.Image
+          source={hub.image ? { uri: hub.image } : require('@/assets/images/school-header.jpg')}
+          style={[
+            styles.headerImage,
+            {
+              transform: [{ scale: imageScale }],
+            },
+          ]}
+          resizeMode="cover"
+        />
+        <View style={styles.headerOverlay} />
+
+        {/* Brand Overlay (Visible when expanded) */}
+        <Animated.View style={[styles.brandOverlay, { opacity: brandOpacity }]}>
+          <Text style={styles.brandTextOverlay}>Uthutho</Text>
+        </Animated.View>
+
+        {/* Sticky Title (Visible when collapsed) */}
+        <Animated.View style={[styles.stickyTitleContainer, { opacity: headerOpacity }]}>
+          <Text style={styles.stickyTitle} numberOfLines={1}>{hub.name}</Text>
+        </Animated.View>
+
+        {/* Fixed Back/Favorite Buttons */}
+        <View style={styles.fixedHeaderActions}>
+          <TouchableOpacity style={styles.glassIconButton} onPress={() => router.back()}>
+            <ArrowLeft size={20} color="#FFF" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.glassIconButton} onPress={toggleFavorite}>
+            {isFavorite ? (
+              <Heart size={20} color="#1ea2b1" fill="#1ea2b1" />
+            ) : (
+              <HeartOff size={20} color="#ffffff" />
+            )}
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -486,43 +528,69 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginBottom: 20,
   },
-  header: {
+  animatedHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#000',
+    overflow: 'hidden',
+    zIndex: 10,
+  },
+  headerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  headerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  brandOverlay: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    left: 24,
+  },
+  brandTextOverlay: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -1,
+    fontStyle: 'italic',
+  },
+  stickyTitleContainer: {
+    position: 'absolute',
+    bottom: 16,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingHorizontal: 60,
+  },
+  stickyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFF',
+    fontStyle: 'italic',
+  },
+  fixedHeaderActions: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 55 : 35,
+    right: 20,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
+    gap: 12,
+    zIndex: 20,
   },
-  backButton: {
-    backgroundColor: '#1a1a1a',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  glassIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backButtonText: {
-    color: '#1ea2b1',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  favoriteButton: {
-    backgroundColor: '#1a1a1a',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   imageContainer: {
-    height: 200,
-    backgroundColor: '#1a1a1a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 20,
-    borderRadius: 16,
-    marginBottom: 20,
+    display: 'none',
   },
   imagePlaceholder: {
     justifyContent: 'center',

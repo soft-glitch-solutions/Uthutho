@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Platform,
   Dimensions,
   Animated,
 } from 'react-native';
@@ -174,7 +175,7 @@ const DesktopSkeletonLoader = () => {
         {/* Right Column - Transactions Skeleton */}
         <View style={styles.rightColumn}>
           <SkeletonItem width={120} height={28} style={{ marginBottom: 24 }} />
-          
+
           {[1, 2, 3, 4, 5, 6, 7, 8].map((item) => (
             <View key={item} style={[styles.transactionItemSkeleton, styles.transactionItemSkeletonDesktop]}>
               <View style={styles.transactionHeaderSkeleton}>
@@ -237,7 +238,7 @@ const MobileSkeletonLoader = () => {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      
+
       {/* Mobile Header Skeleton */}
       <View style={styles.header}>
         <SkeletonItem width={44} height={44} style={{ borderRadius: 22 }} />
@@ -267,7 +268,7 @@ const MobileSkeletonLoader = () => {
         {/* Transactions Skeleton */}
         <View style={styles.transactionsSection}>
           <SkeletonItem width={120} height={20} style={{ marginBottom: 16 }} />
-          
+
           {[1, 2, 3, 4, 5].map((item) => (
             <View key={item} style={styles.transactionItemSkeleton}>
               <View style={styles.transactionHeaderSkeleton}>
@@ -287,45 +288,44 @@ const MobileSkeletonLoader = () => {
 };
 
 // Desktop Layout Component
-const DesktopCardDetail = ({ 
-  selectedCard, 
-  entries, 
-  activityData, 
-  showAddEntryModal, 
-  setShowAddEntryModal, 
-  selectedYear, 
-  setSelectedYear, 
-  handleEntryAdded, 
-  router 
+const DesktopCardDetail = ({
+  selectedCard,
+  entries,
+  activityData,
+  showAddEntryModal,
+  setShowAddEntryModal,
+  selectedYear,
+  setSelectedYear,
+  handleEntryAdded,
+  router
 }) => {
   const cardTypeConfig = getCardTypeConfig(selectedCard.card_type);
-  
+
   return (
     <View style={styles.containerDesktop}>
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Desktop Header */}
-      <View style={styles.desktopHeader}>
-        <TouchableOpacity style={styles.desktopBackButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#ffffff" />
-          <Text style={styles.desktopBackButtonText}>Back</Text>
-        </TouchableOpacity>
-        <View style={styles.desktopHeaderTitleContainer}>
-          <View style={[styles.cardTypeIcon, { backgroundColor: cardTypeConfig.color }]}>
-            <Text style={styles.cardTypeIconText}>{cardTypeConfig.icon}</Text>
-          </View>
-          <View>
-            <Text style={styles.desktopHeaderTitle}>{cardTypeConfig.name}</Text>
-            <Text style={styles.desktopHeaderSubtitle}>Card Number: {selectedCard.card_number.slice(-4)}</Text>
+      <View style={styles.brandedHeaderDesktop}>
+        <View style={styles.headerTop}>
+          <Text style={styles.brandText}>Uthutho</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.backIconButton} onPress={() => router.back()}>
+              <ArrowLeft size={20} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.desktopAddButton, { backgroundColor: cardTypeConfig.color }]}
+              onPress={() => setShowAddEntryModal(true)}
+            >
+              <Plus size={20} color="#ffffff" />
+              <Text style={styles.desktopAddButtonText}>Add Entry</Text>
+            </TouchableOpacity>
           </View>
         </View>
-        <TouchableOpacity 
-          style={[styles.desktopAddButton, { backgroundColor: cardTypeConfig.color }]}
-          onPress={() => setShowAddEntryModal(true)}
-        >
-          <Plus size={20} color="#ffffff" />
-          <Text style={styles.desktopAddButtonText}>Add Entry</Text>
-        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Text style={styles.readyText}>Move Smarter</Text>
+          <Text style={styles.headingText}>{cardTypeConfig.name}</Text>
+        </View>
       </View>
 
       {/* Desktop Layout */}
@@ -387,8 +387,8 @@ const DesktopCardDetail = ({
 
           {/* Activity Graph */}
           <View style={styles.activityGraphWrapper}>
-            <ActivityGraph 
-              data={activityData} 
+            <ActivityGraph
+              data={activityData}
               selectedYear={selectedYear}
               onYearChange={setSelectedYear}
               color={cardTypeConfig.color}
@@ -399,7 +399,7 @@ const DesktopCardDetail = ({
 
         {/* Right Column - Transaction List */}
         <ScrollView style={styles.rightColumn} showsVerticalScrollIndicator={true}>
-          <TransactionList 
+          <TransactionList
             entries={entries}
             cardType={selectedCard.card_type}
             cardTypeConfig={cardTypeConfig}
@@ -429,7 +429,7 @@ export default function CardDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { user } = useAuth();
-  
+
   const [selectedCard, setSelectedCard] = useState<UserCard | null>(null);
   const [entries, setEntries] = useState<CardEntry[]>([]);
   const [activityData, setActivityData] = useState<ActivityData[]>([]);
@@ -511,7 +511,7 @@ export default function CardDetailScreen() {
         else if (count >= 3) level = 3;
         else if (count >= 2) level = 2;
         else if (count >= 1) level = 1;
-        
+
         activity.push({ date, count, level });
       });
 
@@ -556,36 +556,43 @@ export default function CardDetailScreen() {
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {cardTypeConfig.name}
-        </Text>
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={() => setShowAddEntryModal(true)}
-        >
-          <Plus size={24} color={cardTypeConfig.color} />
-        </TouchableOpacity>
+      {/* Branded Header */}
+      <View style={styles.brandedHeader}>
+        <View style={styles.headerTop}>
+          <Text style={styles.brandText}>Uthutho</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.backIconButton} onPress={() => router.back()}>
+              <ArrowLeft size={20} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: cardTypeConfig.color }]}
+              onPress={() => setShowAddEntryModal(true)}
+            >
+              <Plus size={20} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.headerContent}>
+          <Text style={styles.readyText}>Move Smarter</Text>
+          <Text style={styles.headingText}>{cardTypeConfig.name}</Text>
+        </View>
       </View>
 
       <ScrollView style={styles.content}>
-        <ActivityGraph 
-          data={activityData} 
+        <ActivityGraph
+          data={activityData}
           selectedYear={selectedYear}
           onYearChange={setSelectedYear}
           color={cardTypeConfig.color}
         />
-        
-        <QuickStats 
+
+        <QuickStats
           card={selectedCard}
           entries={entries}
           cardTypeConfig={cardTypeConfig}
         />
 
-        <TransactionList 
+        <TransactionList
           entries={entries}
           cardType={selectedCard.card_type}
           cardTypeConfig={cardTypeConfig}
@@ -615,7 +622,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
   },
-  
+
   // Skeleton Styles
   skeletonItem: {
     backgroundColor: '#1a1a1a',
@@ -631,70 +638,70 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
-  
-  // Desktop Header
-  desktopHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+
+  brandedHeader: {
+    paddingHorizontal: 24,
     paddingBottom: 24,
-    paddingTop: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333333',
   },
-  desktopBackButton: {
+  brandedHeaderDesktop: {
+    paddingHorizontal: 40,
+    paddingBottom: 32,
+    borderBottomWidth: 1,
+    borderBottomColor: '#111',
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 8,
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    marginBottom: 24,
   },
-  desktopBackButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '500',
+  brandText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -1,
+    fontStyle: 'italic',
   },
-  desktopHeaderTitleContainer: {
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  cardTypeIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  backIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  cardTypeIconText: {
-    fontSize: 24,
+  headerContent: {
+    marginTop: 0,
   },
-  desktopHeaderTitle: {
-    fontSize: 24,
+  readyText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: '#1ea2b1',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  headingText: {
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#FFF',
+    fontStyle: 'italic',
+    letterSpacing: -1,
   },
-  desktopHeaderSubtitle: {
-    fontSize: 14,
-    color: '#666666',
-    marginTop: 2,
-  },
-  desktopAddButton: {
-    flexDirection: 'row',
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 8,
+    justifyContent: 'center',
   },
-  desktopAddButtonText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  
+
   // Desktop Layout
   desktopLayout: {
     flexDirection: 'row',
@@ -711,7 +718,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flex: 1,
   },
-  
+
   // Desktop Card Overview
   desktopCardOverview: {
     backgroundColor: '#1a1a1a',
@@ -745,7 +752,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666666',
   },
-  
+
   // Desktop Quick Stats
   quickStatsDesktop: {
     backgroundColor: '#1a1a1a',
@@ -788,7 +795,7 @@ const styles = StyleSheet.create({
     color: '#666666',
     textAlign: 'center',
   },
-  
+
   // Desktop Activity Graph Wrapper
   activityGraphWrapper: {
     backgroundColor: '#1a1a1a',
@@ -811,7 +818,7 @@ const styles = StyleSheet.create({
   weekColumnDesktop: {
     marginRight: 2,
   },
-  
+
   // Transaction Skeleton Items
   transactionItemSkeleton: {
     backgroundColor: '#1a1a1a',
@@ -835,12 +842,12 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
   },
-  
+
   // Transactions Section (Mobile)
   transactionsSection: {
     paddingHorizontal: 16,
   },
-  
+
   // Mobile Header Styles
   header: {
     flexDirection: 'row',
@@ -871,13 +878,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   // Mobile Content
   content: {
     flex: 1,
     paddingHorizontal: 16,
   },
-  
+
   // Mobile Activity Graph (Skeleton)
   activityGraph: {
     backgroundColor: '#1a1a1a',
@@ -885,7 +892,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
-  
+
   // Mobile Quick Stats (Skeleton)
   quickStats: {
     flexDirection: 'row',

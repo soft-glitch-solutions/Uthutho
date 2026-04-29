@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,24 +9,26 @@ import {
   Image,
   FlatList,
   Linking,
+  Platform,
   Alert,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import StopBlock from '../../components/stop/StopBlock';
-import { 
-  Plus, 
-  Map, 
-  Share2, 
-  Clock, 
-  Users, 
-  Bookmark, 
-  BookmarkCheck, 
-  ArrowLeft, 
-  Navigation, 
-  CircleAlert as AlertCircle, 
+import {
+  Plus,
+  Map,
+  Share2,
+  Clock,
+  Users,
+  Bookmark,
+  BookmarkCheck,
+  ArrowLeft,
+  Navigation,
+  CircleAlert as AlertCircle,
   Shield,
   MessageSquare,
   Trophy,
@@ -110,114 +112,39 @@ const reportStopOnWhatsApp = (stopName: string, stopId: string) => {
 };
 
 // Skeleton Loading Component
-const SkeletonLoader = ({ colors, isDesktop: propIsDesktop = false }) => {
-  const desktopMode = isDesktop || propIsDesktop;
-  
-  if (desktopMode) {
-    return (
-      <View style={[styles.container, styles.containerDesktop, { backgroundColor: colors.background }]}>
-        <View style={styles.desktopWrapper}>
-          {/* Left Column - Stop Info */}
-          <View style={styles.desktopLeftColumn}>
-            {/* Header Skeleton */}
-            <View style={styles.headerDesktop}>
-              <View style={[styles.skeletonCircle, { backgroundColor: colors.card }]} />
-              <View style={[styles.skeletonCircle, { backgroundColor: colors.card }]} />
-            </View>
-
-            {/* Stop Image Skeleton */}
-            <View style={[styles.skeletonImage, { backgroundColor: colors.card }]} />
-
-            {/* Stop Info Skeleton */}
-            <View style={styles.skeletonInfoSection}>
-              <View style={[styles.skeletonTextLarge, { backgroundColor: colors.card }]} />
-              <View style={[styles.skeletonTextMedium, { backgroundColor: colors.card }]} />
-              <View style={[styles.skeletonTextMedium, { backgroundColor: colors.card }]} />
-              <View style={[styles.skeletonBadge, { backgroundColor: colors.card }]} />
-            </View>
-
-            {/* Action Buttons Skeleton */}
-            <View style={styles.skeletonActionButtons}>
-              <View style={[styles.skeletonButton, { backgroundColor: colors.card }]} />
-              <View style={[styles.skeletonButton, { backgroundColor: colors.card }]} />
-            </View>
-
-            {/* Leaderboard Button Skeleton */}
-            <View style={[styles.skeletonButton, { backgroundColor: colors.card }]} />
-
-            {/* Report Stop Button Skeleton */}
-            <View style={[styles.skeletonButton, { backgroundColor: colors.card }]} />
-
-            {/* Stop Information Card Skeleton */}
-            <View style={styles.skeletonSection}>
-              <View style={[styles.skeletonCard, { backgroundColor: colors.card }]}>
-                {[1, 2, 3, 4].map((item) => (
-                  <View key={item} style={styles.skeletonInfoRow}>
-                    <View style={[styles.skeletonCircleSmall, { backgroundColor: colors.border }]} />
-                    <View style={[styles.skeletonTextMedium, { backgroundColor: colors.border }]} />
-                    <View style={[styles.skeletonTextMedium, { backgroundColor: colors.border }]} />
-                  </View>
-                ))}
-              </View>
-            </View>
-          </View>
-
-          {/* Right Column - Content */}
-          <View style={styles.desktopRightColumn}>
-            {/* Tab Selectors Skeleton */}
-            <View style={styles.skeletonTabContainer}>
-              <View style={[styles.skeletonTab, { backgroundColor: colors.card }]} />
-              <View style={[styles.skeletonTab, { backgroundColor: colors.card }]} />
-            </View>
-
-            {/* Tab Content Skeleton */}
-            <View style={styles.skeletonTabContent}>
-              {[1, 2, 3].map((item) => (
-                <View key={item} style={[styles.skeletonPost, { backgroundColor: colors.card }]}>
-                  <View style={styles.skeletonPostHeader}>
-                    <View style={[styles.skeletonCircle, { backgroundColor: colors.border }]} />
-                    <View>
-                      <View style={[styles.skeletonTextMedium, { backgroundColor: colors.border }]} />
-                      <View style={[styles.skeletonTextSmall, { backgroundColor: colors.border }]} />
-                    </View>
-                  </View>
-                  <View style={[styles.skeletonTextLarge, { backgroundColor: colors.border }]} />
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  // Mobile skeleton
+const SkeletonLoader = ({ colors }) => {
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
-        <View style={[styles.skeletonCircle, { backgroundColor: colors.card }]} />
-        <View style={[styles.skeletonCircle, { backgroundColor: colors.card }]} />
-      </View>
-      <View style={styles.content}>
-        <View style={[styles.skeletonImage, { backgroundColor: colors.card }]} />
-        <View style={[styles.skeletonTextLarge, { backgroundColor: colors.card }]} />
-        <View style={styles.waitingCountContainer}>
-          <View style={[styles.skeletonBadge, { backgroundColor: colors.card }]} />
-          <View style={[styles.skeletonCircle, { backgroundColor: colors.card }]} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header Skeleton */}
+      <View style={[styles.animatedHeader, { height: 300, backgroundColor: colors.card }]}>
+        <View style={styles.headerOverlay} />
+        <View style={styles.fixedHeaderActions}>
+          <View style={[styles.glassIconButton, { backgroundColor: 'rgba(255,255,255,0.1)' }]} />
+          <View style={[styles.glassIconButton, { backgroundColor: 'rgba(255,255,255,0.1)' }]} />
         </View>
-        <View style={styles.section}>
-          <View style={[styles.skeletonCard, { backgroundColor: colors.card }]}>
-            {[1, 2, 3, 4].map((item) => (
-              <View key={item} style={styles.skeletonInfoRow}>
-                <View style={[styles.skeletonCircleSmall, { backgroundColor: colors.border }]} />
-                <View style={[styles.skeletonTextMedium, { backgroundColor: colors.border }]} />
-                <View style={[styles.skeletonTextMedium, { backgroundColor: colors.border }]} />
-              </View>
-            ))}
+      </View>
+
+      <ScrollView style={styles.container}>
+        <View style={{ marginTop: 300 }}>
+          <View style={styles.content}>
+            <View style={[styles.skeletonTextLarge, { backgroundColor: colors.card, width: '40%', height: 16, marginBottom: 8 }]} />
+            <View style={[styles.skeletonTextLarge, { backgroundColor: colors.card, width: '80%', height: 32, marginBottom: 16 }]} />
+            
+            <View style={styles.followerContainer}>
+              <View style={[styles.skeletonCircleSmall, { backgroundColor: colors.card }]} />
+              <View style={[styles.skeletonTextSmall, { backgroundColor: colors.card, width: 100 }]} />
+            </View>
+
+            <View style={styles.actionButtons}>
+              <View style={[styles.actionButton, { backgroundColor: colors.card, height: 56 }]} />
+              <View style={[styles.actionButton, { backgroundColor: colors.card, height: 56 }]} />
+            </View>
+
+            <View style={[styles.skeletonCard, { backgroundColor: colors.card, height: 150, marginTop: 20 }]} />
           </View>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -225,7 +152,7 @@ export default function StopDetailsScreen() {
   const { stopId } = useLocalSearchParams();
   const { colors } = useTheme();
   const router = useRouter();
-  
+
   const [stopDetails, setStopDetails] = useState<Stop | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -236,6 +163,11 @@ export default function StopDetailsScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [followerCount, setFollowerCount] = useState(0);
   const [activeTab, setActiveTab] = useState<'activity' | 'routes'>('activity');
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  const HEADER_MAX_HEIGHT = 300;
+  const HEADER_MIN_HEIGHT = Platform.OS === 'ios' ? 70 : 60;
+  const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
 
   // Filter posts to only show from this week
   const getThisWeeksPosts = () => {
@@ -254,7 +186,7 @@ export default function StopDetailsScreen() {
       loadStopPosts();
       loadFollowerCount();
       checkIfFavorite();
-      
+
       const subscription = supabase
         .channel('stop_waiting_changes')
         .on(
@@ -314,7 +246,7 @@ export default function StopDetailsScreen() {
       if (error) throw error;
 
       const totalWaiting = waitingData?.length || 0;
-      
+
       let busynessLevel = 1;
       if (totalWaiting >= 10) busynessLevel = 5;
       else if (totalWaiting >= 7) busynessLevel = 4;
@@ -329,7 +261,7 @@ export default function StopDetailsScreen() {
           const waitStart = new Date(waiting.created_at);
           return Math.floor((now - waitStart) / (1000 * 60));
         });
-        
+
         const avgWait = waitTimes.reduce((a, b) => a + b, 0) / waitTimes.length;
         const minWait = Math.max(5, Math.floor(avgWait));
         const maxWait = Math.max(10, Math.floor(avgWait) + 5);
@@ -542,7 +474,7 @@ export default function StopDetailsScreen() {
   );
 
   const renderPost = (post: Post) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[styles.postItem, isDesktop && styles.postItemDesktop, { backgroundColor: colors.card }]}
       onPress={() => router.push(`/stop-post-details?postId=${post.id}`)}
     >
@@ -577,7 +509,7 @@ export default function StopDetailsScreen() {
   );
 
   const renderRoute = (route: Route) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[styles.routeItem, isDesktop && styles.routeItemDesktop, { backgroundColor: colors.card, borderColor: colors.border }]}
       onPress={() => navigateToRoute(route.id)}
     >
@@ -674,7 +606,7 @@ export default function StopDetailsScreen() {
   };
 
   if (isLoading) {
-    return <SkeletonLoader colors={colors} isDesktop={isDesktop} />;
+    return <SkeletonLoader colors={colors} />;
   }
 
   if (!stopDetails) {
@@ -697,18 +629,26 @@ export default function StopDetailsScreen() {
         <View style={styles.desktopWrapper}>
           {/* Left Column - Stop Info */}
           <View style={styles.desktopLeftColumn}>
-            {/* Header */}
-            <View style={styles.headerDesktop}>
-              <TouchableOpacity style={[styles.backButton, styles.backButtonDesktop]} onPress={() => router.back()}>
-                <ArrowLeft size={24} color="#ffffff" />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.favoriteButton, styles.favoriteButtonDesktop]} onPress={toggleFavorite}>
-                {isFavorite ? (
-                  <BookmarkCheck size={24} color="#1ea2b1" fill="#1ea2b1" />
-                ) : (
-                  <Bookmark size={24} color="#ffffff" />
-                )}
-              </TouchableOpacity>
+            {/* Branded Header */}
+            <View style={styles.brandedHeaderDesktop}>
+              <View style={styles.headerTop}>
+                <View style={styles.headerActions}>
+                  <TouchableOpacity style={styles.backIconButton} onPress={() => router.back()}>
+                    <ArrowLeft size={20} color="#FFF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.backIconButton} onPress={toggleFavorite}>
+                    {isFavorite ? (
+                      <BookmarkCheck size={20} color="#1ea2b1" fill="#1ea2b1" />
+                    ) : (
+                      <Bookmark size={20} color="#ffffff" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View style={styles.headerContent}>
+                <Text style={styles.readyText}>Move Smarter</Text>
+                <Text style={styles.headingText}>{stopDetails.name}</Text>
+              </View>
             </View>
 
             {/* Stop Image */}
@@ -728,8 +668,7 @@ export default function StopDetailsScreen() {
 
             {/* Stop Info */}
             <View style={[styles.infoSection, styles.infoSectionDesktop]}>
-              <Text style={[styles.hubName, styles.hubNameDesktop, { color: colors.text }]}>{stopDetails.name}</Text>
-              
+
               {/* Follower Count */}
               <View style={[styles.followerContainer, styles.followerContainerDesktop]}>
                 <Users size={16} color={colors.primary} />
@@ -759,15 +698,15 @@ export default function StopDetailsScreen() {
 
             {/* Action Buttons */}
             <View style={[styles.actionButtons, styles.actionButtonsDesktop]}>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.actionButtonDesktop, { backgroundColor: colors.primary }]} 
+              <TouchableOpacity
+                style={[styles.actionButton, styles.actionButtonDesktop, { backgroundColor: colors.primary }]}
                 onPress={openInMaps}
               >
                 <Navigation size={20} color="#ffffff" />
                 <Text style={[styles.actionButtonText, styles.actionButtonTextDesktop]}>Directions</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={[styles.actionButton, styles.actionButtonDesktop, { backgroundColor: colors.primary }]}
                 onPress={() => {
                   if (isFavorite) {
@@ -786,7 +725,7 @@ export default function StopDetailsScreen() {
 
             {/* Leaderboard Button */}
             <View style={[styles.section, styles.sectionDesktop]}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.leaderboardButton, styles.leaderboardButtonDesktop, { backgroundColor: colors.primary }]}
                 onPress={() => router.push(`/FilteredLeaderboard?entityId=${stopId}&entityType=stop&name=${encodeURIComponent(stopDetails.name)}`)}
               >
@@ -796,7 +735,7 @@ export default function StopDetailsScreen() {
             </View>
 
             {/* Report Stop Button */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.reportStopButton, styles.reportStopButtonDesktop, { backgroundColor: '#25D366' }]}
               onPress={handleReportStop}
             >
@@ -826,7 +765,7 @@ export default function StopDetailsScreen() {
                         key={level}
                         style={[
                           styles.busynessDot,
-                          level <= (stopInfo?.busyness_level || 0) 
+                          level <= (stopInfo?.busyness_level || 0)
                             ? [styles.busynessDotActive, { backgroundColor: colors.primary }]
                             : [styles.busynessDotInactive, { backgroundColor: colors.border }]
                         ]}
@@ -867,7 +806,7 @@ export default function StopDetailsScreen() {
                   Recent Activity ({thisWeeksPosts.length})
                 </Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[
                   styles.tab,
@@ -895,81 +834,87 @@ export default function StopDetailsScreen() {
     );
   }
 
+  const headerTranslateY = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE],
+    outputRange: [0, -HEADER_SCROLL_DISTANCE],
+    extrapolate: 'clamp',
+  });
+
+  const imageScale = scrollY.interpolate({
+    inputRange: [-HEADER_MAX_HEIGHT, 0],
+    outputRange: [2, 1],
+    extrapolateLeft: 'extend',
+    extrapolateRight: 'clamp',
+  });
+
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE / 2, HEADER_SCROLL_DISTANCE],
+    outputRange: [0, 0, 1],
+    extrapolate: 'clamp',
+  });
+
+  const brandOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE / 2],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
   // Mobile Layout
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
-          {isFavorite ? (
-            <BookmarkCheck size={24} color="#1ea2b1" fill="#1ea2b1" />
-          ) : (
-            <Bookmark size={24} color="#ffffff" />
-          )}
-        </TouchableOpacity>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Animated.ScrollView
+        style={styles.container}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
+      >
+        <View style={{ marginTop: HEADER_MAX_HEIGHT }}>
+          <View style={styles.content}>
+            {/* Stop Info Header */}
+            <View style={styles.infoSection}>
+              <Text style={styles.readyText}>Move Smarter</Text>
+              <Text style={[styles.headingText, { color: colors.text }]}>{stopDetails.name}</Text>
+              
+              {/* Follower Count */}
+              <View style={styles.followerContainer}>
+                <Users size={16} color={colors.primary} />
+                <Text style={[styles.followerText, { color: colors.primary }]}>
+                  {followerCount} {followerCount === 1 ? 'follower' : 'followers'}
+                </Text>
+              </View>
 
-      <View style={styles.content}>
-        {/* Stop Image */}
-        <View style={styles.imageContainer}>
-          {stopDetails?.image_url ? (
-            <Image
-              source={{ uri: stopDetails.image_url }}
-              style={styles.image}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={[styles.imagePlaceholder, { backgroundColor: colors.card }]}>
-              <Text style={[styles.hubName, { color: colors.text }]}>{stopDetails.name}</Text>
+              {/* Routes Count */}
+              <View style={[styles.followerContainer, { marginBottom: 0 }]}>
+                <RouteIcon size={16} color={colors.primary} />
+                <Text style={[styles.followerText, { color: colors.primary }]}>
+                  {routes.length} {routes.length === 1 ? 'route' : 'routes'} pass here
+                </Text>
+              </View>
+
+              {/* Real-time Waiting Information */}
+              <View style={styles.waitingCountContainer}>
+                <View style={[styles.waitingCountBadge, { backgroundColor: `${colors.primary}20` }]}>
+                  <Users size={20} color={colors.primary} />
+                  <Text style={[styles.waitingCountText, { color: colors.primary }]}>
+                    {stopInfo?.total_waiting || 0} people waiting now
+                  </Text>
+                </View>
+              </View>
             </View>
-          )}
-        </View>
-
-        {/* Stop Info */}
-        <View style={styles.infoSection}>
-          <Text style={[styles.hubName, { color: colors.text }]}>{stopDetails.name}</Text>
-          
-          {/* Follower Count */}
-          <View style={styles.followerContainer}>
-            <Users size={16} color={colors.primary} />
-            <Text style={[styles.followerText, { color: colors.primary }]}>
-              {followerCount} {followerCount === 1 ? 'follower' : 'followers'}
-            </Text>
-          </View>
-
-          {/* Routes Count */}
-          <View style={[styles.followerContainer, { marginBottom: 0 }]}>
-            <RouteIcon size={16} color={colors.primary} />
-            <Text style={[styles.followerText, { color: colors.primary }]}>
-              {routes.length} {routes.length === 1 ? 'route' : 'routes'} pass here
-            </Text>
-          </View>
-
-          {/* Real-time Waiting Information */}
-          <View style={styles.waitingCountContainer}>
-            <View style={[styles.waitingCountBadge, { backgroundColor: `${colors.primary}20` }]}>
-              <Users size={20} color={colors.primary} />
-              <Text style={[styles.waitingCountText, { color: colors.primary }]}>
-                {stopInfo?.total_waiting || 0} people waiting now
-              </Text>
-            </View>
-          </View>
-        </View>
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={[styles.actionButton, { backgroundColor: colors.primary }]} 
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: colors.primary }]}
             onPress={openInMaps}
           >
             <Navigation size={20} color="#ffffff" />
             <Text style={styles.actionButtonText}>Directions</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.primary }]}
             onPress={() => {
               if (isFavorite) {
@@ -990,7 +935,7 @@ export default function StopDetailsScreen() {
 
         {/* Leaderboard Button */}
         <View style={styles.section}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.leaderboardButton, { backgroundColor: colors.primary }]}
             onPress={() => router.push(`/FilteredLeaderboard?entityId=${stopId}&entityType=stop&name=${encodeURIComponent(stopDetails.name)}`)}
           >
@@ -1000,7 +945,7 @@ export default function StopDetailsScreen() {
         </View>
 
         {/* Report Stop Button */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.reportStopButton, { backgroundColor: '#25D366' }]}
           onPress={handleReportStop}
         >
@@ -1030,7 +975,7 @@ export default function StopDetailsScreen() {
                     key={level}
                     style={[
                       styles.busynessDot,
-                      level <= (stopInfo?.busyness_level || 0) 
+                      level <= (stopInfo?.busyness_level || 0)
                         ? [styles.busynessDotActive, { backgroundColor: colors.primary }]
                         : [styles.busynessDotInactive, { backgroundColor: colors.border }]
                     ]}
@@ -1066,7 +1011,7 @@ export default function StopDetailsScreen() {
               Recent Activity ({thisWeeksPosts.length})
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[
               styles.tab,
@@ -1087,7 +1032,53 @@ export default function StopDetailsScreen() {
         {/* Tab Content */}
         {renderTabContent()}
       </View>
-    </ScrollView>
+    </View>
+  </Animated.ScrollView>
+
+  {/* Animated Sticky Header Image */}
+  <Animated.View
+    style={[
+      styles.animatedHeader,
+      {
+        height: HEADER_MAX_HEIGHT,
+        transform: [{ translateY: headerTranslateY }],
+      },
+    ]}
+  >
+    <Animated.Image
+      source={stopDetails.image_url ? { uri: stopDetails.image_url } : require('@/assets/images/school-header.jpg')}
+      style={[
+        styles.headerImage,
+        {
+          transform: [{ scale: imageScale }],
+        },
+      ]}
+      resizeMode="cover"
+    />
+    <View style={styles.headerOverlay} />
+
+
+
+    {/* Sticky Title (Visible when collapsed) */}
+    <Animated.View style={[styles.stickyTitleContainer, { opacity: headerOpacity }]}>
+      <Text style={styles.stickyTitle} numberOfLines={1}>{stopDetails.name}</Text>
+    </Animated.View>
+
+    {/* Fixed Back/Favorite Buttons */}
+    <View style={styles.fixedHeaderActions}>
+      <TouchableOpacity style={styles.glassIconButton} onPress={() => router.back()}>
+        <ArrowLeft size={20} color="#FFF" />
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.glassIconButton} onPress={toggleFavorite}>
+        {isFavorite ? (
+          <BookmarkCheck size={20} color="#1ea2b1" fill="#1ea2b1" />
+        ) : (
+          <Bookmark size={20} color="#ffffff" />
+        )}
+      </TouchableOpacity>
+    </View>
+  </Animated.View>
+</View>
   );
 }
 
@@ -1098,7 +1089,7 @@ const styles = StyleSheet.create({
   containerDesktop: {
     width: '100%',
   },
-  
+
   // Desktop layout
   desktopWrapper: {
     flexDirection: 'row',
@@ -1116,7 +1107,7 @@ const styles = StyleSheet.create({
     width: '55%',
     paddingLeft: 24,
   },
-  
+
   // Header
   headerDesktop: {
     flexDirection: 'row',
@@ -1137,7 +1128,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
   },
-  
+
   // Image
   imageContainerDesktop: {
     height: 280,
@@ -1147,7 +1138,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   // Info Section
   infoSectionDesktop: {
     marginBottom: 24,
@@ -1156,7 +1147,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     marginBottom: 12,
   },
-  
+
   // Follower container
   followerContainerDesktop: {
     paddingHorizontal: 12,
@@ -1167,7 +1158,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginLeft: 6,
   },
-  
+
   // Waiting count
   waitingCountContainerDesktop: {
     marginBottom: 24,
@@ -1181,7 +1172,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginLeft: 8,
   },
-  
+
   // Action buttons
   actionButtonsDesktop: {
     marginBottom: 24,
@@ -1245,12 +1236,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginLeft: 10,
   },
-  
+
   // Section
   sectionDesktop: {
     marginBottom: 24,
   },
-  
+
   // Info Card
   infoCardDesktop: {
     padding: 20,
@@ -1266,7 +1257,7 @@ const styles = StyleSheet.create({
   infoValueDesktop: {
     fontSize: 15,
   },
-  
+
   // Busyness meter
   busynessMeterDesktop: {
     gap: 6,
@@ -1275,7 +1266,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginLeft: 10,
   },
-  
+
   // Tab container
   tabContainerDesktop: {
     marginBottom: 24,
@@ -1290,12 +1281,12 @@ const styles = StyleSheet.create({
   tabTextDesktop: {
     fontSize: 13,
   },
-  
+
   // Tab content
   tabContentDesktop: {
     minHeight: 300,
   },
-  
+
   // Empty state
   emptyStateDesktop: {
     paddingVertical: 60,
@@ -1308,7 +1299,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     maxWidth: 400,
   },
-  
+
   // Post item
   postItemDesktop: {
     padding: 18,
@@ -1351,7 +1342,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginLeft: 6,
   },
-  
+
   // Route item
   routeItemDesktop: {
     padding: 14,
@@ -1388,7 +1379,7 @@ const styles = StyleSheet.create({
   routeArrowTextDesktop: {
     fontSize: 22,
   },
-  
+
   // Add post container
   addPostContainerDesktop: {
     padding: 18,
@@ -1407,7 +1398,7 @@ const styles = StyleSheet.create({
   postButtonTextDesktop: {
     fontSize: 15,
   },
-  
+
   // Waiting user
   waitingUserDesktop: {
     padding: 14,
@@ -1426,7 +1417,7 @@ const styles = StyleSheet.create({
   waitingTimeDesktop: {
     fontSize: 13,
   },
-  
+
   // Error
   errorTextDesktop: {
     fontSize: 20,
@@ -1434,40 +1425,62 @@ const styles = StyleSheet.create({
   backButtonTextDesktop: {
     fontSize: 15,
   },
-  
+
   // Keep all existing mobile styles below
   content: {
     padding: 20,
   },
-  header: {
+  animatedHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#000',
+    overflow: 'hidden',
+    zIndex: 10,
+  },
+  headerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  headerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  stickyTitleContainer: {
+    position: 'absolute',
+    bottom: 16,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingHorizontal: 60,
+  },
+  stickyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFF',
+    fontStyle: 'italic',
+  },
+  fixedHeaderActions: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 55 : 35,
+    right: 20,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 20,
+    gap: 12,
+    zIndex: 20,
   },
-  backButton: {
-    backgroundColor: '#1a1a1a',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
+  glassIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     alignItems: 'center',
-  },
-  favoriteButton: {
-    backgroundColor: '#1a1a1a',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     justifyContent: 'center',
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   imageContainer: {
-    height: 200,
-    borderRadius: 16,
-    marginBottom: 20,
-    overflow: 'hidden',
+    display: 'none',
   },
   image: {
     width: '100%',
@@ -1483,24 +1496,37 @@ const styles = StyleSheet.create({
   infoSection: {
     marginBottom: 20,
   },
-  hubName: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  readyText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#1ea2b1',
+    textTransform: 'uppercase',
+    letterSpacing: 2,
     marginBottom: 8,
+  },
+  headingText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginBottom: 16,
+    letterSpacing: -1,
   },
   followerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
     alignSelf: 'flex-start',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(30, 162, 177, 0.2)',
   },
   followerText: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginLeft: 4,
+    fontSize: 13,
+    fontWeight: '700',
+    marginLeft: 6,
   },
   waitingCountContainer: {
     flexDirection: 'row',
@@ -1548,9 +1574,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   infoCard: {
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   infoRow: {
     flexDirection: 'row',

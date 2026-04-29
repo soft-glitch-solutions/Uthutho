@@ -92,13 +92,17 @@ const DesktopPostDetail = ({
       <StatusBar style="light" backgroundColor="#000000" />
       
       {/* Desktop Header */}
-      <View style={styles.desktopHeader}>
-        <TouchableOpacity style={styles.desktopBackButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#ffffff" />
-          <Text style={styles.desktopBackButtonText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.desktopHeaderTitle}>Post Details</Text>
-        <View style={styles.desktopHeaderPlaceholder} />
+      <View style={styles.brandedHeaderDesktop}>
+        <View style={styles.headerTop}>
+          <Text style={styles.brandText}>Uthutho</Text>
+          <TouchableOpacity style={styles.backIconButton} onPress={() => router.back()}>
+            <ArrowLeft size={20} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.headerContent}>
+          <Text style={styles.readyText}>Move Smarter</Text>
+          <Text style={styles.headingText}>Post Details</Text>
+        </View>
       </View>
 
       {/* Desktop Layout */}
@@ -360,13 +364,18 @@ const MobilePostDetail = ({
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" backgroundColor="#000000" />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Post Details</Text>
-        <View style={styles.placeholder} />
+      {/* Branded Header */}
+      <View style={styles.brandedHeader}>
+        <View style={styles.headerTop}>
+          <Text style={styles.brandText}>Uthutho</Text>
+          <TouchableOpacity style={styles.backIconButton} onPress={() => router.back()}>
+            <ArrowLeft size={20} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.headerContent}>
+          <Text style={styles.readyText}>Move Smarter</Text>
+          <Text style={styles.headingText}>Post Details</Text>
+        </View>
       </View>
 
       {/* Post Content */}
@@ -405,7 +414,7 @@ const MobilePostDetail = ({
           </View>
 
           {/* Post Content */}
-          <Text style={styles.postContent}>{post.content}</Text>
+          <Text style={styles.postContentText}>{post.content}</Text>
 
           {/* Post Actions - Disabled for non-logged-in users */}
           <View style={styles.postActions}>
@@ -1079,37 +1088,62 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   
-  // Desktop Header
-  desktopHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  // Branded Header
+  brandedHeader: {
+    paddingHorizontal: 24,
     paddingBottom: 24,
-    paddingTop: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333333',
   },
-  desktopBackButton: {
+  brandedHeaderDesktop: {
+    paddingHorizontal: 40,
+    paddingBottom: 32,
+    borderBottomWidth: 1,
+    borderBottomColor: '#111',
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 8,
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    marginBottom: 24,
   },
-  desktopBackButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '500',
+  brandText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -1,
+    fontStyle: 'italic',
   },
-  desktopHeaderTitle: {
-    fontSize: 24,
+  backIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerContent: {
+    marginTop: 0,
+  },
+  readyText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: '#1ea2b1',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  headingText: {
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#FFF',
+    fontStyle: 'italic',
+    letterSpacing: -1,
   },
-  desktopHeaderPlaceholder: {
-    width: 100,
+  postContentText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    lineHeight: 24,
+    marginBottom: 24,
   },
   
   // Desktop Layout
