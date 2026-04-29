@@ -23,7 +23,7 @@ export default function HubItem({
     router.push(`/hub/${hubId}`);
   };
 
-  const imageUrl = hub.image || '@/assets/images/Community.jpg';
+  const imageUrl = hub.image || '@/assets/images/community.jpg';
 
   return (
     <TouchableOpacity

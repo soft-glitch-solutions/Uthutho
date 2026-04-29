@@ -26,8 +26,8 @@ interface CommunityHeroProps {
   compact?: boolean;
 }
 
-const DEFAULT_HUB_IMAGE = '@/assets/images/Community.jpg';
-const DEFAULT_STOP_IMAGE = '@/assets/images/Community.jpg';
+const DEFAULT_HUB_IMAGE = '@/assets/images/community.jpg';
+const DEFAULT_STOP_IMAGE = '@/assets/images/community.jpg';
 
 const CommunityHero: React.FC<CommunityHeroProps> = ({
   community,
@@ -40,7 +40,7 @@ const CommunityHero: React.FC<CommunityHeroProps> = ({
 }) => {
   const getHeaderImage = () => {
     if (community.id === 'all_communities') {
-      return require('@/assets/images/Community.jpg');
+      return require('@/assets/images/community.jpg');
     }
 
     if (community.image) {
@@ -49,7 +49,7 @@ const CommunityHero: React.FC<CommunityHeroProps> = ({
 
     return community.type === 'hub'
       ? require('@/assets/images/school-transport.jpg')
-      : require('@/assets/images/Community.jpg');
+      : require('@/assets/images/community.jpg');
   };
 
   return (

@@ -16,8 +16,9 @@ import { ArrowRight, MapPin, Users, MessageCircle, ChevronLeft, Navigation } fro
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import LottieView from 'lottie-react-native';
 
-const { width, height } = Dimensions.get('window');
-const isDesktop = width >= 1024;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
+const isSmallMobile = SCREEN_HEIGHT < 700;
 
 const getSlideConfig = () => [
   {
@@ -93,13 +94,13 @@ export default function Onboarding() {
     
     if (direction === 'next') {
       Animated.timing(slideAnim, {
-        toValue: -width * 0.8,
+        toValue: -SCREEN_WIDTH * 0.8,
         duration: 350,
         useNativeDriver: true,
       }).start(() => {
         if (currentSlideRef.current < slides.length - 1) {
           setCurrentSlide(prev => prev + 1);
-          slideAnim.setValue(width * 0.5);
+          slideAnim.setValue(SCREEN_WIDTH * 0.5);
           Animated.spring(slideAnim, { toValue: 0, friction: 8, tension: 40, useNativeDriver: true }).start(() => setIsTransitioning(false));
         } else {
           router.replace('/auth');
@@ -107,12 +108,12 @@ export default function Onboarding() {
       });
     } else {
       Animated.timing(slideAnim, {
-        toValue: width * 0.8,
+        toValue: SCREEN_WIDTH * 0.8,
         duration: 350,
         useNativeDriver: true,
       }).start(() => {
         setCurrentSlide(prev => prev - 1);
-        slideAnim.setValue(-width * 0.5);
+        slideAnim.setValue(-SCREEN_WIDTH * 0.5);
         Animated.spring(slideAnim, { toValue: 0, friction: 8, tension: 40, useNativeDriver: true }).start(() => setIsTransitioning(false));
       });
     }
@@ -124,12 +125,12 @@ export default function Onboarding() {
       onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 10,
       onPanResponderMove: (_, gestureState) => {
         if (!isTransitioningRef.current) {
-          slideAnim.setValue(Math.max(Math.min(gestureState.dx, width * 0.5), -width * 0.5));
+          slideAnim.setValue(Math.max(Math.min(gestureState.dx, SCREEN_WIDTH * 0.5), -SCREEN_WIDTH * 0.5));
         }
       },
       onPanResponderRelease: (_, gestureState) => {
         if (isTransitioningRef.current) return;
-        const swipeThreshold = width * 0.15;
+        const swipeThreshold = SCREEN_WIDTH * 0.15;
         if (gestureState.dx < -swipeThreshold) handleSlideTransition('next');
         else if (gestureState.dx > swipeThreshold && currentSlideRef.current > 0) handleSlideTransition('prev');
         else Animated.spring(slideAnim, { toValue: 0, friction: 7, tension: 40, useNativeDriver: true }).start();
@@ -153,8 +154,8 @@ export default function Onboarding() {
   const currentItem = slides[currentSlide];
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, isDesktop && styles.containerDesktop]}>
+      <View style={[styles.header, isDesktop && styles.headerDesktop]}>
         {currentSlide > 0 ? (
           <TouchableOpacity style={styles.iconBtn} onPress={() => handleSlideTransition('prev')}>
             <ChevronLeft size={24} color="#FFF" />
@@ -165,38 +166,59 @@ export default function Onboarding() {
         </TouchableOpacity>
       </View>
 
-      <Animated.View 
-        style={[styles.main, { transform: [{ translateX: slideAnim }] }]}
-        {...panResponder.panHandlers}
-      >
-        <View style={styles.animationContainer}>
-          {Platform.OS === 'web' ? (
-            <DotLottieReact src={currentItem.webAnimation} loop autoplay style={styles.animation} />
-          ) : (
-            <LottieView source={currentItem.mobileAnimation} autoPlay loop style={styles.animation} />
-          )}
-        </View>
+      <View style={[styles.contentWrapper, isDesktop && styles.contentWrapperDesktop]}>
+        <Animated.View 
+          style={[
+            styles.main, 
+            isDesktop && styles.mainDesktop,
+            { transform: [{ translateX: slideAnim }] }
+          ]}
+          {...panResponder.panHandlers}
+        >
+          <View style={[styles.animationContainer, isDesktop && styles.animationContainerDesktop]}>
+            {Platform.OS === 'web' ? (
+              <DotLottieReact src={currentItem.webAnimation} loop autoplay style={styles.animation} />
+            ) : (
+              <LottieView source={currentItem.mobileAnimation} autoPlay loop style={styles.animation} />
+            )}
+          </View>
 
-        <View style={styles.textContainer}>
-          <Text style={styles.slideTagline}>{currentItem.tagline}</Text>
-          <Text style={styles.slideTitle}>{currentItem.title}</Text>
-          <Text style={styles.slideDescription}>{currentItem.description}</Text>
-        </View>
-      </Animated.View>
+          <View style={[styles.textContainer, isDesktop && styles.textContainerDesktop]}>
+            <Text style={styles.slideTagline}>{currentItem.tagline}</Text>
+            <Text style={[styles.slideTitle, isSmallMobile && styles.slideTitleSmall]}>
+              {currentItem.title}
+            </Text>
+            <Text style={[styles.slideDescription, isSmallMobile && styles.slideDescriptionSmall]}>
+              {currentItem.description}
+            </Text>
+          </View>
+        </Animated.View>
 
-      <View style={styles.footer}>
+        {/* Floating Back Button on Left Side (Visible after first slide) */}
+        {currentSlide > 0 && (
+          <TouchableOpacity 
+            style={[styles.floatingBackBtn, isDesktop && styles.floatingBackBtnDesktop]} 
+            onPress={() => handleSlideTransition('prev')}
+          >
+            <ChevronLeft size={isDesktop ? 32 : 28} color="#FFF" />
+          </TouchableOpacity>
+        )}
+
+        {/* Floating Next Button on Right Side */}
+        <TouchableOpacity 
+          style={[styles.floatingNextBtn, isDesktop && styles.floatingNextBtnDesktop]} 
+          onPress={() => handleSlideTransition('next')}
+        >
+          <ArrowRight size={isDesktop ? 32 : 28} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      <View style={[styles.footer, isDesktop && styles.footerDesktop]}>
         <View style={styles.pagination}>
           {slides.map((_, i) => (
             <View key={i} style={[styles.dot, currentSlide === i && styles.dotActive]} />
           ))}
         </View>
-
-        <TouchableOpacity style={styles.nextBtn} onPress={() => handleSlideTransition('next')}>
-          <Text style={styles.nextText}>
-            {currentSlide === slides.length - 1 ? 'GET STARTED' : 'NEXT'}
-          </Text>
-          <ArrowRight size={20} color="#000" />
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -207,6 +229,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
+  },
+  containerDesktop: {
+    paddingTop: 0,
+    justifyContent: 'center',
   },
   splashContainer: {
     flex: 1,
@@ -234,6 +260,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 24,
     alignItems: 'center',
+    zIndex: 10,
+  },
+  headerDesktop: {
+    position: 'absolute',
+    top: 40,
+    left: 40,
+    right: 40,
   },
   iconBtn: {
     width: 44,
@@ -257,18 +290,41 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
+  contentWrapper: {
+    flex: 1,
+    position: 'relative',
+  },
+  contentWrapperDesktop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 100,
+  },
   main: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
   },
+  mainDesktop: {
+    flexDirection: 'row',
+    gap: 80,
+    maxWidth: 1200,
+    paddingHorizontal: 0,
+  },
   animationContainer: {
-    width: width * 0.8,
-    height: width * 0.8,
+    width: SCREEN_WIDTH * 0.8,
+    height: SCREEN_WIDTH * 0.8,
     maxWidth: 300,
     maxHeight: 300,
-    marginBottom: 48,
+    marginBottom: isSmallMobile ? 24 : 48,
+  },
+  animationContainerDesktop: {
+    width: 500,
+    height: 500,
+    maxWidth: 500,
+    maxHeight: 500,
+    marginBottom: 0,
   },
   animation: {
     width: '100%',
@@ -276,6 +332,11 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     alignItems: 'center',
+  },
+  textContainerDesktop: {
+    flex: 1,
+    alignItems: 'flex-start',
+    textAlign: 'left',
   },
   slideTagline: {
     fontSize: 10,
@@ -294,16 +355,81 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
     marginBottom: 16,
   },
+  slideTitleSmall: {
+    fontSize: 26,
+    marginBottom: 8,
+  },
   slideDescription: {
     fontSize: 16,
-    color: '#666',
+    color: '#888',
     textAlign: 'center',
     lineHeight: 24,
     fontWeight: '500',
   },
+  slideDescriptionSmall: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  floatingBackBtn: {
+    position: 'absolute',
+    left: 24,
+    top: '50%',
+    marginTop: -32,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#222',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 20,
+  },
+  floatingBackBtnDesktop: {
+    left: 60,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginTop: -40,
+  },
+  floatingNextBtn: {
+    position: 'absolute',
+    right: 24,
+    top: '50%',
+    marginTop: -32,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: BRAND_COLOR,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: BRAND_COLOR,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 20,
+  },
+  floatingNextBtnDesktop: {
+    right: 60,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginTop: -40,
+  },
   footer: {
     padding: 32,
-    gap: 32,
+    paddingBottom: Platform.OS === 'ios' ? 48 : 32,
+  },
+  footerDesktop: {
+    position: 'absolute',
+    bottom: 40,
+    width: '100%',
   },
   pagination: {
     flexDirection: 'row',
@@ -319,20 +445,5 @@ const styles = StyleSheet.create({
   dotActive: {
     width: 24,
     backgroundColor: BRAND_COLOR,
-  },
-  nextBtn: {
-    backgroundColor: BRAND_COLOR,
-    height: 64,
-    borderRadius: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  nextText: {
-    color: '#000',
-    fontWeight: '900',
-    fontSize: 16,
-    letterSpacing: 1,
   },
 });
