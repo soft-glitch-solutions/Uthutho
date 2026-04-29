@@ -26,8 +26,8 @@ interface CommunityHeroProps {
   compact?: boolean;
 }
 
-const DEFAULT_HUB_IMAGE = '@/assets/images/community.jpg';
-const DEFAULT_STOP_IMAGE = '@/assets/images/community.jpg';
+const DEFAULT_HUB_IMAGE = '../../assets/images/community.jpg';
+const DEFAULT_STOP_IMAGE = '../../assets/images/community.jpg';
 
 const CommunityHero: React.FC<CommunityHeroProps> = ({
   community,
@@ -40,7 +40,7 @@ const CommunityHero: React.FC<CommunityHeroProps> = ({
 }) => {
   const getHeaderImage = () => {
     if (community.id === 'all_communities') {
-      return require('@/assets/images/community.jpg');
+      return require('../../assets/images/community.jpg');
     }
 
     if (community.image) {
@@ -48,8 +48,8 @@ const CommunityHero: React.FC<CommunityHeroProps> = ({
     }
 
     return community.type === 'hub'
-      ? require('@/assets/images/school-transport.jpg')
-      : require('@/assets/images/community.jpg');
+      ? require('../../assets/images/school-transport.jpg')
+      : require('../../assets/images/community.jpg');
   };
 
   return (
@@ -66,14 +66,16 @@ const CommunityHero: React.FC<CommunityHeroProps> = ({
           <View style={[styles.headerContent, compact && styles.headerContentCompact]}>
             {!compact && (
               <View style={styles.topRow}>
-                <View style={styles.typeBadge}>
-                  {community.type === 'hub' ? (
-                    <Bus size={12} color="#1ea2b1" />
-                  ) : (
-                    <MapPin size={12} color="#1ea2b1" />
-                  )}
-                  <Text style={styles.typeText}>{community.type.toUpperCase()}</Text>
-                </View>
+                {community.id !== 'all_communities' && (
+                  <View style={styles.typeBadge}>
+                    {community.type === 'hub' ? (
+                      <Bus size={12} color="#1ea2b1" />
+                    ) : (
+                      <MapPin size={12} color="#1ea2b1" />
+                    )}
+                    <Text style={styles.typeText}>{community.type.toUpperCase()}</Text>
+                  </View>
+                )}
 
                 <TouchableOpacity style={styles.iconButton}>
                   <Share2 size={18} color="#FFFFFF" />
@@ -92,35 +94,44 @@ const CommunityHero: React.FC<CommunityHeroProps> = ({
             </View>
 
             <View style={[styles.statsAndActions, compact && styles.statsAndActionsCompact]}>
-              <View style={[styles.statsContainer, compact && styles.statsContainerCompact]}>
-                <View style={styles.statItem}>
-                  <Text style={[styles.statNumber, compact && styles.statNumberCompact]}>{postCount}</Text>
-                  <Text style={styles.statLabel}>Posts</Text>
-                </View>
-                <View style={[styles.statDivider, { backgroundColor: '#333333' }]} />
-                <View style={styles.statItem}>
-                  <Text style={[styles.statNumber, compact && styles.statNumberCompact]}>{reactionCount}</Text>
-                  <Text style={styles.statLabel}>Reactions</Text>
-                </View>
-              </View>
+              {community.id !== 'all_communities' && (
+                <>
+                  <View style={[styles.statsContainer, compact && styles.statsContainerCompact]}>
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statNumber, compact && styles.statNumberCompact]}>{postCount}</Text>
+                      <Text style={styles.statLabel}>Posts</Text>
+                    </View>
+                    <View style={[styles.statDivider, { backgroundColor: '#333333' }]} />
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statNumber, compact && styles.statNumberCompact]}>{reactionCount}</Text>
+                      <Text style={styles.statLabel}>Reactions</Text>
+                    </View>
+                  </View>
 
-              <TouchableOpacity
-                style={[
-                  styles.followButton,
-                  isFollowing && styles.followingButton,
-                  compact && styles.followButtonCompact
-                ]}
-                onPress={isFollowing ? onUnfollow : onFollow}
-              >
-                {!isFollowing && <Users size={compact ? 12 : 16} color="#FFFFFF" style={{ marginRight: compact ? 4 : 6 }} />}
-                <Text style={[
-                  styles.followButtonText,
-                  isFollowing && styles.followingButtonText,
-                  compact && styles.followButtonTextCompact
-                ]}>
-                  {isFollowing ? 'Following' : 'Follow'}
-                </Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.followButton,
+                      isFollowing && styles.followingButton,
+                      compact && styles.followButtonCompact
+                    ]}
+                    onPress={isFollowing ? onUnfollow : onFollow}
+                  >
+                    {!isFollowing && <Users size={compact ? 12 : 16} color="#FFFFFF" style={{ marginRight: compact ? 4 : 6 }} />}
+                    <Text style={[
+                      styles.followButtonText,
+                      isFollowing && styles.followingButtonText,
+                      compact && styles.followButtonTextCompact
+                    ]}>
+                      {isFollowing ? 'Following' : 'Follow'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              {community.id === 'all_communities' && (
+                <View style={styles.allSubheading}>
+                  <Text style={styles.subheadingText}>Word on the street is</Text>
+                </View>
+              )}
             </View>
           </View>
         </LinearGradient>
@@ -299,6 +310,20 @@ const styles = StyleSheet.create({
   },
   followingButtonText: {
     color: '#FFFFFF',
+  },
+  allSubheading: {
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(30, 162, 177, 0.2)',
+  },
+  subheadingText: {
+    color: '#1ea2b1',
+    fontSize: 14,
+    fontWeight: 'bold',
+    fontStyle: 'italic',
   },
 });
 

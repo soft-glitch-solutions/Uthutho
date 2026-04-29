@@ -13,6 +13,7 @@ import {
   Facebook,
   Instagram,
   Car,
+
   BarChart3,
   X
 } from 'lucide-react-native';
@@ -57,6 +58,7 @@ const CustomDrawerContent = (props) => {
 
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isDriver, setIsDriver] = useState(false);
+  const [isPending, setIsPending] = useState(false);
   const [loadingRole, setLoadingRole] = useState(true);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -79,17 +81,26 @@ const CustomDrawerContent = (props) => {
       }
       try {
         const { data: userRoles } = await supabase.from('user_roles').select('role').eq('user_id', user.id).maybeSingle();
-        if (userRoles) {
-          setUserRole(userRoles.role);
-          setIsDriver(userRoles.role === 'driver');
+        if (userRoles && userRoles.role === 'driver') {
+          setUserRole('driver');
+          setIsDriver(true);
+          setIsPending(false);
         } else {
-          const { data: driverData } = await supabase.from('drivers').select('id').eq('user_id', user.id).maybeSingle();
+          const { data: driverData } = await supabase.from('drivers').select('id, is_verified').eq('user_id', user.id).maybeSingle();
           if (driverData) {
-            setUserRole('driver');
-            setIsDriver(true);
+            if (driverData.is_verified) {
+              setUserRole('driver');
+              setIsDriver(true);
+              setIsPending(false);
+            } else {
+              setUserRole('user');
+              setIsDriver(false);
+              setIsPending(true);
+            }
           } else {
             setUserRole('user');
             setIsDriver(false);
+            setIsPending(false);
           }
         }
       } catch (error) {
@@ -114,9 +125,6 @@ const CustomDrawerContent = (props) => {
           <View style={[styles.logoContainer, isSmallMobile && styles.logoContainerSmall]}>
             <Image source={require('../../assets/uthutho-logo.png')} style={styles.logo} resizeMode="contain" />
           </View>
-          <TouchableOpacity onPress={() => props.navigation.closeDrawer()} style={styles.closeBtn}>
-            <X size={16} color="#666" />
-          </TouchableOpacity>
         </View>
         <Text style={[styles.appTitle, isSmallMobile && styles.appTitleSmall]}>Uthutho</Text>
         <Text style={styles.readyText}>Move Smarter</Text>
@@ -163,12 +171,20 @@ const CustomDrawerContent = (props) => {
             style={[styles.driverItem, { transform: [{ scale: scaleAnim }] }, isSmallMobile && styles.driverItemSmall]}
           >
             <View style={styles.driverContent}>
-              <View style={[styles.driverIconBox, { backgroundColor: isDriver ? BRAND_COLOR : '#8B5CF6' }, isSmallMobile && styles.driverIconBoxSmall]}>
-                {isDriver ? <BarChart3 size={16} color="#000" strokeWidth={2.5} /> : <Car size={16} color="#FFF" />}
+              <View style={[
+                styles.driverIconBox,
+                { backgroundColor: isDriver ? BRAND_COLOR : isPending ? '#fbbf24' : '#8B5CF6' },
+                isSmallMobile && styles.driverIconBoxSmall
+              ]}>
+                {isDriver ? <BarChart3 size={16} color="#000" strokeWidth={2.5} /> : isPending ? <Clock size={16} color="#000" /> : <Car size={16} color="#FFF" />}
               </View>
               <View style={styles.driverTexts}>
-                <Text style={styles.driverTitle}>{isDriver ? 'DASHBOARD' : 'BECOME DRIVER'}</Text>
-                <Text style={styles.driverSubtitle}>{isDriver ? 'Manage Services' : 'Earn with Uthutho'}</Text>
+                <Text style={[styles.driverTitle, isPending && { color: '#fbbf24' }]}>
+                  {isDriver ? 'DASHBOARD' : isPending ? 'STATUS PENDING' : 'BECOME DRIVER'}
+                </Text>
+                <Text style={styles.driverSubtitle}>
+                  {isDriver ? 'Manage Services' : isPending ? 'Reviewing Documents' : 'Earn with Uthutho'}
+                </Text>
               </View>
             </View>
             <ChevronRight size={14} color="#333" />

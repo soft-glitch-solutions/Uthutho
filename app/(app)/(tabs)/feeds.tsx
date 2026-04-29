@@ -40,7 +40,7 @@ const IS_SMALL_SCREEN = SCREEN_HEIGHT < 700;
 
 const ALL_COMMUNITY: Community = {
   id: 'all_communities',
-  name: 'All Section',
+  name: 'All',
   type: 'hub', // dummy
   latitude: 0,
   longitude: 0,
