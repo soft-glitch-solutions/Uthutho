@@ -256,19 +256,62 @@ export function useProfile() {
   const handleSignOut = useCallback(async () => {
     try {
       setLoading(true);
+      console.log('Logging out...');
+      
+      // Clear session from Supabase
       const { error } = await supabase.auth.signOut();
+      
       if (error) {
-        throw error;
+        console.error('Logout error:', error);
       }
+
+      // Explicitly clear local state
       setSession(null);
       setProfile(null);
-      router.replace('/auth');
+      
+      // Force a reload on web to clear any cached auth state
+      if (Platform.OS === 'web') {
+        window.location.href = '/auth';
+      } else {
+        router.replace('/auth');
+      }
     } catch (error: any) {
-      throw error;
+      console.error('Logout failed:', error);
+      // Fallback redirect
+      router.replace('/auth');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  // Update profile details
+  const updateProfile = useCallback(async (updates: Partial<Profile>) => {
+    try {
+      setLoading(true);
+      if (!session?.user) throw new Error('No user session found');
+
+      const userId = session.user.id;
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Update local state
+      setProfile(prev => prev ? { ...prev, ...updates } : null);
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      return { success: false, error: error.message };
+    } finally {
+      setLoading(false);
+    }
+  }, [session]);
 
   // Handle title selection
   const handleSelectTitle = useCallback(async (title: string) => {
@@ -311,5 +354,6 @@ export function useProfile() {
     handleSelectTitle,
     handleImagePicker,
     handleSignOut,
+    updateProfile,
   };
 }

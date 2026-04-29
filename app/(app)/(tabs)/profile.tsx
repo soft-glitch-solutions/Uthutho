@@ -39,6 +39,7 @@ export default function ProfileScreen() {
     handleSignOut,
     uploadAvatar,
     uploading,
+    updateProfile,
   } = useProfile();
 
   const [selectedTab, setSelectedTab] = useState('posts');
@@ -623,6 +624,7 @@ export default function ProfileScreen() {
             linkedAccounts={linkedAccounts}
             onSignOut={handleSignOut}
             onConnectAccount={handleConnectAccount}
+            onUpdateProfile={updateProfile}
             isDesktop={isDesktop}
             profile={profile}
           />
