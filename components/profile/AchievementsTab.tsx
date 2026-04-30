@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Badge, Star, ChevronRight } from 'lucide-react-native';
+import { Badge, Star, ChevronRight, Users } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { router } from 'expo-router';
 
@@ -20,6 +20,12 @@ export const AchievementsTab: React.FC<AchievementsTabProps> = ({
       subtitle: 'Change your profile title',
       route: '/changetitle'
     },
+    {
+      icon: <Users size={20} color="#1ea2b1" />,
+      title: 'My Travel Squad',
+      subtitle: 'Manage your cliq and buddies',
+      route: '/cliq'
+    },
   ];
 
   return (
@@ -30,7 +36,7 @@ export const AchievementsTab: React.FC<AchievementsTabProps> = ({
         <TouchableOpacity
           key={index}
           style={styles.menuItem}
-          onPress={() => router.push('/changetitle')}
+          onPress={() => router.push(item.route as any)}
         >
           <View style={styles.itemLeft}>
             <View style={styles.iconBox}>

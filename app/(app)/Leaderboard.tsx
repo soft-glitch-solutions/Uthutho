@@ -94,12 +94,13 @@ const LeaderboardSkeleton = () => {
 export default function LeaderboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'popular' | 'points' | 'drivers' | 'movers'>('popular');
+  const [activeTab, setActiveTab] = useState<'popular' | 'points' | 'drivers' | 'movers' | 'cliqs'>('popular');
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [popularUsers, setPopularUsers] = useState<LeaderboardUser[]>([]);
   const [pointsUsers, setPointsUsers] = useState<LeaderboardUser[]>([]);
   const [driverUsers, setDriverUsers] = useState<LeaderboardUser[]>([]);
   const [moverUsers, setMoverUsers] = useState<LeaderboardUser[]>([]);
+  const [cliqUsers, setCliqUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -129,13 +130,21 @@ export default function LeaderboardScreen() {
       setPointsUsers(process([...(allProfiles || [])].filter(p => p.points > 0), (a, b) => b.points - a.points, p => p.points || 0));
       setDriverUsers(process([...(allProfiles || [])].filter(p => driverRatings[p.id]), (a, b) => (driverRatings[b.id]?.rating || 0) - (driverRatings[a.id]?.rating || 0), p => driverRatings[p.id]?.rating.toFixed(1) || '0.0'));
       setMoverUsers(process([...(allProfiles || [])], (a, b) => (b.favorites_count || 0) - (a.favorites_count || 0), p => p.favorites_count || 0));
+      
+      // Mock Squads data for now
+      const mockCliqs = [
+        { id: 'c1', first_name: 'Phambili Squad', last_name: '', avatar_url: null, points: 2500, selected_title: 'PLATINUM', rank: 1, metric: 'Lvl 12' },
+        { id: 'c2', first_name: 'Eco Riders', last_name: '', avatar_url: null, points: 1800, selected_title: 'GOLD', rank: 2, metric: 'Lvl 8' },
+        { id: 'c3', first_name: 'City Slickers', last_name: '', avatar_url: null, points: 1200, selected_title: 'SILVER', rank: 3, metric: 'Lvl 5' },
+      ];
+      setCliqUsers(mockCliqs as any);
 
       setLoading(false);
     } catch (error) { console.error(error); setLoading(false); }
   };
 
   useEffect(() => {
-    const dataMap = { popular: popularUsers, points: pointsUsers, drivers: driverUsers, movers: moverUsers };
+    const dataMap = { popular: popularUsers, points: pointsUsers, drivers: driverUsers, movers: moverUsers, cliqs: cliqUsers };
     setUsers(dataMap[activeTab]);
   }, [activeTab, popularUsers, pointsUsers, driverUsers, moverUsers]);
 
@@ -166,7 +175,8 @@ export default function LeaderboardScreen() {
           { id: 'popular', icon: Flame, label: 'POPULAR', color: '#FF6B35' },
           { id: 'points', icon: Trophy, label: 'POINTS', color: '#FFD700' },
           { id: 'drivers', icon: Car, label: 'DRIVERS', color: BRAND_COLOR },
-          { id: 'movers', icon: Heart, label: 'MOVERS', color: '#ED67B1' }
+          { id: 'movers', icon: Heart, label: 'MOVERS', color: '#ED67B1' },
+          { id: 'cliqs', icon: Users, label: 'CLIQS', color: '#8B5CF6' }
         ].map(t => (
           <TouchableOpacity key={t.id} style={[styles.tab, activeTab === t.id && styles.activeTab]} onPress={() => setActiveTab(t.id as any)}>
             <t.icon size={14} color={activeTab === t.id ? t.color : '#444'} />

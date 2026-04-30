@@ -105,11 +105,11 @@ export default function SettingsScreen() {
                 <Text style={styles.settingTitle}>Notifications</Text>
                 <Text style={styles.settingSubtitle}>Alerts and updates</Text>
               </View>
-              <Switch 
-                value={notificationsEnabled} 
-                onValueChange={toggleNotifications} 
-                trackColor={{ false: '#222', true: BRAND_COLOR }} 
-                thumbColor="#FFF" 
+              <Switch
+                value={notificationsEnabled}
+                onValueChange={toggleNotifications}
+                trackColor={{ false: '#222', true: BRAND_COLOR }}
+                thumbColor="#FFF"
               />
             </View>
           </View>

@@ -50,7 +50,7 @@ export function useNotifications() {
 
       if (error) throw error;
 
-      setNotifications(prev => 
+      setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
       );
       setUnreadCount(prev => Math.max(0, prev - 1));

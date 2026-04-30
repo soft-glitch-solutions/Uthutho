@@ -15,7 +15,8 @@ import {
   Car,
 
   BarChart3,
-  X
+  X,
+  Users
 } from 'lucide-react-native';
 import {
   Pressable,
@@ -46,6 +47,7 @@ const VISIBLE_DRAWER_SCREENS = [
   'Leaderboard',
   'trips',
   'profile',
+  'cliq',
   'settings',
   'help'
 ];
@@ -231,6 +233,7 @@ export default function AppLayout() {
       <Drawer.Screen name="Leaderboard" options={{ title: 'Leaderboard', drawerIcon: Trophy }} />
       <Drawer.Screen name="trips" options={{ title: 'Trip History', drawerIcon: Clock }} />
       <Drawer.Screen name="profile" options={{ title: 'Profile', drawerIcon: User }} />
+      <Drawer.Screen name="cliq" options={{ title: 'My Squad', drawerIcon: Users }} />
       <Drawer.Screen name="settings" options={{ title: 'Settings', drawerIcon: Settings }} />
       <Drawer.Screen name="help" options={{ title: 'Help', drawerIcon: HelpCircle }} />
       <Drawer.Screen name="driver-dashboard" options={{ title: 'Driver Dashboard', drawerItemStyle: { display: 'none' } }} />

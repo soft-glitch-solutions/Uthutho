@@ -115,22 +115,21 @@ export default function SimpleDebugPanel({
             <Text style={[styles.sectionTitle, styles.sectionSpacing]}>System</Text>
 
             <TouchableOpacity
-              style={[styles.btn, styles.btnTeal]}
-              onPress={async () => {
-                if (Platform.OS !== 'web') {
-                  try {
-                    const { Audio } = require('expo-av');
-                    const { sound } = await Audio.Sound.createAsync(
-                      require('../../assets/sounds/notification.wav')
-                    );
-                    await sound.playAsync();
-                  } catch (e) {}
-                }
-                Alert.alert('Test Notification', 'Notification sound triggered!');
+              style={{
+                backgroundColor: '#1ea2b1',
+                padding: 12,
+                borderRadius: 12,
+                alignItems: 'center',
+                marginBottom: 12,
+              }}
+              onPress={() => {
+                console.log('Push notification test triggered');
               }}
             >
-              <Bell size={16} color="#000" />
-              <Text style={styles.btnTextDark}>Test Notification Sound</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Bell size={16} color="#FFF" />
+                <Text style={{ color: '#FFF', fontWeight: '600' }}>Test Notification</Text>
+              </View>
             </TouchableOpacity>
 
             {/* ─── WAITING DRAWER ─── */}

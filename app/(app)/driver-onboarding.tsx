@@ -301,21 +301,6 @@ export default function DriverOnboardingScreen() {
 
       const uploadedPaths = await Promise.all(uploadPromises);
 
-      // Play notification sound
-      if (Platform.OS !== 'web') {
-        try {
-          const { Audio } = require('expo-av');
-          if (Audio && Audio.Sound) {
-            const { sound } = await Audio.Sound.createAsync(
-              require('../../assets/sounds/notification.wav')
-            );
-            await sound.playAsync();
-          }
-        } catch (soundError) {
-          // Silent catch for web/native compatibility
-        }
-      }
-
       // Create driver record
       const { error } = await supabase
         .from('drivers')

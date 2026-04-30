@@ -35,6 +35,7 @@ import RateTripModal from '@/components/home/RateTripModal';
 import SimpleDebugPanel from '@/components/debug/SimpleDebugPanel';
 import { useTutorial } from '@/context/TutorialContext';
 import { DriverStatsSummary } from '@/components/home/DriverStatsSummary';
+import { shouldShowTutorial } from '@/components/AppTutorial';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -59,7 +60,7 @@ interface LocationCoords {
   lng: number;
 }
 
-const calculateWalkingTime = (lat1, lng1, lat2, lng2) => {
+function calculateWalkingTime(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLng = (lng2 - lng1) * (Math.PI / 180);
@@ -75,10 +76,10 @@ const calculateWalkingTime = (lat1, lng1, lat2, lng2) => {
   const walkingTimeMinutes = Math.round(distanceKm / 0.0833);
 
   return walkingTimeMinutes;
-};
+}
 
 // MOVED OUTSIDE COMPONENT: findNearestLocation is now a pure function
-const findNearestLocation = (userLocation: LocationCoords, locations: any[]) => {
+function findNearestLocation(userLocation: LocationCoords, locations: any[]) {
   if (!userLocation || !locations || locations.length === 0) return null;
 
   let nearestLocation = null;
@@ -99,9 +100,9 @@ const findNearestLocation = (userLocation: LocationCoords, locations: any[]) => 
   });
 
   return nearestLocation;
-};
+}
 
-const findTopNearestLocations = (userLocation: LocationCoords, locations: any[], limit: number = 5) => {
+function findTopNearestLocations(userLocation: LocationCoords, locations: any[], limit: number = 5) {
   if (!userLocation || !locations || locations.length === 0) return [];
 
   const locationsWithDistance = locations.map(location => {
@@ -119,7 +120,7 @@ const findTopNearestLocations = (userLocation: LocationCoords, locations: any[],
   return locationsWithDistance
     .sort((a, b) => a.distance - b.distance)
     .slice(0, limit);
-};
+}
 
 const getIconForType = (type: string, size: number = 20) => {
   switch (type) {
@@ -399,25 +400,48 @@ export default function HomeScreen() {
       const nearestHub = findNearestLocation(userLocation, hubs || []);
 
       console.log('Nearest top stops:', nearestStops?.length);
-      console.log('Nearest hub:', nearestHub?.name);
+      if (nearestHub) console.log('Nearest hub:', nearestHub.name);
 
       setNearestLocations({ nearestStop, nearestHub, nearestStops });
 
-      // Calculate suggested routes based on nearest stops
+      console.log('Calculating unique routes for suggested row...');
       const uniqueRoutes = new Map();
-      nearestStops.forEach((stop: any) => {
-        if (stop.routes && !uniqueRoutes.has(stop.routes.id)) {
-          uniqueRoutes.set(stop.routes.id, {
-            id: stop.routes.id,
-            name: stop.routes.name,
-            nearestStopName: stop.name,
-            distanceToStop: stop.distance
-          });
-        }
-      });
-      setSuggestedRoutes(Array.from(uniqueRoutes.values()).slice(0, 3));
+      
+      if (Array.isArray(nearestStops)) {
+        nearestStops.forEach((stop: any) => {
+          if (!stop) return;
+          const routes = stop.routes;
+          if (!routes) return;
+
+          if (Array.isArray(routes)) {
+            routes.forEach(r => {
+              if (r && r.id && !uniqueRoutes.has(r.id)) {
+                uniqueRoutes.set(r.id, {
+                  id: r.id,
+                  name: r.name || 'Unknown Route',
+                  nearestStopName: stop.name || 'Unknown Stop',
+                  distanceToStop: stop.distance
+                });
+              }
+            });
+          } else if (typeof routes === 'object' && routes.id) {
+            if (!uniqueRoutes.has(routes.id)) {
+              uniqueRoutes.set(routes.id, {
+                id: routes.id,
+                name: routes.name || 'Unknown Route',
+                nearestStopName: stop.name || 'Unknown Stop',
+                distanceToStop: stop.distance
+              });
+            }
+          }
+        });
+      }
+      
+      const suggested = Array.from(uniqueRoutes.values()).slice(0, 3);
+      console.log(`Generated ${suggested.length} suggested routes`);
+      setSuggestedRoutes(suggested);
     } catch (error) {
-      console.error('Error fetching nearest locations:', error);
+      console.error('CRITICAL: Error fetching nearest locations:', error);
     } finally {
       setIsNearestLoading(false);
       setIsSuggestedLoading(false);
