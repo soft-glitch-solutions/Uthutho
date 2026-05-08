@@ -30,6 +30,7 @@ interface StopBlockProps {
     primary: string;
   };
   radius?: number;
+  variant?: 'default' | 'compact';
   // Debug props (optional)
   debugMode?: boolean;
   onDebugWaitingDrawerRequest?: () => void;
@@ -41,6 +42,7 @@ const StopBlock = ({
   stopLocation, 
   colors, 
   radius = 0.5,
+  variant = 'default',
   debugMode = false,
   onDebugWaitingDrawerRequest 
 }: StopBlockProps) => {
@@ -616,25 +618,37 @@ const StopBlock = ({
     return (
       <View style={styles.container}>
         <View style={[styles.skeletonContainer, { opacity: 0.8 }]}>
-          <View style={[styles.skeletonButton, { backgroundColor: colors.primary }]}>
-            <View style={styles.skeletonContent}>
-              <View style={[styles.skeletonIcon, { backgroundColor: colors.text }]} />
-              <View style={[styles.skeletonText, { backgroundColor: colors.text, width: 100 }]} />
-            </View>
+          <View style={[
+            variant === 'compact' ? styles.compactButton : styles.skeletonButton, 
+            { backgroundColor: variant === 'compact' ? '#10b981' : colors.primary }
+          ]}>
+            {variant === 'compact' ? (
+              <View style={styles.compactSkeletonContent}>
+                <View style={[styles.compactSkeletonIcon, { backgroundColor: '#ffffff', opacity: 0.3 }]} />
+                <View style={[styles.compactSkeletonText, { backgroundColor: '#ffffff', opacity: 0.3 }]} />
+              </View>
+            ) : (
+              <View style={styles.skeletonContent}>
+                <View style={[styles.skeletonIcon, { backgroundColor: colors.text }]} />
+                <View style={[styles.skeletonText, { backgroundColor: colors.text, width: 100 }]} />
+              </View>
+            )}
             <Animated.View
               style={[
                 styles.shimmer,
                 {
-                  backgroundColor: colors.text,
+                  backgroundColor: variant === 'compact' ? '#ffffff' : colors.text,
                   opacity: shimmerOpacity,
                   transform: [{ translateX: shimmerTranslate }, { skewX: '-20deg' }],
                 },
               ]}
             />
           </View>
-          <View style={styles.skeletonHint}>
-            <View style={[styles.skeletonHintLine, { backgroundColor: colors.text, width: '60%' }]} />
-          </View>
+          {variant !== 'compact' && (
+            <View style={styles.skeletonHint}>
+              <View style={[styles.skeletonHintLine, { backgroundColor: colors.text, width: '60%' }]} />
+            </View>
+          )}
         </View>
       </View>
     );
@@ -667,30 +681,46 @@ const StopBlock = ({
       
       {isWaiting ? (
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: '#ef4444' }]}
+          style={[
+            variant === 'compact' ? styles.compactButton : styles.button, 
+            { backgroundColor: '#ef4444' },
+            variant === 'compact' && styles.compactButtonWithShadow
+          ]}
           onPress={handlePickedUp}
         >
-          <Square size={20} color="white" />
-          <Text style={styles.buttonText}>Picked Up ({countdown}s)</Text>
+          <Square size={variant === 'compact' ? 24 : 20} color="white" />
+          <Text style={variant === 'compact' ? styles.compactButtonText : styles.buttonText}>
+            {variant === 'compact' ? 'Done' : `Picked Up (${countdown}s)`}
+          </Text>
         </TouchableOpacity>
       ) : (
         <>
           {hasActiveJourney ? (
             <TouchableOpacity
-              style={[styles.button, { backgroundColor: '#f51b0bff' }]}
+              style={[
+                variant === 'compact' ? styles.compactButton : styles.button, 
+                { backgroundColor: '#f51b0bff' },
+                variant === 'compact' && styles.compactButtonWithShadow
+              ]}
               onPress={() => setShowCancelModal(true)}
             >
-              <Trash2 size={20} color="white" />
-              <Text style={styles.buttonText}>Cancel Journey</Text>
+              <Trash2 size={variant === 'compact' ? 24 : 20} color="white" />
+              <Text style={variant === 'compact' ? styles.compactButtonText : styles.buttonText}>
+                {variant === 'compact' ? 'Cancel' : 'Cancel Journey'}
+              </Text>
             </TouchableOpacity>
           ) : (
             <>
               <TouchableOpacity
-                style={[styles.button, { backgroundColor: '#10b981' }]}
+                style={[
+                  variant === 'compact' ? styles.compactButton : styles.button, 
+                  { backgroundColor: '#10b981' },
+                  variant === 'compact' && styles.compactButtonWithShadow
+                ]}
                 onPress={handleShowWaitingDrawer}
               >
-                <Hand size={20} color="white" />
-                <Text style={styles.buttonText}>Waiting</Text>
+                <Hand size={variant === 'compact' ? 28 : 20} color="white" />
+                <Text style={variant === 'compact' ? styles.compactButtonText : styles.buttonText}>Waiting</Text>
               </TouchableOpacity>
               
               <WaitingDrawer
@@ -788,6 +818,41 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  compactButton: {
+    width: 70,
+    height: 80,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+  },
+  compactButtonWithShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  compactButtonText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  compactSkeletonContent: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  compactSkeletonIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+  },
+  compactSkeletonText: {
+    width: 40,
+    height: 10,
+    borderRadius: 4,
   },
   // Debug button styles
   debugButton: {

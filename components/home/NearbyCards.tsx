@@ -145,14 +145,11 @@ const LocationCard: React.FC<LocationCardProps> = ({
           <View style={styles.darkOverlay} />
           
           <View style={styles.contentOverlay}>
-            <View style={styles.headerContainer}>
-              <View style={styles.favoriteItem}>
-                <MapPin size={20} color="#ffffff" />
-                <Text style={styles.cardTitle}>Nearby Stop</Text>
+            <View style={styles.leftContent}>
+              <View style={styles.pinContainer}>
+                <MapPin size={22} color="#ffffff" strokeWidth={2.5} />
               </View>
-            </View>
-            
-            <View style={styles.contentBottom}>
+              
               <View style={styles.textContainer}>
                 <Text 
                   style={styles.cardText}
@@ -170,21 +167,23 @@ const LocationCard: React.FC<LocationCardProps> = ({
                   )} min walk
                 </Text>
               </View>
-              
-              <View style={styles.actionContainer}>
-                <StopBlock
-                  stopId={location.id}
-                  stopName={location.name}
-                  stopLocation={{
-                    latitude: location.latitude,
-                    longitude: location.longitude,
-                  }}
-                  colors={colors}
-                  radius={0.5}
-                />
-              </View>
+            </View>
+
+            <View style={styles.rightContent}>
+              <StopBlock
+                stopId={location.id}
+                stopName={location.name}
+                stopLocation={{
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                }}
+                colors={colors}
+                radius={0.5}
+                variant="compact"
+              />
             </View>
           </View>
+
         </ImageBackground>
       </Animated.View>
     </Pressable>
@@ -202,73 +201,63 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cardContainer: {
-    borderRadius: 12,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    backgroundColor: '#000', // To prevent weird background flashes
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+    backgroundColor: '#004d40', // Dark teal base
   },
   imageBackground: {
     width: '100%',
-    minHeight: 180,
+    minHeight: 140,
   },
+
   imageStyle: {
     borderRadius: 12,
   },
   darkOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-    borderRadius: 12,
+    backgroundColor: 'rgba(0, 77, 64, 0.85)', // Very opaque dark teal
+    borderRadius: 16,
   },
   contentOverlay: {
     flex: 1,
     padding: 16,
-    justifyContent: 'space-between',
-  },
-  headerContainer: {
-    marginBottom: 12,
-  },
-  favoriteItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
+    justifyContent: 'space-between',
   },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginLeft: 6,
-  },
-  contentBottom: {
+  leftContent: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    height: '100%',
+    paddingRight: 12,
+  },
+  pinContainer: {
+    marginBottom: 8,
+  },
+  rightContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   textContainer: {
-    marginBottom: 12,
+    marginTop: 'auto',
   },
   cardText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '800',
     color: '#ffffff',
-    marginBottom: 4,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    lineHeight: 24,
+    marginBottom: 8,
   },
   distanceText: {
-    fontSize: 13,
-    color: '#e0e0e0',
-    fontWeight: '500',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
   },
-  actionContainer: {
-    marginTop: 8,
-  },
+
   emptyContainer: {
     padding: 24,
     borderRadius: 12,

@@ -23,8 +23,8 @@ export const AchievementsTab: React.FC<AchievementsTabProps> = ({
     {
       icon: <Users size={20} color="#1ea2b1" />,
       title: 'My Travel Squad',
-      subtitle: 'Manage your cliq and buddies',
-      route: '/cliq'
+      subtitle: 'Manage your squad and buddies',
+      route: '/squads'
     },
   ];
 

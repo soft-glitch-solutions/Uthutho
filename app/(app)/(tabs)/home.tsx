@@ -1289,6 +1289,8 @@ export default function HomeScreen() {
       <ScrollView
         ref={scrollViewRef}
         style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -1298,43 +1300,38 @@ export default function HomeScreen() {
           />
         }
       >
-        <View style={styles.topHeader} ref={refs.headerRef}>
-          <AnimatedHamburgerMenu
-            onPress={openSidebar}
-            onLongPress={() => setShowDebugPanel(true)}
-            delayLongPress={2000}
-            color={colors.primary}
-            textColor={colors.text}
-          />
-          {isProfileLoading ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={[styles.pointsContainer, {
-                backgroundColor: colors.border,
-                width: 80,
-                height: 30,
-                borderRadius: 15
-              }]} />
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.border }} />
-            </View>
-          ) : (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={styles.pointsContainer}>
-                <Text style={[styles.pointsText, { color: colors.text }]}>TP - {userProfile?.points || 0}</Text>
+        {/* Top Branding Row */}
+        <View style={styles.topRow}>
+          <View style={styles.leftBranding}>
+            <Pressable onPress={() => (navigation as any).openDrawer()} style={styles.menuBtn}>
+              <Menu size={28} color={colors.primary} />
+            </Pressable>
+            <View style={styles.logoContainer}>
+              <View style={styles.logoTextRow}>
+                <Text style={styles.logoText}>Uthutho</Text>
+                <Text style={[styles.logoDot, { color: colors.primary }]}>.</Text>
               </View>
-              <TouchableOpacity onPress={() => router.push('/profile')}>
-                {userProfile?.avatar_url ? (
-                  <Image
-                    source={{ uri: userProfile.avatar_url }}
-                    style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.primary }}
-                  />
-                ) : (
-                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
-                    <User color="#fff" size={20} />
-                  </View>
-                )}
-              </TouchableOpacity>
+              <Text style={styles.moveSmarter}>MOVE SMARTER</Text>
             </View>
-          )}
+          </View>
+
+          <View style={styles.rightBranding}>
+            <View style={styles.pointsBox}>
+              <Text style={styles.pointsValue}>{userProfile?.points || 0}</Text>
+              <Text style={styles.pointsLabel}>POINTS</Text>
+            </View>
+            <Pressable onPress={() => router.push('/profile')} style={styles.profileWrapper}>
+              <Image 
+                source={require('../../../assets/logo.png')} 
+                style={styles.logoBg}
+                resizeMode="contain"
+              />
+              <Image 
+                source={{ uri: userProfile?.avatar_url || 'https://ui-avatars.com/api/?name=U&background=111&color=fff' }} 
+                style={styles.avatar} 
+              />
+            </Pressable>
+          </View>
         </View>
 
         <HeaderSection
@@ -2159,5 +2156,121 @@ const styles = StyleSheet.create({
   serviceSubtitle: {
     fontSize: 12,
     textAlign: 'center',
+  },
+  mobileComposeBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 8,
+    marginBottom: 20,
+    backgroundColor: '#111111',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#222222',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 12,
+  },
+  mobileComposeAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#222',
+  },
+  mobileComposeFakeInput: {
+    flex: 1,
+  },
+  mobileComposePlaceholder: {
+    color: '#555555',
+    fontSize: 14,
+  },
+  mobileComposeBtn: {
+    backgroundColor: '#1ea2b1',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  mobileComposeBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 32,
+    paddingHorizontal: 8,
+  },
+  leftBranding: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  menuBtn: {
+    padding: 4,
+  },
+  logoContainer: {
+    justifyContent: 'center',
+  },
+  logoTextRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  logoText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFF',
+    letterSpacing: -1,
+  },
+  logoDot: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginLeft: 1,
+  },
+  moveSmarter: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#CCC',
+    letterSpacing: 1.5,
+    marginTop: -4,
+  },
+  rightBranding: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  pointsBox: {
+    alignItems: 'flex-end',
+  },
+  pointsValue: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFF',
+  },
+  pointsLabel: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#FFF',
+    marginTop: -2,
+  },
+  profileWrapper: {
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoBg: {
+    position: 'absolute',
+    width: 64,
+    height: 64,
+    zIndex: 0,
+  },
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    zIndex: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
 });

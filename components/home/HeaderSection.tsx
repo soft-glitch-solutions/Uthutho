@@ -1,10 +1,8 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Dimensions, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Search, Mic } from 'lucide-react-native';
-import { useTheme } from '@/context/ThemeContext';
+import { Search, Menu } from 'lucide-react-native';
 import HeaderSkeleton from './skeletons/HeaderSkeleton';
-import { useTranslation } from '@/hook/useTranslation';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -41,21 +39,18 @@ const HeaderSection = ({ isProfileLoading, userProfile, colors, onSearchPress }:
     }
   };
 
-  const nameString = userProfile?.first_name ? ` ${userProfile.first_name}` : '';
+  const nameString = userProfile?.first_name ? `, ${userProfile.first_name}` : '';
 
   return (
     <View style={[styles.header, isDesktop && styles.headerDesktop]}>
-      <Text style={[styles.readyText, { color: colors.primary }]}>
-        READY TO MOVE
-      </Text>
-
       <Text style={[styles.greetingText, { color: colors.text }]}>
-        {getGreeting()}{nameString},
+        {getGreeting()}{nameString}
       </Text>
 
-      <Text style={[styles.headingText, { color: colors.primary }]}>
-        where are we heading?
+      <Text style={[styles.headingText, { color: '#fed43f' }]}>
+        Where are we heading?
       </Text>
+
 
       <Pressable
         ref={searchBarRef}
@@ -78,21 +73,15 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     paddingTop: 16,
   },
-  readyText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 2,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
   greetingText: {
-    fontSize: 24,
-    fontWeight: '400',
-    marginBottom: 2,
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 8,
     letterSpacing: -0.5,
   },
   headingText: {
-    fontSize: 24,
+    fontSize: 30,
     fontWeight: 'bold',
     fontStyle: 'italic',
     marginBottom: 28,
@@ -101,14 +90,10 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 54,
+    height: 56,
     borderRadius: 16,
     paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: '#1A1D1E',
   },
   searchPlaceholder: {
     flex: 1,

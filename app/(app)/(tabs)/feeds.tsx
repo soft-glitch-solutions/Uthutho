@@ -27,12 +27,11 @@ import { useTutorial } from '@/context/TutorialContext';
 // Import components (Remove AddCommunityScreen import)
 import Header from '@/components/feeds/Header';
 import CommunityTabs from '@/components/feeds/CommunityTabs';
-import PostCreation from '@/components/feeds/PostCreation';
+import PostCreationModal from '@/components/feeds/PostCreationModal';
 import EmptyState from '@/components/feeds/EmptyState';
 import SkeletonLoader from '@/components/feeds/SkeletonLoader';
 import PostCard from '@/components/feeds/PostCard';
 import EmptyPosts from '@/components/feeds/EmptyPosts';
-import CommunityHero from '@/components/feeds/CommunityHero';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -162,6 +161,8 @@ export default function FeedsScreen() {
   const [weekRange, setWeekRange] = useState('');
   const [postFilter, setPostFilter] = useState<PostFilter>('week');
   const [sharingPost, setSharingPost] = useState(false);
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   // Preview state
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -189,6 +190,30 @@ export default function FeedsScreen() {
     sunday.setHours(23, 59, 59, 999);
 
     return { monday, sunday };
+  };
+
+  // Fetch user profile for avatar
+  useEffect(() => {
+    if (userId) {
+      loadUserProfile();
+    }
+  }, [userId]);
+
+  const loadUserProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, selected_title, avatar_url')
+        .eq('id', userId)
+        .single();
+      
+      if (error) throw error;
+      if (data) {
+        setUserProfile(data as UserProfile);
+      }
+    } catch (error) {
+      console.error('Error loading user profile in Feeds:', error);
+    }
   };
 
   // Check for preview parameters
@@ -399,17 +424,26 @@ export default function FeedsScreen() {
       let postsWithProfiles: any[] = [];
 
       if (community.id === 'all_communities') {
-        // Fetch from both tables
-        const realCommunityIds = communities.filter(c => c.id !== 'all_communities').map(c => c.id);
-        
+        // General discovery feed — fetch all recent public posts from both tables.
+        // Separate hub IDs from stop IDs so each query only gets valid IDs.
+        const hubIds = communities.filter(c => c.id !== 'all_communities' && c.type === 'hub').map(c => c.id);
+        const stopIds = communities.filter(c => c.id !== 'all_communities' && c.type === 'stop').map(c => c.id);
+
+        // Always fetch globally (no ID filter) so the feed feels general even if
+        // the user has no favorites yet. Fall back to a favorites-scoped query only
+        // when favorites exist, to keep results relevant.
         const [hubRes, stopRes] = await Promise.all([
-          supabase.from('hub_posts').select(baseSelect).in('hub_id', realCommunityIds).order('created_at', { ascending: false }).limit(20),
-          supabase.from('stop_posts').select(baseSelect).in('stop_id', realCommunityIds).order('created_at', { ascending: false }).limit(20)
+          hubIds.length > 0
+            ? supabase.from('hub_posts').select(baseSelect).in('hub_id', hubIds).order('created_at', { ascending: false }).limit(30)
+            : supabase.from('hub_posts').select(baseSelect).order('created_at', { ascending: false }).limit(30),
+          stopIds.length > 0
+            ? supabase.from('stop_posts').select(baseSelect).in('stop_id', stopIds).order('created_at', { ascending: false }).limit(30)
+            : supabase.from('stop_posts').select(baseSelect).order('created_at', { ascending: false }).limit(30),
         ]);
 
         const combined = [...(hubRes.data || []), ...(stopRes.data || [])];
         combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        
+
         postsWithProfiles = combined.map((post: any) => ({
           ...post,
           profiles: post.profiles || { first_name: 'Unknown', last_name: '', avatar_url: 'https://via.placeholder.com/40x40/333333/ffffff?text=U' },
@@ -722,34 +756,13 @@ export default function FeedsScreen() {
     }
   }, [selectedCommunity, postFilter]);
 
-  const renderPostCreation = () => {
-    if (previewMode && !isFollowingPreview) {
-      return (
-        <View style={[styles.previewPostCreation, isDesktop && styles.previewPostCreationDesktop]}>
-          <MessageSquare size={isDesktop ? 20 : 24} color="#666666" />
-          <Text style={[styles.previewPostCreationText, isDesktop && styles.previewPostCreationTextDesktop]}>
-            Follow this community to post and comment
-          </Text>
-        </View>
-      );
-    }
-
-    if (selectedCommunity?.id === 'all_communities') return null;
-    return (
-      <PostCreation
-        newPost={newPost}
-        setNewPost={setNewPost}
-        createPost={createPost}
-        selectedCommunity={selectedCommunity}
-        isDesktop={isDesktop}
-      />
-    );
-  };
+  const canPost = !previewMode || isFollowingPreview;
+  const showFab = selectedCommunity && selectedCommunity.id !== 'all_communities' && canPost && !isDesktop;
 
   const renderMobileHeader = () => {
     return (
-      <View>
-        <View style={{ height: 320 }} />
+      <View style={styles.mobileHeaderContent}>
+        <View style={{ height: 160 }} /> {/* Spacer for fixed header */}
         <CommunityTabs
           communities={communities}
           selectedCommunity={selectedCommunity}
@@ -765,7 +778,35 @@ export default function FeedsScreen() {
             isDesktop={false}
           />
         )}
-        {renderPostCreation()}
+        {previewMode && !isFollowingPreview ? (
+          <View style={styles.previewPostCreation}>
+            <MessageSquare size={20} color="#555555" />
+            <Text style={styles.previewPostCreationText}>
+              Follow this community to post and comment
+            </Text>
+          </View>
+        ) : (
+          selectedCommunity && selectedCommunity.id !== 'all_communities' && (
+            <TouchableOpacity
+              style={styles.mobileComposeBar}
+              onPress={() => setShowPostModal(true)}
+              activeOpacity={0.7}
+            >
+              <Image 
+                source={{ uri: userProfile?.avatar_url || 'https://ui-avatars.com/api/?name=U&background=111&color=fff' }} 
+                style={styles.mobileComposeAvatar} 
+              />
+              <View style={styles.mobileComposeFakeInput}>
+                <Text style={styles.mobileComposePlaceholder}>
+                  What's happening in {selectedCommunity.name}?
+                </Text>
+              </View>
+              <View style={styles.mobileComposeBtn}>
+                <Text style={styles.mobileComposeBtnText}>Post</Text>
+              </View>
+            </TouchableOpacity>
+          )
+        )}
       </View>
     );
   };
@@ -798,11 +839,6 @@ export default function FeedsScreen() {
               unreadNotifications={unreadNotifications}
               router={router}
               selectedCommunity={selectedCommunity}
-              isFollowing={previewMode ? isFollowingPreview : communities.some(c => c.id === selectedCommunity?.id)}
-              onFollow={previewMode ? followPreviewCommunity : (selectedCommunity ? () => toggleFavorite(selectedCommunity.id) : undefined)}
-              onUnfollow={previewMode ? unfollowPreviewCommunity : (selectedCommunity ? () => toggleFavorite(selectedCommunity.id) : undefined)}
-              postCount={posts.length}
-              reactionCount={posts.reduce((acc, p) => acc + (p.post_reactions?.length || 0), 0)}
               isDesktop={isDesktop}
             />
           </View>
@@ -849,7 +885,19 @@ export default function FeedsScreen() {
                   />
                 )}
 
-                {renderPostCreation()}
+                {/* Desktop post creation button */}
+                {selectedCommunity && selectedCommunity.id !== 'all_communities' && canPost && (
+                  <TouchableOpacity
+                    style={styles.desktopCreatePostBtn}
+                    onPress={() => setShowPostModal(true)}
+                  >
+                    <MessageSquare size={16} color="#555555" />
+                    <Text style={styles.desktopCreatePostText}>What's happening in the community?</Text>
+                    <View style={styles.desktopCreatePostAction}>
+                      <Text style={styles.desktopCreatePostActionText}>Post</Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
 
                 <ScrollView
                   style={styles.desktopPostsScroll}
@@ -933,13 +981,8 @@ export default function FeedsScreen() {
               unreadNotifications={unreadNotifications}
               router={router}
               selectedCommunity={selectedCommunity}
-              isFollowing={previewMode ? isFollowingPreview : communities.some(c => c.id === selectedCommunity?.id)}
-              onFollow={previewMode ? followPreviewCommunity : (selectedCommunity ? () => toggleFavorite(selectedCommunity.id) : undefined)}
-              onUnfollow={previewMode ? unfollowPreviewCommunity : (selectedCommunity ? () => toggleFavorite(selectedCommunity.id) : undefined)}
-              postCount={posts.length}
               scrollY={scrollY}
-              reactionCount={posts.reduce((acc, p) => acc + (p.post_reactions?.length || 0), 0)}
-              isDesktop={isDesktop}
+              isDesktop={false}
             />
           </View>
 
@@ -991,7 +1034,7 @@ export default function FeedsScreen() {
                 onRefresh={onRefresh}
                 tintColor="#1ea2b1"
                 colors={['#1ea2b1']}
-                progressViewOffset={selectedCommunity ? 320 : 0}
+                progressViewOffset={160}
               />
             }
             contentContainerStyle={[
@@ -1005,8 +1048,31 @@ export default function FeedsScreen() {
             scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
           />
+
+          {/* Floating Action Button */}
+          {showFab && (
+            <TouchableOpacity
+              style={styles.fab}
+              onPress={() => setShowPostModal(true)}
+              activeOpacity={0.85}
+            >
+              <View style={styles.fabInner}>
+                <MessageSquare size={22} color="#ffffff" />
+              </View>
+            </TouchableOpacity>
+          )}
         </>
       )}
+
+      {/* Post Creation Modal */}
+      <PostCreationModal
+        visible={showPostModal}
+        onClose={() => setShowPostModal(false)}
+        newPost={newPost}
+        setNewPost={setNewPost}
+        createPost={createPost}
+        selectedCommunity={selectedCommunity}
+      />
     </View>
   );
 }
@@ -1059,6 +1125,46 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 24,
   },
+  mobileHeaderContent: {
+    paddingBottom: 8,
+  },
+  mobileComposeBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    backgroundColor: '#111111',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#222222',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 12,
+  },
+  mobileComposeAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#222',
+  },
+  mobileComposeFakeInput: {
+    flex: 1,
+  },
+  mobileComposePlaceholder: {
+    color: '#555555',
+    fontSize: 14,
+  },
+  mobileComposeBtn: {
+    backgroundColor: '#1ea2b1',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  mobileComposeBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   desktopSidebarRight: {
     width: 300,
     paddingLeft: 24,
@@ -1080,6 +1186,53 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 32,
+    right: 20,
+    zIndex: 20,
+    shadowColor: '#1ea2b1',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  fabInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#1ea2b1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  desktopCreatePostBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111111',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 16,
+    gap: 12,
+  },
+  desktopCreatePostText: {
+    flex: 1,
+    color: '#555555',
+    fontSize: 14,
+  },
+  desktopCreatePostAction: {
+    backgroundColor: '#1ea2b1',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  desktopCreatePostActionText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   communityStats: {
     backgroundColor: '#111111',
@@ -1275,35 +1428,59 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   previewPostCreation: {
-    backgroundColor: '#1a1a1a',
-    padding: 16,
+    backgroundColor: '#111111',
+    padding: 14,
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: '#2a2a2a',
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
-  },
-  previewPostCreationDesktop: {
-    marginHorizontal: 0,
-    marginBottom: 16,
-    padding: 16,
-    backgroundColor: '#111111',
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#333333',
-    borderRadius: 8,
+    gap: 10,
   },
   previewPostCreationText: {
-    color: '#666666',
-    fontSize: 14,
+    color: '#555555',
+    fontSize: 13,
     textAlign: 'center',
   },
-  previewPostCreationTextDesktop: {
+  mobileComposeBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    backgroundColor: '#111111',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#222222',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 12,
+  },
+  mobileComposeAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#222',
+  },
+  mobileComposeFakeInput: {
+    flex: 1,
+  },
+  mobileComposePlaceholder: {
+    color: '#555555',
+    fontSize: 14,
+  },
+  mobileComposeBtn: {
+    backgroundColor: '#1ea2b1',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  mobileComposeBtnText: {
+    color: '#ffffff',
     fontSize: 13,
+    fontWeight: '700',
   },
   previewContent: {
     paddingTop: 0,

@@ -582,21 +582,21 @@ export default function EnhancedTabLayout() {
         />
 
         <Tabs.Screen
-          name="tracker"
-          options={{
-            title: 'Cards',
-            tabBarIcon: ({ color, size, focused }) => (
-              <WalletCards color={color} size={size} />
-            ),
-          }}
-        />
-
-        <Tabs.Screen
           name="routes"
           options={{
             title: 'Planner',
             tabBarIcon: ({ color, size, focused }) => (
               <Route color={color} size={size} />
+            ),
+          }}
+        />
+
+        <Tabs.Screen
+          name="tracker"
+          options={{
+            title: 'Cards',
+            tabBarIcon: ({ color, size, focused }) => (
+              <WalletCards color={color} size={size} />
             ),
           }}
         />

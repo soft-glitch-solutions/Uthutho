@@ -94,7 +94,7 @@ const LeaderboardSkeleton = () => {
 export default function LeaderboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'popular' | 'points' | 'drivers' | 'movers' | 'cliqs'>('popular');
+  const [activeTab, setActiveTab] = useState<'popular' | 'points' | 'drivers' | 'movers' | 'squads'>('popular');
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [popularUsers, setPopularUsers] = useState<LeaderboardUser[]>([]);
   const [pointsUsers, setPointsUsers] = useState<LeaderboardUser[]>([]);
@@ -144,9 +144,9 @@ export default function LeaderboardScreen() {
   };
 
   useEffect(() => {
-    const dataMap = { popular: popularUsers, points: pointsUsers, drivers: driverUsers, movers: moverUsers, cliqs: cliqUsers };
+    const dataMap = { popular: popularUsers, points: pointsUsers, drivers: driverUsers, movers: moverUsers, squads: cliqUsers };
     setUsers(dataMap[activeTab]);
-  }, [activeTab, popularUsers, pointsUsers, driverUsers, moverUsers]);
+  }, [activeTab, popularUsers, pointsUsers, driverUsers, moverUsers, cliqUsers]);
 
   const onRefresh = () => { setRefreshing(true); loadLeaderboard(); };
 
@@ -176,7 +176,7 @@ export default function LeaderboardScreen() {
           { id: 'points', icon: Trophy, label: 'POINTS', color: '#FFD700' },
           { id: 'drivers', icon: Car, label: 'DRIVERS', color: BRAND_COLOR },
           { id: 'movers', icon: Heart, label: 'MOVERS', color: '#ED67B1' },
-          { id: 'cliqs', icon: Users, label: 'CLIQS', color: '#8B5CF6' }
+          { id: 'squads', icon: Users, label: 'SQUADS', color: '#8B5CF6' }
         ].map(t => (
           <TouchableOpacity key={t.id} style={[styles.tab, activeTab === t.id && styles.activeTab]} onPress={() => setActiveTab(t.id as any)}>
             <t.icon size={14} color={activeTab === t.id ? t.color : '#444'} />
