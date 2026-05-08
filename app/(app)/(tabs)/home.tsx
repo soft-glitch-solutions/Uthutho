@@ -406,7 +406,7 @@ export default function HomeScreen() {
 
       console.log('Calculating unique routes for suggested row...');
       const uniqueRoutes = new Map();
-      
+
       if (Array.isArray(nearestStops)) {
         nearestStops.forEach((stop: any) => {
           if (!stop) return;
@@ -436,7 +436,7 @@ export default function HomeScreen() {
           }
         });
       }
-      
+
       const suggested = Array.from(uniqueRoutes.values()).slice(0, 3);
       console.log(`Generated ${suggested.length} suggested routes`);
       setSuggestedRoutes(suggested);
@@ -1321,14 +1321,14 @@ export default function HomeScreen() {
               <Text style={styles.pointsLabel}>POINTS</Text>
             </View>
             <Pressable onPress={() => router.push('/profile')} style={styles.profileWrapper}>
-              <Image 
-                source={require('../../../assets/logo.png')} 
+              <Image
+                source={require('../../../assets/logo.png')}
                 style={styles.logoBg}
                 resizeMode="contain"
               />
-              <Image 
-                source={{ uri: userProfile?.avatar_url || 'https://ui-avatars.com/api/?name=U&background=111&color=fff' }} 
-                style={styles.avatar} 
+              <Image
+                source={{ uri: userProfile?.avatar_url || 'https://ui-avatars.com/api/?name=U&background=111&color=fff' }}
+                style={styles.avatar}
               />
             </Pressable>
           </View>
@@ -2199,15 +2199,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 32,
-    paddingHorizontal: 8,
   },
   leftBranding: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  menuBtn: {
-    padding: 4,
   },
   logoContainer: {
     justifyContent: 'center',
