@@ -12,6 +12,7 @@ import {
   Share,
   Dimensions,
   ScrollView,
+  Image,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Users, MessageSquare } from 'lucide-react-native';
