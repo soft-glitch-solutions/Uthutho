@@ -165,9 +165,25 @@ export default function Auth() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.card, isDesktop && styles.cardDesktop]}>
-          <View style={[styles.header, isSmallMobile && styles.headerSmall]}>
-            <Text style={styles.logo}>Uthutho</Text>
-            <Text style={styles.title}>Move Smarter</Text>
+          <View style={styles.brandingHeader}>
+            <View style={styles.logoRow}>
+              <Image 
+                source={require('../../assets/logo.png')} 
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+              <View style={styles.brandInfo}>
+                <View style={styles.logoTextRow}>
+                  <Text style={styles.brandText}>Uthutho</Text>
+                  <Text style={[styles.brandDot, { color: '#00f5d4' }]}>.</Text>
+                </View>
+                <Text style={styles.moveSmarter}>MOVE SMARTER</Text>
+              </View>
+            </View>
+            
+            <Text style={styles.welcomeBack}>
+              {isLogin ? 'Welcome Back' : 'Join Uthutho'}
+            </Text>
           </View>
 
           <View style={styles.tabContainer}>
@@ -270,11 +286,25 @@ export default function Auth() {
                 </TouchableOpacity>
               )}
 
+              <View style={styles.socialDivider}>
+                <Text style={styles.dividerText}>OR CONTINUE WITH</Text>
+              </View>
+
+              <View style={styles.socialRow}>
+                <TouchableOpacity style={styles.socialCircle} onPress={handleGoogleSignIn} disabled={googleLoading}>
+                  <Image source={require('../../assets/images/google-icon.png')} style={styles.socialIconLarge} />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.socialCircle} onPress={handleFacebookSignIn} disabled={facebookLoading}>
+                  <Image source={require('../../assets/images/facebook-icon.png')} style={styles.socialIconLarge} />
+                </TouchableOpacity>
+              </View>
+
               {!isLogin && (
                 <View style={styles.termsContainer}>
                   <TouchableOpacity style={styles.termsRow} onPress={() => setAcceptedTerms(!acceptedTerms)}>
                     <View style={styles.checkbox}>
-                      {acceptedTerms && <Check size={14} color={BRAND_COLOR} />}
+                      {acceptedTerms && <Check size={14} color="#00f5d4" />}
                     </View>
                     <Text style={styles.termsText}>I agree to the Terms</Text>
                   </TouchableOpacity>
@@ -282,26 +312,15 @@ export default function Auth() {
               )}
 
               <TouchableOpacity
-                style={styles.button}
+                style={styles.mainButton}
                 onPress={isLogin ? handleSignIn : handleSignUp}
                 disabled={isLoading}>
-                <Text style={styles.buttonText}>
-                  {isLoading ? '...' : isLogin ? 'Sign In' : 'Create Account'}
+                <Text style={styles.mainButtonText}>
+                  {isLoading ? '...' : isLogin ? 'LOG IN' : 'CREATE ACCOUNT'}
                 </Text>
-                {!isLoading && <ArrowRight size={18} color="#000" />}
+                {!isLoading && <ArrowRight size={20} color="#000" />}
               </TouchableOpacity>
 
-              <View style={styles.socialRow}>
-                <TouchableOpacity style={styles.socialButton} onPress={handleGoogleSignIn} disabled={googleLoading}>
-                  <Image source={require('../../assets/images/google-icon.png')} style={styles.socialIcon} />
-                  <Text style={styles.socialButtonText}>Google</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.socialButton} onPress={handleFacebookSignIn} disabled={facebookLoading}>
-                  <Image source={require('../../assets/images/facebook-icon.png')} style={styles.socialIcon} />
-                  <Text style={styles.socialButtonText}>Facebook</Text>
-                </TouchableOpacity>
-              </View>
             </View>
           )}
         </View>
@@ -346,53 +365,75 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#111',
   },
-  header: {
+  brandingHeader: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 40,
   },
-  headerSmall: {
-    marginBottom: 20,
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
   },
-  logo: {
-    fontSize: 42,
+  logoImage: {
+    width: 60,
+    height: 60,
+  },
+  brandInfo: {
+    justifyContent: 'center',
+  },
+  logoTextRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  brandText: {
+    fontSize: 48,
     fontWeight: '900',
-    color: BRAND_COLOR,
-    fontStyle: 'italic',
-    marginBottom: 4,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
     color: '#FFFFFF',
-    textAlign: 'center',
-    letterSpacing: -0.5,
+    letterSpacing: -1,
+  },
+  brandDot: {
+    fontSize: 48,
+    fontWeight: '900',
+    marginLeft: 2,
+  },
+  moveSmarter: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFF',
+    textTransform: 'uppercase',
+    letterSpacing: 3,
+    marginTop: -8,
+  },
+  welcomeBack: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#FFF',
+    marginTop: 12,
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#0A0A0A',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#111',
+    backgroundColor: '#262626',
+    borderRadius: 20,
+    padding: 6,
+    marginBottom: 32,
   },
   tab: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 14,
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 16,
   },
   activeTab: {
-    backgroundColor: BRAND_COLOR,
+    backgroundColor: '#38b2ac',
   },
   tabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#666',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#888',
   },
   activeTabText: {
-    color: '#000000',
-    fontWeight: '700',
+    color: '#000',
   },
   errorContainer: {
     backgroundColor: 'rgba(239, 68, 68, 0.05)',
@@ -417,32 +458,26 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0A0A0A',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#151515',
-    height: 48,
-    position: 'relative',
+    backgroundColor: '#333',
+    borderRadius: 8,
+    height: 56,
+    marginBottom: 4,
   },
   halfInput: {
     flex: 1,
   },
   inputIconLeft: {
-    position: 'absolute',
-    left: 14,
-    zIndex: 1,
+    marginLeft: 16,
+    marginRight: 12,
   },
   inputIconRight: {
-    position: 'absolute',
-    right: 14,
-    zIndex: 1,
+    marginRight: 16,
   },
   input: {
     flex: 1,
-    color: '#FFFFFF',
-    fontSize: 14,
-    paddingHorizontal: 42,
-    height: 48,
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '500',
   },
   inputNoIcon: {
     flex: 1,
@@ -456,24 +491,24 @@ const styles = StyleSheet.create({
     marginTop: -4,
   },
   forgotLinkText: {
-    color: BRAND_COLOR,
-    fontSize: 12,
-    fontWeight: '600',
+    color: '#00f5d4',
+    fontSize: 14,
+    fontWeight: '800',
   },
-  button: {
-    backgroundColor: BRAND_COLOR,
-    height: 52,
-    borderRadius: 12,
+  mainButton: {
+    backgroundColor: '#00f5d4',
+    height: 64,
+    borderRadius: 32,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
-    gap: 8,
+    marginTop: 20,
+    gap: 12,
   },
-  buttonText: {
-    color: '#000000',
-    fontSize: 14,
-    fontWeight: '700',
+  mainButtonText: {
+    color: '#000',
+    fontSize: 18,
+    fontWeight: '900',
     letterSpacing: 0.5,
   },
   termsContainer: {
@@ -507,31 +542,34 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  socialRow: {
-    marginTop: 16,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  socialButton: {
-    flex: 1,
-    flexDirection: 'row',
+  socialDivider: {
     alignItems: 'center',
-    backgroundColor: '#0A0A0A',
-    paddingVertical: 10,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#151515',
+    marginVertical: 24,
+  },
+  dividerText: {
+    color: '#888',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  socialRow: {
+    flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
+    gap: 24,
+    marginBottom: 32,
   },
-  socialButtonText: {
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: '600',
+  socialCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  socialIcon: {
-    width: 18,
-    height: 18,
+  socialIconLarge: {
+    width: 64,
+    height: 64,
     resizeMode: 'contain',
   },
 });

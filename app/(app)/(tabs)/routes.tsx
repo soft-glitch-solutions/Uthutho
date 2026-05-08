@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Pressable, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { Menu } from 'lucide-react-native';
+import { useNavigation, useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hook/useAuth';
 import { useTheme } from '@/context/ThemeContext';
 import { TabNavigation, StopsTab, RoutesTab, HubsTab, PlannerTab } from '@/components/routes';
 import type { TabType } from '@/components/routes';
@@ -272,9 +275,38 @@ export default function RoutesScreen() {
     }
   };
 
+  const navigation = useNavigation();
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style="light" />
+
+      {/* Global Branding Header */}
+      <View style={styles.topBrandingWrapper}>
+        <View style={styles.topRow}>
+          <View style={styles.leftBranding}>
+            <Pressable onPress={() => (navigation as any).openDrawer()} style={styles.menuBtn}>
+              <Menu size={28} color={colors.primary} />
+            </Pressable>
+            <View style={styles.logoContainer}>
+              <View style={styles.logoTextRow}>
+                <Text style={styles.logoText}>Uthutho</Text>
+                <Text style={[styles.logoDot, { color: colors.primary }]}>.</Text>
+              </View>
+              <Text style={styles.moveSmarter}>MOVE SMARTER</Text>
+            </View>
+          </View>
+          <View style={styles.rightBranding}>
+            {/* Context specific icons can go here if needed */}
+          </View>
+        </View>
+      </View>
+
+      {/* Routes Specific Header */}
+      <View style={styles.routesHeader}>
+        <Text style={styles.sectionTitle}>Transport</Text>
+      </View>
+
       <View style={[styles.innerContainer, isDesktop && styles.innerContainerDesktop]}>
         <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} isDesktop={isDesktop} />
         {renderTabContent()}
@@ -295,5 +327,69 @@ const styles = StyleSheet.create({
     maxWidth: 1200,
     alignSelf: 'center',
     width: '100%',
+  },
+  // Branding Styles
+  topBrandingWrapper: {
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    backgroundColor: '#000',
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  leftBranding: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  menuBtn: {
+    padding: 4,
+  },
+  logoContainer: {
+    justifyContent: 'center',
+  },
+  logoTextRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  logoText: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -1,
+  },
+  logoDot: {
+    fontSize: 28,
+    fontWeight: '900',
+    marginLeft: 1,
+  },
+  moveSmarter: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#CCC',
+    letterSpacing: 1.5,
+    marginTop: -4,
+  },
+  rightBranding: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  routesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 15,
+    backgroundColor: '#000',
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFF',
+    fontStyle: 'italic',
   },
 });

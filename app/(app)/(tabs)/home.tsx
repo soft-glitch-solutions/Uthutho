@@ -170,7 +170,13 @@ const AnimatedHamburgerMenu = ({ onPress, color, onLongPress, delayLongPress, te
       <Animated.View style={{ transform: [{ rotate: rotateInterpolation }] }}>
         <Menu size={28} color={color} />
       </Animated.View>
-      <Text style={[styles.uthuthoText, { color: textColor }]}> Uthutho </Text>
+      <View style={styles.brandInfo}>
+        <View style={styles.logoTextRow}>
+          <Text style={styles.logoText}>Uthutho</Text>
+          <Text style={[styles.logoDot, { color: color }]}>.</Text>
+        </View>
+        <Text style={styles.moveSmarter}>MOVE SMARTER</Text>
+      </View>
     </Pressable>
   );
 };
@@ -1303,16 +1309,13 @@ export default function HomeScreen() {
         {/* Top Branding Row */}
         <View style={styles.topRow}>
           <View style={styles.leftBranding}>
-            <Pressable onPress={() => (navigation as any).openDrawer()} style={styles.menuBtn}>
-              <Menu size={28} color={colors.primary} />
-            </Pressable>
-            <View style={styles.logoContainer}>
-              <View style={styles.logoTextRow}>
-                <Text style={styles.logoText}>Uthutho</Text>
-                <Text style={[styles.logoDot, { color: colors.primary }]}>.</Text>
-              </View>
-              <Text style={styles.moveSmarter}>MOVE SMARTER</Text>
-            </View>
+            <AnimatedHamburgerMenu
+              onPress={openSidebar}
+              onLongPress={() => setShowDebugPanel(true)}
+              delayLongPress={2000}
+              color={colors.primary}
+              textColor={colors.text}
+            />
           </View>
 
           <View style={styles.rightBranding}>
@@ -2206,7 +2209,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   logoContainer: {
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   logoTextRow: {
     flexDirection: 'row',

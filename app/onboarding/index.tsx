@@ -25,7 +25,7 @@ const getSlideConfig = () => [
     id: 1,
     tagline: 'WELCOME TO UTHUTHO',
     title: 'Ready to Move Together?',
-    description: 'Connect with fellow commuters, share real-time updates, and transform your daily travel experience.',
+    description: 'Uthutho is built around commuters. Stay connected, informed, and part of a shared journey with every trip you take.',
     icon: MapPin,
     webAnimation: 'https://lottie.host/261d0be8-1b97-44d7-9e94-9424f113cb1c/LgneVRy8Za.lottie',
     mobileAnimation: require('../../assets/animations/welcome.json'),
@@ -33,8 +33,8 @@ const getSlideConfig = () => [
   {
     id: 2,
     tagline: 'HUBS & STOPS',
-    title: 'Understand Your Journey',
-    description: 'Join communities through the routes you actually use. Help others know when transport is arriving.',
+    title: 'Build Your Community',
+    description: 'Read and create posts about the routes and stops you always use. The stronger the community, the more powerful Uthutho becomes.',
     icon: Navigation,
     webAnimation: 'https://lottie.host/6a2179e4-c19b-447f-abf8-ba546671c275/buGwONChJP.lottie',
     mobileAnimation: require('../../assets/animations/understand.json'),
@@ -50,9 +50,9 @@ const getSlideConfig = () => [
   },
   {
     id: 4,
-    tagline: 'COMMUTER CHAT',
-    title: 'Connect & Communicate',
-    description: 'Chat with other commuters, share tips, and coordinate your daily travel more efficiently.',
+    tagline: 'COMMUTER REWARDS',
+    title: 'Earn Points & Recognition',
+    description: 'Earn points for every journey, unlock exclusive titles, and show off being a community hero.',
     icon: MessageCircle,
     webAnimation: 'https://lottie.host/37ec536f-4eb1-4c2f-a8a3-523995f5bb7a/h7PQAmfGF7.lottie',
     mobileAnimation: require('../../assets/animations/connect.json'),
@@ -65,13 +65,13 @@ export default function Onboarding() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  
+
   const currentSlideRef = useRef(currentSlide);
   currentSlideRef.current = currentSlide;
   const isTransitioningRef = useRef(isTransitioning);
   isTransitioningRef.current = isTransitioning;
   const lastTapRef = useRef(0);
-  
+
   const slideAnim = useRef(new Animated.Value(0)).current;
   const router = useRouter();
   const slides = getSlideConfig();
@@ -91,7 +91,7 @@ export default function Onboarding() {
   const handleSlideTransition = (direction: 'next' | 'prev') => {
     if (isTransitioningRef.current) return;
     setIsTransitioning(true);
-    
+
     if (direction === 'next') {
       Animated.timing(slideAnim, {
         toValue: -SCREEN_WIDTH * 0.8,
@@ -156,20 +156,15 @@ export default function Onboarding() {
   return (
     <View style={[styles.container, isDesktop && styles.containerDesktop]}>
       <View style={[styles.header, isDesktop && styles.headerDesktop]}>
-        {currentSlide > 0 ? (
-          <TouchableOpacity style={styles.iconBtn} onPress={() => handleSlideTransition('prev')}>
-            <ChevronLeft size={24} color="#FFF" />
-          </TouchableOpacity>
-        ) : <View style={styles.placeholder} />}
         <TouchableOpacity style={styles.skipBtn} onPress={() => router.replace('/auth')}>
           <Text style={styles.skipText}>Skip</Text>
         </TouchableOpacity>
       </View>
 
       <View style={[styles.contentWrapper, isDesktop && styles.contentWrapperDesktop]}>
-        <Animated.View 
+        <Animated.View
           style={[
-            styles.main, 
+            styles.main,
             isDesktop && styles.mainDesktop,
             { transform: [{ translateX: slideAnim }] }
           ]}
@@ -184,41 +179,61 @@ export default function Onboarding() {
           </View>
 
           <View style={[styles.textContainer, isDesktop && styles.textContainerDesktop]}>
-            <Text style={styles.slideTagline}>{currentItem.tagline}</Text>
+            <View style={styles.taglineRow}>
+              {currentSlide > 0 ? (
+                <TouchableOpacity
+                  style={styles.inlineActionBtn}
+                  onPress={() => handleSlideTransition('prev')}
+                >
+                  <ChevronLeft size={20} color="#000" />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.inlineActionBtnEmpty} />
+              )}
+
+              <Text style={styles.slideTagline}>{currentItem.tagline}</Text>
+
+              {currentSlide < slides.length - 1 ? (
+                <TouchableOpacity
+                  style={styles.inlineActionBtn}
+                  onPress={() => handleSlideTransition('next')}
+                >
+                  <ArrowRight size={20} color="#000" />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.inlineActionBtnEmpty} />
+              )}
+            </View>
+
             <Text style={[styles.slideTitle, isSmallMobile && styles.slideTitleSmall]}>
               {currentItem.title}
             </Text>
             <Text style={[styles.slideDescription, isSmallMobile && styles.slideDescriptionSmall]}>
               {currentItem.description}
             </Text>
+
+            {currentSlide === slides.length - 1 && (
+              <TouchableOpacity
+                style={styles.getStartedBtn}
+                onPress={() => router.replace('/auth')}
+              >
+                <Text style={styles.getStartedText}>GET STARTED</Text>
+                <ArrowRight size={20} color="#000" />
+              </TouchableOpacity>
+            )}
           </View>
         </Animated.View>
 
-        {/* Floating Back Button on Left Side (Visible after first slide) */}
-        {currentSlide > 0 && (
-          <TouchableOpacity 
-            style={[styles.floatingBackBtn, isDesktop && styles.floatingBackBtnDesktop]} 
-            onPress={() => handleSlideTransition('prev')}
-          >
-            <ChevronLeft size={isDesktop ? 32 : 28} color="#FFF" />
-          </TouchableOpacity>
-        )}
-
-        {/* Floating Next Button on Right Side */}
-        <TouchableOpacity 
-          style={[styles.floatingNextBtn, isDesktop && styles.floatingNextBtnDesktop]} 
-          onPress={() => handleSlideTransition('next')}
-        >
-          <ArrowRight size={isDesktop ? 32 : 28} color="#000" />
-        </TouchableOpacity>
       </View>
 
       <View style={[styles.footer, isDesktop && styles.footerDesktop]}>
-        <View style={styles.pagination}>
-          {slides.map((_, i) => (
-            <View key={i} style={[styles.dot, currentSlide === i && styles.dotActive]} />
-          ))}
-        </View>
+        {currentSlide < slides.length - 1 && (
+          <View style={styles.pagination}>
+            {slides.map((_, i) => (
+              <View key={i} style={[styles.dot, currentSlide === i && styles.dotActive]} />
+            ))}
+          </View>
+        )}
       </View>
     </View>
   );
@@ -332,23 +347,31 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     alignItems: 'center',
+    width: '100%',
   },
   textContainerDesktop: {
     flex: 1,
-    alignItems: 'flex-start',
-    textAlign: 'left',
+    alignItems: 'center',
+    textAlign: 'center',
+  },
+  taglineRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 24,
   },
   slideTagline: {
-    fontSize: 10,
+    fontSize: 14,
     fontWeight: '900',
-    color: BRAND_COLOR,
-    letterSpacing: 2,
-    marginBottom: 12,
+    color: '#fed43f',
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
+    textAlign: 'center',
   },
   slideTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
+    fontSize: 38,
+    fontWeight: '900',
     color: '#FFF',
     textAlign: 'center',
     fontStyle: 'italic',
@@ -356,19 +379,59 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   slideTitleSmall: {
-    fontSize: 26,
-    marginBottom: 8,
+    fontSize: 32,
+    lineHeight: 38,
+    marginBottom: 12,
   },
   slideDescription: {
-    fontSize: 16,
-    color: '#888',
+    fontSize: 18,
+    color: '#94a3b8',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 28,
     fontWeight: '500',
   },
   slideDescriptionSmall: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  inlineActionBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: BRAND_COLOR,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: BRAND_COLOR,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  inlineActionBtnEmpty: {
+    width: 44,
+    height: 44,
+  },
+  getStartedBtn: {
+    flexDirection: 'row',
+    backgroundColor: '#fed43f',
+    width: '100%',
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 40,
+    gap: 12,
+    shadowColor: '#fed43f',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  getStartedText: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#000',
+    letterSpacing: 0.5,
   },
   floatingBackBtn: {
     position: 'absolute',
@@ -437,13 +500,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#222',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#334155',
   },
   dotActive: {
-    width: 24,
+    width: 32,
     backgroundColor: BRAND_COLOR,
   },
 });

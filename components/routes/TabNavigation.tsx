@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Navigation, Flag, Route as RouteIcon, MapPin } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
-import { gifPrefetchService, TabType, TAB_URLS } from '@/services/gifPrefetchService';
+import type { TabType } from '@/services/gifPrefetchService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -21,19 +21,6 @@ interface TabNavigationProps {
 
 export default function TabNavigation({ activeTab, onTabChange, isDesktop }: TabNavigationProps) {
   const { colors } = useTheme();
-  const headline = TAB_HEADLINES[activeTab];
-
-  // Force a re-render when GIFs are ready
-  const [, setReady] = useState(false);
-
-  useEffect(() => {
-    // If not ready yet, wait for prefetch to complete
-    if (!gifPrefetchService.isReady()) {
-      gifPrefetchService.startPrefetching().then(() => {
-        setReady(true); // Trigger re-render once all GIFs are cached
-      });
-    }
-  }, []);
 
   const tabs: { key: TabType; label: string; icon: (c: string) => React.ReactNode }[] = [
     { key: 'planner', label: 'Planner', icon: (c) => <Navigation size={16} color={c} /> },
@@ -42,24 +29,8 @@ export default function TabNavigation({ activeTab, onTabChange, isDesktop }: Tab
     { key: 'hubs', label: 'Hubs', icon: (c) => <MapPin size={16} color={c} /> },
   ];
 
-  // Get cached URI (will be available instantly after first load)
-  const currentImageURI = gifPrefetchService.getCachedURI(activeTab);
-
   return (
     <View style={styles.container}>
-      {/* Hero image - appears instantly with cached GIF */}
-      <View style={styles.heroWrap}>
-        <Image
-          source={{ uri: currentImageURI || TAB_URLS[activeTab] }}
-          style={styles.heroImage}
-          resizeMode="cover"
-        />
-        <View style={styles.heroOverlay} />
-        <View style={styles.heroContent}>
-          <Text style={styles.heroLabel}>{headline.label}</Text>
-          <Text style={styles.heroSub}>{headline.sub}</Text>
-        </View>
-      </View>
 
       {/* Tab pills */}
       <View style={[styles.tabBar, { backgroundColor: colors.card || '#1A1D1E' }]}>
@@ -91,41 +62,7 @@ export default function TabNavigation({ activeTab, onTabChange, isDesktop }: Tab
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 50,
-  },
-
-  // Hero image
-  heroWrap: {
-    marginHorizontal: 20,
-    height: 160,
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-  },
-  heroOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  heroContent: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
-  },
-  heroLabel: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 2,
-  },
-  heroSub: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    fontStyle: 'italic',
+    paddingTop: 10,
   },
 
   // Tab bar
