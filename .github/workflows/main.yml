@@ -1,4 +1,4 @@
-name: Deploy via lftp
+name: Deploy via FTP
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
@@ -57,16 +57,19 @@ jobs:
       - name: Install lftp
         run: sudo apt-get update && sudo apt-get install -y lftp
 
-      - name: Deploy using lftp
+      - name: Deploy via plain FTP
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           REMOTE_DIR: ${{ steps.set-dir.outputs.DIR }}
         run: |
-          lftp -c "
-          set ftp:ssl-allow yes;
-          set ssl:verify-certificate no;
-          open -u $FTP_USERNAME,$FTP_PASSWORD $FTP_SERVER;
-          mirror -R dist/ $REMOTE_DIR --delete --verbose
-          "
+          lftp <<EOF
+          set ftp:ssl-allow no
+          set ftp:passive-mode true
+          set net:max-retries 2
+          set net:timeout 20
+          open -u $FTP_USERNAME,$FTP_PASSWORD $FTP_SERVER
+          mirror -R dist/ $REMOTE_DIR --verbose --delete
+          bye
+          EOF
