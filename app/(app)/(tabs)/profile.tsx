@@ -15,6 +15,33 @@ import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import {
+  Menu,
+  User,
+  Target,
+  Map,
+  Navigation,
+  Plus,
+  BookmarkCheck,
+  Users,
+  ArrowRight,
+  ShieldCheck,
+  Award,
+  Bell,
+  Settings,
+  HelpCircle,
+  ChevronRight,
+  LogOut,
+  Camera,
+  Trash2,
+  Mail,
+  Lock,
+  Globe,
+  Share2,
+  Check
+} from 'lucide-react-native';
+import { useNavigation } from 'expo-router';
+import { Animated, Easing, Pressable, Image } from 'react-native';
 
 // Components
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
@@ -30,6 +57,39 @@ import { UserPost, LinkedAccount } from '@/types/profile';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
 
+// Animated Hamburger Menu Component
+const AnimatedHamburgerMenu = ({ onPress, color, onLongPress, delayLongPress, textColor }: any) => {
+  const rotation = useRef(new Animated.Value(0)).current;
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(rotation, { toValue: 1, duration: 150, easing: Easing.linear, useNativeDriver: true }),
+      Animated.timing(rotation, { toValue: 0, duration: 150, easing: Easing.linear, useNativeDriver: true })
+    ]).start();
+    if (onPress) onPress();
+  };
+
+  const rotateInterpolation = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '90deg']
+  });
+
+  return (
+    <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={delayLongPress} style={styles.logoContainer}>
+      <Animated.View style={{ transform: [{ rotate: rotateInterpolation }] }}>
+        <Menu size={28} color={color} />
+      </Animated.View>
+      <View style={styles.brandInfo}>
+        <View style={styles.logoTextRow}>
+          <Text style={styles.logoText}>Uthutho</Text>
+          <Text style={[styles.logoDot, { color: color }]}>.</Text>
+        </View>
+        <Text style={styles.moveSmarter}>MOVE SMARTER</Text>
+      </View>
+    </Pressable>
+  );
+};
+
 export default function ProfileScreen() {
   const { formatTimeAgo } = require('@/components/utils');
   const { colors } = useTheme();
@@ -41,6 +101,9 @@ export default function ProfileScreen() {
     uploading,
     updateProfile,
   } = useProfile();
+
+  const navigation = useNavigation();
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
 
   const [selectedTab, setSelectedTab] = useState('posts');
   const [userPosts, setUserPosts] = useState<UserPost[]>([]);
@@ -649,6 +712,37 @@ export default function ProfileScreen() {
         contentContainerStyle={[styles.contentContainer, isDesktop && styles.contentContainerDesktop]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Top Branding Row */}
+        <View style={styles.topRow}>
+          <View style={styles.leftBranding}>
+            <AnimatedHamburgerMenu
+              onPress={() => (navigation as any).openDrawer()}
+              onLongPress={() => setShowDebugPanel(true)}
+              delayLongPress={2000}
+              color={colors.primary}
+              textColor={colors.text}
+            />
+          </View>
+
+          <View style={styles.rightBranding}>
+            <View style={styles.pointsBox}>
+              <Text style={styles.pointsValue}>{profile?.points || 0}</Text>
+              <Text style={styles.pointsLabel}>POINTS</Text>
+            </View>
+            <View style={styles.profileWrapper}>
+              <Image
+                source={require('../../../assets/logo.png')}
+                style={styles.logoBg}
+                resizeMode="contain"
+              />
+              <Image
+                source={{ uri: profile?.avatar_url || 'https://ui-avatars.com/api/?name=U&background=111&color=fff' }}
+                style={styles.avatar}
+              />
+            </View>
+          </View>
+        </View>
+
         {/* Hidden file input for web */}
         {Platform.OS === 'web' && (
           <input
@@ -864,5 +958,87 @@ const styles = StyleSheet.create({
     color: '#FFF',
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    marginBottom: 24,
+  },
+  leftBranding: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  brandInfo: {
+    justifyContent: 'center',
+  },
+  logoTextRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  logoText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFF',
+    letterSpacing: -1,
+  },
+  logoDot: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginLeft: 1,
+  },
+  moveSmarter: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#CCC',
+    letterSpacing: 1.5,
+    marginTop: -4,
+  },
+  rightBranding: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  pointsBox: {
+    alignItems: 'flex-end',
+  },
+  pointsValue: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFF',
+  },
+  pointsLabel: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#FFF',
+    marginTop: -2,
+  },
+  profileWrapper: {
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoBg: {
+    position: 'absolute',
+    width: 64,
+    height: 64,
+    zIndex: 0,
+  },
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    zIndex: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
 });

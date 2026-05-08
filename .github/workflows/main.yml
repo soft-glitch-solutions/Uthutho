@@ -33,31 +33,45 @@ jobs:
           npm install undici@5.22.1 --save-exact --legacy-peer-deps
           npx expo export -p web
 
-      # 🔥 Set deployment directory based on branch
+      # Set deployment directory based on branch
       - name: Set deploy directory
         id: set-dir
         run: |
-          if [[ "${GITHUB_REF##*/}" == "shaqeel" ]]; then
-            echo "DIR=/shaqeel.uthutho.co.za/" >> $GITHUB_OUTPUT
-          elif [[ "${GITHUB_REF##*/}" == "Mahki" ]]; then
-            echo "DIR=/makhi.uthutho.co.za/" >> $GITHUB_OUTPUT
-          elif [[ "${GITHUB_REF##*/}" == "mirror" ]]; then
-            echo "DIR=/mirror.uthutho.co.za/" >> $GITHUB_OUTPUT
-          elif [[ "${GITHUB_REF##*/}" == "Ishmael" ]]; then
-            echo "DIR=/ishmael.uthutho.co.za/" >> $GITHUB_OUTPUT
+          BRANCH="${GITHUB_REF##*/}"
+
+          if [[ "$BRANCH" == "shaqeel" ]]; then
+            echo "DIR=/public_html/shaqeel/" >> $GITHUB_OUTPUT
+
+          elif [[ "$BRANCH" == "Mahki" ]]; then
+            echo "DIR=/public_html/makhi/" >> $GITHUB_OUTPUT
+
+          elif [[ "$BRANCH" == "mirror" ]]; then
+            echo "DIR=/public_html/mirror/" >> $GITHUB_OUTPUT
+
+          elif [[ "$BRANCH" == "Ishmael" ]]; then
+            echo "DIR=/public_html/ishmael/" >> $GITHUB_OUTPUT
+
           else
-            echo "DIR=/mobile.uthutho.co.za/" >> $GITHUB_OUTPUT
+            echo "DIR=/public_html/mobile/" >> $GITHUB_OUTPUT
           fi
 
-      - name: Deploy to cPanel via FTP
+      - name: Deploy to cPanel via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftp
-          port: ${{ secrets.FTP_PORT }}
+
+          protocol: ftps
+          security: loose
+          port: 21
+
           local-dir: dist/
           server-dir: ${{ steps.set-dir.outputs.DIR }}
-          cleanup: true
-          
+
+          dangerous-clean-slate: true
+
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
