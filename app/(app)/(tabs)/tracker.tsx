@@ -11,7 +11,9 @@ import {
   Animated,
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
-import { Plus, CreditCard, Grid3x3, LayoutList } from 'lucide-react-native';
+import { Plus, CreditCard, Grid3x3, LayoutList, Menu, Search, User } from 'lucide-react-native';
+import { useNavigation } from 'expo-router';
+import { Image, Pressable } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import CardComponent from '@/components/tracker/CardComponent';
@@ -57,7 +59,7 @@ export default function TrackerScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
   const { refs } = useTutorial();
-  
+
   const [userCards, setUserCards] = useState<UserCard[]>([]);
   const [showAddCardModal, setShowAddCardModal] = useState(false);
   const [showAddEntryModal, setShowAddEntryModal] = useState(false);
@@ -68,12 +70,35 @@ export default function TrackerScreen() {
 
   const [editingCard, setEditingCard] = useState<UserCard | null>(null);
   const [showEditCardModal, setShowEditCardModal] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+
+  const navigation = useNavigation();
 
   useEffect(() => {
     if (user) {
       loadUserCards();
+      loadUserProfile();
     }
   }, [user]);
+
+  const loadUserProfile = async () => {
+    try {
+      setIsProfileLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user?.id)
+        .single();
+
+      if (error) throw error;
+      setUserProfile(data);
+    } catch (error) {
+      console.error('Error loading profile in Tracker:', error);
+    } finally {
+      setIsProfileLoading(false);
+    }
+  };
 
   const loadUserCards = async () => {
     try {
@@ -145,32 +170,48 @@ export default function TrackerScreen() {
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Branded Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Text style={styles.brandText}>Uthutho</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity 
+      {/* Global Branding Header */}
+      <View style={styles.topBrandingWrapper}>
+        <View style={styles.topRow}>
+          <View style={styles.leftBranding}>
+            <Pressable onPress={() => (navigation as any).openDrawer()} style={styles.menuBtn}>
+              <Menu size={28} color={colors.primary} />
+            </Pressable>
+            <View style={styles.logoContainer}>
+              <View style={styles.logoTextRow}>
+                <Text style={styles.logoText}>Uthutho</Text>
+                <Text style={[styles.logoDot, { color: colors.primary }]}>.</Text>
+              </View>
+              <Text style={styles.moveSmarter}>MOVE SMARTER</Text>
+            </View>
+          </View>
+
+          <View style={styles.rightBranding}>
+            <TouchableOpacity
               style={styles.iconButton}
               onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
             >
-              {viewMode === 'grid' ? <LayoutList size={20} color="#FFF" /> : <Grid3x3 size={20} color="#FFF" />}
+              {viewMode === 'grid' ? <LayoutList size={22} color="#FFF" /> : <Grid3x3 size={22} color="#FFF" />}
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.addButton}
               onPress={() => setShowAddCardModal(true)}
             >
-              <Plus size={24} color="#000" />
+              <Plus size={22} color="#000" />
             </TouchableOpacity>
           </View>
         </View>
-        <View style={styles.headerContent}>
-          <Text style={styles.readyText}>READY TO MOVE</Text>
-          <Text style={styles.headingText}>My Wallet</Text>
+      </View>
+
+      {/* Tracker Specific Header Actions */}
+      <View style={styles.trackerHeader}>
+        <Text style={styles.sectionTitle}>My Wallet</Text>
+        <View style={styles.headerActions}>
+
         </View>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -187,7 +228,7 @@ export default function TrackerScreen() {
             </View>
             <Text style={styles.emptyTitle}>No Cards Found</Text>
             <Text style={styles.emptySubtitle}>Add your first transport card to start tracking your commute budget.</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.emptyButton}
               onPress={() => setShowAddCardModal(true)}
             >
@@ -218,7 +259,7 @@ export default function TrackerScreen() {
             <View style={styles.quickActionsSection} ref={refs.trackerActionsRef}>
               <Text style={styles.sectionLabel}>QUICK ACTIONS</Text>
               <View style={styles.actionsGrid}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.actionCard}
                   onPress={() => {
                     setSelectedAction('ride');
@@ -231,7 +272,7 @@ export default function TrackerScreen() {
                   <Text style={styles.actionText}>Log Ride</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.actionCard}
                   onPress={() => {
                     setSelectedAction('purchase');
@@ -314,22 +355,102 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  header: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
+  topBrandingWrapper: {
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    backgroundColor: '#000',
+    paddingHorizontal: 20,
+    paddingBottom: 15,
   },
-  headerTop: {
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  leftBranding: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    marginBottom: 32,
+    gap: 12,
   },
-  brandText: {
-    fontSize: 22,
+  menuBtn: {
+    padding: 4,
+  },
+  logoContainer: {
+    justifyContent: 'center',
+  },
+  logoTextRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  logoText: {
+    fontSize: 24,
     fontWeight: '900',
     color: '#FFF',
     letterSpacing: -1,
+  },
+  logoDot: {
+    fontSize: 28,
+    fontWeight: '900',
+    marginLeft: 1,
+  },
+  moveSmarter: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#CCC',
+    letterSpacing: 1.5,
+    marginTop: -4,
+  },
+  rightBranding: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  pointsBox: {
+    alignItems: 'flex-end',
+  },
+  pointsValue: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFF',
+  },
+  pointsLabel: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#FFF',
+    marginTop: -2,
+  },
+  profileWrapper: {
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoBg: {
+    position: 'absolute',
+    width: 64,
+    height: 64,
+    zIndex: 0,
+  },
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    zIndex: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  trackerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    backgroundColor: '#000',
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFF',
+    fontStyle: 'italic',
   },
   headerActions: {
     flexDirection: 'row',
@@ -352,24 +473,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerContent: {
-    marginTop: 0,
-  },
-  readyText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 2,
-    color: '#1ea2b1',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
-  headingText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#FFF',
-    fontStyle: 'italic',
-    letterSpacing: -1,
-  },
+
   content: {
     flex: 1,
   },
