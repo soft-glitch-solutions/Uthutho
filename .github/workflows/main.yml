@@ -17,15 +17,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: '18'
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
-      - name: Build app
+      - name: Build the app
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}
@@ -33,43 +33,31 @@ jobs:
           npm install undici@5.22.1 --save-exact --legacy-peer-deps
           npx expo export -p web
 
-      - name: Set deployment directory
+      # 🔥 Set deployment directory based on branch
+      - name: Set deploy directory
         id: set-dir
         run: |
-          BRANCH="${GITHUB_REF##*/}"
-
-          if [[ "$BRANCH" == "shaqeel" ]]; then
-            echo "DIR=/public_html/shaqeel/" >> $GITHUB_OUTPUT
-
-          elif [[ "$BRANCH" == "Mahki" ]]; then
-            echo "DIR=/public_html/makhi/" >> $GITHUB_OUTPUT
-
-          elif [[ "$BRANCH" == "mirror" ]]; then
-            echo "DIR=/public_html/mirror/" >> $GITHUB_OUTPUT
-
-          elif [[ "$BRANCH" == "Ishmael" ]]; then
-            echo "DIR=/public_html/ishmael/" >> $GITHUB_OUTPUT
-
+          if [[ "${GITHUB_REF##*/}" == "shaqeel" ]]; then
+            echo "DIR=/shaqeel.uthutho.co.za/" >> $GITHUB_OUTPUT
+          elif [[ "${GITHUB_REF##*/}" == "Mahki" ]]; then
+            echo "DIR=/makhi.uthutho.co.za/" >> $GITHUB_OUTPUT
+          elif [[ "${GITHUB_REF##*/}" == "mirror" ]]; then
+            echo "DIR=/mirror.uthutho.co.za/" >> $GITHUB_OUTPUT
+          elif [[ "${GITHUB_REF##*/}" == "Ishmael" ]]; then
+            echo "DIR=/ishmael.uthutho.co.za/" >> $GITHUB_OUTPUT
           else
-            echo "DIR=/public_html/mobile/" >> $GITHUB_OUTPUT
+            echo "DIR=/mobile.uthutho.co.za/" >> $GITHUB_OUTPUT
           fi
 
-      - name: Install lftp
-        run: sudo apt-get update && sudo apt-get install -y lftp
-
-      - name: Deploy via plain FTP
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-          REMOTE_DIR: ${{ steps.set-dir.outputs.DIR }}
-        run: |
-          lftp <<EOF
-          set ftp:ssl-allow no
-          set ftp:passive-mode true
-          set net:max-retries 2
-          set net:timeout 20
-          open -u $FTP_USERNAME,$FTP_PASSWORD $FTP_SERVER
-          mirror -R dist/ $REMOTE_DIR --verbose --delete
-          bye
-          EOF
+      - name: Deploy to cPanel via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          port: ${{ secrets.FTP_PORT }}
+          local-dir: dist/
+          server-dir: ${{ steps.set-dir.outputs.DIR }}
+          cleanup: true
+          
