@@ -172,9 +172,9 @@ export default function Onboarding() {
         >
           <View style={[styles.animationContainer, isDesktop && styles.animationContainerDesktop]}>
             {Platform.OS === 'web' ? (
-              <DotLottieReact src={currentItem.webAnimation} loop autoplay style={styles.animation} />
+              <DotLottieReact key={`web-${currentItem.id}`} src={currentItem.webAnimation} loop autoplay style={styles.animation} />
             ) : (
-              <LottieView source={currentItem.mobileAnimation} autoPlay loop style={styles.animation} />
+              <LottieView key={`mobile-${currentItem.id}`} source={currentItem.mobileAnimation} autoPlay loop style={styles.animation} />
             )}
           </View>
 
@@ -244,6 +244,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
   },
   containerDesktop: {
     paddingTop: 0,
@@ -308,6 +311,7 @@ const styles = StyleSheet.create({
   contentWrapper: {
     flex: 1,
     position: 'relative',
+    overflow: 'hidden',
   },
   contentWrapperDesktop: {
     flexDirection: 'row',
@@ -328,11 +332,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
   animationContainer: {
-    width: SCREEN_WIDTH * 0.8,
-    height: SCREEN_WIDTH * 0.8,
+    width: isSmallMobile ? SCREEN_WIDTH * 0.6 : SCREEN_WIDTH * 0.8,
+    height: isSmallMobile ? SCREEN_WIDTH * 0.6 : SCREEN_WIDTH * 0.8,
     maxWidth: 300,
     maxHeight: 300,
-    marginBottom: isSmallMobile ? 24 : 48,
+    marginBottom: isSmallMobile ? 16 : 48,
   },
   animationContainerDesktop: {
     width: 500,
@@ -359,10 +363,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    marginBottom: 24,
+    marginBottom: isSmallMobile ? 12 : 24,
   },
   slideTagline: {
-    fontSize: 14,
+    fontSize: isSmallMobile ? 12 : 14,
     fontWeight: '900',
     color: '#fed43f',
     letterSpacing: 1.5,
@@ -379,9 +383,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   slideTitleSmall: {
-    fontSize: 32,
-    lineHeight: 38,
-    marginBottom: 12,
+    fontSize: 28,
+    lineHeight: 32,
+    marginBottom: 8,
   },
   slideDescription: {
     fontSize: 18,
@@ -391,13 +395,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   slideDescriptionSmall: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 20,
+    paddingHorizontal: 8,
   },
   inlineActionBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: isSmallMobile ? 36 : 44,
+    height: isSmallMobile ? 36 : 44,
+    borderRadius: isSmallMobile ? 18 : 22,
     backgroundColor: BRAND_COLOR,
     alignItems: 'center',
     justifyContent: 'center',
@@ -408,8 +413,8 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   inlineActionBtnEmpty: {
-    width: 44,
-    height: 44,
+    width: isSmallMobile ? 36 : 44,
+    height: isSmallMobile ? 36 : 44,
   },
   getStartedBtn: {
     flexDirection: 'row',

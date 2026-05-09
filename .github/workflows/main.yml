@@ -84,7 +84,7 @@ jobs:
           server-dir: ${{ steps.set-dir.outputs.DIR }}
 
           # DELETE OLD FILES
-          dangerous-clean-slate: true
+          dangerous-clean-slate: False
 
           # FORCE FULL UPLOAD
           state-name: .ftp-deploy-sync-state-v2.json
