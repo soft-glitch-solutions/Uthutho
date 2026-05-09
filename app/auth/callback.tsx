@@ -10,61 +10,45 @@ export default function AuthCallback() {
   const [status, setStatus] = useState('Processing authentication...');
 
   useEffect(() => {
-    const handleAuthCallback = async () => {
-      try {
-        // Get the URL that launched the app
-        const url = await Linking.getInitialURL();
-        
-        if (!url) {
-          throw new Error('No URL found');
-        }
-
-        console.log('[AuthCallback] Handling URL:', url);
-        
-        // Parse the URL for tokens
-        const urlObj = new URL(url);
-        const hashParams = new URLSearchParams(urlObj.hash.substring(1));
-        
-        const access_token = hashParams.get('access_token');
-        const refresh_token = hashParams.get('refresh_token');
-        const error_description = hashParams.get('error_description');
-
-        if (error_description) {
-          throw new Error(error_description);
-        }
-
-        if (!access_token || !refresh_token) {
-          throw new Error('No authentication tokens found');
-        }
-
-        setStatus('Setting up your session...');
-        
-        // Set the session
-        const { error } = await supabase.auth.setSession({
-          access_token,
-          refresh_token,
-        });
-
-        if (error) throw error;
-
+    // The actual deep link parsing and session setup is handled in app/_layout.tsx
+    // This component just serves as a visual placeholder while that happens.
+    
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
         setStatus('Success! Redirecting...');
-        
-        // Small delay to show success message
         setTimeout(() => {
           router.replace('/(app)/(tabs)/home');
-        }, 1000);
-
-      } catch (error: any) {
-        console.error('[AuthCallback] Error:', error);
-        setStatus(`Authentication failed: ${error.message}`);
-        
-        setTimeout(() => {
-          router.replace('/auth');
-        }, 3000);
+        }, 500);
       }
     };
+    
+    checkAuth();
 
-    handleAuthCallback();
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        setStatus('Success! Redirecting...');
+        setTimeout(() => {
+          router.replace('/(app)/(tabs)/home');
+        }, 500);
+      } else if (event === 'SIGNED_OUT') {
+        router.replace('/auth');
+      }
+    });
+
+    // Fallback in case _layout.tsx fails to handle it for some reason after a long delay
+    const timeout = setTimeout(() => {
+      supabase.auth.getSession().then(({ data }) => {
+        if (!data.session) {
+          setStatus('Taking longer than expected...');
+        }
+      });
+    }, 5000);
+
+    return () => {
+      authListener.subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   return (

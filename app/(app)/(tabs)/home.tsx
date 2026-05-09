@@ -299,7 +299,10 @@ const GridSkeletonLoader = ({ colors }) => {
   );
 };
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors } = useTheme();
   const params = useLocalSearchParams();
@@ -1296,7 +1299,7 @@ export default function HomeScreen() {
     <ScreenTransition>
       <ScrollView
         ref={scrollViewRef}
-        style={[styles.container, { backgroundColor: colors.background }]}
+        style={[styles.container, { backgroundColor: colors.background, paddingTop: Math.max(insets.top, 8) }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -1320,7 +1323,12 @@ export default function HomeScreen() {
             />
           </View>
 
-          <View style={styles.rightBranding}>
+          <View
+            style={[styles.rightBranding, { minHeight: 1 }]}
+            ref={refs.headerRef}
+            collapsable={false}
+            renderToHardwareTextureAndroid
+          >
             {isProfileLoading ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
                 <View style={styles.pointsBox}>

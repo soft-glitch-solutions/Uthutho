@@ -76,7 +76,7 @@ const Header: React.FC<HeaderProps> = ({
 
           <TouchableOpacity
             style={styles.iconBtn}
-            onPress={() => router.push('/favorites')}
+            onPress={() => router.push('/explore-communities')}
           >
             <Plus size={20} color="#1ea2b1" />
           </TouchableOpacity>

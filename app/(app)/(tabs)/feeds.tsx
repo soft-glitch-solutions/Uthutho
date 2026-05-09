@@ -139,7 +139,10 @@ const WeekRangeHeader: React.FC<{
 // PreviewHeader has been replaced by CommunityHero for a more premium experience
 
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default function FeedsScreen() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { refs } = useTutorial();
   const userId = user?.id ?? '';
@@ -207,7 +210,7 @@ export default function FeedsScreen() {
         .select('first_name, last_name, selected_title, avatar_url')
         .eq('id', userId)
         .single();
-      
+
       if (error) throw error;
       if (data) {
         setUserProfile(data as UserProfile);
@@ -793,9 +796,9 @@ export default function FeedsScreen() {
               onPress={() => setShowPostModal(true)}
               activeOpacity={0.7}
             >
-              <Image 
-                source={{ uri: userProfile?.avatar_url || 'https://ui-avatars.com/api/?name=U&background=111&color=fff' }} 
-                style={styles.mobileComposeAvatar} 
+              <Image
+                source={{ uri: userProfile?.avatar_url || 'https://ui-avatars.com/api/?name=U&background=111&color=fff' }}
+                style={styles.mobileComposeAvatar}
               />
               <View style={styles.mobileComposeFakeInput}>
                 <Text style={styles.mobileComposePlaceholder}>
@@ -820,7 +823,7 @@ export default function FeedsScreen() {
   // Show empty state if no communities
   if (communities.length === 0) {
     return (
-      <View style={[styles.container, isDesktop && styles.containerDesktop]}>
+      <View style={[styles.container, isDesktop && styles.containerDesktop, { paddingTop: Math.max(insets.top, 8) }]}>
         <EmptyState
           unreadNotifications={unreadNotifications}
           router={router}
@@ -831,7 +834,7 @@ export default function FeedsScreen() {
   }
 
   return (
-    <View style={[styles.container, isDesktop && styles.containerDesktop]}>
+    <View style={[styles.container, isDesktop && styles.containerDesktop, { paddingTop: Math.max(insets.top, 8) }]}>
       {isDesktop ? (
         <>
           {/* Desktop Header */}
@@ -1127,6 +1130,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   mobileHeaderContent: {
+
     paddingBottom: 8,
   },
   mobileComposeBar: {
