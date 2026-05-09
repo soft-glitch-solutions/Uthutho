@@ -15,6 +15,7 @@ export interface TutorialRefs {
   // Screen elements
   trackerActionsRef?: React.RefObject<View>;
   feedsContentRef?: React.RefObject<View>;
+  awardsTabRef?: React.RefObject<View>;
 }
 
 interface TutorialContextType {
@@ -54,6 +55,7 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
     plannerTabRef: React.createRef<View>(),
     trackerActionsRef: React.createRef<View>(),
     feedsContentRef: React.createRef<View>(),
+    awardsTabRef: React.createRef<View>(),
   }), []);
 
   const registerRef = (key: keyof TutorialRefs, ref: React.RefObject<View>) => {};

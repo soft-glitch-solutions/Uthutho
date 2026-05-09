@@ -1,14 +1,14 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Animated, Dimensions, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ChevronRight, ChevronLeft, X, Navigation, MapPin, Bus, Star, Users, Zap, CreditCard, MessageSquare, Heart, Share2 } from 'lucide-react-native';
+import { ChevronRight, ChevronLeft, X, Navigation, MapPin, Bus, Star, Users, Zap, CreditCard, MessageSquare, Heart, Share2, Trophy, Shield } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTutorial, TutorialRefs } from '@/context/TutorialContext';
 import DemoWaitingDrawer from './DemoWaitingDrawer';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const IS_SMALL_SCREEN = SH < 700;
-export const TUTORIAL_SEEN_KEY = 'hasSeenAppTutorial_v4';
+export const TUTORIAL_SEEN_KEY = 'hasSeenAppTutorial_v5';
 
 export async function shouldShowTutorial(): Promise<boolean> {
   return (await AsyncStorage.getItem(TUTORIAL_SEEN_KEY)) !== 'true';
@@ -37,11 +37,13 @@ interface Step {
 const STEPS: Step[] = [
   { id: 'demo_waiting', refKey: null, isDemo: 'waiting', tag: 'THE CORE EXPERIENCE', title: 'Start Your First Journey', body: "Uthutho is built around community-driven transport. Here's exactly what it looks like when you join a waiting list at a stop. Tap below to try!", icon: <Bus size={30} color="#1ea2b1" />, accent: '#1ea2b1', position: 'center', pad: 0, tab: 'home' },
   { id: 'welcome', refKey: null, tag: 'WELCOME TO UTHUTHO', title: 'Your Smart Commute Companion', body: "Now that you've seen the core flow, let's explore your home dashboard. Tap NEXT for a guided tour of your tools.", icon: <Navigation size={30} color="#1ea2b1" />, accent: '#1ea2b1', position: 'center', pad: 0, tab: 'home' },
-  { id: 'header', refKey: 'headerRef', tag: 'YOUR IDENTITY', title: 'Points & Profile', body: 'Your live Uthutho Points (TP) balance. Tap your avatar to view your profile, streak and achievements.', icon: <Star size={26} color="#fbbf24" />, accent: '#fbbf24', position: 'below', pad: 12, tab: 'home' },
+  { id: 'header', refKey: 'headerRef', tag: 'YOUR IDENTITY', title: 'Points & Profile', body: 'Your live Uthutho Points (TP) balance sits right here. Tap your avatar to view your profile, streak, and titles you have earned on your journey.', icon: <Star size={26} color="#fbbf24" />, accent: '#fbbf24', position: 'below', pad: 12, tab: 'home' },
   { id: 'nearby', refKey: 'nearbyRef', tag: 'STEP 1 — STOPS', title: 'Nearby Stops & Hubs', body: 'Your nearest transport stop and community hub. Tap it to see live waiting counts and available routes.', icon: <MapPin size={26} color="#1ea2b1" />, accent: '#1ea2b1', position: 'below', pad: 14, tab: 'home' },
   { id: 'services', refKey: 'servicesRef', tag: 'STEP 2 — SERVICES', title: 'Quick Access Panel', body: 'Jump to Leaderboards, Trips, School Transport, Driver dashboard and more — all from one row.', icon: <Zap size={26} color="#8B5CF6" />, accent: '#8B5CF6', position: 'below', pad: 10, tab: 'home' },
   { id: 'favorites', refKey: 'favoritesRef', tag: 'STEP 3 — COMMUNITY', title: 'Your Saved Places', body: 'Pin your favourite stops, routes and hubs here for quick access and live community activity.', icon: <Users size={26} color="#10B981" />, accent: '#10B981', position: 'above', pad: 10, tab: 'home' },
   { id: 'gamification', refKey: 'gamificationRef', tag: 'STEP 4 — REWARDS', title: 'Earn Points & Level Up', body: 'Every journey earns Uthutho Points. Build streaks for bonuses and climb the weekly leaderboard.', icon: <Star size={26} color="#fbbf24" />, accent: '#fbbf24', position: 'above', pad: 10, tab: 'home' },
+  { id: 'titles_intro', refKey: null, tag: 'HALL OF GLORY', title: 'Earn Legendary Titles', body: "Every title in Uthutho has a story — a badge of honour earned through your Points. From Rookie Rider to Legion Commander, each rank says something powerful about who you are on the road.\n\nHead to your Profile → Awards tab to see all titles, their lore, and how close you are to unlocking the next one.", icon: <Trophy size={30} color="#fbbf24" />, accent: '#fbbf24', position: 'center', pad: 0, tab: 'profile' },
+  { id: 'squads_intro', refKey: null, tag: 'THE LEGION SYSTEM', title: 'Join or Form a Squad', body: "Squads are competitive groups of commuters who move together and dominate the leaderboard.\n\n• Pool your Points to level up your Legion\n• Recruit members and assign Commander roles\n• Challenge rival squads for weekly supremacy\n\nDiscover squads from the home screen, or create your own Legion for just 1,000 Points.", icon: <Shield size={30} color="#1ea2b1" />, accent: '#1ea2b1', position: 'center', pad: 0, tab: 'home' },
   { id: 'tracker_tab', refKey: 'trackerTabRef', tag: 'BUDGETING', title: 'The Expense Tracker', body: "Manage your transport spending. We'll switch you to the Cards tab now so you can see where your digital cards live.", icon: <CreditCard size={30} color="#8B5CF6" />, accent: '#8B5CF6', position: 'above', pad: 15, tab: 'tracker' },
   { id: 'demo_tracker', refKey: 'trackerActionsRef', isDemo: 'tracker', tag: 'DIGITAL CARDS', title: 'Expense Logging', body: "Track your spending by creating cards for your transport modes. Log every ride to stay on top of your budget.", icon: <CreditCard size={30} color="#8B5CF6" />, accent: '#8B5CF6', position: 'above', pad: 10, tab: 'tracker' },
   { id: 'feeds_tab', refKey: 'feedsTabRef', tag: 'COMMUNITY', title: 'Community Feeds', body: "Stay connected! We're moving to the Feeds tab where you can see live updates from your community.", icon: <MessageSquare size={30} color="#1ea2b1" />, accent: '#1ea2b1', position: 'above', pad: 15, tab: 'feeds' },

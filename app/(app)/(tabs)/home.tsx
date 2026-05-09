@@ -1424,7 +1424,7 @@ export default function HomeScreen() {
 
         </View>
 
-        <SquadsSection userId={userId} colors={colors} />
+
 
         {userProfile?.role === 'driver' && userId && (
           <DriverStatsSummary userId={userId} colors={colors} />
@@ -1434,6 +1434,7 @@ export default function HomeScreen() {
           <ServicesSection colors={colors} router={router} />
         </View>
 
+        <SquadsSection userId={userId} colors={colors} />
 
         {isProfileLoading || isFavoritesLoading ? (
           <View ref={refs.favoritesRef} collapsable={false} renderToHardwareTextureAndroid style={{ minHeight: 1 }}>

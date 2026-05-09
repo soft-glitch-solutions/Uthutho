@@ -123,12 +123,10 @@ const CustomDrawerContent = (props) => {
     <View style={styles.drawerContainer}>
       {/* Header */}
       <View style={[styles.drawerHeader, isSmallMobile && styles.drawerHeaderSmall]}>
-        <View style={[styles.headerTop, isSmallMobile && styles.headerTopSmall]}>
-          <View style={[styles.logoContainer, isSmallMobile && styles.logoContainerSmall]}>
-            <Image source={require('../../assets/uthutho-logo.png')} style={styles.logo} resizeMode="contain" />
-          </View>
+        <View style={styles.logoTextRow}>
+          <Text style={styles.logoText}>Uthutho</Text>
+          <Text style={[styles.logoDot, { color: BRAND_COLOR }]}>.</Text>
         </View>
-        <Text style={[styles.appTitle, isSmallMobile && styles.appTitleSmall]}>Uthutho</Text>
         <Text style={styles.readyText}>Move Smarter</Text>
       </View>
 
@@ -209,7 +207,7 @@ const CustomDrawerContent = (props) => {
         </View>
         <Text style={styles.versionText}>v1.8.2 — READY TO MOVE</Text>
       </View>
-    </View>
+    </View >
   );
 };
 
@@ -404,6 +402,10 @@ const styles = StyleSheet.create({
     color: '#FFF',
     letterSpacing: 1,
   },
+  logoTextRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
   driverSubtitle: {
     fontSize: 12,
     fontWeight: '600',
@@ -425,6 +427,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 20,
     marginBottom: 20,
+  },
+  logoText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFF',
+    letterSpacing: -1,
+  },
+  logoDot: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginLeft: 1,
   },
   socialContainerSmall: {
     marginBottom: 12,
@@ -448,3 +461,4 @@ const styles = StyleSheet.create({
   },
 });
 import { TouchableOpacity } from 'react-native-gesture-handler';
+import { PrimaryColor } from '@expo/config-plugins/build/android';

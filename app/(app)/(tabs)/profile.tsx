@@ -667,6 +667,7 @@ export default function ProfileScreen() {
             colors={colors}
             loading={loading}
             isDesktop={isDesktop}
+            profile={profile}
           />
         );
       default:

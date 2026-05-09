@@ -10,7 +10,6 @@ import {
   Modal, 
   StyleSheet, 
   Platform,
-  Alert
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,81 +20,17 @@ import {
   Star, 
   Zap, 
   Sparkles, 
-  X, 
-  Play, 
-  TrendingUp,
+  X,
   Award
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface LoginStreakPopupProps {
   open: boolean;
   onClose: () => void;
 }
-
-// Mock Ad Component
-const MockAdPlayer = ({ onComplete, onCancel }: { onComplete: () => void, onCancel: () => void }) => {
-  const [timeLeft, setTimeLeft] = useState(5);
-  const progress = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: 5000,
-      useNativeDriver: false,
-    }).start();
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <View style={styles.adOverlay}>
-      <LinearGradient colors={['#000', '#111']} style={styles.adContainer}>
-        <View style={styles.adHeader}>
-          <Text style={styles.adBadge}>ADVERTISEMENT</Text>
-          {timeLeft > 0 ? (
-            <Text style={styles.adTimer}>Reward in {timeLeft}s</Text>
-          ) : (
-            <TouchableOpacity onPress={onComplete} style={styles.adCloseBtn}>
-              <X size={20} color="#FFF" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <View style={styles.adVideoPlaceholder}>
-          <Play size={48} color="rgba(255,255,255,0.2)" />
-          <Text style={styles.adVideoText}>Uthutho Premium Video</Text>
-          <ActivityIndicator size="small" color="#1ea2b1" style={{ marginTop: 20 }} />
-        </View>
-
-        <View style={styles.adFooter}>
-          <Text style={styles.adFooterTitle}>Uthutho: Move with Purpose</Text>
-          <Text style={styles.adFooterDesc}>Join the eco-friendly transport revolution today.</Text>
-          <View style={styles.adProgressBarBg}>
-            <Animated.View 
-              style={[
-                styles.adProgressBarFill, 
-                { width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }
-              ]} 
-            />
-          </View>
-        </View>
-      </LinearGradient>
-    </View>
-  );
-};
 
 export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
   const { colors } = useTheme();
@@ -108,8 +43,6 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
   const [showSpinResult, setShowSpinResult] = useState(false);
   const [spinResult, setSpinResult] = useState<number | null>(null);
   const [hasSpunToday, setHasSpunToday] = useState(false);
-  const [showAd, setShowAd] = useState(false);
-  const [rewardDoubled, setRewardDoubled] = useState(false);
 
   const spinValue = useRef(new Animated.Value(0)).current;
   const scaleValue = useRef(new Animated.Value(1)).current;
@@ -130,7 +63,6 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
       fetchLoginStreak();
       setShowSpinResult(false);
       setSpinResult(null);
-      setRewardDoubled(false);
     }
   }, [open]);
 
@@ -222,43 +154,76 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
       setSpinResult(pointsWon);
       setShowSpinResult(true);
       setHasSpunToday(true);
-      await AsyncStorage.setItem(`lastSpinDate_${userId}`, today);
-      
-      // Initial Award
-      try {
-        await supabase.rpc('increment_points', { user_id: userId, points_to_add: pointsWon });
-      } catch (error) {
-        console.error('Error awarding points:', error);
-      }
-      
       setSpinning(false);
+      await AsyncStorage.setItem(`lastSpinDate_${userId}`, today);
+
+      // Award points to user profile
+      try {
+        // Try the RPC first (preferred — atomic increment)
+        const { error: rpcError } = await supabase.rpc('increment_points', {
+          user_id: userId,
+          points_to_add: pointsWon,
+        });
+
+        if (rpcError) {
+          // Fallback: manual read-then-write
+          console.warn('RPC increment_points failed, using fallback:', rpcError.message);
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('points')
+            .eq('id', userId)
+            .single();
+
+          if (profileData) {
+            await supabase
+              .from('profiles')
+              .update({ points: (profileData.points || 0) + pointsWon })
+              .eq('id', userId);
+          }
+        }
+      } catch (error) {
+        console.error('Error awarding spin points:', error);
+      }
     });
   };
 
-  const handleDoubleReward = () => {
-    setShowAd(true);
-  };
-
-  const onAdComplete = async () => {
-    setShowAd(false);
-    if (!spinResult) return;
+  const takeBonusPoints = async () => {
+    if (hasSpunToday) return;
+    const { data: session } = await supabase.auth.getSession();
+    if (!session.session?.user.id) return;
+    const userId = session.session.user.id;
+    const today = new Date().toDateString();
+    const bonusPoints = 10;
 
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session.session?.user.id) return;
-      
-      const additionalPoints = spinResult; // Double it means adding the same amount again
-      await supabase.rpc('increment_points', { 
-        user_id: session.session.user.id, 
-        points_to_add: additionalPoints 
+      // Try RPC first
+      const { error: rpcError } = await supabase.rpc('increment_points', {
+        user_id: userId,
+        points_to_add: bonusPoints,
       });
 
-      setSpinResult(spinResult * 2);
-      setRewardDoubled(true);
-      
-      Alert.alert('Success!', `Your reward has been doubled to ${spinResult * 2} points!`);
+      if (rpcError) {
+        // Fallback
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('points')
+          .eq('id', userId)
+          .single();
+
+        if (profileData) {
+          await supabase
+            .from('profiles')
+            .update({ points: (profileData.points || 0) + bonusPoints })
+            .eq('id', userId);
+        }
+      }
+
+      setShowSpinResult(true);
+      setSpinResult(bonusPoints);
+      setHasSpunToday(true);
+      await AsyncStorage.setItem(`lastSpinDate_${userId}`, today);
     } catch (error) {
-      console.error('Error doubling reward:', error);
+      console.error('Error awarding bonus:', error);
     }
   };
 
@@ -284,21 +249,6 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
         </View>
       </View>
     );
-  };
-
-  const takeBonusPoints = async () => {
-    if (hasSpunToday) return;
-    const { data: session } = await supabase.auth.getSession();
-    if (!session.session?.user.id) return;
-    try {
-      await supabase.rpc('increment_points', { user_id: session.session.user.id, points_to_add: 10 });
-      setShowSpinResult(true);
-      setSpinResult(10);
-      setHasSpunToday(true);
-      await AsyncStorage.setItem(`lastSpinDate_${session.session.user.id}`, new Date().toDateString());
-    } catch (error) {
-      console.error('Error awarding bonus:', error);
-    }
   };
 
   return (
@@ -347,28 +297,14 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
                       <Sparkles size={24} color="#000" />
                       <Text style={styles.resultText}>+{spinResult} POINTS WON!</Text>
                     </Animated.View>
-                    
-                    {!rewardDoubled && (
-                      <TouchableOpacity 
-                        style={styles.doubleBtn} 
-                        onPress={handleDoubleReward}
-                      >
-                        <LinearGradient
-                          colors={['#fbbf24', '#f59e0b']}
-                          style={styles.doubleBtnInner}
-                        >
-                          <Play size={18} color="#000" fill="#000" />
-                          <Text style={styles.doubleBtnText}>Watch Ad to Double Reward!</Text>
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    )}
-                    
+
                     <TouchableOpacity style={styles.claimBtn} onPress={onClose}>
-                      <Text style={styles.claimBtnText}>Claim Points</Text>
+                      <Text style={styles.claimBtnText}>Claim Points & Close</Text>
                     </TouchableOpacity>
                   </View>
                 ) : hasSpunToday ? (
                   <View style={styles.alreadySpunBox}>
+                    <Award size={24} color="#444" style={{ marginBottom: 8 }} />
                     <Text style={styles.alreadySpunText}>Reward collected! Come back tomorrow.</Text>
                   </View>
                 ) : (
@@ -393,11 +329,6 @@ export function LoginStreakPopup({ open, onClose }: LoginStreakPopupProps) {
           )}
         </View>
       </View>
-
-      {/* Full Screen Ad Modal */}
-      <Modal visible={showAd} transparent animationType="slide">
-        <MockAdPlayer onComplete={onAdComplete} onCancel={() => setShowAd(false)} />
-      </Modal>
     </Modal>
   );
 }
@@ -565,7 +496,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 20,
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 24,
   },
   resultText: {
     color: '#000',
@@ -574,121 +505,29 @@ const styles = StyleSheet.create({
   },
   alreadySpunBox: {
     backgroundColor: '#000',
-    padding: 20,
+    padding: 24,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#222',
+    alignItems: 'center',
   },
   alreadySpunText: {
     color: '#666',
     fontWeight: '600',
     textAlign: 'center',
   },
-  doubleBtn: {
-    width: '100%',
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  doubleBtnInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 10,
-  },
-  doubleBtnText: {
-    color: '#000',
-    fontWeight: '900',
-    fontSize: 14,
-  },
   claimBtn: {
-    paddingVertical: 12,
-  },
-  claimBtnText: {
-    color: '#666',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  // Ad Styles
-  adOverlay: {
-    flex: 1,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  adContainer: {
-    width: '100%',
-    height: '100%',
-    padding: 32,
-    justifyContent: 'space-between',
-  },
-  adHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 40,
-  },
-  adBadge: {
-    color: '#666',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 2,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    backgroundColor: '#111',
     borderWidth: 1,
     borderColor: '#222',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
   },
-  adTimer: {
+  claimBtnText: {
     color: '#FFF',
-    fontSize: 14,
     fontWeight: '700',
-  },
-  adCloseBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#222',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  adVideoPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-  },
-  adVideoText: {
-    color: '#444',
-    fontSize: 18,
-    fontWeight: '700',
-    fontStyle: 'italic',
-  },
-  adFooter: {
-    marginBottom: 40,
-  },
-  adFooterTitle: {
-    color: '#FFF',
-    fontSize: 20,
-    fontWeight: '900',
-    marginBottom: 8,
-  },
-  adFooterDesc: {
-    color: '#666',
     fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  adProgressBarBg: {
-    height: 4,
-    backgroundColor: '#111',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  adProgressBarFill: {
-    height: '100%',
-    backgroundColor: '#1ea2b1',
   },
 });
 
