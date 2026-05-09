@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import {
@@ -20,15 +21,23 @@ import {
   School,
   DollarSign,
   Users,
+  ChevronRight,
+  ShieldCheck,
+  CheckCircle2,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInRight, FadeOutLeft, FadeInDown } from 'react-native-reanimated';
+
+const BRAND_COLOR = '#1ea2b1';
 
 export default function CreateSchoolServiceScreen() {
   const router = useRouter();
   const { user } = useAuth();
   
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [driverId, setDriverId] = useState<string | null>(null);
   
@@ -100,12 +109,25 @@ export default function CreateSchoolServiceScreen() {
     });
   };
 
-  const handleSubmit = async () => {
-    if (!formData.schoolName.trim() || !formData.schoolArea.trim() || !formData.pricePerMonth) {
-      Alert.alert('Error', 'Please fill in all required fields');
+  const nextStep = () => {
+    if (step === 1 && (!formData.schoolName.trim() || !formData.schoolArea.trim())) {
+      Alert.alert('Incomplete', 'Please provide school name and area.');
       return;
     }
-    
+    if (step === 2 && formData.pickupAreas.some(a => !a.trim())) {
+      Alert.alert('Incomplete', 'Please fill in all pickup areas.');
+      return;
+    }
+    if (step === 3 && (!formData.capacity || !formData.pricePerMonth)) {
+      Alert.alert('Incomplete', 'Please set capacity and monthly price.');
+      return;
+    }
+    setStep(prev => prev + 1);
+  };
+
+  const prevStep = () => setStep(prev => prev - 1);
+
+  const handleSubmit = async () => {
     setLoading(true);
     try {
       const { error } = await supabase
@@ -124,8 +146,8 @@ export default function CreateSchoolServiceScreen() {
 
       if (error) throw error;
 
-      Alert.alert('Success!', 'Service created successfully.', [
-        { text: 'OK', onPress: () => router.replace('/driver-dashboard') }
+      Alert.alert('Service Live!', 'Your school transport service has been created and is now visible to parents.', [
+        { text: 'View Dashboard', onPress: () => router.replace('/driver-dashboard') }
       ]);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to create service');
@@ -134,87 +156,113 @@ export default function CreateSchoolServiceScreen() {
     }
   };
 
+  const renderStepIndicator = () => (
+    <View style={styles.stepIndicator}>
+      {[1, 2, 3, 4].map(s => (
+        <View key={s} style={styles.stepDotContainer}>
+          <View style={[
+            styles.stepDot,
+            step >= s ? styles.stepDotActive : styles.stepDotInactive
+          ]} />
+          {s < 4 && <View style={[
+            styles.stepLine,
+            step > s ? styles.stepLineActive : styles.stepLineInactive
+          ]} />}
+        </View>
+      ))}
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       
-      {/* Premium Header */}
+      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <TouchableOpacity 
             style={styles.backButton} 
-            onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/driver/create-service');
-              }
-            }}
+            onPress={() => step > 1 ? prevStep() : router.back()}
           >
             <ArrowLeft size={24} color="#FFF" />
           </TouchableOpacity>
-          <Text style={styles.brandText}>Uthutho</Text>
+          <View style={styles.progressTextContainer}>
+            <Text style={styles.progressText}>STEP {step} OF 4</Text>
+          </View>
           <View style={{ width: 40 }} />
         </View>
-        <View style={styles.headerContent}>
-          <Text style={styles.readyText}>SERVICE CREATION</Text>
-          <Text style={styles.headingText}>School Transport</Text>
-        </View>
+        <Text style={styles.headingText}>
+          {step === 1 && "School Details"}
+          {step === 2 && "Route & Timing"}
+          {step === 3 && "Capacity & Price"}
+          {step === 4 && "Review Service"}
+        </Text>
       </View>
 
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-          <View style={styles.formContainer}>
-            
-            {/* School Info Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>SCHOOL DETAILS</Text>
+        <ScrollView style={styles.scrollContainer} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+          {renderStepIndicator()}
+
+          {step === 1 && (
+            <Animated.View entering={FadeInRight} exiting={FadeOutLeft} style={styles.formSection}>
+              <Text style={styles.sectionDesc}>Which school will you be serving?</Text>
               <View style={styles.inputCard}>
                 <View style={styles.inputRow}>
-                  <School size={18} color="#1ea2b1" />
+                  <School size={20} color={BRAND_COLOR} />
                   <TextInput
                     style={styles.input}
-                    placeholder="School Name"
+                    placeholder="Full School Name"
                     placeholderTextColor="#444"
                     value={formData.schoolName}
                     onChangeText={(text) => setFormData(prev => ({ ...prev, schoolName: text }))}
                   />
                 </View>
                 <View style={[styles.inputRow, { borderTopWidth: 1, borderTopColor: '#1a1a1a' }]}>
-                  <MapPin size={18} color="#1ea2b1" />
+                  <MapPin size={20} color={BRAND_COLOR} />
                   <TextInput
                     style={styles.input}
-                    placeholder="School Area / Suburb"
+                    placeholder="Suburb / General Area"
                     placeholderTextColor="#444"
                     value={formData.schoolArea}
                     onChangeText={(text) => setFormData(prev => ({ ...prev, schoolArea: text }))}
                   />
                 </View>
               </View>
-            </View>
+              <View style={styles.tipCard}>
+                <ShieldCheck size={18} color={BRAND_COLOR} />
+                <Text style={styles.tipText}>Accurate school names help parents find your service faster.</Text>
+              </View>
+            </Animated.View>
+          )}
 
-            {/* Pickup Areas Section */}
-            <View style={styles.section}>
+          {step === 2 && (
+            <Animated.View entering={FadeInRight} style={styles.formSection}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionLabel}>PICKUP AREAS</Text>
-                <TouchableOpacity onPress={handleAddPickupArea}>
-                  <Plus size={18} color="#1ea2b1" />
+                <Text style={styles.sectionDesc}>Where will you pick up students?</Text>
+                <TouchableOpacity onPress={handleAddPickupArea} style={styles.addBtn}>
+                  <Plus size={18} color={BRAND_COLOR} />
+                  <Text style={styles.addBtnText}>ADD AREA</Text>
                 </TouchableOpacity>
               </View>
+              
               {formData.pickupAreas.map((area, index) => (
                 <View key={index} style={styles.arrayInputRow}>
                   <View style={styles.arrayInputCard}>
-                    <MapPin size={16} color="#666" />
+                    <MapPin size={18} color="#666" />
                     <TextInput
                       style={styles.input}
-                      placeholder={`Area ${index + 1}`}
+                      placeholder={`Pickup Suburb ${index + 1}`}
                       placeholderTextColor="#444"
                       value={area}
                       onChangeText={(text) => handlePickupAreaChange(index, text)}
                     />
+                    <TouchableOpacity onPress={() => setShowTimePicker(index)} style={styles.timeSelectBtn}>
+                      <Clock size={16} color={BRAND_COLOR} />
+                      <Text style={styles.timeSelectText}>{formatTime(formData.pickupTimes[index] || new Date())}</Text>
+                    </TouchableOpacity>
                   </View>
                   {formData.pickupAreas.length > 1 && (
                     <TouchableOpacity onPress={() => handleRemovePickupArea(index)} style={styles.removeBtn}>
@@ -223,58 +271,111 @@ export default function CreateSchoolServiceScreen() {
                   )}
                 </View>
               ))}
-            </View>
+            </Animated.View>
+          )}
 
-            {/* Capacity & Pricing */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>CAPACITY & PRICING</Text>
+          {step === 3 && (
+            <Animated.View entering={FadeInRight} style={styles.formSection}>
+              <Text style={styles.sectionDesc}>Set your monthly rates and seats.</Text>
               <View style={styles.inputCard}>
                 <View style={styles.inputRow}>
-                  <Users size={18} color="#1ea2b1" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Capacity (Seats)"
-                    placeholderTextColor="#444"
-                    keyboardType="numeric"
-                    value={formData.capacity}
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, capacity: text }))}
-                  />
+                  <Users size={20} color={BRAND_COLOR} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>TOTAL SEATS</Text>
+                    <TextInput
+                      style={styles.inputLarge}
+                      placeholder="e.g. 15"
+                      placeholderTextColor="#444"
+                      keyboardType="numeric"
+                      value={formData.capacity}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, capacity: text }))}
+                    />
+                  </View>
                 </View>
                 <View style={[styles.inputRow, { borderTopWidth: 1, borderTopColor: '#1a1a1a' }]}>
-                  <DollarSign size={18} color="#1ea2b1" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Monthly Price (ZAR)"
-                    placeholderTextColor="#444"
-                    keyboardType="numeric"
-                    value={formData.pricePerMonth}
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, pricePerMonth: text }))}
-                  />
+                  <DollarSign size={20} color={BRAND_COLOR} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>MONTHLY PRICE (ZAR)</Text>
+                    <TextInput
+                      style={styles.inputLarge}
+                      placeholder="e.g. 850"
+                      placeholderTextColor="#444"
+                      keyboardType="numeric"
+                      value={formData.pricePerMonth}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, pricePerMonth: text }))}
+                    />
+                  </View>
                 </View>
               </View>
-            </View>
+            </Animated.View>
+          )}
 
-            <TouchableOpacity
-              style={[styles.submitButton, loading && { opacity: 0.7 }]}
-              onPress={handleSubmit}
-              disabled={loading}
-            >
-              <Text style={styles.submitButtonText}>
-                {loading ? 'CREATING...' : 'CREATE SERVICE'}
-              </Text>
-            </TouchableOpacity>
+          {step === 4 && (
+            <Animated.View entering={FadeInDown} style={styles.formSection}>
+              <View style={styles.reviewCard}>
+                <View style={styles.reviewHeader}>
+                  <CheckCircle2 size={24} color={BRAND_COLOR} />
+                  <Text style={styles.reviewTitle}>Service Summary</Text>
+                </View>
+                
+                <View style={styles.reviewItem}>
+                  <Text style={styles.reviewLabel}>SCHOOL</Text>
+                  <Text style={styles.reviewValue}>{formData.schoolName}</Text>
+                  <Text style={styles.reviewSubValue}>{formData.schoolArea}</Text>
+                </View>
 
-            <Text style={styles.disclaimer}>
-              By creating this service, you agree to our driver terms and safety guidelines.
-            </Text>
-          </View>
-          <View style={{ height: 100 }} />
+                <View style={styles.reviewItem}>
+                  <Text style={styles.reviewLabel}>PICKUP AREAS</Text>
+                  {formData.pickupAreas.map((area, i) => (
+                    <Text key={i} style={styles.reviewValue}>• {area} ({formatTime(formData.pickupTimes[i])})</Text>
+                  ))}
+                </View>
+
+                <View style={styles.reviewFooter}>
+                  <View>
+                    <Text style={styles.reviewLabel}>CAPACITY</Text>
+                    <Text style={styles.reviewValue}>{formData.capacity} Seats</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.reviewLabel}>PRICE</Text>
+                    <Text style={[styles.reviewValue, { color: BRAND_COLOR }]}>R{formData.pricePerMonth}/mo</Text>
+                  </View>
+                </View>
+              </View>
+            </Animated.View>
+          )}
+
         </ScrollView>
       </KeyboardAvoidingView>
 
+      {/* Footer Navigation */}
+      <View style={styles.footer}>
+        <TouchableOpacity 
+          style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
+          onPress={step === 4 ? handleSubmit : nextStep}
+          disabled={loading}
+        >
+          <LinearGradient
+            colors={[BRAND_COLOR, '#15808d']}
+            style={styles.primaryBtnInner}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <>
+                <Text style={styles.primaryBtnText}>
+                  {step === 4 ? 'LAUNCH SERVICE' : 'CONTINUE'}
+                </Text>
+                {step < 4 && <ChevronRight size={20} color="#FFF" />}
+              </>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+
       {showTimePicker !== null && (
         <DateTimePicker
-          value={formData.pickupTimes[showTimePicker]}
+          value={formData.pickupTimes[showTimePicker] || new Date()}
           mode="time"
           onChange={(event, time) => handleTimeChange(showTimePicker, event, time)}
         />
@@ -290,68 +391,93 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 24,
-    paddingBottom: 24,
-    backgroundColor: '#000',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 20,
   },
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    marginBottom: 32,
+    marginBottom: 20,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  progressTextContainer: {
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  progressText: {
+    color: BRAND_COLOR,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  headingText: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -0.5,
+  },
+  stepIndicator: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    marginBottom: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brandText: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#FFF',
-    letterSpacing: -1,
+  stepDotContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  headerContent: {
-    marginTop: 0,
+  stepDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
-  readyText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 2,
-    color: '#1ea2b1',
-    marginBottom: 12,
-    textTransform: 'uppercase',
+  stepDotActive: {
+    backgroundColor: BRAND_COLOR,
+    transform: [{ scale: 1.2 }],
   },
-  headingText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#FFF',
-    fontStyle: 'italic',
-    letterSpacing: -1,
+  stepDotInactive: {
+    backgroundColor: '#222',
+  },
+  stepLine: {
+    width: 40,
+    height: 2,
+    marginHorizontal: 4,
+  },
+  stepLineActive: {
+    backgroundColor: BRAND_COLOR,
+  },
+  stepLineInactive: {
+    backgroundColor: '#222',
   },
   scrollContainer: {
     flex: 1,
   },
-  formContainer: {
+  formSection: {
     paddingHorizontal: 24,
   },
-  section: {
-    marginBottom: 32,
+  sectionDesc: {
+    fontSize: 16,
+    color: '#888',
+    marginBottom: 24,
+    fontWeight: '500',
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 2,
-    color: '#444',
     marginBottom: 16,
   },
   inputCard: {
@@ -365,20 +491,65 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    height: 64,
+    height: 72,
     gap: 16,
+  },
+  fieldLabel: {
+    fontSize: 9,
+    color: '#444',
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 2,
   },
   input: {
     flex: 1,
     color: '#FFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
+  },
+  inputLarge: {
+    flex: 1,
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  tipCard: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(30, 162, 177, 0.05)',
+    padding: 16,
+    borderRadius: 20,
+    marginTop: 24,
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(30, 162, 177, 0.1)',
+  },
+  tipText: {
+    flex: 1,
+    color: '#1ea2b1',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  addBtnText: {
+    color: BRAND_COLOR,
+    fontSize: 10,
+    fontWeight: '900',
   },
   arrayInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   arrayInputCard: {
     flex: 1,
@@ -387,38 +558,104 @@ const styles = StyleSheet.create({
     backgroundColor: '#111',
     borderRadius: 20,
     paddingHorizontal: 16,
-    height: 56,
+    height: 64,
     borderWidth: 1,
     borderColor: '#222',
     gap: 12,
   },
+  timeSelectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#050505',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  timeSelectText: {
+    color: BRAND_COLOR,
+    fontSize: 11,
+    fontWeight: '800',
+  },
   removeBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: 'rgba(239, 68, 68, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.1)',
   },
-  submitButton: {
-    backgroundColor: '#1ea2b1',
-    height: 64,
+  reviewCard: {
+    backgroundColor: '#111',
     borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 24,
+  },
+  reviewTitle: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  reviewItem: {
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  reviewLabel: {
+    color: '#444',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  reviewValue: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  reviewSubValue: {
+    color: '#888',
+    fontSize: 13,
+    marginTop: 2,
+  },
+  reviewFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  footer: {
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+  },
+  primaryBtn: {
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  primaryBtnInner: {
+    height: 64,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
+    gap: 8,
   },
-  submitButtonText: {
+  primaryBtnText: {
     color: '#FFF',
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 1,
-  },
-  disclaimer: {
-    fontSize: 12,
-    color: '#444',
-    textAlign: 'center',
-    marginTop: 24,
-    lineHeight: 18,
   },
 });

@@ -1,17 +1,47 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, SafeAreaView } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Search, MapPin, Users, Clock, Star, Shield, Car, School, Filter, ArrowLeft, CheckCircle2 } from 'lucide-react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  RefreshControl,
+  Animated as RNAnimated,
+  Platform,
+  Image,
+  Dimensions,
+  ActivityIndicator,
+  FlatList
+} from 'react-native';
+import { useRouter, Stack } from 'expo-router';
+import {
+  Search,
+  MapPin,
+  Users,
+  Clock,
+  Star,
+  Shield,
+  School,
+  Filter,
+  ArrowLeft,
+  ChevronRight,
+  Plus,
+  Compass,
+  TrendingUp,
+  ShieldCheck,
+  Zap,
+  CheckCircle2,
+  AlertCircle
+} from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import { useTheme } from '@/context/ThemeContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown, FadeInUp, FadeInRight } from 'react-native-reanimated';
 
-import SchoolTransportCard from '@/components/school-transport/SchoolTransportCard';
-import SchoolTransportGridCard from '@/components/school-transport/SchoolTransportGridCard';
-import TransportFilters from '@/components/school-transport/TransportFilters';
-import ApplyModal from '@/components/modals/ApplyModal';
-import StatusModal from '@/components/modals/StatusModal';
-import { Animated, Platform, Image } from 'react-native';
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const BRAND_COLOR = '#1ea2b1';
 
 interface SchoolTransport {
   id: string;
@@ -22,400 +52,261 @@ interface SchoolTransport {
   capacity: number;
   current_riders: number;
   price_per_month: number;
-  price_per_week: number;
-  vehicle_info: string;
-  vehicle_type: string;
-  features: string[];
-  description: string;
   is_verified: boolean;
-  driver_id: string;
   driver: {
-    id: string;
-    user_id: string;
-    is_verified: boolean;
     profiles: {
       first_name: string;
       last_name: string;
+      avatar_url: string;
       rating: number;
       total_trips: number;
     };
   };
 }
 
+const SchoolTransportCard = ({ item, onPress }: { item: SchoolTransport, onPress: () => void }) => {
+  const isFull = (item.current_riders || 0) >= item.capacity;
+  const spotsLeft = item.capacity - (item.current_riders || 0);
+
+  return (
+    <Animated.View entering={FadeInDown.duration(600)}>
+      <TouchableOpacity
+        style={styles.premiumCard}
+        onPress={onPress}
+        activeOpacity={0.9}
+      >
+        <View style={styles.cardTop}>
+          <View style={styles.cardHeaderInfo}>
+            <View style={styles.schoolRow}>
+              <School size={16} color={BRAND_COLOR} />
+              <Text style={styles.schoolName} numberOfLines={1}>{item.school_name}</Text>
+            </View>
+            <View style={styles.areaRow}>
+              <MapPin size={12} color="#444" />
+              <Text style={styles.areaText}>{item.school_area}</Text>
+            </View>
+          </View>
+          <View style={styles.priceTag}>
+            <Text style={styles.priceVal}>R{item.price_per_month}</Text>
+            <Text style={styles.priceSub}>/month</Text>
+          </View>
+        </View>
+
+        <View style={styles.cardStats}>
+          <View style={styles.statPill}>
+            <Zap size={12} color={BRAND_COLOR} fill={BRAND_COLOR} />
+            <Text style={styles.statPillText}>Lvl {Math.floor((item.driver?.profiles?.rating || 4) * 2)} Service</Text>
+          </View>
+          <View style={[styles.statPill, isFull && { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+            <Users size={12} color={isFull ? '#ef4444' : BRAND_COLOR} />
+            <Text style={[styles.statPillText, isFull && { color: '#ef4444' }]}>
+              {isFull ? 'FULL' : `${spotsLeft} SEATS`}
+            </Text>
+          </View>
+          {item.is_verified && (
+            <View style={styles.verifiedBadge}>
+              <ShieldCheck size={14} color={BRAND_COLOR} />
+            </View>
+          )}
+        </View>
+
+        <View style={styles.cardFooter}>
+          <View style={styles.driverInfo}>
+            <Image
+              source={{ uri: item.driver?.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${item.driver?.profiles?.first_name}+${item.driver?.profiles?.last_name}&background=111&color=fff` }}
+              style={styles.driverAvatar}
+            />
+            <View>
+              <Text style={styles.driverName}>{item.driver?.profiles?.first_name} {item.driver?.profiles?.last_name?.charAt(0)}.</Text>
+              <View style={styles.ratingRow}>
+                <Star size={10} color="#fbbf24" fill="#fbbf24" />
+                <Text style={styles.ratingText}>{item.driver?.profiles?.rating?.toFixed(1) || '4.8'}</Text>
+              </View>
+            </View>
+          </View>
+          <TouchableOpacity style={styles.viewBtn} onPress={onPress}>
+            <Text style={styles.viewBtnText}>SECURE SEAT</Text>
+            <ChevronRight size={14} color="#000" />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 export default function SchoolTransportScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
 
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const HEADER_MAX_HEIGHT = 160;
-  const HEADER_MIN_HEIGHT = Platform.OS === 'ios' ? 100 : 80;
-  const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
-
-  // State
   const [transports, setTransports] = useState<SchoolTransport[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
-    schoolArea: '',
-    pickupArea: '',
-    minPrice: '',
-    maxPrice: '',
-    vehicleType: '',
-    verifiedOnly: false,
-  });
 
-  // Modal states
-  const [showApplyModal, setShowApplyModal] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [selectedTransport, setSelectedTransport] = useState<string | null>(null);
-  const [modalStatus, setModalStatus] = useState<{
-    type: 'success' | 'error' | 'warning' | 'info';
-    title: string;
-    message: string;
-  }>({
-    type: 'info',
-    title: '',
-    message: '',
-  });
-  const [applyLoading, setApplyLoading] = useState(false);
-
-  useEffect(() => {
-    fetchTransports();
-  }, [filters]);
+  const scrollY = useRef(new RNAnimated.Value(0)).current;
 
   const fetchTransports = async () => {
     try {
-      let query = supabase
+      setLoading(true);
+      const { data, error } = await supabase
         .from('school_transports')
-        .select('*')
+        .select(`
+          *,
+          driver:drivers (
+            profiles:user_id (
+              first_name,
+              last_name,
+              avatar_url,
+              rating,
+              total_trips
+            )
+          )
+        `)
         .eq('is_active', true)
         .order('is_verified', { ascending: false })
         .order('created_at', { ascending: false });
 
-      if (filters.schoolArea) query = query.ilike('school_area', `%${filters.schoolArea}%`);
-      if (filters.verifiedOnly) query = query.eq('is_verified', true);
-      if (filters.vehicleType) query = query.eq('vehicle_type', filters.vehicleType);
-      if (filters.minPrice) query = query.gte('price_per_month', parseFloat(filters.minPrice));
-      if (filters.maxPrice) query = query.lte('price_per_month', parseFloat(filters.maxPrice));
+      if (error) throw error;
 
-      const { data: transportsData, error: transportsError } = await query;
-      if (transportsError) throw transportsError;
-
-      if (!transportsData || transportsData.length === 0) {
-        setTransports([]);
-        return;
-      }
-
-      const driverIds = transportsData.map(t => t.driver_id).filter(id => id) as string[];
-      let driversMap = new Map();
-
-      if (driverIds.length > 0) {
-        const { data: driversData, error: driversError } = await supabase
-          .from('drivers')
-          .select(`
-            id,
-            user_id,
-            is_verified,
-            profiles:user_id (
-              first_name,
-              last_name,
-              rating,
-              total_trips
-            )
-          `)
-          .in('id', driverIds);
-
-        if (!driversError && driversData) {
-          driversData.forEach(driver => {
-            driversMap.set(driver.id, {
-              id: driver.id,
-              user_id: driver.user_id,
-              is_verified: driver.is_verified,
-              profiles: driver.profiles || { first_name: 'Unknown', last_name: 'Driver', rating: 0, total_trips: 0 }
-            });
-          });
+      // Transform data to match interface
+      const formatted = data?.map(t => ({
+        ...t,
+        driver: {
+          profiles: t.driver?.profiles || { first_name: 'Unknown', last_name: 'Driver', rating: 0, total_trips: 0 }
         }
-      }
+      }));
 
-      const formattedData = transportsData.map(transport => {
-        const driverData = driversMap.get(transport.driver_id) || {
-          id: transport.driver_id || '',
-          user_id: '',
-          is_verified: false,
-          profiles: { first_name: 'Unknown', last_name: 'Driver', rating: 0, total_trips: 0 }
-        };
-
-        if (filters.pickupArea) {
-          const pickupAreas = Array.isArray(transport.pickup_areas) ? transport.pickup_areas : [];
-          if (!pickupAreas.some(area => area.toLowerCase().includes(filters.pickupArea.toLowerCase()))) return null;
-        }
-
-        return {
-          ...transport,
-          pickup_areas: Array.isArray(transport.pickup_areas) ? transport.pickup_areas : [],
-          pickup_times: Array.isArray(transport.pickup_times) ? transport.pickup_times : [],
-          features: Array.isArray(transport.features) ? transport.features : [],
-          driver: driverData
-        };
-      }).filter(Boolean) as SchoolTransport[];
-
-      setTransports(formattedData);
-    } catch (error: any) {
-      console.error('Error fetching transports:', error);
-      setTransports([]);
+      setTransports(formatted as any);
+    } catch (error) {
+      console.error('Error fetching school transport:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
+  useEffect(() => {
+    fetchTransports();
+  }, []);
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchTransports();
   };
 
-  const handleApply = async (transportId: string) => {
-    if (!user) {
-      setModalStatus({ type: 'error', title: 'Sign In Required', message: 'Please sign in to apply for transport' });
-      setShowStatusModal(true);
-      return;
-    }
-
-    const transport = transports.find(t => t.id === transportId);
-    if (!transport) return;
-
-    if (transport.current_riders >= transport.capacity) {
-      setModalStatus({ type: 'warning', title: 'Full Capacity', message: 'This transport service has reached its maximum capacity' });
-      setShowStatusModal(true);
-      return;
-    }
-
-    try {
-      const { data: existingRequest } = await supabase
-        .from('transport_requests')
-        .select('id')
-        .eq('transport_id', transportId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (existingRequest) {
-        setModalStatus({ type: 'warning', title: 'Already Applied', message: 'You have already applied to this transport service' });
-        setShowStatusModal(true);
-        return;
-      }
-
-      setSelectedTransport(transportId);
-      setShowApplyModal(true);
-    } catch (error) {
-      console.error('Error checking application:', error);
-    }
-  };
-
-  const handleSubmitApplication = async (applicationData: {
-    studentName: string;
-    grade: string;
-    pickupAddress: string;
-    parentPhone: string;
-    parentEmail: string;
-  }) => {
-    if (!selectedTransport || !user) return;
-    setApplyLoading(true);
-    try {
-      const { error } = await supabase
-        .from('transport_requests')
-        .insert({
-          transport_id: selectedTransport,
-          user_id: user.id,
-          student_name: applicationData.studentName,
-          student_grade: applicationData.grade,
-          pickup_address: applicationData.pickupAddress,
-          parent_phone: applicationData.parentPhone,
-          parent_email: applicationData.parentEmail,
-          status: 'pending',
-        });
-
-      if (error) throw error;
-      setModalStatus({ type: 'success', title: 'Success', message: 'Application submitted! The driver will review your request.' });
-      setShowStatusModal(true);
-      setShowApplyModal(false);
-      fetchTransports();
-    } catch (error: any) {
-      console.error('Error applying:', error);
-    } finally {
-      setApplyLoading(false);
-    }
-  };
-
-  const filteredTransports = transports.filter(transport => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      transport.school_name.toLowerCase().includes(query) ||
-      transport.school_area.toLowerCase().includes(query) ||
-      transport.pickup_areas.some(area => area.toLowerCase().includes(query)) ||
-      transport.driver.profiles.first_name.toLowerCase().includes(query)
-    );
-  });
-
-  const renderSkeleton = () => (
-    <View style={styles.skeletonGrid}>
-      {[1, 2, 3, 4].map(i => (
-        <View key={i} style={[styles.skeletonGridCard, { backgroundColor: colors.card, borderColor: colors.border }]} />
-      ))}
-    </View>
+  const filteredTransports = transports.filter(t =>
+    t.school_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.school_area.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.pickup_areas?.some(a => a.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const headerImageHeight = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE],
-    outputRange: [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT],
-    extrapolate: 'clamp',
-  });
-
-  const imageOpacity = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE / 2, HEADER_SCROLL_DISTANCE],
-    outputRange: [1, 0.5, 0],
-    extrapolate: 'clamp',
-  });
-
-  const headerTitleScale = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE],
-    outputRange: [1, 0.75],
-    extrapolate: 'clamp',
-  });
-
-  const headerTitleTranslateY = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE],
-    outputRange: [0, -10],
-    extrapolate: 'clamp',
-  });
-
   const renderHeader = () => (
-    <View>
-      {/* Added marginTop to create space between header image and search bar */}
-      <View style={{ height: HEADER_MAX_HEIGHT - 30 }} />
-      <View style={[styles.searchWrapper, { backgroundColor: colors.background }]}>
-        {/* Added marginTop to the search bar container for extra spacing */}
-        <View style={{ marginTop: 16 }}>
-          <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Search size={18} color={colors.primary} />
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Search schools or areas..."
-              placeholderTextColor="#888"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            <TouchableOpacity
-              style={[styles.filterIcon, { backgroundColor: colors.primary }]}
-              onPress={() => setShowFilters(true)}
-            >
-              <Filter size={18} color="#FFF" />
-            </TouchableOpacity>
+    <View style={styles.listHeader}>
+      <Animated.View entering={FadeInDown.duration(800)} style={styles.heroSection}>
+        <View style={styles.heroTop}>
+          <View>
+            <Text style={styles.heroLabel}>SAFE PASSAGE</Text>
+            <Text style={styles.heroTitle}>School Express</Text>
           </View>
+
         </View>
+
+        <View style={styles.searchBar}>
+          <Search size={20} color="#888" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search school or suburb..."
+            placeholderTextColor="#444"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          <TouchableOpacity style={styles.filterBtn}>
+            <Filter size={18} color={BRAND_COLOR} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.quickActions}>
+          <TouchableOpacity style={styles.actionPill}>
+            <ShieldCheck size={14} color={BRAND_COLOR} />
+            <Text style={styles.actionText}>Verified</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionPill}>
+            <TrendingUp size={14} color={BRAND_COLOR} />
+            <Text style={styles.actionText}>Top Rated</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionPill}>
+            <Clock size={14} color={BRAND_COLOR} />
+            <Text style={styles.actionText}>Early Birds</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+
+      <View style={styles.sectionTitleRow}>
+        <Text style={styles.sectionTitle}>LEGION OF DRIVERS</Text>
+        <Text style={styles.sectionCount}>{filteredTransports.length} Found</Text>
       </View>
-      {loading && renderSkeleton()}
     </View>
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Animated Header */}
-      <Animated.View style={[styles.imageHeader, { height: headerImageHeight, backgroundColor: colors.background }]}>
-        <Animated.Image
-          source={require('@/assets/images/school-transport.jpg')}
-          style={[styles.headerImage, { opacity: imageOpacity }]}
-          resizeMode="cover"
-        />
-        <View style={styles.imageOverlay} />
+    <View style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
 
-        <View style={styles.headerContent}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeft size={24} color="#FFF" />
-          </TouchableOpacity>
+      {/* Top Navigation */}
+      <View style={styles.navBar}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <ArrowLeft size={24} color="#FFF" />
+        </TouchableOpacity>
+        <Text style={styles.navTitle}>Uthutho School</Text>
+        <View style={{ width: 44 }} />
+      </View>
 
-          <Animated.View style={{
-            transform: [
-              { scale: headerTitleScale },
-              { translateY: headerTitleTranslateY }
-            ]
-          }}>
-            <Text style={styles.heroTitle}>School Transport</Text>
-            <Animated.Text style={[styles.heroSubtitle, { opacity: imageOpacity }]}>
-              Safe and reliable journeys for your children
-            </Animated.Text>
-          </Animated.View>
-        </View>
-      </Animated.View>
-
-      <Animated.FlatList
+      <FlatList
         data={filteredTransports}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={styles.columnWrapper}
+        keyExtractor={item => item.id}
         renderItem={({ item }) => (
-          <SchoolTransportGridCard
-            transport={item}
-            onViewDetails={() => router.push(`/school-transport/${item.id}`)}
+          <SchoolTransportCard
+            item={item}
+            onPress={() => router.push(`/school-transport/${item.id}`)}
           />
         )}
         ListHeaderComponent={renderHeader()}
-        ListEmptyComponent={
-          !loading ? (
-            <View style={styles.emptyState}>
-              <School size={64} color={colors.border} />
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No services found</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.text, opacity: 0.5 }]}>
-                Try adjusting your search or filters
-              </Text>
-              <TouchableOpacity style={[styles.secondaryButton, { borderColor: colors.primary }]} onPress={() => router.push('/driver-onboarding')}>
-                <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>Become a Driver</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null
-        }
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
-        scrollEventThrottle={16}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
-            progressViewOffset={HEADER_MAX_HEIGHT}
+            tintColor={BRAND_COLOR}
           />
         }
-        contentContainerStyle={styles.flatListContent}
-        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator size="large" color={BRAND_COLOR} style={{ marginTop: 40 }} />
+          ) : (
+            <View style={styles.emptyState}>
+              <School size={64} color="#222" />
+              <Text style={styles.emptyTitle}>No Service Found</Text>
+              <Text style={styles.emptySubtitle}>Try searching for a different school or suburb.</Text>
+            </View>
+          )
+        }
       />
 
-      <TransportFilters
-        visible={showFilters}
-        filters={filters}
-        onFiltersChange={setFilters}
-        onClose={() => setShowFilters(false)}
-      />
-
-      <ApplyModal
-        visible={showApplyModal}
-        onClose={() => setShowApplyModal(false)}
-        onSubmit={handleSubmitApplication}
-        loading={applyLoading}
-      />
-
-      <StatusModal
-        visible={showStatusModal}
-        type={modalStatus.type}
-        title={modalStatus.title}
-        message={modalStatus.message}
-        onClose={() => setShowStatusModal(false)}
-      />
+      {/* Floating Action Button */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push('/driver/create-service/school')}
+      >
+        <LinearGradient
+          colors={[BRAND_COLOR, '#15808d']}
+          style={styles.fabInner}
+        >
+          <Plus size={24} color="#FFF" />
+          <Text style={styles.fabText}>LAUNCH SERVICE</Text>
+        </LinearGradient>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -423,120 +314,316 @@ export default function SchoolTransportScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
   },
-  imageHeader: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    overflow: 'hidden',
-    zIndex: 10,
-  },
-  headerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  imageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  headerContent: {
-    position: 'absolute',
-    bottom: 10,
-    left: 24,
-    right: 24,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
+  navBar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 20,
+    backgroundColor: '#000',
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  navTitle: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 120,
+  },
+  listHeader: {
+    marginTop: 12,
+  },
+  heroSection: {
+    marginBottom: 32,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 24,
+  },
+  heroLabel: {
+    color: '#444',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 4,
   },
   heroTitle: {
-    fontSize: 28,
-    fontWeight: '800',
     color: '#FFF',
-    letterSpacing: -0.5,
+    fontSize: 36,
+    fontWeight: '900',
+    letterSpacing: -1,
   },
-  heroSubtitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 4,
+  heroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
   },
-  searchWrapper: {
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    paddingTop: 20,
+  heroBadgeText: {
+    color: BRAND_COLOR,
+    fontSize: 10,
+    fontWeight: '900',
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    paddingLeft: 16,
-    borderRadius: 16,
+    backgroundColor: '#111',
+    borderRadius: 20,
+    height: 64,
+    paddingHorizontal: 20,
     borderWidth: 1,
-    gap: 12,
+    borderColor: '#222',
+    marginBottom: 16,
   },
   searchInput: {
     flex: 1,
+    marginLeft: 12,
+    color: '#FFF',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
-  filterIcon: {
+  filterBtn: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    justifyContent: 'center',
+    backgroundColor: '#050505',
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#222',
   },
-  columnWrapper: {
+  quickActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#111',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  actionText: {
+    color: '#888',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  flatListContent: {
-    paddingBottom: 40,
+  sectionTitle: {
+    color: '#444',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  sectionCount: {
+    color: BRAND_COLOR,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  premiumCard: {
+    backgroundColor: '#111',
+    borderRadius: 32,
+    padding: 24,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  cardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  cardHeaderInfo: {
+    flex: 1,
+  },
+  schoolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  schoolName: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '900',
+    flex: 1,
+  },
+  areaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  areaText: {
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  priceTag: {
+    alignItems: 'flex-end',
+  },
+  priceVal: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  priceSub: {
+    color: '#444',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  cardStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 24,
+  },
+  statPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(30, 162, 177, 0.05)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(30, 162, 177, 0.1)',
+  },
+  statPillText: {
+    color: BRAND_COLOR,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  verifiedBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(30, 162, 177, 0.2)',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#222',
+  },
+  driverInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  driverAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+  },
+  driverName: {
+    color: '#CCC',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  ratingText: {
+    color: '#fbbf24',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  viewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: BRAND_COLOR,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  viewBtnText: {
+    color: '#000',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 24,
+    marginTop: 60,
+    paddingHorizontal: 40,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 20,
+    color: '#FFF',
+    fontSize: 24,
+    fontWeight: '900',
+    marginTop: 24,
   },
   emptySubtitle: {
+    color: '#444',
     fontSize: 14,
-    marginTop: 4,
     textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 20,
   },
-  secondaryButton: {
-    marginTop: 24,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
+  fab: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: BRAND_COLOR,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  secondaryButtonText: {
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  skeletonGrid: {
+  fabInner: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 24,
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 64,
+    gap: 12,
   },
-  skeletonGridCard: {
-    width: '48%',
-    height: 200,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginBottom: 16,
+  fabText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 2,
   },
 });

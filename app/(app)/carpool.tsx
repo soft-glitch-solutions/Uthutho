@@ -1,5 +1,4 @@
-// app/carpool.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,13 +7,14 @@ import {
   TouchableOpacity,
   TextInput,
   RefreshControl,
-  Animated,
+  Animated as RNAnimated,
   Platform,
   Image,
   Dimensions,
-  SafeAreaView
+  ActivityIndicator,
+  FlatList
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import {
   Search,
   MapPin,
@@ -27,17 +27,20 @@ import {
   ArrowLeft,
   Users as UsersIcon,
   ChevronRight,
-  TrendingUp
+  Plus,
+  Compass,
+  TrendingUp,
+  ShieldCheck,
+  Zap
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
 import { useTheme } from '@/context/ThemeContext';
-
-import TransportFilters from '@/components/school-transport/TransportFilters';
-import ApplyModal from '@/components/modals/ApplyModal';
-import StatusModal from '@/components/modals/StatusModal';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown, FadeInUp, FadeInRight } from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const BRAND_COLOR = '#1ea2b1';
 
 interface CarpoolClub {
   id: string;
@@ -53,67 +56,75 @@ interface CarpoolClub {
   price_per_trip: number | null;
   vehicle_info: string | null;
   creator_id: string;
-  creator: {
-    id: string;
+  driver: {
     profiles: {
       first_name: string;
       last_name: string;
+      avatar_url: string;
       rating: number;
       total_trips: number;
     };
   };
 }
 
-// Sub-component for Grid Item to match school transport style
-const CarpoolGridCard = ({ carpool, onViewDetails }: { carpool: any, onViewDetails: () => void }) => {
-  const { colors } = useTheme();
-  const isFull = carpool.current_members >= carpool.max_members;
-  const spotsLeft = carpool.max_members - carpool.current_members;
+const CarpoolCard = ({ item, onPress }: { item: CarpoolClub, onPress: () => void }) => {
+  const isFull = item.current_members >= item.max_members;
+  const spotsLeft = item.max_members - item.current_members;
 
   return (
-    <TouchableOpacity
-      style={[styles.gridCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-      onPress={onViewDetails}
-      activeOpacity={0.9}
-    >
-      <View style={styles.cardHeader}>
-        <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
-          {carpool.name}
-        </Text>
-        <View style={styles.cardLocation}>
-          <MapPin size={10} color={colors.primary} />
-          <Text style={[styles.cardLocationText, { color: colors.text }]} numberOfLines={1}>
-            {carpool.to_location}
-          </Text>
+    <Animated.View entering={FadeInDown.duration(600)}>
+      <TouchableOpacity 
+        style={styles.premiumCard} 
+        onPress={onPress}
+        activeOpacity={0.9}
+      >
+        <View style={styles.cardTop}>
+          <View style={styles.cardHeaderInfo}>
+            <Text style={styles.clubName}>{item.name}</Text>
+            <View style={styles.routeRow}>
+              <Text style={styles.routeText}>{item.from_location}</Text>
+              <ArrowLeft size={10} color="#444" style={{ transform: [{ rotate: '180deg' }] }} />
+              <Text style={styles.routeText}>{item.to_location}</Text>
+            </View>
+          </View>
+          <View style={styles.priceTag}>
+            <Text style={styles.priceVal}>R{item.price_per_trip || 0}</Text>
+            <Text style={styles.priceSub}>/trip</Text>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.cardStats}>
-        <View style={styles.cardStat}>
-          <Users size={12} color={isFull ? '#EF4444' : '#10B981'} />
-          <Text style={[styles.cardStatText, { color: isFull ? '#EF4444' : '#10B981' }]}>
-            {isFull ? 'FULL' : `${spotsLeft} SPOTS`}
-          </Text>
+        <View style={styles.cardStats}>
+          <View style={styles.statPill}>
+            <Clock size={12} color={BRAND_COLOR} />
+            <Text style={styles.statPillText}>{item.pickup_time}</Text>
+          </View>
+          <View style={[styles.statPill, isFull && { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+            <Users size={12} color={isFull ? '#ef4444' : BRAND_COLOR} />
+            <Text style={[styles.statPillText, isFull && { color: '#ef4444' }]}>
+              {isFull ? 'FULL' : `${spotsLeft} SPOTS LEFT`}
+            </Text>
+          </View>
+          <View style={styles.driverRating}>
+            <Star size={12} color="#fbbf24" fill="#fbbf24" />
+            <Text style={styles.ratingText}>{item.driver?.profiles?.rating?.toFixed(1) || 'N/A'}</Text>
+          </View>
         </View>
-        <View style={styles.cardRating}>
-          <Star size={12} color="#FFD700" fill="#FFD700" />
-          <Text style={[styles.cardRatingText, { color: colors.text }]}>
-            {carpool.driver.profiles.rating?.toFixed(1) || 'N/A'}
-          </Text>
-        </View>
-      </View>
 
-      <View style={styles.cardFooter}>
-        <View style={styles.timeInfo}>
-          <Clock size={12} color={colors.primary} />
-          <Text style={[styles.timeText, { color: colors.text }]}>{carpool.pickup_time}</Text>
+        <View style={styles.cardFooter}>
+          <View style={styles.driverInfo}>
+            <Image 
+              source={{ uri: item.driver?.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${item.driver?.profiles?.first_name}+${item.driver?.profiles?.last_name}&background=111&color=fff` }}
+              style={styles.driverAvatar}
+            />
+            <Text style={styles.driverName}>{item.driver?.profiles?.first_name} {item.driver?.profiles?.last_name?.charAt(0)}.</Text>
+          </View>
+          <TouchableOpacity style={styles.viewBtn} onPress={onPress}>
+            <Text style={styles.viewBtnText}>SECURE SEAT</Text>
+            <ChevronRight size={14} color="#000" />
+          </TouchableOpacity>
         </View>
-        <View style={styles.priceInfo}>
-          <Text style={[styles.priceText, { color: colors.text }]}>R{carpool.price_per_trip || '0'}</Text>
-          <Text style={styles.priceSubText}>/trip</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -122,98 +133,33 @@ export default function CarpoolScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
 
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const HEADER_MAX_HEIGHT = 160;
-  const HEADER_MIN_HEIGHT = Platform.OS === 'ios' ? 100 : 80;
-  const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
-
-  // State
-  const [carpools, setCarpools] = useState<any[]>([]);
+  const [carpools, setCarpools] = useState<CarpoolClub[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
-    fromLocation: '',
-    toLocation: '',
-    minPrice: '',
-    maxPrice: '',
-    pickupTime: '',
-    daysOfWeek: [] as string[],
-    vehicleType: '',
-  });
-
-  // Modal states
-  const [showApplyModal, setShowApplyModal] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [selectedCarpool, setSelectedCarpool] = useState<string | null>(null);
-  const [modalStatus, setModalStatus] = useState<{
-    type: 'success' | 'error' | 'warning' | 'info';
-    title: string;
-    message: string;
-  }>({
-    type: 'info',
-    title: '',
-    message: '',
-  });
-  const [applyLoading, setApplyLoading] = useState(false);
-
-  useEffect(() => {
-    fetchCarpools();
-  }, [filters]);
+  
+  const scrollY = useRef(new RNAnimated.Value(0)).current;
 
   const fetchCarpools = async () => {
     try {
       setLoading(true);
-      let query = supabase
+      const { data: carpoolsData, error: carpoolsError } = await supabase
         .from('carpool_clubs')
-        .select('*')
+        .select(`
+          *,
+          driver:profiles (
+            first_name,
+            last_name,
+            avatar_url,
+            rating,
+            total_trips
+          )
+        `)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      if (filters.fromLocation) query = query.ilike('from_location', `%${filters.fromLocation}%`);
-      if (filters.toLocation) query = query.ilike('to_location', `%${filters.toLocation}%`);
-      if (filters.pickupTime) query = query.ilike('pickup_time', `%${filters.pickupTime}%`);
-
-      const { data: carpoolsData, error: carpoolsError } = await query;
       if (carpoolsError) throw carpoolsError;
-
-      if (!carpoolsData || carpoolsData.length === 0) {
-        setCarpools([]);
-        return;
-      }
-
-      const creatorIds = carpoolsData.map(c => c.creator_id).filter(id => id);
-      let creatorsMap = new Map();
-
-      if (creatorIds.length > 0) {
-        const { data: creatorsData } = await supabase
-          .from('profiles')
-          .select('id, user_id, first_name, last_name, rating, total_trips')
-          .in('id', creatorIds);
-
-        if (creatorsData) {
-          creatorsData.forEach(creator => {
-            creatorsMap.set(creator.id, creator);
-          });
-        }
-      }
-
-      const formattedData = carpoolsData.map(carpool => {
-        const creatorData = creatorsMap.get(carpool.creator_id) || {
-          first_name: 'Unknown', last_name: 'User', rating: 0, total_trips: 0
-        };
-
-        return {
-          ...carpool,
-          days_of_week: Array.isArray(carpool.days_of_week) ? carpool.days_of_week : [],
-          driver: {
-            profiles: creatorData
-          }
-        };
-      });
-
-      setCarpools(formattedData);
+      setCarpools(carpoolsData as any);
     } catch (error) {
       console.error('Error fetching carpools:', error);
     } finally {
@@ -222,171 +168,140 @@ export default function CarpoolScreen() {
     }
   };
 
+  useEffect(() => {
+    fetchCarpools();
+  }, []);
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchCarpools();
   };
 
-  const filteredCarpools = carpools.filter(carpool => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      carpool.name.toLowerCase().includes(query) ||
-      carpool.from_location.toLowerCase().includes(query) ||
-      carpool.to_location.toLowerCase().includes(query) ||
-      carpool.driver.profiles.first_name.toLowerCase().includes(query)
-    );
-  });
-
-  const headerImageHeight = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE],
-    outputRange: [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT],
-    extrapolate: 'clamp',
-  });
-
-  const imageOpacity = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE / 2, HEADER_SCROLL_DISTANCE],
-    outputRange: [1, 0.5, 0],
-    extrapolate: 'clamp',
-  });
-
-  const headerTitleScale = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE],
-    outputRange: [1, 0.75],
-    extrapolate: 'clamp',
-  });
-
-  const headerTitleTranslateY = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE],
-    outputRange: [0, -10],
-    extrapolate: 'clamp',
-  });
-
-  const renderSkeleton = () => (
-    <View style={styles.skeletonGrid}>
-      {[1, 2, 3, 4].map(i => (
-        <View key={i} style={[styles.skeletonGridCard, { backgroundColor: colors.card, borderColor: colors.border }]} />
-      ))}
-    </View>
+  const filteredCarpools = carpools.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.to_location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.from_location.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [1, 0],
+    extrapolate: 'clamp'
+  });
+
   const renderHeader = () => (
-    <View>
-      <View style={{ height: HEADER_MAX_HEIGHT - 30 }} />
+    <View style={styles.listHeader}>
+      <Animated.View entering={FadeInDown.duration(800)} style={styles.heroSection}>
+        <View style={styles.heroTop}>
+          <View>
+            <Text style={styles.heroLabel}>COMMUNITY TRANSIT</Text>
+            <Text style={styles.heroTitle}>Carpool Clubs</Text>
+          </View>
+          <View style={styles.heroBadge}>
+            <Zap size={14} color="#fbbf24" fill="#fbbf24" />
+            <Text style={styles.heroBadgeText}>SAVE 40%</Text>
+          </View>
+        </View>
 
-      {/* Stats Bar */}
-      <View style={styles.statsBar}>
-
-      </View>
-
-      <View style={[styles.searchWrapper, { backgroundColor: colors.background }]}>
-        <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Search size={18} color={colors.primary} />
+        <View style={styles.searchBar}>
+          <Search size={20} color="#888" />
           <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search destination or creator..."
-            placeholderTextColor="#888"
+            style={styles.searchInput}
+            placeholder="Search destination or club..."
+            placeholderTextColor="#444"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          <TouchableOpacity
-            style={[styles.filterIcon, { backgroundColor: colors.primary }]}
-            onPress={() => setShowFilters(true)}
-          >
-            <Filter size={18} color="#FFF" />
+          <TouchableOpacity style={styles.filterBtn}>
+            <Filter size={18} color={BRAND_COLOR} />
           </TouchableOpacity>
         </View>
-      </View>
 
-      {loading && renderSkeleton()}
+        <View style={styles.quickActions}>
+          <TouchableOpacity style={styles.actionPill}>
+            <MapPin size={14} color={BRAND_COLOR} />
+            <Text style={styles.actionText}>Near Me</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionPill}>
+            <TrendingUp size={14} color={BRAND_COLOR} />
+            <Text style={styles.actionText}>Top Rated</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionPill}>
+            <Clock size={14} color={BRAND_COLOR} />
+            <Text style={styles.actionText}>Evening</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+
+      <View style={styles.sectionTitleRow}>
+        <Text style={styles.sectionTitle}>ACTIVE CLUBS</Text>
+        <Text style={styles.sectionCount}>{filteredCarpools.length} Found</Text>
+      </View>
     </View>
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Animated Header */}
-      <Animated.View style={[styles.imageHeader, { height: headerImageHeight, backgroundColor: colors.background }]}>
-        <Animated.Image
-          source={require('@/assets/images/carpool-header.jpg')}
-          style={[styles.headerImage, { opacity: imageOpacity }]}
-          resizeMode="cover"
-        />
-        <View style={styles.imageOverlay} />
+    <View style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Top Navigation */}
+      <View style={styles.navBar}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <ArrowLeft size={24} color="#FFF" />
+        </TouchableOpacity>
+        <Text style={styles.navTitle}>Uthutho Clubs</Text>
+        <View style={{ width: 44 }} />
+      </View>
 
-        <View style={styles.headerContent}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeft size={24} color="#FFF" />
-          </TouchableOpacity>
-
-          <Animated.View style={{
-            transform: [
-              { scale: headerTitleScale },
-              { translateY: headerTitleTranslateY }
-            ]
-          }}>
-            <Text style={styles.heroTitle}>Carpool Clubs</Text>
-            <Animated.Text style={[styles.heroSubtitle, { opacity: imageOpacity }]}>
-              Share rides and save on commuting
-            </Animated.Text>
-          </Animated.View>
-        </View>
-      </Animated.View>
-
-      <Animated.FlatList
+      <FlatList
         data={filteredCarpools}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={styles.columnWrapper}
+        keyExtractor={item => item.id}
         renderItem={({ item }) => (
-          <CarpoolGridCard
-            carpool={item}
-            onViewDetails={() => router.push(`/carpool/${item.id}`)}
+          <CarpoolCard 
+            item={item} 
+            onPress={() => router.push(`/carpool/${item.id}`)} 
           />
         )}
         ListHeaderComponent={renderHeader()}
-        ListEmptyComponent={
-          !loading ? (
-            <View style={styles.emptyState}>
-              <UsersIcon size={64} color={colors.border} />
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No clubs found</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.text, opacity: 0.5 }]}>
-                Try adjusting your search or filters
-              </Text>
-            </View>
-          ) : null
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={BRAND_COLOR}
+          />
         }
-        onScroll={Animated.event(
+        onScroll={RNAnimated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: false }
         )}
-        scrollEventThrottle={16}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
-            progressViewOffset={HEADER_MAX_HEIGHT}
-          />
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator size="large" color={BRAND_COLOR} style={{ marginTop: 40 }} />
+          ) : (
+            <View style={styles.emptyState}>
+              <Compass size={64} color="#222" />
+              <Text style={styles.emptyTitle}>No Clubs Found</Text>
+              <Text style={styles.emptySubtitle}>Try searching for a different destination.</Text>
+            </View>
+          )
         }
-        contentContainerStyle={styles.flatListContent}
-        showsVerticalScrollIndicator={false}
       />
 
-      <TransportFilters
-        visible={showFilters}
-        filters={filters}
-        onFiltersChange={setFilters}
-        onClose={() => setShowFilters(false)}
-      />
-
-      <StatusModal
-        visible={showStatusModal}
-        type={modalStatus.type}
-        title={modalStatus.title}
-        message={modalStatus.message}
-        onClose={() => setShowStatusModal(false)}
-      />
+      {/* Floating Action Button */}
+      <TouchableOpacity 
+        style={styles.fab} 
+        onPress={() => router.push('/driver/create-service/carpool')}
+      >
+        <LinearGradient
+          colors={[BRAND_COLOR, '#15808d']}
+          style={styles.fabInner}
+        >
+          <Plus size={24} color="#FFF" />
+          <Text style={styles.fabText}>START A CLUB</Text>
+        </LinearGradient>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -394,225 +309,299 @@ export default function CarpoolScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
   },
-  imageHeader: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    overflow: 'hidden',
-    zIndex: 10,
-  },
-  headerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  imageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  headerContent: {
-    position: 'absolute',
-    bottom: 15,
-    left: 24,
-    right: 24,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
+  navBar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 20,
+    backgroundColor: '#000',
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  navTitle: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 120,
+  },
+  listHeader: {
+    marginTop: 12,
+  },
+  heroSection: {
+    marginBottom: 32,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 24,
+  },
+  heroLabel: {
+    color: '#444',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 4,
   },
   heroTitle: {
-    fontSize: 28,
-    fontWeight: '800',
     color: '#FFF',
-    letterSpacing: -0.5,
+    fontSize: 36,
+    fontWeight: '900',
+    letterSpacing: -1,
   },
-  heroSubtitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 4,
-  },
-  statsBar: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 24,
-    marginTop: 20,
-    marginBottom: 8,
-  },
-  statPill: {
-    flex: 1,
-    borderRadius: 16,
-    padding: 12,
+  heroBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
+    gap: 6,
+    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
   },
-  statValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  statLabel: {
+  heroBadgeText: {
+    color: '#fbbf24',
     fontSize: 10,
-    fontWeight: '600',
-    color: '#666',
-    textTransform: 'uppercase',
-  },
-  searchWrapper: {
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    paddingTop: 12,
+    fontWeight: '900',
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    paddingLeft: 16,
-    borderRadius: 16,
+    backgroundColor: '#111',
+    borderRadius: 20,
+    height: 64,
+    paddingHorizontal: 20,
     borderWidth: 1,
-    gap: 12,
+    borderColor: '#222',
+    marginBottom: 16,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
+    marginLeft: 12,
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
-  filterIcon: {
+  filterBtn: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    justifyContent: 'center',
+    backgroundColor: '#050505',
     alignItems: 'center',
-  },
-  columnWrapper: {
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-  },
-  flatListContent: {
-    paddingBottom: 40,
-  },
-  gridCard: {
-    width: '48%',
-    borderRadius: 24,
-    padding: 16,
-    marginBottom: 16,
+    justifyContent: 'center',
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    borderColor: '#222',
   },
-  cardHeader: {
-    marginBottom: 12,
+  quickActions: {
+    flexDirection: 'row',
+    gap: 10,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  cardLocation: {
+  actionPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    backgroundColor: '#111',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#222',
   },
-  cardLocationText: {
+  actionText: {
+    color: '#888',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    color: '#444',
     fontSize: 11,
-    fontWeight: '500',
-    opacity: 0.6,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  sectionCount: {
+    color: BRAND_COLOR,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  premiumCard: {
+    backgroundColor: '#111',
+    borderRadius: 32,
+    padding: 24,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  cardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  cardHeaderInfo: {
+    flex: 1,
+  },
+  clubName: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  routeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  routeText: {
+    color: '#888',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  priceTag: {
+    alignItems: 'flex-end',
+  },
+  priceVal: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  priceSub: {
+    color: '#444',
+    fontSize: 10,
+    fontWeight: '700',
   },
   cardStats: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    gap: 12,
+    marginBottom: 24,
   },
-  cardStat: {
+  statPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    backgroundColor: 'rgba(30, 162, 177, 0.05)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(30, 162, 177, 0.1)',
   },
-  cardStatText: {
-    fontSize: 10,
+  statPillText: {
+    color: BRAND_COLOR,
+    fontSize: 11,
     fontWeight: '800',
   },
-  cardRating: {
+  driverRating: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    marginLeft: 'auto',
   },
-  cardRatingText: {
-    fontSize: 11,
-    fontWeight: 'bold',
+  ratingText: {
+    color: '#fbbf24',
+    fontSize: 12,
+    fontWeight: '900',
   },
   cardFooter: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
+    paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
+    borderTopColor: '#222',
   },
-  timeInfo: {
+  driverInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 12,
   },
-  timeText: {
-    fontSize: 11,
-    fontWeight: '600',
+  driverAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
   },
-  priceInfo: {
+  driverName: {
+    color: '#CCC',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  viewBtn: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 2,
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: BRAND_COLOR,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
   },
-  priceText: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  priceSubText: {
-    fontSize: 9,
-    color: '#666',
-    fontWeight: '600',
+  viewBtnText: {
+    color: '#000',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 24,
+    marginTop: 60,
+    paddingHorizontal: 40,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 20,
+    color: '#FFF',
+    fontSize: 24,
+    fontWeight: '900',
+    marginTop: 24,
   },
   emptySubtitle: {
+    color: '#444',
     fontSize: 14,
-    marginTop: 4,
     textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 20,
   },
-  loadingBox: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  skeletonGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 24,
-    justifyContent: 'space-between',
-  },
-  skeletonGridCard: {
-    width: '48%',
-    height: 180,
+  fab: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
     borderRadius: 24,
-    borderWidth: 1,
-    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: BRAND_COLOR,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  fabInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 64,
+    gap: 12,
+  },
+  fabText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 2,
   },
 });
