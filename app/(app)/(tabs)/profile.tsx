@@ -816,7 +816,7 @@ export default function ProfileScreen() {
                 Uthutho v1.8.2
               </Text>
               <Text style={styles.motto}>
-                "Izindlela zakho ziqinisekisa impumelelo!"
+                "Move Smarter. Live Better."
               </Text>
             </View>
           </>

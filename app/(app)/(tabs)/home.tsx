@@ -28,6 +28,7 @@ import FavoritesSection from '@/components/home/FavoritesSection';
 import GamificationSection from '@/components/home/GamificationSection';
 import ScreenTransition from '@/components/ScreenTransition';
 import SearchOverlay from '@/components/home/SearchOverlay';
+import SquadsSection from '@/components/home/SquadsSection';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 import LottieView from 'lottie-react-native';
@@ -1423,8 +1424,10 @@ export default function HomeScreen() {
 
         </View>
 
-        {userProfile?.role === 'driver' && user?.id && (
-          <DriverStatsSummary userId={user.id} colors={colors} />
+        <SquadsSection userId={userId} colors={colors} />
+
+        {userProfile?.role === 'driver' && userId && (
+          <DriverStatsSummary userId={userId} colors={colors} />
         )}
 
         <View ref={refs.servicesRef} collapsable={false} renderToHardwareTextureAndroid style={{ minHeight: 1 }}>
