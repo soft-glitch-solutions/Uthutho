@@ -28,10 +28,10 @@ interface NearbySectionProps {
 
 const NearbySection: React.FC<NearbySectionProps> = (props) => {
   const { colors } = useTheme();
-  const { 
-    locationError, 
-    isNearestLoading, 
-    userLocation 
+  const {
+    locationError,
+    isNearestLoading,
+    userLocation
   } = props;
 
   return (
@@ -39,7 +39,7 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
       <Text style={[styles.sectionTitle, { color: colors.text }, isDesktop && styles.sectionTitleDesktop]}>
         Nearby Stops
       </Text>
-      
+
       {locationError ? (
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <Text style={[styles.errorText, { color: colors.error || '#ef4444' }]}>{locationError}</Text>
@@ -69,9 +69,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
+    fontSize: 32,
+    fontWeight: '900',
+    marginBottom: 20,
+    letterSpacing: -1,
   },
   sectionTitleDesktop: {
     fontSize: 16,

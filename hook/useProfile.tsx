@@ -70,7 +70,9 @@ export function useProfile() {
           total_ride_time,
           favorites_count,
           total_trips,
-          updated_at
+          updated_at,
+          phone,
+          bio
         `)
         .eq('id', userId)
         .single();

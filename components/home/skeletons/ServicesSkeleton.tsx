@@ -17,14 +17,12 @@ const ServicesSkeleton = ({ colors }: ServicesSkeletonProps) => (
         <View key={i} style={styles.cardContainer}>
           <Shimmer colors={colors}>
             <View style={[styles.card, { backgroundColor: colors.border }]}>
-              <View style={styles.gradientOverlay}>
-                <View style={styles.cardHeader}>
-                  <View style={[styles.skeletonIcon, { backgroundColor: colors.text, opacity: 0.1 }]} />
-                </View>
+              <View style={styles.cardContent}>
+                <View style={[styles.skeletonLabel, { backgroundColor: colors.text, opacity: 0.1 }]} />
+                <View style={[styles.skeletonLabel, { backgroundColor: colors.text, opacity: 0.1, width: '40%', marginTop: 8 }]} />
                 
-                <View style={styles.cardFooter}>
-                  <View style={[styles.skeletonLabel, { backgroundColor: colors.text, opacity: 0.1 }]} />
-                  <View style={[styles.skeletonArrow, { backgroundColor: colors.text, opacity: 0.1 }]} />
+                <View style={styles.iconWrapper}>
+                  <View style={[styles.skeletonIcon, { backgroundColor: colors.text, opacity: 0.1 }]} />
                 </View>
               </View>
             </View>
@@ -38,13 +36,13 @@ const ServicesSkeleton = ({ colors }: ServicesSkeletonProps) => (
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    paddingVertical: 20,
+    paddingVertical: 24,
   },
   skeletonTitle: {
-    width: 100,
-    height: 20,
-    borderRadius: 4,
-    marginBottom: 16,
+    width: 140,
+    height: 32,
+    borderRadius: 8,
+    marginBottom: 20,
   },
   servicesGrid: {
     flexDirection: 'row',
@@ -53,8 +51,8 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     flex: 1,
-    height: 200,
-    borderRadius: 24,
+    height: 140,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   card: {
@@ -62,34 +60,23 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  gradientOverlay: {
+  cardContent: {
     flex: 1,
-    justifyContent: 'space-between',
-    padding: 12,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-  },
-  skeletonIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    padding: 16,
     justifyContent: 'space-between',
   },
   skeletonLabel: {
-    width: '60%',
-    height: 16,
-    borderRadius: 4,
+    width: '80%',
+    height: 24,
+    borderRadius: 6,
   },
-  skeletonArrow: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  iconWrapper: {
+    alignSelf: 'flex-end',
+  },
+  skeletonIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
   },
 });
 

@@ -27,8 +27,9 @@ import { TutorialProvider, useTutorial } from '@/context/TutorialContext';
 import AppTutorial, { shouldShowTutorial } from '@/components/AppTutorial';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const IS_SMALL_SCREEN = SCREEN_HEIGHT < 700;
 const TAB_COUNT = 4;
-const TAB_BAR_MARGIN = 20;
+const TAB_BAR_MARGIN = IS_SMALL_SCREEN ? 12 : 20;
 const TAB_BAR_WIDTH = SCREEN_WIDTH - (TAB_BAR_MARGIN * 2);
 
 // Check if desktop
@@ -70,7 +71,7 @@ const FloatingBackground = ({ activeIndex, colors }) => {
           position: 'absolute',
           left: 0,
           width: TAB_BAR_WIDTH / TAB_COUNT,
-          height: 80,
+          height: IS_SMALL_SCREEN ? 65 : 70,
           backgroundColor: colors.primary,
           borderRadius: 16,
           shadowColor: colors.primary,
@@ -367,11 +368,11 @@ const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount })
     <AnimatedView
       style={{
         position: 'absolute',
-        bottom: 25,
+        bottom: IS_SMALL_SCREEN ? 15 : 25,
         left: TAB_BAR_MARGIN,
         right: TAB_BAR_MARGIN,
         width: TAB_BAR_WIDTH,
-        height: 70,
+        height: IS_SMALL_SCREEN ? 65 : 70,
         backgroundColor: colors.card || 'rgba(30, 30, 30, 0.95)',
         borderRadius: 25,
         flexDirection: 'row',
@@ -555,10 +556,11 @@ export default function EnhancedTabLayout() {
           },
           headerShown: false,
           // Add padding to content for desktop to account for top nav bar
-          contentStyle: isDesktop ? {
-            paddingTop: 60, // Height of desktop top nav
+          contentStyle: {
+            paddingTop: isDesktop ? 60 : 0,
+            paddingBottom: isDesktop ? 0 : (IS_SMALL_SCREEN ? 90 : 110), // Avoid floating tab bar on mobile
             backgroundColor: colors.background,
-          } : undefined,
+          },
         }}
       >
         <Tabs.Screen

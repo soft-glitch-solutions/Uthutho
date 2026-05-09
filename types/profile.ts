@@ -18,6 +18,8 @@ export interface Profile {
   favorites_count?: number;
   total_trips?: number | null;
   updated_at?: string | null;
+  phone?: string | null;
+  bio?: string | null;
 }
 
 export interface UserPost {

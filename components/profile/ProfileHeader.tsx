@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Image, ActivityIndicator, StyleSheet, Dimensions, Platform } from 'react-native';
-import { Camera, Settings, User, Star, MapPin, Clock } from 'lucide-react-native';
+import React, { useRef } from 'react';
+import { View, Text, TouchableOpacity, Image, ActivityIndicator, StyleSheet, Dimensions, Platform, Animated, Easing, Pressable } from 'react-native';
+import { Star, MapPin, Menu, Camera, Settings, User, Clock } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { router } from 'expo-router';
 
@@ -10,7 +10,42 @@ interface ProfileHeaderProps {
   uploading: boolean;
   onImagePicker: () => void;
   isDesktop: boolean;
+  onOpenDrawer?: () => void;
+  onShowDebug?: () => void;
 }
+
+// Animated Hamburger Menu Component
+const AnimatedHamburgerMenu = ({ onPress, color, onLongPress, delayLongPress, textColor }: any) => {
+  const rotation = useRef(new Animated.Value(0)).current;
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(rotation, { toValue: 1, duration: 150, easing: Easing.linear, useNativeDriver: true }),
+      Animated.timing(rotation, { toValue: 0, duration: 150, easing: Easing.linear, useNativeDriver: true })
+    ]).start();
+    if (onPress) onPress();
+  };
+
+  const rotateInterpolation = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '90deg']
+  });
+
+  return (
+    <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={delayLongPress} style={styles.logoContainer}>
+      <Animated.View style={{ transform: [{ rotate: rotateInterpolation }] }}>
+        <Menu size={28} color={color} />
+      </Animated.View>
+      <View style={styles.brandInfo}>
+        <View style={styles.logoTextRow}>
+          <Text style={styles.logoText}>Uthutho</Text>
+          <Text style={[styles.logoDot, { color: color }]}>.</Text>
+        </View>
+        <Text style={styles.moveSmarter}>MOVE SMARTER</Text>
+      </View>
+    </Pressable>
+  );
+};
 
 const ProfileSkeleton = () => {
   return (
@@ -45,7 +80,9 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   profile,
   uploading,
   onImagePicker,
-  isDesktop
+  isDesktop,
+  onOpenDrawer,
+  onShowDebug
 }) => {
   const { colors } = useTheme();
 
@@ -70,7 +107,14 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     <View style={styles.container}>
       {/* Top Bar Branding */}
       <View style={styles.topBar}>
-        <Text style={styles.brandText}>Uthutho</Text>
+        <AnimatedHamburgerMenu
+          onPress={onOpenDrawer}
+          onLongPress={onShowDebug}
+          delayLongPress={2000}
+          color={colors.primary}
+          textColor={colors.text}
+        />
+
         <View style={styles.topActions}>
           <TouchableOpacity
             style={styles.avatarContainer}
@@ -92,7 +136,10 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               )}
             </View>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.settingsButton}>
+          <TouchableOpacity 
+            style={styles.settingsButton}
+            onPress={() => router.push('/edit-profile')}
+          >
             <Settings size={22} color="#FFF" />
           </TouchableOpacity>
         </View>
@@ -240,5 +287,35 @@ const styles = StyleSheet.create({
   skeleton: {
     backgroundColor: '#111',
     overflow: 'hidden',
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  brandInfo: {
+    justifyContent: 'center',
+  },
+  logoTextRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  logoText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFF',
+    letterSpacing: -1,
+  },
+  logoDot: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginLeft: 1,
+  },
+  moveSmarter: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#CCC',
+    letterSpacing: 1.5,
+    marginTop: -4,
   },
 });

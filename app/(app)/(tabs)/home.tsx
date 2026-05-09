@@ -36,6 +36,7 @@ import SimpleDebugPanel from '@/components/debug/SimpleDebugPanel';
 import { useTutorial } from '@/context/TutorialContext';
 import { DriverStatsSummary } from '@/components/home/DriverStatsSummary';
 import { shouldShowTutorial } from '@/components/AppTutorial';
+import Shimmer from '@/components/home/skeletons/Shimmer';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -1319,21 +1320,45 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.rightBranding}>
-            <View style={styles.pointsBox}>
-              <Text style={styles.pointsValue}>{userProfile?.points || 0}</Text>
-              <Text style={styles.pointsLabel}>POINTS</Text>
-            </View>
-            <Pressable onPress={() => router.push('/profile')} style={styles.profileWrapper}>
-              <Image
-                source={require('../../../assets/logo.png')}
-                style={styles.logoBg}
-                resizeMode="contain"
-              />
-              <Image
-                source={{ uri: userProfile?.avatar_url || 'https://ui-avatars.com/api/?name=U&background=111&color=fff' }}
-                style={styles.avatar}
-              />
-            </Pressable>
+            {isProfileLoading ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                <View style={styles.pointsBox}>
+                  <Shimmer colors={colors}>
+                    <View style={[styles.skeletonPoints, { backgroundColor: colors.border }]} />
+                  </Shimmer>
+                  <Shimmer colors={colors}>
+                    <View style={[styles.skeletonPointsLabel, { backgroundColor: colors.border }]} />
+                  </Shimmer>
+                </View>
+                <Shimmer colors={colors}>
+                  <View style={[styles.skeletonAvatar, { backgroundColor: colors.border }]} />
+                </Shimmer>
+              </View>
+            ) : (
+              <>
+                <View style={styles.pointsBox}>
+                  <Text style={styles.pointsValue}>{userProfile?.points || 0}</Text>
+                  <Text style={styles.pointsLabel}>POINTS</Text>
+                </View>
+                <Pressable onPress={() => router.push('/profile')} style={styles.profileWrapper}>
+                  <Image
+                    source={require('../../../assets/logo.png')}
+                    style={styles.logoBg}
+                    resizeMode="contain"
+                  />
+                  {userProfile?.avatar_url ? (
+                    <Image
+                      source={{ uri: userProfile.avatar_url }}
+                      style={styles.avatar}
+                    />
+                  ) : (
+                    <View style={[styles.avatar, { backgroundColor: '#222', alignItems: 'center', justifyContent: 'center' }]}>
+                      <User size={18} color="#555" />
+                    </View>
+                  )}
+                </Pressable>
+              </>
+            )}
           </View>
         </View>
 
@@ -2273,5 +2298,21 @@ const styles = StyleSheet.create({
     zIndex: 1,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+  },
+  skeletonAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  skeletonPoints: {
+    width: 40,
+    height: 18,
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  skeletonPointsLabel: {
+    width: 50,
+    height: 12,
+    borderRadius: 3,
   },
 });
