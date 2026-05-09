@@ -63,25 +63,14 @@ jobs:
       # -----------------------------------
       # FTP DEPLOY WITH FULL DEBUG LOGS
       # -----------------------------------
-      - name: Deploy to cPanel via FTP (DEBUG MODE)
-        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-
           protocol: ftp
-          port: 21
-
+          port: ${{ secrets.FTP_PORT }}
           local-dir: dist/
           server-dir: ${{ steps.set-dir.outputs.DIR }}
-
-          # IMPORTANT: prevents destructive wipes while debugging
-          dangerous-clean-slate: false
-
-          # -------------------------------
-          # DEBUG SETTINGS (VERY IMPORTANT)
-          # -------------------------------
-          log-level: verbose
-          security: loose
-          timeout: 120000
+          cleanup: true
