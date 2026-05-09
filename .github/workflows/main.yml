@@ -1,4 +1,4 @@
-name: Deploy via FTP
+name: Deploy via FTPS
 
 on:
   push:
@@ -34,13 +34,13 @@ jobs:
           npx expo export -p web
 
       # -----------------------------------
-      # SET DEPLOY DIRECTORY (FIXED PATHS)
+      # SET DEPLOY DIRECTORY
       # -----------------------------------
       - name: Set deploy directory
         id: set-dir
         run: |
           BRANCH="${GITHUB_REF##*/}"
-          echo "Branch detected: $BRANCH"
+          echo "Branch: $BRANCH"
 
           if [[ "$BRANCH" == "shaqeel" ]]; then
             echo "DIR=/public_html/shaqeel/" >> $GITHUB_OUTPUT
@@ -58,19 +58,24 @@ jobs:
             echo "DIR=/public_html/mobile/" >> $GITHUB_OUTPUT
           fi
 
-          echo "Deploy path set to: $DIR"
-
       # -----------------------------------
-      # FTP DEPLOY WITH FULL DEBUG LOGS
+      # DEPLOY VIA FTPS
       # -----------------------------------
-      - name: Deploy via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      - name: Deploy to cPanel via FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftp
-          port: ${{ secrets.FTP_PORT }}
+
+          protocol: ftps
+          port: 21
+          security: loose
+
           local-dir: dist/
           server-dir: ${{ steps.set-dir.outputs.DIR }}
-          cleanup: true
+
+          dangerous-clean-slate: false
+
+          log-level: verbose
+          timeout: 120000
