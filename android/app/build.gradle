@@ -92,7 +92,7 @@ android {
         applicationId 'com.softglitch.uthutho'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 37
+        versionCode 38
         versionName "1.5.2"
     }
     signingConfigs {

@@ -41,7 +41,7 @@
     },
     "android": {
       "package": "com.softglitch.uthutho",
-      "versionCode": 37,
+      "versionCode": 38,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
