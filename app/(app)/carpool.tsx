@@ -137,12 +137,24 @@ export default function CarpoolScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDriver, setIsDriver] = useState(false);
   
   const scrollY = useRef(new RNAnimated.Value(0)).current;
 
   const fetchCarpools = async () => {
     try {
       setLoading(true);
+
+      // Check if user is a driver
+      if (user?.id) {
+        const { data: driverData } = await supabase
+          .from('drivers')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        setIsDriver(!!driverData);
+      }
+
       const { data: carpoolsData, error: carpoolsError } = await supabase
         .from('carpool_clubs')
         .select(`
@@ -292,14 +304,14 @@ export default function CarpoolScreen() {
       {/* Floating Action Button */}
       <TouchableOpacity 
         style={styles.fab} 
-        onPress={() => router.push('/driver/create-service/carpool')}
+        onPress={() => isDriver ? router.push('/driver/create-service/carpool') : router.push('/driver-onboarding')}
       >
         <LinearGradient
           colors={[BRAND_COLOR, '#15808d']}
           style={styles.fabInner}
         >
           <Plus size={24} color="#FFF" />
-          <Text style={styles.fabText}>START A CLUB</Text>
+          <Text style={styles.fabText}>{isDriver ? 'START A CLUB' : 'DRIVE WITH US'}</Text>
         </LinearGradient>
       </TouchableOpacity>
     </View>

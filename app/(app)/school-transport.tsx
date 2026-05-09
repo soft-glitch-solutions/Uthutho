@@ -143,12 +143,24 @@ export default function SchoolTransportScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDriver, setIsDriver] = useState(false);
 
   const scrollY = useRef(new RNAnimated.Value(0)).current;
 
   const fetchTransports = async () => {
     try {
       setLoading(true);
+
+      // Check if user is a driver
+      if (user?.id) {
+        const { data: driverData } = await supabase
+          .from('drivers')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        setIsDriver(!!driverData);
+      }
+
       const { data, error } = await supabase
         .from('school_transports')
         .select(`
@@ -297,14 +309,14 @@ export default function SchoolTransportScreen() {
       {/* Floating Action Button */}
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => router.push('/driver/create-service/school')}
+        onPress={() => isDriver ? router.push('/driver/create-service/school') : router.push('/driver-onboarding')}
       >
         <LinearGradient
           colors={[BRAND_COLOR, '#15808d']}
           style={styles.fabInner}
         >
           <Plus size={24} color="#FFF" />
-          <Text style={styles.fabText}>LAUNCH SERVICE</Text>
+          <Text style={styles.fabText}>{isDriver ? 'LAUNCH SERVICE' : 'DRIVE WITH US'}</Text>
         </LinearGradient>
       </TouchableOpacity>
     </View>

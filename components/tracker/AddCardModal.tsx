@@ -33,25 +33,25 @@ const CARD_TYPES: Record<CardType, {
     name: 'Golden Arrow',
     color: '#f59e0b',
     pointsName: 'Rides',
-    logoImage: 'https://www.gabs.co.za/Assets/Images/logo_main.png'
+    logoImage: null
   },
   go_george: {
     name: 'Go George',
     color: '#2563eb',
     pointsName: 'Trips',
-    logoImage: 'https://www.gogeorge.org.za/wp-content/uploads/2024/06/GO-GEORGE-logo-10-Years-icon.jpg'
+    logoImage: null
   },
   rea_vaya: {
     name: 'Rea Vaya',
     color: '#dc2626',
     pointsName: 'Trips',
-    logoImage: 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/Rea_Vaya_logo.svg/1200px-Rea_Vaya_logo.svg.png'
+    logoImage: null
   },
   gautrain: {
     name: 'Gautrain',
     color: '#0f172a',
     pointsName: 'Trips',
-    logoImage: 'https://icon2.cleanpng.com/20180804/ske/kisspng-logo-product-design-centurion-breakfast-brand-file-gautrain-logo-svg-wikipedia-5b65261ce4d854.0570432315333555489374.jpg'
+    logoImage: null
   }
 };
 
@@ -130,7 +130,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({
       Alert.alert('Success', 'Card added successfully!');
     } catch (error: any) {
       console.error('Error adding card:', error);
-      
+
       // More specific error messages
       if (error.code === '23514') {
         Alert.alert('Error', 'Invalid card type. Please select a valid card type.');
@@ -230,7 +230,7 @@ const AddCardModal: React.FC<AddCardModalProps> = ({
               <Text style={styles.inputLabel}>Card Holder Name</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="Enter your name as on card"
+                placeholder="Enter your name"
                 value={cardHolder}
                 onChangeText={setCardHolder}
                 placeholderTextColor="#666"
@@ -251,15 +251,15 @@ const AddCardModal: React.FC<AddCardModalProps> = ({
           </ScrollView>
 
           <View style={styles.modalFooter}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.cancelButton}
               onPress={handleClose}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
-                styles.saveButton, 
+                styles.saveButton,
                 (!cardNumber || !cardHolder || !initialBalance) && styles.saveButtonDisabled
               ]}
               onPress={handleAddCard}
