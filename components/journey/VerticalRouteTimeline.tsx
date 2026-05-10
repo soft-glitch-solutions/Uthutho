@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  Image,
 } from 'react-native';
 import { CheckCircle, Clock, Bus, Train, Navigation as Taxi, Users, HeartPulse } from 'lucide-react-native';
 import { JourneyStop, Passenger } from '@/types/journey';
@@ -19,6 +20,7 @@ interface VerticalRouteTimelineProps {
   participantStatus: 'waiting' | 'picked_up' | 'arrived';
   onStopPress: (stop: JourneyStop) => void;
   onNavigateToStopDetails?: (stopId: string) => void;
+  userProfile?: any;
 }
 
 export const VerticalRouteTimeline: React.FC<VerticalRouteTimelineProps> = ({
@@ -30,6 +32,7 @@ export const VerticalRouteTimeline: React.FC<VerticalRouteTimelineProps> = ({
   currentStopSequence,
   participantStatus,
   onStopPress,
+  userProfile,
 }) => {
 
   const getTransportIcon = (size: number, color: string) => {
@@ -127,6 +130,20 @@ export const VerticalRouteTimeline: React.FC<VerticalRouteTimelineProps> = ({
                         </Text>
                       </View>
                     )}
+                  </View>
+                )}
+                
+                {/* User's current stop indicator */}
+                {stop.name === currentUserStopName && userProfile && (
+                  <View style={styles.userLocationBadge}>
+                    <Text style={styles.userLocationText}>You are here</Text>
+                    <View style={styles.userAvatarContainer}>
+                      {userProfile.avatar_url ? (
+                        <Image source={{ uri: userProfile.avatar_url }} style={styles.userAvatar} />
+                      ) : (
+                        <Users size={12} color="#FFF" />
+                      )}
+                    </View>
                   </View>
                 )}
               </View>
@@ -335,5 +352,38 @@ const styles = StyleSheet.create({
     color: '#888888',
     fontSize: 12,
     fontWeight: '500',
+  },
+  userLocationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(30, 162, 177, 0.15)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(30, 162, 177, 0.3)',
+  },
+  userLocationText: {
+    color: '#1ea2b1',
+    fontSize: 12,
+    fontWeight: '700',
+    marginRight: 8,
+  },
+  userAvatarContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#333',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#1ea2b1',
+  },
+  userAvatar: {
+    width: '100%',
+    height: '100%',
   }
 });

@@ -125,6 +125,7 @@ export const InfoTab: React.FC<InfoTabProps> = ({
           participantStatus={participantStatus}
           onStopPress={onStopPress}
           onNavigateToStopDetails={handleNavigateToStopDetails}
+          userProfile={userProfile}
         />
 
         {/* Statistics Row */}
