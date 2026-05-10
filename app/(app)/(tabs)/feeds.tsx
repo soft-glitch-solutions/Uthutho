@@ -980,7 +980,10 @@ export default function FeedsScreen() {
       ) : (
         // Mobile layout
         <>
-          <View style={styles.mobileHeaderWrapper} ref={refs.feedsContentRef}>
+          <View style={[
+            styles.mobileHeaderWrapper,
+            { top: Platform.OS === 'ios' ? Math.max(insets.top, 44) : Math.max(insets.top, 24) }
+          ]} ref={refs.feedsContentRef}>
             <Header
               unreadNotifications={unreadNotifications}
               router={router}

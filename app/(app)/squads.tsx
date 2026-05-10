@@ -40,7 +40,6 @@ import { LeaderboardTab } from '@/components/squads/LeaderboardTab';
 import { CreateSquadModal } from '@/components/squads/CreateSquadModal';
 import { PostModal } from '@/components/squads/PostModal';
 import { ContributeModal } from '@/components/squads/ContributeModal';
-import SquadsSkeleton from '@/components/home/skeletons/ServicesSkeleton';
 
 const BRAND_COLOR = '#1ea2b1';
 
@@ -53,6 +52,7 @@ type Squad = {
   avatar_url: string;
   invite_code: string;
   member_count?: number;
+  owner_id?: string;
 };
 
 type SquadMember = {
@@ -77,6 +77,18 @@ type SquadPost = {
     avatar_url: string;
   };
 };
+
+// Simple inline skeleton component to avoid external dependency
+const SquadsSkeleton = () => (
+  <View style={{ flex: 1, backgroundColor: '#000', padding: 20 }}>
+    {[1, 2, 3].map((i) => (
+      <View key={i} style={{ marginBottom: 20 }}>
+        <View style={{ height: 100, backgroundColor: '#111', borderRadius: 12, marginBottom: 10 }} />
+        <View style={{ height: 60, backgroundColor: '#111', borderRadius: 12 }} />
+      </View>
+    ))}
+  </View>
+);
 
 export default function SquadsScreen() {
   const { colors } = useTheme();
@@ -140,6 +152,7 @@ export default function SquadsScreen() {
     if (!profile?.id) {
       console.log('⚠️ No profile ID, fetching only discovery squads...');
       await fetchAllSquads(searchQuery);
+      setLoading(false);
       return;
     }
 
@@ -158,10 +171,10 @@ export default function SquadsScreen() {
         .eq('user_id', profile.id)
         .maybeSingle();
 
-      console.log('📊 Membership fetch result:', { 
+      console.log('📊 Membership fetch result:', {
         status: memberInfo?.status,
         hasSquad: !!memberInfo?.squads,
-        error: memError 
+        error: memError
       });
 
       if (memError) {
@@ -236,22 +249,22 @@ export default function SquadsScreen() {
 
   const fetchAllSquads = async (query = '') => {
     try {
-      let rpcCall = supabase
+      let supabaseQuery = supabase
         .from('squads')
         .select('*, squad_members(count)');
 
       if (query) {
-        rpcCall = rpcCall.ilike('name', `%${query}%`);
+        supabaseQuery = supabaseQuery.ilike('name', `%${query}%`);
       }
 
-      const { data: squadsData, error } = await rpcCall;
+      const { data: squadsData, error } = await supabaseQuery;
 
       if (error) throw error;
 
       if (squadsData) {
         console.log(`✨ Fetched ${squadsData.length} discovery squads`);
         const formatted = squadsData.map(s => {
-          const mCount = Array.isArray(s.squad_members) 
+          const mCount = Array.isArray(s.squad_members)
             ? (s.squad_members[0]?.count || 0)
             : (s.squad_members?.count || 0);
 
@@ -346,7 +359,7 @@ export default function SquadsScreen() {
                 .eq('user_id', profile.id);
 
               if (error) throw error;
-              
+
               Alert.alert('Left Squad', `You have left ${squad.name}.`);
               fetchSquadData();
             } catch (err) {
@@ -382,7 +395,7 @@ export default function SquadsScreen() {
                 .eq('user_id', member.user_id);
 
               if (error) throw error;
-              
+
               Alert.alert('Member Removed', `${member.profiles?.first_name} has been removed.`);
               fetchSquadData();
             } catch (err) {
@@ -432,7 +445,9 @@ export default function SquadsScreen() {
 
       if (error) throw error;
 
-      updateProfile({ points: profile.points - 1000 });
+      if (updateProfile) {
+        updateProfile({ points: profile.points - 1000 });
+      }
 
       setShowCreateModal(false);
       setNewSquadName('');
@@ -456,7 +471,7 @@ export default function SquadsScreen() {
 
     try {
       setContributing(true);
-      
+
       const { error: userError } = await supabase
         .from('profiles')
         .update({ points: profile.points - amount })
@@ -471,8 +486,10 @@ export default function SquadsScreen() {
 
       if (squadError) throw squadError;
 
-      updateProfile({ points: profile.points - amount });
-      
+      if (updateProfile) {
+        updateProfile({ points: profile.points - amount });
+      }
+
       Alert.alert('Contribution Successful', `You contributed ${amount} points to ${squad.name}!`);
       setShowContributeModal(false);
       setContributionAmount('');
@@ -608,41 +625,44 @@ export default function SquadsScreen() {
           ))}
         </View>
 
-        {activeTab === 'my-squad' && squad && (
-          <MySquadTab
-            squad={squad}
-            members={members}
-            posts={posts}
-            profile={profile}
-            isLeader={isLeader}
-            onShareInvite={handleShareInvite}
-            onShowPostModal={() => setShowPostModal(true)}
-            onShowContributeModal={() => setShowContributeModal(true)}
-            onLeaveSquad={handleLeaveSquad}
-            onKickMember={handleKickMember}
-            onViewLeaderboard={() => setActiveTab('leaderboard')}
-            BRAND_COLOR={BRAND_COLOR}
-          />
-        )}
+        {/* Render tabs */}
+        <View style={styles.tabContent}>
+          {activeTab === 'my-squad' && squad && (
+            <MySquadTab
+              squad={squad}
+              members={members}
+              posts={posts}
+              profile={profile}
+              isLeader={isLeader}
+              onShareInvite={handleShareInvite}
+              onShowPostModal={() => setShowPostModal(true)}
+              onShowContributeModal={() => setShowContributeModal(true)}
+              onLeaveSquad={handleLeaveSquad}
+              onKickMember={handleKickMember}
+              onViewLeaderboard={() => setActiveTab('leaderboard')}
+              BRAND_COLOR={BRAND_COLOR}
+            />
+          )}
 
-        {activeTab === 'discovery' && (
-          <DiscoveryTab
-            allSquads={allSquads}
-            searchQuery={searchQuery}
-            onSearch={handleSearch}
-            onSelectSquad={(id) => router.push({ pathname: '/squad-details', params: { id } })}
-            joining={joining}
-            BRAND_COLOR={BRAND_COLOR}
-          />
-        )}
+          {activeTab === 'discovery' && (
+            <DiscoveryTab
+              allSquads={allSquads}
+              searchQuery={searchQuery}
+              onSearch={handleSearch}
+              onSelectSquad={(id) => router.push({ pathname: '/squad-details', params: { id } })}
+              joining={joining}
+              BRAND_COLOR={BRAND_COLOR}
+            />
+          )}
 
-        {activeTab === 'leaderboard' && (
-          <LeaderboardTab
-            allSquads={allSquads}
-            onSelectSquad={(id) => router.push({ pathname: '/squad-details', params: { id } })}
-            BRAND_COLOR={BRAND_COLOR}
-          />
-        )}
+          {activeTab === 'leaderboard' && (
+            <LeaderboardTab
+              allSquads={allSquads}
+              onSelectSquad={(id) => router.push({ pathname: '/squad-details', params: { id } })}
+              BRAND_COLOR={BRAND_COLOR}
+            />
+          )}
+        </View>
       </Animated.ScrollView>
 
       {/* Modals */}
@@ -792,5 +812,8 @@ const styles = StyleSheet.create({
   },
   activeTabLabel: {
     color: BRAND_COLOR,
+  },
+  tabContent: {
+    flex: 1,
   },
 });
