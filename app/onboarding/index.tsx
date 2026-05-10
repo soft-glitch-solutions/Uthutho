@@ -141,12 +141,11 @@ export default function Onboarding() {
   if (isLoading) {
     return (
       <View style={styles.splashContainer}>
-        <Text style={styles.logosplash}>Uthutho</Text>
-        <View style={styles.taglineRow}>
-          <Text style={[styles.taglineText, { color: '#1EA2B1' }]}>Commute.</Text>
-          <Text style={[styles.taglineText, { color: '#ED67B1' }]}> Connect.</Text>
-          <Text style={[styles.taglineText, { color: '#FD602D' }]}> Community.</Text>
+        <View style={styles.splashLogoRow}>
+          <Text style={styles.logosplash}>Uthutho</Text>
+          <Text style={styles.splashDot}>.</Text>
         </View>
+        <Text style={styles.splashTagline}>MOVE SMARTER</Text>
       </View>
     );
   }
@@ -261,17 +260,33 @@ const styles = StyleSheet.create({
   logosplash: {
     fontSize: 48,
     fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -1,
+  },
+  splashLogoRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  splashDot: {
+    fontSize: 52,
+    fontWeight: '900',
     color: BRAND_COLOR,
-    fontStyle: 'italic',
-    letterSpacing: -2,
+    marginLeft: 2,
+  },
+  splashTagline: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: BRAND_COLOR,
+    textTransform: 'uppercase',
+    letterSpacing: 3,
+    marginTop: -8,
   },
   taglineRow: {
     flexDirection: 'row',
-    marginTop: 12,
-  },
-  taglineText: {
-    fontSize: 16,
-    fontWeight: '700',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: isSmallMobile ? 12 : 24,
   },
   header: {
     flexDirection: 'row',
