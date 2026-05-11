@@ -40,7 +40,7 @@ import { LeaderboardTab } from '@/components/squads/LeaderboardTab';
 import { CreateSquadModal } from '@/components/squads/CreateSquadModal';
 import { PostModal } from '@/components/squads/PostModal';
 import { ContributeModal } from '@/components/squads/ContributeModal';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import SquadsSkeleton from '@/components/home/skeletons/ServicesSkeleton';
 
 const BRAND_COLOR = '#1ea2b1';
 
@@ -53,7 +53,6 @@ type Squad = {
   avatar_url: string;
   invite_code: string;
   member_count?: number;
-  owner_id?: string;
 };
 
 type SquadMember = {
@@ -78,18 +77,6 @@ type SquadPost = {
     avatar_url: string;
   };
 };
-
-// Simple inline skeleton component to avoid external dependency
-const SquadsSkeleton = () => (
-  <View style={{ flex: 1, backgroundColor: '#000', padding: 20 }}>
-    {[1, 2, 3].map((i) => (
-      <View key={i} style={{ marginBottom: 20 }}>
-        <View style={{ height: 100, backgroundColor: '#111', borderRadius: 12, marginBottom: 10 }} />
-        <View style={{ height: 60, backgroundColor: '#111', borderRadius: 12 }} />
-      </View>
-    ))}
-  </View>
-);
 
 export default function SquadsScreen() {
   const { colors } = useTheme();
@@ -154,7 +141,6 @@ export default function SquadsScreen() {
     if (!profile?.id) {
       console.log('⚠️ No profile ID, fetching only discovery squads...');
       await fetchAllSquads(searchQuery);
-      setLoading(false);
       return;
     }
 
@@ -251,15 +237,15 @@ export default function SquadsScreen() {
 
   const fetchAllSquads = async (query = '') => {
     try {
-      let supabaseQuery = supabase
+      let rpcCall = supabase
         .from('squads')
         .select('*, squad_members(count)');
 
       if (query) {
-        supabaseQuery = supabaseQuery.ilike('name', `%${query}%`);
+        rpcCall = rpcCall.ilike('name', `%${query}%`);
       }
 
-      const { data: squadsData, error } = await supabaseQuery;
+      const { data: squadsData, error } = await rpcCall;
 
       if (error) throw error;
 
@@ -447,9 +433,7 @@ export default function SquadsScreen() {
 
       if (error) throw error;
 
-      if (updateProfile) {
-        updateProfile({ points: profile.points - 1000 });
-      }
+      updateProfile({ points: profile.points - 1000 });
 
       setShowCreateModal(false);
       setNewSquadName('');
@@ -488,9 +472,7 @@ export default function SquadsScreen() {
 
       if (squadError) throw squadError;
 
-      if (updateProfile) {
-        updateProfile({ points: profile.points - amount });
-      }
+      updateProfile({ points: profile.points - amount });
 
       Alert.alert('Contribution Successful', `You contributed ${amount} points to ${squad.name}!`);
       setShowContributeModal(false);
@@ -632,44 +614,41 @@ export default function SquadsScreen() {
           ))}
         </View>
 
-        {/* Render tabs */}
-        <View style={styles.tabContent}>
-          {activeTab === 'my-squad' && squad && (
-            <MySquadTab
-              squad={squad}
-              members={members}
-              posts={posts}
-              profile={profile}
-              isLeader={isLeader}
-              onShareInvite={handleShareInvite}
-              onShowPostModal={() => setShowPostModal(true)}
-              onShowContributeModal={() => setShowContributeModal(true)}
-              onLeaveSquad={handleLeaveSquad}
-              onKickMember={handleKickMember}
-              onViewLeaderboard={() => setActiveTab('leaderboard')}
-              BRAND_COLOR={BRAND_COLOR}
-            />
-          )}
+        {activeTab === 'my-squad' && squad && (
+          <MySquadTab
+            squad={squad}
+            members={members}
+            posts={posts}
+            profile={profile}
+            isLeader={isLeader}
+            onShareInvite={handleShareInvite}
+            onShowPostModal={() => setShowPostModal(true)}
+            onShowContributeModal={() => setShowContributeModal(true)}
+            onLeaveSquad={handleLeaveSquad}
+            onKickMember={handleKickMember}
+            onViewLeaderboard={() => setActiveTab('leaderboard')}
+            BRAND_COLOR={BRAND_COLOR}
+          />
+        )}
 
-          {activeTab === 'discovery' && (
-            <DiscoveryTab
-              allSquads={allSquads}
-              searchQuery={searchQuery}
-              onSearch={handleSearch}
-              onSelectSquad={(id) => router.push({ pathname: '/squad-details', params: { id } })}
-              joining={joining}
-              BRAND_COLOR={BRAND_COLOR}
-            />
-          )}
+        {activeTab === 'discovery' && (
+          <DiscoveryTab
+            allSquads={allSquads}
+            searchQuery={searchQuery}
+            onSearch={handleSearch}
+            onSelectSquad={(id) => router.push({ pathname: '/squad-details', params: { id } })}
+            joining={joining}
+            BRAND_COLOR={BRAND_COLOR}
+          />
+        )}
 
-          {activeTab === 'leaderboard' && (
-            <LeaderboardTab
-              allSquads={allSquads}
-              onSelectSquad={(id) => router.push({ pathname: '/squad-details', params: { id } })}
-              BRAND_COLOR={BRAND_COLOR}
-            />
-          )}
-        </View>
+        {activeTab === 'leaderboard' && (
+          <LeaderboardTab
+            allSquads={allSquads}
+            onSelectSquad={(id) => router.push({ pathname: '/squad-details', params: { id } })}
+            BRAND_COLOR={BRAND_COLOR}
+          />
+        )}
       </Animated.ScrollView>
 
       {/* Modals */}
@@ -819,8 +798,5 @@ const styles = StyleSheet.create({
   },
   activeTabLabel: {
     color: BRAND_COLOR,
-  },
-  tabContent: {
-    flex: 1,
   },
 });

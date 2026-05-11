@@ -1,14 +1,14 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
-import {
-  ShieldCheck,
-  Star,
-  UserPlus,
-  MessageSquare,
-  Trophy,
-  LogOut,
-  Plus,
-  Zap,
+import { 
+  ShieldCheck, 
+  Star, 
+  UserPlus, 
+  MessageSquare, 
+  Trophy, 
+  LogOut, 
+  Plus, 
+  Zap, 
   X,
   Heart,
   MoreVertical
@@ -45,7 +45,7 @@ export const MySquadTab = ({
   BRAND_COLOR
 }: MySquadTabProps) => {
   return (
-    <Animated.View entering={FadeInDown.duration(800)} style={{ flex: 1 }}>
+    <Animated.View entering={FadeInDown.duration(800)}>
       {/* Hero Section */}
       <View style={styles.heroCard}>
         <View style={styles.heroContent}>
@@ -68,10 +68,10 @@ export const MySquadTab = ({
             <Text style={styles.progressValue}>{Math.round(Math.min(100, (squad.points % 1000) / 10))}%</Text>
           </View>
           <View style={styles.progressBarBg}>
-            <View style={[styles.progressBarFill, { width: `${Math.min(100, (squad.points % 1000) / 10)}%`, backgroundColor: BRAND_COLOR }]} />
+            <View style={[styles.progressBarFill, { width: `${Math.min(100, (squad.points % 1000) / 10)}%` }]} />
           </View>
-          <TouchableOpacity
-            style={[styles.contributeBtn, { backgroundColor: BRAND_COLOR }]}
+          <TouchableOpacity 
+            style={styles.contributeBtn} 
             onPress={onShowContributeModal}
           >
             <Zap size={14} color="#000" fill="#000" />
@@ -81,7 +81,7 @@ export const MySquadTab = ({
       </View>
 
       <View style={styles.actionBar}>
-        <TouchableOpacity style={styles.actionBtn} onPress={onShareInvite}>
+        <TouchableOpacity style={[styles.actionBtn, { flex: 0, width: '100%' }]} onPress={onShareInvite}>
           <View style={styles.actionBtnInner}>
             <UserPlus size={20} color={BRAND_COLOR} />
             <Text style={styles.actionBtnText}>Recruit Members</Text>
@@ -89,7 +89,7 @@ export const MySquadTab = ({
         </TouchableOpacity>
       </View>
 
-      <View style={styles.actionBar}>
+      <View style={[styles.actionBar, { marginTop: 12 }]}>
         <TouchableOpacity style={styles.actionBtn} onPress={onShowPostModal}>
           <View style={styles.actionBtnInner}>
             <MessageSquare size={20} color={BRAND_COLOR} />
@@ -104,11 +104,11 @@ export const MySquadTab = ({
         </TouchableOpacity>
       </View>
 
-      <View style={styles.actionBar}>
-        <TouchableOpacity style={[styles.actionBtn, styles.dangerBtn]} onPress={onLeaveSquad}>
+      <View style={[styles.actionBar, { marginTop: 12 }]}>
+        <TouchableOpacity style={[styles.actionBtn, { borderColor: '#ef444430' }]} onPress={onLeaveSquad}>
           <View style={styles.actionBtnInner}>
             <LogOut size={20} color="#ef4444" />
-            <Text style={[styles.actionBtnText, styles.dangerText]}>Leave Squad</Text>
+            <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>Leave Squad</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -180,10 +180,10 @@ export const MySquadTab = ({
               <Text style={styles.memberRole}>{member.role.toUpperCase()}</Text>
             </View>
             <View style={styles.memberStatus}>
-              <Text style={[styles.statusText, { color: BRAND_COLOR }]}>{member.profiles?.points} pts</Text>
+              <Text style={styles.statusText}>{member.profiles?.points} pts</Text>
             </View>
             {isLeader && member.user_id !== profile?.id && (
-              <TouchableOpacity
+              <TouchableOpacity 
                 style={styles.kickBtn}
                 onPress={() => onKickMember(member)}
               >
@@ -276,9 +276,11 @@ const styles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
+    backgroundColor: '#1ea2b1',
     borderRadius: 3,
   },
   contributeBtn: {
+    backgroundColor: '#1ea2b1',
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -298,6 +300,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginTop: 24,
+    paddingHorizontal: 2,
   },
   actionBtn: {
     flex: 1,
@@ -318,12 +321,6 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     fontWeight: '800',
-  },
-  dangerBtn: {
-    borderColor: '#ef444430',
-  },
-  dangerText: {
-    color: '#ef4444',
   },
   section: {
     marginTop: 32,
@@ -406,6 +403,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: '#222',
+    borderStyle: 'dashed',
   },
   emptyText: {
     color: '#444',
@@ -453,6 +451,7 @@ const styles = StyleSheet.create({
     borderColor: '#222',
   },
   statusText: {
+    color: '#1ea2b1',
     fontSize: 10,
     fontWeight: '900',
   },

@@ -1299,7 +1299,7 @@ export default function HomeScreen() {
     <ScreenTransition>
       <ScrollView
         ref={scrollViewRef}
-        style={[styles.container, { backgroundColor: colors.background, paddingTop: Math.max(insets.top, 20) }]}
+        style={[styles.container, { backgroundColor: colors.background, paddingTop: Math.max(insets.top, 8) }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
