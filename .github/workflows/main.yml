@@ -1,4 +1,4 @@
-name: Deploy via FTPS
+name: Deploy via SFTP
 
 on:
   push:
@@ -14,29 +14,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ----------------------------------------
+      # CHECKOUT
+      # ----------------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # ----------------------------------------
+      # NODE
+      # ----------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
+      # ----------------------------------------
+      # INSTALL
+      # ----------------------------------------
       - name: Install dependencies
         run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
+      # ----------------------------------------
+      # BUILD EXPO WEB
+      # ----------------------------------------
       - name: Build Expo Web
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}
-          GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+          EXPO_PUBLIC_GOOGLE_PLACES_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY }}
         run: |
           npm install undici@5.22.1 --save-exact --legacy-peer-deps
           npx expo export --platform web
 
       # ----------------------------------------
-      # IMPORTANT DEBUG STEP
-      # Shows what actually got built
+      # VERIFY BUILD
       # ----------------------------------------
       - name: Verify build output
         run: |
@@ -44,7 +55,8 @@ jobs:
           find dist -type f | head -50
 
       # ----------------------------------------
-      # SET CORRECT REMOTE DIRECTORY
+      # SET DEPLOY DIRECTORY
+      # CHANGE THESE TO YOUR REAL SERVER PATHS
       # ----------------------------------------
       - name: Set deploy directory
         id: set-dir
@@ -52,48 +64,31 @@ jobs:
           BRANCH="${GITHUB_REF##*/}"
 
           if [[ "$BRANCH" == "shaqeel" ]]; then
-            echo "DIR=/shaqeel.uthutho.co.za/" >> $GITHUB_OUTPUT
+            echo "DIR=/public_html/shaqeel/" >> $GITHUB_OUTPUT
 
           elif [[ "$BRANCH" == "Mahki" ]]; then
-            echo "DIR=/makhi.uthutho.co.za/" >> $GITHUB_OUTPUT
+            echo "DIR=/public_html/makhi/" >> $GITHUB_OUTPUT
 
           elif [[ "$BRANCH" == "mirror" ]]; then
-            echo "DIR=/mirror.uthutho.co.za/" >> $GITHUB_OUTPUT
+            echo "DIR=/public_html/mirror/" >> $GITHUB_OUTPUT
 
           elif [[ "$BRANCH" == "Ishmael" ]]; then
-            echo "DIR=/ishmael.uthutho.co.za/" >> $GITHUB_OUTPUT
+            echo "DIR=/public_html/ishmael/" >> $GITHUB_OUTPUT
 
           else
-            echo "DIR=/mobile.uthutho.co.za/" >> $GITHUB_OUTPUT
+            echo "DIR=/public_html/mobile/" >> $GITHUB_OUTPUT
           fi
 
       # ----------------------------------------
-      # DEPLOY
+      # DEPLOY VIA SFTP
       # ----------------------------------------
-      - name: Deploy to cPanel via FTPS
-        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+      - name: Deploy via SFTP
+        uses: Dylan700/sftp-upload-action@latest
         with:
-          server: ${{ secrets.FTP_SERVER }}
+          server: 51.89.20.167
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          port: 1624
 
-          protocol: ftps
-          security: loose
-          port: 21
-
-          local-dir: dist/
-          server-dir: ${{ steps.set-dir.outputs.DIR }}
-
-          # DELETE OLD FILES
-          dangerous-clean-slate: False
-
-          # FORCE FULL UPLOAD
-          state-name: .ftp-deploy-sync-state-v2.json
-
-          log-level: verbose
-          timeout: 120000
-
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
+          uploads: |
+            dist/ => ${{ steps.set-dir.outputs.DIR }}
