@@ -1,23 +1,33 @@
-// RootLayout.tsx - UPDATED VERSION
+// RootLayout.tsx - UPDATED VERSION WITH WEB SUPPORT
 import { useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme, Platform } from 'react-native';
-import * as Linking from 'expo-linking';
-import * as Notifications from 'expo-notifications';
 import { ThemeProvider } from '../context/ThemeContext';
 import { WaitingProvider } from '../context/WaitingContext';
 import { LanguageProvider } from '../context/LanguageContext';
 import { supabase } from '../lib/supabase';
 import NetworkGate from '@/components/NetworkGate';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+// Only import native modules on native platforms
+let Linking: any = null;
+let Notifications: any = null;
+
+if (Platform.OS !== 'web') {
+  Linking = require('expo-linking');
+  Notifications = require('expo-notifications');
+
+  // Only set notification handler on native
+  if (Notifications) {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  }
+}
 
 // Make sure this matches your app.json scheme
 const DEEP_LINK_SCHEME = 'uthutho';
@@ -28,6 +38,52 @@ export default function RootLayout() {
 
   // Deep link handling for OAuth and password reset
   useEffect(() => {
+    // Only setup deep linking on native platforms
+    if (Platform.OS === 'web') {
+      // For web, handle URL params directly
+      const handleWebAuth = async () => {
+        const url = window.location.href;
+        if (url.includes('auth/callback')) {
+          console.log('[Web] Processing OAuth callback');
+
+          // Parse URL parameters
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const searchParams = new URLSearchParams(window.location.search);
+
+          const access_token = hashParams.get('access_token') || searchParams.get('access_token');
+          const refresh_token = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+          const error_description = hashParams.get('error_description') || searchParams.get('error_description');
+
+          if (error_description) {
+            console.error('[Web] OAuth error:', error_description);
+            router.replace('/auth');
+            return;
+          }
+
+          if (access_token && refresh_token) {
+            console.log('[Web] Setting session from tokens');
+            const { error } = await supabase.auth.setSession({
+              access_token,
+              refresh_token,
+            });
+
+            if (error) {
+              console.error('[Web] Error setting session:', error);
+              router.replace('/auth');
+              return;
+            }
+
+            console.log('[Web] OAuth successful, redirecting to home');
+            router.replace('/(app)/(tabs)/home');
+          }
+        }
+      };
+
+      handleWebAuth();
+      return;
+    }
+
+    // Native platform deep linking
     const handleDeepLink = async (url: string) => {
       console.log('[DeepLink] Handling URL:', url);
 
@@ -35,35 +91,35 @@ export default function RootLayout() {
         // Handle OAuth callbacks
         if (url.includes('auth/callback')) {
           console.log('[DeepLink] Processing OAuth callback');
-          
+
           // Parse URL parameters manually
           const urlObj = new URL(url);
           const hashParams = new URLSearchParams(urlObj.hash.substring(1));
           const searchParams = new URLSearchParams(urlObj.search);
-          
+
           const access_token = hashParams.get('access_token') || searchParams.get('access_token');
           const refresh_token = hashParams.get('refresh_token') || searchParams.get('refresh_token');
           const error_description = hashParams.get('error_description') || searchParams.get('error_description');
-          
+
           if (error_description) {
             console.error('[DeepLink] OAuth error:', error_description);
             router.replace('/auth');
             return;
           }
-          
+
           if (access_token && refresh_token) {
             console.log('[DeepLink] Setting session from tokens');
             const { error } = await supabase.auth.setSession({
               access_token,
               refresh_token,
             });
-            
+
             if (error) {
               console.error('[DeepLink] Error setting session:', error);
               router.replace('/auth');
               return;
             }
-            
+
             console.log('[DeepLink] OAuth successful, redirecting to home');
             router.replace('/(app)/(tabs)/home');
             return;
@@ -96,14 +152,16 @@ export default function RootLayout() {
       }
     };
 
-    const subscription = Linking.addEventListener('url', ({ url }) => handleDeepLink(url));
-    
-    // Handle initial URL when app is launched from a deep link
-    Linking.getInitialURL().then((url) => {
-      if (url) handleDeepLink(url);
-    });
-    
-    return () => subscription.remove();
+    if (Linking) {
+      const subscription = Linking.addEventListener('url', ({ url }) => handleDeepLink(url));
+
+      // Handle initial URL when app is launched from a deep link
+      Linking.getInitialURL().then((url) => {
+        if (url) handleDeepLink(url);
+      });
+
+      return () => subscription.remove();
+    }
   }, []);
 
   return (
