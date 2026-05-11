@@ -52,7 +52,7 @@ const SOUTH_AFRICA_BIAS = {
   },
 };
 
-const GOOGLE_PLACES_API_KEY = 'AIzaSyCNhnn5T_4Hq2ZRwK6JTBC0ju0anA99jA4';
+const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 
 interface SearchOverlayProps {
   visible: boolean;
