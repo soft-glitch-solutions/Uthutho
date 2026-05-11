@@ -46,7 +46,7 @@ const InteractiveNearbyMap: React.FC<InteractiveNearbyMapProps> = ({
 }) => {
   const { colors } = useTheme();
   const [mapHtml, setMapHtml] = useState<string>('');
-  const [mapLoading, setMapLoading] = useState<boolean>(true);
+  const [isMapLoading, setIsMapLoading] = useState<boolean>(true);
   const [allStops, setAllStops] = useState<any[]>([]);
   const [allHubs, setAllHubs] = useState<any[]>([]);
   const [loadingAdditionalData, setLoadingAdditionalData] = useState<boolean>(true);
@@ -218,7 +218,6 @@ const InteractiveNearbyMap: React.FC<InteractiveNearbyMapProps> = ({
 
     if (!loadingAdditionalData && userProfile !== null) {
       setMapHtml(generateMapHtml());
-      setMapLoading(true);
     }
   }, [userLocation, allStops, allHubs, colors, loadingAdditionalData, userProfile]);
 
@@ -235,11 +234,11 @@ const InteractiveNearbyMap: React.FC<InteractiveNearbyMapProps> = ({
           handleNearestHubPress(id);
         }
       } else if (data === 'mapLoaded') {
-        setMapLoading(false);
+        setIsMapLoading(false);
       }
     } catch (error) {
       if (event.nativeEvent.data === 'mapLoaded') {
-        setMapLoading(false);
+        setIsMapLoading(false);
       }
     }
   };
@@ -273,7 +272,7 @@ const InteractiveNearbyMap: React.FC<InteractiveNearbyMapProps> = ({
         </View>
       ) : mapHtml ? (
         <View style={styles.mapWrapper}>
-          {mapLoading && (
+          {isMapLoading && (
             <View style={styles.mapOverlay}>
               <ActivityIndicator size="large" color={colors.primary} />
               <Text style={[styles.mapLoadingText, { color: colors.text }]}>
@@ -286,7 +285,7 @@ const InteractiveNearbyMap: React.FC<InteractiveNearbyMapProps> = ({
               srcDoc={mapHtml}
               style={styles.mapIframe}
               title="Interactive Nearby Map"
-              onLoad={() => setMapLoading(false)}
+              onLoad={() => setIsMapLoading(false)}
             />
           ) : (
             <View style={styles.webViewFallback}>
@@ -638,7 +637,7 @@ const generateMapHtmlContent = (locations: LocationData[], colors: any, mapData:
                   popupContent += '<div class="popup-distance">' + location.distance + ' min walk</div>';
                 }
                 
-                popupContent += '<button class="popup-button" onclick="navigateToLocation(\\'' + buttonAction + '\\', \\'' + location.id + '\\')">' +
+                popupContent += '<button class="popup-button" onclick="navigateToLocation(\\' + buttonAction + '\\', \\'' + location.id + '\\')">' +
                                 'View Details ↗' +
                               '</button>';
                 

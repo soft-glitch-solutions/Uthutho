@@ -88,7 +88,8 @@
       },
       "eas": {
         "projectId": "2669c125-3910-49ce-a24b-5675a796b3ec"
-      }
+      },
+      "expo_public_google_places_api_key": "AIzaSyCNhnn5T_4Hq2ZRwK6JTBC0ju0anA99jA4"
     },
     "splash": {
       "image": "./assets/images/SplashScreen.png",
