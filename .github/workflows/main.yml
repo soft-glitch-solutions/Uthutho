@@ -1,4 +1,4 @@
-name: Deploy via SFTP
+name: Deploy via FTPS
 
 on:
   push:
@@ -10,61 +10,41 @@ on:
       - mirror
 
 jobs:
-
-  # =========================================================
-  # BUILD
-  # =========================================================
-  build:
-    name: Build Expo Web
+  deploy:
     runs-on: ubuntu-latest
 
-    outputs:
-      deploy_dir: ${{ steps.set-dir.outputs.DIR }}
-
     steps:
-      # -----------------------------------------------------
-      # CHECKOUT
-      # -----------------------------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # -----------------------------------------------------
-      # NODE
-      # -----------------------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # -----------------------------------------------------
-      # INSTALL
-      # -----------------------------------------------------
       - name: Install dependencies
         run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
-      # -----------------------------------------------------
-      # BUILD
-      # -----------------------------------------------------
       - name: Build Expo Web
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}
-          EXPO_PUBLIC_GOOGLE_PLACES_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY }}
         run: |
           npm install undici@5.22.1 --save-exact --legacy-peer-deps
           npx expo export --platform web
 
-      # -----------------------------------------------------
-      # VERIFY BUILD
-      # -----------------------------------------------------
+      # ----------------------------------------
+      # IMPORTANT DEBUG STEP
+      # Shows what actually got built
+      # ----------------------------------------
       - name: Verify build output
         run: |
           echo "==== DIST FILES ===="
           find dist -type f | head -50
 
-      # -----------------------------------------------------
-      # SET DIRECTORY
-      # -----------------------------------------------------
+      # ----------------------------------------
+      # SET CORRECT REMOTE DIRECTORY
+      # ----------------------------------------
       - name: Set deploy directory
         id: set-dir
         run: |
@@ -86,101 +66,33 @@ jobs:
             echo "DIR=/mobile.uthutho.co.za/" >> $GITHUB_OUTPUT
           fi
 
-      # -----------------------------------------------------
-      # UPLOAD BUILD ARTIFACT
-      # -----------------------------------------------------
-      - name: Upload dist artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: expo-web-build
-          path: dist/
-
-  # =========================================================
-  # BACKUP
-  # =========================================================
-  backup:
-    name: Backup Existing Files
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - name: Backup current deployment
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: 51.89.20.167
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          port: 1624
-          script: |
-            echo "STARTING BACKUP"
-
-            BACKUP_DIR="${{ needs.build.outputs.deploy_dir }}backup-$(date +%Y%m%d-%H%M%S)"
-
-            mkdir -p "$BACKUP_DIR"
-
-            cp -r ${{ needs.build.outputs.deploy_dir }}* "$BACKUP_DIR/" || true
-
-            echo "BACKUP COMPLETE"
-
-  # =========================================================
-  # CLEAN
-  # =========================================================
-  clean:
-    name: Delete Old Files
-    runs-on: ubuntu-latest
-    needs: backup
-
-    steps:
-      - name: Delete existing deployment
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: 51.89.20.167
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          port: 1624
-          script: |
-            echo "DELETING OLD FILES"
-
-            find ${{ needs.build.outputs.deploy_dir }} -mindepth 1 -delete
-
-            echo "OLD FILES REMOVED"
-
-  # =========================================================
-  # DEPLOY
-  # =========================================================
-  deploy:
-    name: Upload New Files
-    runs-on: ubuntu-latest
-    needs: clean
-
-    steps:
-      # -----------------------------------------------------
-      # DOWNLOAD BUILD
-      # -----------------------------------------------------
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: expo-web-build
-          path: dist/
-
-      # -----------------------------------------------------
-      # VERIFY DOWNLOADED BUILD
-      # -----------------------------------------------------
-      - name: Verify downloaded files
-        run: |
-          echo "==== DEPLOY FILES ===="
-          find dist -type f | head -50
-
-      # -----------------------------------------------------
+      # ----------------------------------------
       # DEPLOY
-      # -----------------------------------------------------
-      - name: Upload via SFTP
-        uses: Dylan700/sftp-upload-action@latest
+      # ----------------------------------------
+      - name: Deploy to cPanel via FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
-          server: 51.89.20.167
+          server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          port: 1624
 
-          uploads: |
-            dist/ => ${{ needs.build.outputs.deploy_dir }}
+          protocol: ftps
+          security: loose
+          port: 21
+
+          local-dir: dist/
+          server-dir: ${{ steps.set-dir.outputs.DIR }}
+
+          # DELETE OLD FILES
+          dangerous-clean-slate: False
+
+          # FORCE FULL UPLOAD
+          state-name: .ftp-deploy-sync-state-v2.json
+
+          log-level: verbose
+          timeout: 120000
+
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
