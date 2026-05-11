@@ -40,6 +40,7 @@ import { LeaderboardTab } from '@/components/squads/LeaderboardTab';
 import { CreateSquadModal } from '@/components/squads/CreateSquadModal';
 import { PostModal } from '@/components/squads/PostModal';
 import { ContributeModal } from '@/components/squads/ContributeModal';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const BRAND_COLOR = '#1ea2b1';
 
@@ -94,6 +95,7 @@ export default function SquadsScreen() {
   const { colors } = useTheme();
   const { profile, loading: profileLoading, updateProfile } = useProfile();
   const { join_code } = useLocalSearchParams<{ join_code: string }>();
+  const insets = useSafeAreaInsets();
 
   const [squad, setSquad] = useState<Squad | null>(null);
   const [members, setMembers] = useState<SquadMember[]>([]);
@@ -550,7 +552,12 @@ export default function SquadsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[
+      styles.container,
+      {
+        paddingTop: Platform.OS === 'ios' ? Math.max(insets.top, 44) : Math.max(insets.top, 20)
+      }
+    ]}>
       {/* Sticky Animated Header */}
       <Animated.View style={[styles.stickyHeader, headerStyle]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
