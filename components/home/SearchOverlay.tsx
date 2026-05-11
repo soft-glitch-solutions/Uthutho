@@ -50,7 +50,7 @@ const SOUTH_AFRICA_BIAS = {
 };
 
 // Use environment variable with fallback
-const GOOGLE_PLACES_API_KEY = 'AIzaSyCNhnn5T_4Hq2ZRwK6JTBC0ju0anA99jA4';
+const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
 
 console.log('Google API Key loaded:', GOOGLE_PLACES_API_KEY ? 'Yes (length: ' + GOOGLE_PLACES_API_KEY.length + ')' : 'No');
 
