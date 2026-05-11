@@ -28,9 +28,6 @@ import {
   Navigation,
   LocateFixed,
   AlertCircle,
-  X,
-  Check,
-  Star,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
@@ -52,7 +49,10 @@ const SOUTH_AFRICA_BIAS = {
   },
 };
 
-const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+// Use environment variable with fallback
+const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+
+console.log('Google API Key loaded:', GOOGLE_PLACES_API_KEY ? 'Yes (length: ' + GOOGLE_PLACES_API_KEY.length + ')' : 'No');
 
 interface SearchOverlayProps {
   visible: boolean;
@@ -95,7 +95,6 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
   const [isGettingLocation, setIsGettingLocation] = useState(true);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [savingLocation, setSavingLocation] = useState(false);
 
   const placesRef = useRef<any>(null);
 
@@ -121,7 +120,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
 
       if (error) throw error;
 
-      // Parse home address if it exists (stored as JSON string)
+      // Parse home address if it exists
       if (profile?.home && typeof profile.home === 'string') {
         try {
           const homeData = JSON.parse(profile.home);
@@ -136,15 +135,6 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
         } catch (e) {
           console.error('Error parsing home address:', e);
         }
-      } else if (profile?.home && typeof profile.home === 'object') {
-        setHomeAddress({
-          id: 'home',
-          type: 'home',
-          address: profile.home.address || profile.home.label,
-          latitude: profile.home.latitude,
-          longitude: profile.home.longitude,
-          label: profile.home.label
-        });
       }
 
       // Parse work address if it exists
@@ -162,15 +152,6 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
         } catch (e) {
           console.error('Error parsing work address:', e);
         }
-      } else if (profile?.work && typeof profile.work === 'object') {
-        setWorkAddress({
-          id: 'work',
-          type: 'work',
-          address: profile.work.address || profile.work.label,
-          latitude: profile.work.latitude,
-          longitude: profile.work.longitude,
-          label: profile.work.label
-        });
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -555,6 +536,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
 
   if (!visible) return null;
 
+  // Rest of your JSX remains the same...
   return (
     <>
       <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
@@ -648,11 +630,10 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
             </Animated.View>
 
             <View style={styles.discoveryContent}>
-              {/* 3-Column Shortcuts: Home, Work, Nearby */}
+              {/* 3-Column Shortcuts */}
               <Animated.View style={[styles.sectionWrapper, { transform: [{ translateY: anims.shortcutsY }] }]}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
                 <View style={styles.threeColumnGrid}>
-                  {/* Home Button */}
                   <TouchableOpacity
                     style={[styles.shortcutCard, { backgroundColor: colors.card }]}
                     onPress={() => homeAddress && handleSavedAddressPress(homeAddress)}
@@ -660,9 +641,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
                     <View style={[styles.shortcutIconBox, { backgroundColor: `${colors.primary}15` }]}>
                       <Home size={24} color={homeAddress ? colors.primary : '#888888'} />
                     </View>
-                    <Text style={[styles.shortcutTitle, { color: homeAddress ? colors.text : '#888888' }]}>
-                      Home
-                    </Text>
+                    <Text style={[styles.shortcutTitle, { color: homeAddress ? colors.text : '#888888' }]}>Home</Text>
                     {homeAddress ? (
                       <Text style={styles.shortcutAddress} numberOfLines={1}>
                         {homeAddress.address.split(',')[0]}
@@ -672,7 +651,6 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
                     )}
                   </TouchableOpacity>
 
-                  {/* Work Button */}
                   <TouchableOpacity
                     style={[styles.shortcutCard, { backgroundColor: colors.card }]}
                     onPress={() => workAddress && handleSavedAddressPress(workAddress)}
@@ -680,9 +658,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
                     <View style={[styles.shortcutIconBox, { backgroundColor: `${colors.primary}15` }]}>
                       <Briefcase size={24} color={workAddress ? colors.primary : '#888888'} />
                     </View>
-                    <Text style={[styles.shortcutTitle, { color: workAddress ? colors.text : '#888888' }]}>
-                      Work
-                    </Text>
+                    <Text style={[styles.shortcutTitle, { color: workAddress ? colors.text : '#888888' }]}>Work</Text>
                     {workAddress ? (
                       <Text style={styles.shortcutAddress} numberOfLines={1}>
                         {workAddress.address.split(',')[0]}
@@ -692,7 +668,6 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
                     )}
                   </TouchableOpacity>
 
-                  {/* Nearby Button */}
                   <TouchableOpacity
                     style={[styles.shortcutCard, { backgroundColor: colors.card }]}
                     onPress={handleUseMyLocation}
@@ -789,13 +764,13 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
         </Animated.View>
       </Modal>
 
-      {/* Success/Error Modal */}
       <SuccessModal />
     </>
   );
 };
 
 const styles = StyleSheet.create({
+  // ... (keep all your existing styles)
   overlay: {
     flex: 1,
     backgroundColor: '#000000',
