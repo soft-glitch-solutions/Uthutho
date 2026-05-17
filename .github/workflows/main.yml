@@ -79,6 +79,7 @@ jobs:
             echo "DIR=/mobile.uthutho.co.za/" >> $GITHUB_OUTPUT
           fi
 
+          
       # ----------------------------------------
       # DEPLOY VIA SFTP
       # ----------------------------------------
