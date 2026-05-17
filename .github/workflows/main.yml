@@ -52,11 +52,11 @@ jobs:
       - name: Verify build output
         run: |
           echo "==== DIST FILES ===="
+          ls -la dist/
           find dist -type f | head -50
 
       # ----------------------------------------
       # SET DEPLOY DIRECTORY
-      # CHANGE THESE TO YOUR REAL SERVER PATHS
       # ----------------------------------------
       - name: Set deploy directory
         id: set-dir
@@ -64,22 +64,21 @@ jobs:
           BRANCH="${GITHUB_REF##*/}"
 
           if [[ "$BRANCH" == "shaqeel" ]]; then
-            echo "DIR=/public_html/shaqeel/" >> $GITHUB_OUTPUT
-
+            echo "DIR=/public_html/shaqeel" >> $GITHUB_OUTPUT
           elif [[ "$BRANCH" == "Mahki" ]]; then
-            echo "DIR=/public_html/makhi/" >> $GITHUB_OUTPUT
-
+            echo "DIR=/public_html/makhi" >> $GITHUB_OUTPUT
           elif [[ "$BRANCH" == "mirror" ]]; then
-            echo "DIR=/public_html/mirror/" >> $GITHUB_OUTPUT
-
+            echo "DIR=/public_html/mirror" >> $GITHUB_OUTPUT
           elif [[ "$BRANCH" == "Ishmael" ]]; then
-            echo "DIR=/public_html/ishmael/" >> $GITHUB_OUTPUT
-
+            echo "DIR=/public_html/ishmael" >> $GITHUB_OUTPUT
           else
-            echo "DIR=/mobile.uthutho.co.za/" >> $GITHUB_OUTPUT
+            echo "DIR=/mobile.uthutho.co.za" >> $GITHUB_OUTPUT
           fi
-
           
+      - name: Debug - Print directory
+        run: |
+          echo "Deploying to: ${{ steps.set-dir.outputs.DIR }}"
+
       # ----------------------------------------
       # DEPLOY VIA SFTP
       # ----------------------------------------
@@ -90,6 +89,7 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           port: 1624
-
           uploads: |
-            dist/ => ${{ steps.set-dir.outputs.DIR }}
+            ./dist/ => ${{ steps.set-dir.outputs.DIR }}/
+          delete: true
+          force-upload: true
