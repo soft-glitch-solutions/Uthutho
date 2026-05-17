@@ -58,13 +58,14 @@ jobs:
       # ----------------------------------------
       # CREATE DIRECTORY AND DEPLOY VIA SFTP
       # ----------------------------------------
-      - name: Deploy via SFTP
-        uses: Dylan700/sftp-upload-action@latest
+      - name: Deploy to cPanel via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
-          server: 51.89.20.167
+          server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          port: 1624
-          uploads: |
-            ./dist/ => /mobile.uthutho.co.za/
-          delete: true
+          protocol: ftp
+          port: ${{ secrets.FTP_PORT }}
+          local-dir: dist/  # This is your build directory
+          server-dir: /mobile.uthutho.co.za/  # Change this if needed
+          cleanup: true  # Remove old files before uploading
