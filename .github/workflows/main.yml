@@ -76,39 +76,19 @@ jobs:
           fi
 
       # ----------------------------------------
-      # DEBUG: Show deployment path
+      # SETUP SSH KEY
       # ----------------------------------------
-      - name: Show deployment path
+      - name: Setup SSH key
         run: |
-          echo "Deploying to: ${{ steps.set-dir.outputs.DIR }}"
-          echo "Branch: ${GITHUB_REF##*/}"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p 1624 51.89.20.167 >> ~/.ssh/known_hosts
 
       # ----------------------------------------
-      # INSTALL LFTP AND DEPLOY VIA SFTP
+      # DEPLOY USING RSYNC OVER SSH
       # ----------------------------------------
-      - name: Install lftp
-        run: sudo apt-get update && sudo apt-get install -y lftp
-
-      - name: Deploy via SFTP
+      - name: Deploy via rsync
         run: |
-          lftp -c "
-            set sftp:auto-confirm yes
-            set sftp:connect-program 'ssh -o StrictHostKeyChecking=no -a -x'
-            open -u ${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }} -p 1624 sftp://51.89.20.167
-            mkdir -p ${{ steps.set-dir.outputs.DIR }}
-            mirror -R --verbose --delete --no-perms --ignore-time ./dist/ ${{ steps.set-dir.outputs.DIR }}/
-            quit
-          "
-
-      # ----------------------------------------
-      # VERIFY DEPLOYMENT
-      # ----------------------------------------
-      - name: Verify deployment
-        run: |
-          echo "✅ Successfully deployed to: ${{ steps.set-dir.outputs.DIR }}"
-          lftp -c "
-            set sftp:auto-confirm yes
-            open -u ${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }} -p 1624 sftp://51.89.20.167
-            cls -la ${{ steps.set-dir.outputs.DIR }} | head -20
-            quit
-          "
+          rsync -avz --delete -e "ssh -p 1624 -o StrictHostKeyChecking=no" \
+            ./dist/ ${{ secrets.FTP_USERNAME }}@51.89.20.167:${{ steps.set-dir.outputs.DIR }}/
