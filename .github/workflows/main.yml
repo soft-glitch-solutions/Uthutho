@@ -53,34 +53,10 @@ jobs:
         run: |
           echo "==== DIST FILES ===="
           ls -la dist/
-          find dist -type f | head -50
+          echo "Total files: $(find dist -type f | wc -l)"
 
       # ----------------------------------------
-      # SET DEPLOY DIRECTORY
-      # ----------------------------------------
-      - name: Set deploy directory
-        id: set-dir
-        run: |
-          BRANCH="${GITHUB_REF##*/}"
-
-          if [[ "$BRANCH" == "shaqeel" ]]; then
-            echo "DIR=/public_html/shaqeel" >> $GITHUB_OUTPUT
-          elif [[ "$BRANCH" == "Mahki" ]]; then
-            echo "DIR=/public_html/makhi" >> $GITHUB_OUTPUT
-          elif [[ "$BRANCH" == "mirror" ]]; then
-            echo "DIR=/public_html/mirror" >> $GITHUB_OUTPUT
-          elif [[ "$BRANCH" == "Ishmael" ]]; then
-            echo "DIR=/public_html/ishmael" >> $GITHUB_OUTPUT
-          else
-            echo "DIR=/mobile.uthutho.co.za" >> $GITHUB_OUTPUT
-          fi
-          
-      - name: Debug - Print directory
-        run: |
-          echo "Deploying to: ${{ steps.set-dir.outputs.DIR }}"
-
-      # ----------------------------------------
-      # DEPLOY VIA SFTP
+      # CREATE DIRECTORY AND DEPLOY VIA SFTP
       # ----------------------------------------
       - name: Deploy via SFTP
         uses: Dylan700/sftp-upload-action@latest
@@ -90,6 +66,5 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           port: 1624
           uploads: |
-            ./dist/ => ${{ steps.set-dir.outputs.DIR }}/
+            ./dist/ => /mobile.uthutho.co.za/
           delete: true
-          force-upload: true
