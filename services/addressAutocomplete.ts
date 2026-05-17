@@ -1,8 +1,8 @@
+import { Platform } from 'react-native';
+
 /**
  * Address Autocomplete Service
- * Uses OpenStreetMap Nominatim API for real address suggestions.
- * Focused on South Africa but works globally.
- * Free, no API key required, works on web and native.
+ * Uses Google Places API and Google Geocoding API.
  */
 
 export interface AddressSuggestion {
@@ -58,81 +58,64 @@ export async function searchAddresses(
   if (trimmed.length < 2) return [];
 
   const limit = options?.limit || 8;
-  const countryCode = options?.countryCode || 'za'; // South Africa bias
+  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+
+  if (!apiKey) {
+    console.warn('Google Places API key is missing. Ensure EXPO_PUBLIC_GOOGLE_PLACES_API_KEY is set in .env');
+    return [];
+  }
 
   try {
-    // Build Nominatim URL with South Africa focus
     const params = new URLSearchParams({
-      q: trimmed,
-      format: 'json',
-      addressdetails: '1',
-      limit: String(limit),
-      countrycodes: countryCode,
-      'accept-language': 'en',
+      query: trimmed,
+      key: apiKey,
+      region: options?.countryCode || 'za',
     });
 
-    // Add viewbox for South Africa bounding box to prioritize local results
-    // but don't restrict (bounded=0)
-    params.set('viewbox', '16.3,-34.9,32.9,-22.1');
-    params.set('bounded', '0');
+    if (options?.userLat && options?.userLon) {
+      params.append('location', `${options.userLat},${options.userLon}`);
+      params.append('radius', '50000'); // 50km radius bias
+    }
 
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?${params.toString()}`,
-      {
-        headers: {
-          'User-Agent': 'Uthutho-TransitApp/1.0',
-        },
-      }
-    );
+    let targetUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?${params.toString()}`;
+    const url = Platform.OS === 'web' ? `https://corsproxy.io/?${encodeURIComponent(targetUrl)}` : targetUrl;
+
+    const response = await fetch(url);
 
     if (!response.ok) {
-      console.error('Nominatim API error:', response.status);
+      console.error('Google Places API error:', response.status);
       return [];
     }
 
-    const data: NominatimResult[] = await response.json();
+    const data = await response.json();
+    
+    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+      console.error('Google Places API returned status:', data.status);
+      return [];
+    }
 
-    return data.map((item) => {
-      const addr = item.address || {};
-      const city = addr.city || addr.town || addr.village || addr.suburb || '';
+    return data.results.slice(0, limit).map((item: any) => {
+      // Format the address logic
+      const addressParts = item.formatted_address ? item.formatted_address.split(', ') : [];
+      const label = item.name || addressParts[0] || '';
+      const address = addressParts.length > 1 ? addressParts.slice(1).join(', ') : item.formatted_address || '';
       
-      // Build a clean label from the display_name
-      const displayParts = item.display_name.split(',').map(p => p.trim());
-      const label = displayParts[0] || item.display_name;
-      
-      // Build a shorter address line
-      const addressParts: string[] = [];
-      if (addr.road) addressParts.push(addr.road);
-      if (addr.suburb && addr.suburb !== label) addressParts.push(addr.suburb);
-      if (city && city !== label && city !== addr.suburb) addressParts.push(city);
-      if (addr.postcode) addressParts.push(addr.postcode);
-      const address = addressParts.length > 0 
-        ? addressParts.join(', ') 
-        : displayParts.slice(1, 4).join(', ');
-
-      // Determine type
       let type: 'address' | 'poi' | 'transport' = 'address';
-      if (item.class === 'amenity' || item.class === 'shop' || item.class === 'tourism') {
-        type = 'poi';
-      }
-      if (
-        item.type === 'station' ||
-        item.type === 'bus_stop' ||
-        item.type === 'taxi' ||
-        item.type === 'bus_station' ||
-        item.class === 'railway' ||
-        item.class === 'public_transport'
-      ) {
-        type = 'transport';
+      if (item.types) {
+        if (item.types.includes('transit_station') || item.types.includes('bus_station')) {
+          type = 'transport';
+        } else if (item.types.includes('point_of_interest') || item.types.includes('establishment')) {
+          type = 'poi';
+        }
       }
 
       return {
-        id: String(item.place_id),
+        id: item.place_id,
         label,
         address,
-        city: city || addr.state || '',
-        latitude: parseFloat(item.lat),
-        longitude: parseFloat(item.lon),
+        city: '', // Can be extracted from address_components if necessary
+        latitude: item.geometry.location.lat,
+        longitude: item.geometry.location.lng,
         type,
       };
     });
@@ -180,38 +163,42 @@ export async function reverseGeocode(
   lat: number,
   lon: number
 ): Promise<AddressSuggestion | null> {
+  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+
+  if (!apiKey) {
+    console.warn('Google Places API key is missing. Ensure EXPO_PUBLIC_GOOGLE_PLACES_API_KEY is set in .env');
+    return null;
+  }
+
   try {
     const params = new URLSearchParams({
-      lat: String(lat),
-      lon: String(lon),
-      format: 'json',
-      addressdetails: '1',
-      'accept-language': 'en',
+      latlng: `${lat},${lon}`,
+      key: apiKey,
     });
 
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?${params.toString()}`,
-      {
-        headers: {
-          'User-Agent': 'Uthutho-TransitApp/1.0',
-        },
-      }
-    );
+    let targetUrl = `https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`;
+    const url = Platform.OS === 'web' ? `https://corsproxy.io/?${encodeURIComponent(targetUrl)}` : targetUrl;
+
+    const response = await fetch(url);
 
     if (!response.ok) return null;
 
-    const data: NominatimResult = await response.json();
-    const addr = data.address || {};
-    const city = addr.city || addr.town || addr.village || addr.suburb || '';
-    const displayParts = data.display_name.split(',').map(p => p.trim());
+    const data = await response.json();
+    
+    if (data.status !== 'OK' || !data.results || data.results.length === 0) return null;
+
+    const item = data.results[0];
+    const addressParts = item.formatted_address ? item.formatted_address.split(', ') : [];
+    const label = addressParts[0] || '';
+    const address = addressParts.length > 1 ? addressParts.slice(1).join(', ') : '';
 
     return {
-      id: String(data.place_id),
-      label: displayParts[0] || data.display_name,
-      address: displayParts.slice(1, 4).join(', '),
-      city,
-      latitude: parseFloat(data.lat),
-      longitude: parseFloat(data.lon),
+      id: item.place_id,
+      label,
+      address,
+      city: '',
+      latitude: item.geometry.location.lat,
+      longitude: item.geometry.location.lng,
       type: 'address',
     };
   } catch (error) {

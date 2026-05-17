@@ -19,7 +19,7 @@ import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useTheme } from '@/context/ThemeContext';
-import { MapPin, Bus, Brain as Train, Navigation, Users, Clock, Flag, Route, BookmarkCheck, Plus, Menu, Map as MapIcon, User, Target } from 'lucide-react-native';
+import { MapPin, Bus, Brain as Train, Navigation, Users, Clock, Flag, Route, BookmarkCheck, Plus, Menu, User, Target } from 'lucide-react-native';
 import { useJourney } from '@/hook/useJourney';
 import HeaderSection from '@/components/home/HeaderSection';
 import NearbySection from '@/components/home/NearbySection';
@@ -196,7 +196,7 @@ const CommunityGrid = ({
     return (
       <View style={styles.emptyGridContainer}>
         <View style={styles.emptyGridIllustration}>
-          <Map size={48} color={colors.primary} />
+          <User size={48} color={colors.primary} />
         </View>
         <Text style={[styles.emptyGridText, { color: colors.text }]}>
           Your community grid is empty
