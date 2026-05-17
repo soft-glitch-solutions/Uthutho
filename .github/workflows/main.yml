@@ -64,15 +64,15 @@ jobs:
           BRANCH="${GITHUB_REF##*/}"
 
           if [[ "$BRANCH" == "shaqeel" ]]; then
-            echo "DIR=/public_html/shaqeel" >> $GITHUB_OUTPUT
+            echo "DIR=/home/bpyshwey/public_html/shaqeel" >> $GITHUB_OUTPUT
           elif [[ "$BRANCH" == "Mahki" ]]; then
-            echo "DIR=/public_html/makhi" >> $GITHUB_OUTPUT
+            echo "DIR=/home/bpyshwey/public_html/makhi" >> $GITHUB_OUTPUT
           elif [[ "$BRANCH" == "mirror" ]]; then
-            echo "DIR=/public_html/mirror" >> $GITHUB_OUTPUT
+            echo "DIR=/home/bpyshwey/public_html/mirror" >> $GITHUB_OUTPUT
           elif [[ "$BRANCH" == "Ishmael" ]]; then
-            echo "DIR=/public_html/ishmael" >> $GITHUB_OUTPUT
+            echo "DIR=/home/bpyshwey/public_html/ishmael" >> $GITHUB_OUTPUT
           else
-            echo "DIR=/mobile.uthutho.co.za" >> $GITHUB_OUTPUT
+            echo "DIR=/home/bpyshwey/mobile.uthutho.co.za" >> $GITHUB_OUTPUT
           fi
 
       # ----------------------------------------
@@ -84,15 +84,31 @@ jobs:
           echo "Branch: ${GITHUB_REF##*/}"
 
       # ----------------------------------------
-      # DEPLOY VIA SFTP USING DYLAN700
+      # INSTALL LFTP AND DEPLOY VIA SFTP
       # ----------------------------------------
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
       - name: Deploy via SFTP
-        uses: Dylan700/sftp-upload-action@latest
-        with:
-          server: 51.89.20.167
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          port: 1624
-          uploads: |
-            ./dist/ => ${{ steps.set-dir.outputs.DIR }}/
-          delete: true
+        run: |
+          lftp -c "
+            set sftp:auto-confirm yes
+            set sftp:connect-program 'ssh -o StrictHostKeyChecking=no -a -x'
+            open -u ${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }} -p 1624 sftp://51.89.20.167
+            mkdir -p ${{ steps.set-dir.outputs.DIR }}
+            mirror -R --verbose --delete --no-perms --ignore-time ./dist/ ${{ steps.set-dir.outputs.DIR }}/
+            quit
+          "
+
+      # ----------------------------------------
+      # VERIFY DEPLOYMENT
+      # ----------------------------------------
+      - name: Verify deployment
+        run: |
+          echo "✅ Successfully deployed to: ${{ steps.set-dir.outputs.DIR }}"
+          lftp -c "
+            set sftp:auto-confirm yes
+            open -u ${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }} -p 1624 sftp://51.89.20.167
+            cls -la ${{ steps.set-dir.outputs.DIR }} | head -20
+            quit
+          "
