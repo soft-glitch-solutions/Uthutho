@@ -56,16 +56,43 @@ jobs:
           echo "Total files: $(find dist -type f | wc -l)"
 
       # ----------------------------------------
-      # CREATE DIRECTORY AND DEPLOY VIA SFTP
+      # SET DEPLOY DIRECTORY
       # ----------------------------------------
-      - name: Deploy to cPanel via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      - name: Set deploy directory
+        id: set-dir
+        run: |
+          BRANCH="${GITHUB_REF##*/}"
+
+          if [[ "$BRANCH" == "shaqeel" ]]; then
+            echo "DIR=/public_html/shaqeel" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == "Mahki" ]]; then
+            echo "DIR=/public_html/makhi" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == "mirror" ]]; then
+            echo "DIR=/public_html/mirror" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == "Ishmael" ]]; then
+            echo "DIR=/public_html/ishmael" >> $GITHUB_OUTPUT
+          else
+            echo "DIR=/mobile.uthutho.co.za" >> $GITHUB_OUTPUT
+          fi
+
+      # ----------------------------------------
+      # DEBUG: Show deployment path
+      # ----------------------------------------
+      - name: Show deployment path
+        run: |
+          echo "Deploying to: ${{ steps.set-dir.outputs.DIR }}"
+          echo "Branch: ${GITHUB_REF##*/}"
+
+      # ----------------------------------------
+      # DEPLOY VIA SFTP USING DYLAN700
+      # ----------------------------------------
+      - name: Deploy via SFTP
+        uses: Dylan700/sftp-upload-action@latest
         with:
-          server: ${{ secrets.FTP_SERVER }}
+          server: 51.89.20.167
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftp
-          port: ${{ secrets.FTP_PORT }}
-          local-dir: dist/  # This is your build directory
-          server-dir: /mobile.uthutho.co.za/  # Change this if needed
-          cleanup: true  # Remove old files before uploading
+          port: 1624
+          uploads: |
+            ./dist/ => ${{ steps.set-dir.outputs.DIR }}/
+          delete: true
