@@ -19,7 +19,7 @@ import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useTheme } from '@/context/ThemeContext';
-import { MapPin, Bus, Brain as Train, Navigation, Users, Clock, Flag, Route, BookmarkCheck, Plus, Menu, User, Target } from 'lucide-react-native';
+import { MapPin, Bus, Brain as Train, Navigation, Users, Clock, Flag, Route, BookmarkCheck, Plus, Menu, User, Target, Map as MapIcon } from 'lucide-react-native';
 import { useJourney } from '@/hook/useJourney';
 import HeaderSection from '@/components/home/HeaderSection';
 import NearbySection from '@/components/home/NearbySection';
@@ -1153,7 +1153,7 @@ export default function HomeScreen() {
                   <View style={styles.statDivider} />
 
                   <View style={styles.statItem}>
-                    <Map size={20} color={colors.primary} />
+                    <MapIcon size={20} color={colors.primary} />
                     <Text style={[styles.statValue, { color: colors.text }]}>
                       Level {userStats.level}
                     </Text>
@@ -1251,7 +1251,7 @@ export default function HomeScreen() {
                     style={[styles.quickAction, { backgroundColor: colors.background }]}
                     onPress={() => router.push('/Map')}
                   >
-                    <Map size={20} color={colors.primary} />
+                    <MapIcon size={20} color={colors.primary} />
                     <Text style={[styles.quickActionText, { color: colors.text }]}>
                       Explore Map
                     </Text>

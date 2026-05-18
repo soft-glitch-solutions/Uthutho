@@ -13,6 +13,7 @@ export interface AddressSuggestion {
   latitude: number;
   longitude: number;
   type: 'address' | 'poi' | 'transport';
+  distance?: number; // Add distance field for sorting
 }
 
 interface NominatimResult {
@@ -42,8 +43,27 @@ interface NominatimResult {
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
- * Search for address suggestions using Nominatim.
- * Biased toward South Africa but returns results globally.
+ * Calculate distance between two coordinates in kilometers
+ */
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function deg2rad(deg: number): number {
+  return deg * (Math.PI / 180);
+}
+
+/**
+ * Search for address suggestions using Google Places API.
+ * Results are prioritized by proximity to user's location if provided.
  */
 export async function searchAddresses(
   query: string,
@@ -72,6 +92,7 @@ export async function searchAddresses(
       region: options?.countryCode || 'za',
     });
 
+    // Add location bias to prioritize nearby results
     if (options?.userLat && options?.userLon) {
       params.append('location', `${options.userLat},${options.userLon}`);
       params.append('radius', '50000'); // 50km radius bias
@@ -88,18 +109,18 @@ export async function searchAddresses(
     }
 
     const data = await response.json();
-    
+
     if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
       console.error('Google Places API returned status:', data.status);
       return [];
     }
 
-    return data.results.slice(0, limit).map((item: any) => {
-      // Format the address logic
+    // Map results and calculate distances if user location is provided
+    let results = data.results.slice(0, limit * 2).map((item: any) => {
       const addressParts = item.formatted_address ? item.formatted_address.split(', ') : [];
       const label = item.name || addressParts[0] || '';
       const address = addressParts.length > 1 ? addressParts.slice(1).join(', ') : item.formatted_address || '';
-      
+
       let type: 'address' | 'poi' | 'transport' = 'address';
       if (item.types) {
         if (item.types.includes('transit_station') || item.types.includes('bus_station')) {
@@ -109,16 +130,36 @@ export async function searchAddresses(
         }
       }
 
-      return {
+      const suggestion: AddressSuggestion = {
         id: item.place_id,
         label,
         address,
-        city: '', // Can be extracted from address_components if necessary
+        city: '',
         latitude: item.geometry.location.lat,
         longitude: item.geometry.location.lng,
         type,
       };
+
+      // Calculate distance if user location is available
+      if (options?.userLat && options?.userLon) {
+        suggestion.distance = calculateDistance(
+          options.userLat,
+          options.userLon,
+          suggestion.latitude,
+          suggestion.longitude
+        );
+      }
+
+      return suggestion;
     });
+
+    // Sort by distance if user location is provided (closest first)
+    if (options?.userLat && options?.userLon) {
+      results.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+    }
+
+    // Return limited results after sorting
+    return results.slice(0, limit);
   } catch (error) {
     console.error('Address search error:', error);
     return [];
@@ -136,6 +177,8 @@ export function searchAddressesDebounced(
   options?: {
     limit?: number;
     countryCode?: string;
+    userLat?: number;
+    userLon?: number;
   }
 ): () => void {
   if (debounceTimer) {
@@ -184,7 +227,7 @@ export async function reverseGeocode(
     if (!response.ok) return null;
 
     const data = await response.json();
-    
+
     if (data.status !== 'OK' || !data.results || data.results.length === 0) return null;
 
     const item = data.results[0];

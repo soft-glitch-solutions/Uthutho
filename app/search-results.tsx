@@ -61,31 +61,28 @@ interface NearbyStop {
   routes: Route[];
 }
 
-// Skeleton Loader Component
+// Skeleton Loader Component with web support
 const SkeletonLoader = () => {
-  const animatedValue = new Animated.Value(0);
+  const [opacity] = useState(new Animated.Value(0.3));
 
   useEffect(() => {
-    Animated.loop(
+    const animation = Animated.loop(
       Animated.sequence([
-        Animated.timing(animatedValue, {
-          toValue: 1,
+        Animated.timing(opacity, {
+          toValue: 0.7,
           duration: 1000,
           useNativeDriver: true,
         }),
-        Animated.timing(animatedValue, {
-          toValue: 0,
+        Animated.timing(opacity, {
+          toValue: 0.3,
           duration: 1000,
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    animation.start();
+    return () => animation.stop();
   }, []);
-
-  const opacity = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 0.7],
-  });
 
   const SkeletonItem = ({ style }: { style: any }) => (
     <Animated.View style={[style, { opacity, backgroundColor: '#222' }]} />
@@ -144,7 +141,9 @@ export default function SearchResultsScreen() {
   const [nearbyStops, setNearbyStops] = useState<NearbyStop[]>([]);
   const [addressName, setAddressName] = useState('');
   const [addressDetails, setAddressDetails] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
+  // Parse coordinates with validation
   const addressLat = parseFloat(params.latitude as string);
   const addressLng = parseFloat(params.longitude as string);
 
@@ -179,7 +178,7 @@ export default function SearchResultsScreen() {
         distance: calculateDistance(latitude, longitude, stop.latitude, stop.longitude)
       })).filter(stop => stop.distance <= radiusKm)
         .sort((a, b) => a.distance - b.distance)
-        .slice(0, 5); // Only take top 5 nearest stops
+        .slice(0, 5);
 
       // For each nearby stop, fetch its routes via route_stops
       const nearbyStopsWithRoutes = await Promise.all(
@@ -223,17 +222,54 @@ export default function SearchResultsScreen() {
       return nearbyStopsWithRoutes;
     } catch (error) {
       console.error('Error finding nearby stops with routes:', error);
-      return [];
+      throw error;
+    }
+  };
+
+  // Function to get address name from coordinates (for web fallback)
+  const getAddressFromCoords = async (lat: number, lng: number) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            'Accept-Language': 'en',
+            'User-Agent': 'YourAppName/1.0'
+          }
+        }
+      );
+      const data = await response.json();
+      return data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    } catch (error) {
+      console.error('Error getting address from coordinates:', error);
+      return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
     }
   };
 
   useEffect(() => {
     const loadSearchResults = async () => {
       setLoading(true);
+      setError(null);
+
       try {
-        setAddressName(params.address as string || 'Selected Location');
+        // Handle address name - decode if it was encoded
+        let address = params.address as string || 'Selected Location';
+        try {
+          address = decodeURIComponent(address);
+        } catch (e) {
+          // If decoding fails, use as is
+        }
+
+        setAddressName(address);
+
+        // If coordinates are valid, try to get a better address name (for web)
+        if (!isNaN(addressLat) && !isNaN(addressLng) && address === 'Selected Location' && Platform.OS === 'web') {
+          const detailedAddress = await getAddressFromCoords(addressLat, addressLng);
+          setAddressName(detailedAddress);
+        }
+
         setAddressDetails({
-          label: params.address,
+          label: address,
           latitude: addressLat,
           longitude: addressLng
         });
@@ -242,18 +278,26 @@ export default function SearchResultsScreen() {
         setNearbyStops(nearby);
       } catch (error) {
         console.error('Error loading search results:', error);
-        Alert.alert('Error', 'Failed to load nearby stops');
+        setError('Failed to load nearby stops. Please check your connection and try again.');
+        if (Platform.OS !== 'web') {
+          Alert.alert('Error', 'Failed to load nearby stops');
+        }
       } finally {
+        // Add a small delay for smoother UX
         setTimeout(() => {
           setLoading(false);
         }, 500);
       }
     };
 
-    if (addressLat && addressLng) {
+    if (!isNaN(addressLat) && !isNaN(addressLng) && addressLat && addressLng) {
       loadSearchResults();
+    } else {
+      setLoading(false);
+      setAddressName('Invalid Location');
+      setError('The selected location coordinates are invalid. Please try searching again.');
     }
-  }, [addressLat, addressLng]);
+  }, [addressLat, addressLng, params.address]);
 
   const getDistanceDisplay = (distance: number) => {
     if (distance < 1) {
@@ -287,6 +331,20 @@ export default function SearchResultsScreen() {
 
   const handleRoutePress = (routeId: string) => {
     router.push(`/route-details?routeId=${routeId}`);
+  };
+
+  const handleRetry = () => {
+    if (!isNaN(addressLat) && !isNaN(addressLng) && addressLat && addressLng) {
+      setLoading(true);
+      setError(null);
+      findNearbyStopsWithRoutes(addressLat, addressLng)
+        .then(setNearbyStops)
+        .catch((err) => {
+          console.error('Retry error:', err);
+          setError('Failed to load nearby stops. Please try again.');
+        })
+        .finally(() => setLoading(false));
+    }
   };
 
   if (loading) {
@@ -328,20 +386,34 @@ export default function SearchResultsScreen() {
           </View>
         </View>
 
+        {/* Error State */}
+        {error && (
+          <View style={styles.errorContainer}>
+            <AlertCircle size={48} color="#ff4444" />
+            <Text style={styles.errorTitle}>Something went wrong</Text>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Results Summary */}
-        <View style={styles.summaryContainer}>
-          <Text style={styles.summaryText}>
-            Found {nearbyStops.length} stop{nearbyStops.length !== 1 ? 's' : ''} nearby
-          </Text>
-          {nearbyStops.length > 0 && (
-            <Text style={styles.summarySubtext}>
-              Showing the 5 closest stops to your location
+        {!error && (
+          <View style={styles.summaryContainer}>
+            <Text style={styles.summaryText}>
+              Found {nearbyStops.length} stop{nearbyStops.length !== 1 ? 's' : ''} nearby
             </Text>
-          )}
-        </View>
+            {nearbyStops.length > 0 && (
+              <Text style={styles.summarySubtext}>
+                Showing the 5 closest stops to your location
+              </Text>
+            )}
+          </View>
+        )}
 
         {/* Nearby Stops List */}
-        {nearbyStops.length > 0 ? (
+        {!error && nearbyStops.length > 0 ? (
           nearbyStops.map((item, index) => (
             <TouchableOpacity
               key={item.stop.id}
@@ -424,7 +496,7 @@ export default function SearchResultsScreen() {
               )}
             </TouchableOpacity>
           ))
-        ) : (
+        ) : !error && (
           <View style={styles.emptyContainer}>
             <MapPin size={64} color="#333" />
             <Text style={styles.emptyTitle}>No stops found nearby</Text>
@@ -435,12 +507,14 @@ export default function SearchResultsScreen() {
         )}
 
         {/* Help Section */}
-        <View style={styles.helpSection}>
-          <Text style={styles.helpTitle}>Need help finding a stop?</Text>
-          <Text style={styles.helpText}>
-            You can also search for specific route names or browse the map to find stops near you.
-          </Text>
-        </View>
+        {!error && (
+          <View style={styles.helpSection}>
+            <Text style={styles.helpTitle}>Need help finding a stop?</Text>
+            <Text style={styles.helpText}>
+              You can also search for specific route names or browse the map to find stops near you.
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -465,6 +539,7 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    cursor: Platform.OS === 'web' ? 'pointer' : 'default',
   },
   headerTitle: {
     color: '#FFF',
@@ -595,6 +670,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     gap: 6,
+    cursor: Platform.OS === 'web' ? 'pointer' : 'default',
   },
   routeName: {
     color: '#1ea2b1',
@@ -675,6 +751,41 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 12,
     lineHeight: 18,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    marginHorizontal: 16,
+    backgroundColor: '#111',
+    borderRadius: 16,
+    marginTop: 20,
+  },
+  errorTitle: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorText: {
+    color: '#666',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  retryButton: {
+    backgroundColor: '#1ea2b1',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    cursor: Platform.OS === 'web' ? 'pointer' : 'default',
+  },
+  retryButtonText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   // Skeleton Styles
   skeletonContainer: {
