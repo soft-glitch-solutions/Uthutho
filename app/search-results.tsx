@@ -26,7 +26,8 @@ import {
   DollarSign,
   Train,
   Car,
-  AlertCircle
+  AlertCircle,
+  Image as ImageIcon
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
@@ -59,6 +60,11 @@ interface NearbyStop {
   stop: Stop;
   distance: number;
   routes: Route[];
+}
+
+interface PlaceImage {
+  url: string;
+  attribution?: string;
 }
 
 // Skeleton Loader Component with web support
@@ -141,6 +147,7 @@ export default function SearchResultsScreen() {
   const [nearbyStops, setNearbyStops] = useState<NearbyStop[]>([]);
   const [addressName, setAddressName] = useState('');
   const [addressDetails, setAddressDetails] = useState<any>(null);
+  const [addressImage, setAddressImage] = useState<PlaceImage | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Parse coordinates with validation
@@ -160,6 +167,51 @@ export default function SearchResultsScreen() {
   };
 
   const deg2rad = (deg: number) => deg * (Math.PI / 180);
+
+  // Function to get place image from Google Places API
+  const getPlaceImage = async (lat: number, lng: number, placeName: string): Promise<PlaceImage | null> => {
+    const apiKey = Platform.OS === 'web'
+      ? process.env.EXPO_PUBLIC_WEB_GOOGLE_PLACES_API_KEY
+      : process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+
+    if (!apiKey) {
+      console.warn('Google Places API key missing');
+      return null;
+    }
+
+    try {
+      // First, search for the place by name and location
+      const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(placeName)}&location=${lat},${lng}&radius=500&key=${apiKey}`;
+
+      let response;
+      if (Platform.OS === 'web') {
+        // For web, use the proxy or direct fetch (might need proxy)
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(searchUrl)}`;
+        response = await fetch(proxyUrl);
+      } else {
+        response = await fetch(searchUrl);
+      }
+
+      const data = await response.json();
+
+      if (data.status === 'OK' && data.results && data.results.length > 0) {
+        const place = data.results[0];
+        if (place.photos && place.photos.length > 0) {
+          const photoReference = place.photos[0].photo_reference;
+          const imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&maxheight=600&photo_reference=${photoReference}&key=${apiKey}`;
+
+          return {
+            url: imageUrl,
+            attribution: place.photos[0].html_attributions?.[0]
+          };
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching place image:', error);
+      return null;
+    }
+  };
 
   const findNearbyStopsWithRoutes = async (latitude: number, longitude: number, radiusKm: number = 10) => {
     try {
@@ -229,12 +281,35 @@ export default function SearchResultsScreen() {
   // Function to get address name from coordinates (for web fallback)
   const getAddressFromCoords = async (lat: number, lng: number) => {
     try {
+      const apiKey = Platform.OS === 'web'
+        ? process.env.EXPO_PUBLIC_WEB_GOOGLE_PLACES_API_KEY
+        : process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+
+      if (apiKey) {
+        // Use Google Geocoding API for better results
+        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
+
+        let response;
+        if (Platform.OS === 'web') {
+          const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(geocodeUrl)}`;
+          response = await fetch(proxyUrl);
+        } else {
+          response = await fetch(geocodeUrl);
+        }
+
+        const data = await response.json();
+        if (data.status === 'OK' && data.results && data.results[0]) {
+          return data.results[0].formatted_address;
+        }
+      }
+
+      // Fallback to Nominatim
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
         {
           headers: {
             'Accept-Language': 'en',
-            'User-Agent': 'YourAppName/1.0'
+            'User-Agent': 'UthuthoApp/1.0'
           }
         }
       );
@@ -254,18 +329,29 @@ export default function SearchResultsScreen() {
       try {
         // Handle address name - decode if it was encoded
         let address = params.address as string || 'Selected Location';
+        let fullAddress = params.fullAddress as string || address;
+
         try {
           address = decodeURIComponent(address);
+          fullAddress = decodeURIComponent(fullAddress);
         } catch (e) {
           // If decoding fails, use as is
         }
 
         setAddressName(address);
 
-        // If coordinates are valid, try to get a better address name (for web)
-        if (!isNaN(addressLat) && !isNaN(addressLng) && address === 'Selected Location' && Platform.OS === 'web') {
-          const detailedAddress = await getAddressFromCoords(addressLat, addressLng);
-          setAddressName(detailedAddress);
+        // If coordinates are valid, try to get a better address name and image
+        if (!isNaN(addressLat) && !isNaN(addressLng) && addressLat && addressLng) {
+          if (address === 'Selected Location' || address === fullAddress) {
+            const detailedAddress = await getAddressFromCoords(addressLat, addressLng);
+            setAddressName(detailedAddress);
+          }
+
+          // Fetch place image
+          const image = await getPlaceImage(addressLat, addressLng, address);
+          if (image) {
+            setAddressImage(image);
+          }
         }
 
         setAddressDetails({
@@ -283,7 +369,6 @@ export default function SearchResultsScreen() {
           Alert.alert('Error', 'Failed to load nearby stops');
         }
       } finally {
-        // Add a small delay for smoother UX
         setTimeout(() => {
           setLoading(false);
         }, 500);
@@ -297,7 +382,7 @@ export default function SearchResultsScreen() {
       setAddressName('Invalid Location');
       setError('The selected location coordinates are invalid. Please try searching again.');
     }
-  }, [addressLat, addressLng, params.address]);
+  }, [addressLat, addressLng, params.address, params.fullAddress]);
 
   const getDistanceDisplay = (distance: number) => {
     if (distance < 1) {
@@ -370,17 +455,30 @@ export default function SearchResultsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
       >
-        {/* Address Header */}
+        {/* Address Header with Image */}
         <View style={styles.addressHeader}>
-          <View style={styles.addressIconContainer}>
-            <MapPin size={24} color="#1ea2b1" />
-          </View>
+          {addressImage ? (
+            <Image
+              source={{ uri: addressImage.url }}
+              style={styles.addressImage}
+              onError={() => setAddressImage(null)}
+            />
+          ) : (
+            <View style={styles.addressIconContainer}>
+              <MapPin size={24} color="#1ea2b1" />
+            </View>
+          )}
           <View style={styles.addressInfo}>
             <Text style={styles.addressLabel}>Selected Location</Text>
             <Text style={styles.addressText}>{addressName}</Text>
             {addressDetails?.latitude && addressDetails?.longitude && (
               <Text style={styles.addressCoordinates}>
                 {addressDetails.latitude.toFixed(6)}, {addressDetails.longitude.toFixed(6)}
+              </Text>
+            )}
+            {addressImage?.attribution && (
+              <Text style={styles.imageAttribution} numberOfLines={1}>
+                {addressImage.attribution.replace(/<[^>]*>/g, '')}
               </Text>
             )}
           </View>
@@ -562,10 +660,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#222',
   },
+  addressImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 16,
+    backgroundColor: '#222',
+  },
   addressIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: 'rgba(30, 162, 177, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -590,6 +695,11 @@ const styles = StyleSheet.create({
   addressCoordinates: {
     color: '#666',
     fontSize: 12,
+  },
+  imageAttribution: {
+    color: '#555',
+    fontSize: 9,
+    marginTop: 4,
   },
   summaryContainer: {
     paddingHorizontal: 16,
@@ -812,9 +922,9 @@ const styles = StyleSheet.create({
     borderColor: '#222',
   },
   skeletonAddressIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     marginRight: 16,
   },
   skeletonAddressInfo: {

@@ -39,13 +39,15 @@ import { useTheme } from '@/context/ThemeContext';
 import { searchAddresses, reverseGeocode, type AddressSuggestion } from '@/services/addressAutocomplete';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+console.log('📱 Screen dimensions:', { width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
+
 // Conditionally import GooglePlacesTextInput only for native
 let GooglePlacesTextInput: any = null;
 if (Platform.OS !== 'web') {
   GooglePlacesTextInput = require('react-native-google-places-textinput').default;
 }
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // South Africa only - restrict to ZA
 const SOUTH_AFRICA_REGION_CODE = 'za';
@@ -63,6 +65,9 @@ const SOUTH_AFRICA_BIAS = {
 const GOOGLE_PLACES_API_KEY = Platform.OS === 'web'
   ? process.env.EXPO_PUBLIC_WEB_GOOGLE_PLACES_API_KEY
   : process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+
+console.log('🔑 Platform:', Platform.OS);
+console.log('🔑 API Key configured:', GOOGLE_PLACES_API_KEY ? 'Yes' : 'No');
 
 interface SearchOverlayProps {
   visible: boolean;
@@ -163,13 +168,14 @@ const SaveAddressModal = ({
   );
 };
 
-// Web Address Search Component using your existing service
+// Web Address Search Component
 const WebAddressSearch = ({
   onAddressSelect,
   placeholder,
   onTextChange,
   userLat,
   userLon,
+  onFocusChange,
 }: any) => {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
@@ -179,6 +185,7 @@ const WebAddressSearch = ({
   const inputRef = useRef<RNTextInput>(null);
 
   const searchAddressesAPI = async (searchText: string) => {
+    console.log('🔍 Searching for:', searchText);
     if (!searchText.trim() || searchText.length < 2) {
       setSuggestions([]);
       return;
@@ -191,9 +198,10 @@ const WebAddressSearch = ({
         userLat: userLat,
         userLon: userLon,
       });
+      console.log('📊 Search results count:', results.length);
       setSuggestions(results);
     } catch (error) {
-      console.error('Error searching addresses:', error);
+      console.error('❌ Error searching addresses:', error);
       setSuggestions([]);
     } finally {
       setLoading(false);
@@ -201,6 +209,7 @@ const WebAddressSearch = ({
   };
 
   const handleTextChange = (text: string) => {
+    console.log('✏️ Text changed:', text);
     setQuery(text);
     if (onTextChange) onTextChange(text);
 
@@ -211,11 +220,12 @@ const WebAddressSearch = ({
   };
 
   const handleSelectAddress = (suggestion: AddressSuggestion) => {
+    console.log('📍 Selected address:', suggestion.label);
     setQuery(suggestion.label);
     setSuggestions([]);
     setIsFocused(false);
+    onFocusChange?.(false);
 
-    // Directly navigate to search results with coordinates
     onAddressSelect({
       id: suggestion.id,
       name: suggestion.label,
@@ -227,6 +237,22 @@ const WebAddressSearch = ({
     });
   };
 
+  const handleFocus = () => {
+    console.log('🔽 Input focused');
+    setIsFocused(true);
+    onFocusChange?.(true);
+  };
+
+  const handleBlur = () => {
+    console.log('🔼 Input blurred');
+    setTimeout(() => {
+      setIsFocused(false);
+      onFocusChange?.(false);
+    }, 200);
+  };
+
+  const hasSuggestions = (isFocused || query.length > 0) && (suggestions.length > 0 || loading);
+
   return (
     <View style={{ position: 'relative', zIndex: 1000 }}>
       <View style={{ position: 'relative' }}>
@@ -237,17 +263,15 @@ const WebAddressSearch = ({
           placeholderTextColor="#888888"
           value={query}
           onChangeText={handleTextChange}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => {
-            setTimeout(() => setIsFocused(false), 200);
-          }}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
         />
         <View style={styles.searchIconOverlay}>
           <Search size={20} color="#888888" />
         </View>
       </View>
 
-      {isFocused && (suggestions.length > 0 || loading) && (
+      {hasSuggestions && (
         <View style={styles.webSuggestionsContainer}>
           <ScrollView
             style={{ maxHeight: 300 }}
@@ -259,10 +283,13 @@ const WebAddressSearch = ({
                 <Text style={styles.webSuggestionLoadingText}>Searching...</Text>
               </View>
             )}
-            {suggestions.map((suggestion) => (
+            {suggestions.map((suggestion, index) => (
               <TouchableOpacity
                 key={suggestion.id}
-                style={styles.webSuggestionItem}
+                style={[
+                  styles.webSuggestionItem,
+                  index === suggestions.length - 1 && styles.webSuggestionItemLast
+                ]}
                 onPress={() => handleSelectAddress(suggestion)}
               >
                 <View style={styles.webSuggestionContent}>
@@ -340,6 +367,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
   const [isGettingLocation, setIsGettingLocation] = useState(true);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   // Save address modal state
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -362,10 +390,13 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
     suggestedY: new Animated.Value(250),
   }).current;
 
+  console.log('🎨 SearchOverlay visible:', visible, 'isSearchFocused:', isSearchFocused);
+
   // Get current user and load profile data
   const loadUserProfile = useCallback(async () => {
     if (!user?.id) return;
 
+    console.log('👤 Loading user profile for:', user.id);
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -387,6 +418,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
             label: homeData.label,
             fullAddress: homeData.fullAddress || homeData.address
           });
+          console.log('🏠 Home address loaded');
         } catch (e) {
           console.error('Error parsing home address:', e);
         }
@@ -406,6 +438,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
             label: workData.label,
             fullAddress: workData.fullAddress || workData.address
           });
+          console.log('💼 Work address loaded');
         } catch (e) {
           console.error('Error parsing work address:', e);
         }
@@ -418,6 +451,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
   }, [user]);
 
   const getUserLocation = useCallback(async () => {
+    console.log('📍 Getting user location...');
     setIsGettingLocation(true);
     try {
       if (Platform.OS === 'web') {
@@ -434,6 +468,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
             heading: null,
             speed: null
           });
+          console.log('📍 Web location obtained:', position.coords.latitude, position.coords.longitude);
         }
       } else {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -444,6 +479,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
         }
         const location = await Location.getCurrentPositionAsync({});
         setUserLocation(location.coords);
+        console.log('📍 Native location obtained:', location.coords.latitude, location.coords.longitude);
       }
     } catch (error) {
       console.error('Error getting user location:', error);
@@ -453,10 +489,13 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
   }, []);
 
   const loadRecentSearches = useCallback(async () => {
+    console.log('📜 Loading recent searches...');
     try {
       const stored = await AsyncStorage.getItem('recent_searches');
       if (stored) {
-        setRecentSearches(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        setRecentSearches(parsed);
+        console.log('📜 Recent searches loaded:', parsed.length);
       }
     } catch (error) {
       console.error('Error loading recent searches:', error);
@@ -464,6 +503,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
   }, []);
 
   const clearRecentSearches = useCallback(() => {
+    console.log('🗑️ Clearing recent searches...');
     Alert.alert(
       'Clear Recent Searches',
       'Are you sure you want to clear all recent searches?',
@@ -475,6 +515,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
           onPress: () => {
             setRecentSearches([]);
             AsyncStorage.removeItem('recent_searches');
+            console.log('🗑️ Recent searches cleared');
           }
         }
       ]
@@ -482,10 +523,12 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
   }, []);
 
   const saveRecentSearch = useCallback(async (result: SearchResult) => {
+    console.log('💾 Saving recent search:', result.name);
     try {
       const updated = [result, ...recentSearches.filter(r => r.id !== result.id)].slice(0, 10);
       setRecentSearches(updated);
       await AsyncStorage.setItem('recent_searches', JSON.stringify(updated));
+      console.log('💾 Recent search saved, total:', updated.length);
     } catch (error) {
       console.error('Error saving recent search:', error);
     }
@@ -506,7 +549,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
   const deg2rad = (deg: number) => deg * (Math.PI / 180);
 
   const navigateToSearchResults = (latitude: number, longitude: number, name: string, fullAddress: string) => {
-    console.log('Navigating to search results with:', { latitude, longitude, name, fullAddress });
+    console.log('🚀 Navigating to search results:', { latitude, longitude, name, fullAddress });
 
     handleClose();
 
@@ -532,6 +575,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
       return;
     }
 
+    console.log('💾 Saving address to profile:', { type, address: selectedAddress.name });
     setLoading(true);
     try {
       const addressData = {
@@ -595,6 +639,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
       setShowSuccessModal(true);
       setShowSaveModal(false);
       setSelectedAddress(null);
+      console.log('💾 Address saved successfully');
     } catch (error) {
       console.error('Error saving address:', error);
       setSuccessMessage('Failed to save address. Please try again.');
@@ -613,6 +658,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
     fullAddress: string;
     distance?: number;
   }) => {
+    console.log('📍 Address selected:', address.name);
     const searchResult: SearchResult = {
       id: `addr-${address.id}`,
       name: address.name,
@@ -630,15 +676,13 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
       fullAddress: address.fullAddress
     };
 
-    // Save to recent searches
     saveRecentSearch(searchResult);
-
-    // Navigate directly to search results
     navigateToSearchResults(address.latitude, address.longitude, address.name, address.fullAddress);
   };
 
   // Save address from recent search
   const handleSaveRecentAddress = (result: SearchResult) => {
+    console.log('💾 Saving recent address:', result.name);
     if (result.coords) {
       setSelectedAddress({
         id: result.id,
@@ -653,6 +697,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
 
   // Handle recent search press - navigate without API call
   const handleRecentSearchPress = (result: SearchResult) => {
+    console.log('📜 Recent search pressed:', result.name);
     if (result.coords) {
       navigateToSearchResults(
         result.coords.latitude,
@@ -665,6 +710,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
 
   // Handle saved address press
   const handleSavedAddressPress = (address: SavedAddress) => {
+    console.log('🏠 Saved address pressed:', address.type);
     navigateToSearchResults(
       address.latitude,
       address.longitude,
@@ -675,11 +721,13 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
 
   // Handle empty home/work - show add address option
   const handleAddHomeAddress = () => {
+    console.log('➕ Add address pressed');
     setSuccessMessage('Search for an address and select it, then you can save it as Home or Work');
     setShowSuccessModal(true);
   };
 
   const handleUseMyLocation = async () => {
+    console.log('📍 Use my location pressed');
     setLocatingUser(true);
     try {
       let coords;
@@ -727,6 +775,8 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
   };
 
   const handleClose = () => {
+    console.log('❌ Closing search overlay');
+    setIsSearchFocused(false);
     Animated.parallel([
       Animated.timing(anims.opacity, { toValue: 0, duration: 200 }),
       Animated.timing(anims.searchBarY, { toValue: initialY, duration: 200 }),
@@ -738,6 +788,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
 
   useEffect(() => {
     if (visible) {
+      console.log('🔓 Search overlay opened');
       getUserLocation();
       Animated.parallel([
         Animated.timing(anims.opacity, { toValue: 1, duration: 250 }),
@@ -751,6 +802,10 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
       ]).start();
 
       const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (isSearchFocused) {
+          setIsSearchFocused(false);
+          return true;
+        }
         handleClose();
         return true;
       });
@@ -766,11 +821,13 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      console.log('👤 User authenticated:', user?.id || 'No user');
     })();
   }, []);
 
   const fetchSuggestedRoutes = async () => {
     if (!userLocation) return;
+    console.log('🚌 Fetching suggested routes...');
     setLoadingSuggestions(true);
     try {
       const { data: stops } = await supabase
@@ -810,6 +867,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
 
       const routeArray = Array.from(uniqueRoutes.values());
       setSuggestedRoutes(routeArray.slice(0, 3));
+      console.log('🚌 Suggested routes found:', routeArray.length);
     } catch (error) {
       console.error('Error fetching suggested routes:', error);
     } finally {
@@ -818,13 +876,14 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
   };
 
   useEffect(() => {
-    if (visible && userLocation) {
+    if (visible && userLocation && !isSearchFocused) {
       fetchSuggestedRoutes();
     }
-  }, [visible, userLocation]);
+  }, [visible, userLocation, isSearchFocused]);
 
   // Handle native place selection from Google Places
   const handlePlaceSelected = async (place: any) => {
+    console.log('📍 Native place selected:', place);
     let lat = null;
     let lng = null;
     let formattedAddress = '';
@@ -894,6 +953,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
           onTextChange={setSearchQuery}
           userLat={userLocation?.latitude}
           userLon={userLocation?.longitude}
+          onFocusChange={setIsSearchFocused}
         />
       );
     }
@@ -915,6 +975,8 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
           locationBias={SOUTH_AFRICA_BIAS}
           types={['geocode', 'establishment']}
           enableDebug={__DEV__}
+          onFocus={() => setIsSearchFocused(true)}
+          onBlur={() => setIsSearchFocused(false)}
           style={{
             container: { zIndex: 100 },
             inputContainer: {
@@ -967,6 +1029,8 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
         placeholderTextColor="#888888"
         value={searchQuery}
         onChangeText={setSearchQuery}
+        onFocus={() => setIsSearchFocused(true)}
+        onBlur={() => setIsSearchFocused(false)}
       />
     );
   };
@@ -1002,141 +1066,143 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
               </View>
             </Animated.View>
 
-            {/* Scrollable Content - Pushed down */}
-            <ScrollView
-              style={styles.scrollView}
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <View style={styles.discoveryContent}>
-                {/* Quick Actions Section */}
-                <Animated.View style={[styles.sectionWrapper, { transform: [{ translateY: anims.shortcutsY }] }]}>
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
-                  <View style={styles.threeColumnGrid}>
-                    {/* Home Card */}
-                    <TouchableOpacity
-                      style={[styles.shortcutCard, { backgroundColor: colors.card }]}
-                      onPress={() => homeAddress ? handleSavedAddressPress(homeAddress) : handleAddHomeAddress()}
-                    >
-                      <View style={[styles.shortcutIconBox, { backgroundColor: `${colors.primary}15` }]}>
-                        <Home size={24} color={homeAddress ? colors.primary : '#888888'} />
-                      </View>
-                      <Text style={[styles.shortcutTitle, { color: homeAddress ? colors.text : '#888888' }]}>Home</Text>
-                      {homeAddress ? (
-                        <Text style={styles.shortcutAddress} numberOfLines={1}>
-                          {homeAddress.address.split(',')[0]}
-                        </Text>
-                      ) : (
-                        <Text style={styles.shortcutAddText}>Add address</Text>
-                      )}
-                    </TouchableOpacity>
-
-                    {/* Work Card */}
-                    <TouchableOpacity
-                      style={[styles.shortcutCard, { backgroundColor: colors.card }]}
-                      onPress={() => workAddress ? handleSavedAddressPress(workAddress) : handleAddHomeAddress()}
-                    >
-                      <View style={[styles.shortcutIconBox, { backgroundColor: `${colors.primary}15` }]}>
-                        <Briefcase size={24} color={workAddress ? colors.primary : '#888888'} />
-                      </View>
-                      <Text style={[styles.shortcutTitle, { color: workAddress ? colors.text : '#888888' }]}>Work</Text>
-                      {workAddress ? (
-                        <Text style={styles.shortcutAddress} numberOfLines={1}>
-                          {workAddress.address.split(',')[0]}
-                        </Text>
-                      ) : (
-                        <Text style={styles.shortcutAddText}>Add address</Text>
-                      )}
-                    </TouchableOpacity>
-
-                    {/* Nearby Card */}
-                    <TouchableOpacity
-                      style={[styles.shortcutCard, { backgroundColor: colors.card }]}
-                      onPress={handleUseMyLocation}
-                      disabled={locatingUser}
-                    >
-                      <View style={[styles.shortcutIconBox, { backgroundColor: `${colors.primary}15` }]}>
-                        {locatingUser ? (
-                          <ActivityIndicator size="small" color={colors.primary} />
-                        ) : (
-                          <LocateFixed size={24} color={colors.primary} />
-                        )}
-                      </View>
-                      <Text style={[styles.shortcutTitle, { color: colors.text }]}>Nearby</Text>
-                      <Text style={styles.shortcutAddress} numberOfLines={1}>
-                        Find stops near you
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </Animated.View>
-
-                {/* Recent Searches Section */}
-                {recentSearches.length > 0 && (
-                  <Animated.View style={[styles.sectionWrapper, { transform: [{ translateY: anims.recentsY }] }]}>
-                    <View style={styles.sectionHeader}>
-                      <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Searches</Text>
-                      <TouchableOpacity onPress={clearRecentSearches}>
-                        <Text style={styles.clearAllText}>Clear all</Text>
-                      </TouchableOpacity>
-                    </View>
-                    {recentSearches.map((item) => (
-                      <RecentSearchItem
-                        key={item.id}
-                        item={item}
-                        onPress={() => handleRecentSearchPress(item)}
-                        onSave={() => handleSaveRecentAddress(item)}
-                        colors={colors}
-                      />
-                    ))}
-                  </Animated.View>
-                )}
-
-                {/* Suggested Routes Section */}
-                <Animated.View style={[styles.sectionWrapper, { transform: [{ translateY: anims.suggestedY }] }]}>
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Suggested for You</Text>
-                  {loadingSuggestions ? (
-                    <View style={styles.suggestionLoading}>
-                      <ActivityIndicator size="small" color={colors.primary} />
-                      <Text style={styles.loadingText}>Finding nearby routes...</Text>
-                    </View>
-                  ) : suggestedRoutes.length > 0 ? (
-                    suggestedRoutes.map((route, index) => (
+            {/* Content - Only show when not searching */}
+            {!isSearchFocused && (
+              <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                <View style={styles.discoveryContent}>
+                  {/* Quick Actions Section */}
+                  <Animated.View style={[styles.sectionWrapper, { transform: [{ translateY: anims.shortcutsY }] }]}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
+                    <View style={styles.threeColumnGrid}>
+                      {/* Home Card */}
                       <TouchableOpacity
-                        key={route.id}
-                        style={[
-                          styles.suggestedCard,
-                          { backgroundColor: colors.card },
-                          index < suggestedRoutes.length - 1 && styles.suggestedCardWithMargin
-                        ]}
-                        onPress={() => {
-                          handleClose();
-                          setTimeout(() => {
-                            router.push(`/route-details?routeId=${route.id}`);
-                          }, 300);
-                        }}
+                        style={[styles.shortcutCard, { backgroundColor: colors.card }]}
+                        onPress={() => homeAddress ? handleSavedAddressPress(homeAddress) : handleAddHomeAddress()}
                       >
-                        <View style={styles.suggestedHeader}>
-                          <View style={[styles.fastestBadge, { backgroundColor: `${colors.primary}15` }]}>
-                            <Zap size={10} color={colors.primary} style={{ marginRight: 4 }} />
-                            <Text style={[styles.fastestText, { color: colors.primary }]}>NEARBY</Text>
-                          </View>
-                          <Bus size={22} color={colors.text} />
+                        <View style={[styles.shortcutIconBox, { backgroundColor: `${colors.primary}15` }]}>
+                          <Home size={24} color={homeAddress ? colors.primary : '#888888'} />
                         </View>
-                        <Text style={[styles.suggestedTitle, { color: colors.text }]}>{route.name}</Text>
-                        <Text style={styles.suggestedSubtitle}>
-                          Nearest stop: {route.nearestStopName} ({route.distanceToStop?.toFixed(1)}km away)
+                        <Text style={[styles.shortcutTitle, { color: homeAddress ? colors.text : '#888888' }]}>Home</Text>
+                        {homeAddress ? (
+                          <Text style={styles.shortcutAddress} numberOfLines={1}>
+                            {homeAddress.address.split(',')[0]}
+                          </Text>
+                        ) : (
+                          <Text style={styles.shortcutAddText}>Add address</Text>
+                        )}
+                      </TouchableOpacity>
+
+                      {/* Work Card */}
+                      <TouchableOpacity
+                        style={[styles.shortcutCard, { backgroundColor: colors.card }]}
+                        onPress={() => workAddress ? handleSavedAddressPress(workAddress) : handleAddHomeAddress()}
+                      >
+                        <View style={[styles.shortcutIconBox, { backgroundColor: `${colors.primary}15` }]}>
+                          <Briefcase size={24} color={workAddress ? colors.primary : '#888888'} />
+                        </View>
+                        <Text style={[styles.shortcutTitle, { color: workAddress ? colors.text : '#888888' }]}>Work</Text>
+                        {workAddress ? (
+                          <Text style={styles.shortcutAddress} numberOfLines={1}>
+                            {workAddress.address.split(',')[0]}
+                          </Text>
+                        ) : (
+                          <Text style={styles.shortcutAddText}>Add address</Text>
+                        )}
+                      </TouchableOpacity>
+
+                      {/* Nearby Card */}
+                      <TouchableOpacity
+                        style={[styles.shortcutCard, { backgroundColor: colors.card }]}
+                        onPress={handleUseMyLocation}
+                        disabled={locatingUser}
+                      >
+                        <View style={[styles.shortcutIconBox, { backgroundColor: `${colors.primary}15` }]}>
+                          {locatingUser ? (
+                            <ActivityIndicator size="small" color={colors.primary} />
+                          ) : (
+                            <LocateFixed size={24} color={colors.primary} />
+                          )}
+                        </View>
+                        <Text style={[styles.shortcutTitle, { color: colors.text }]}>Nearby</Text>
+                        <Text style={styles.shortcutAddress} numberOfLines={1}>
+                          Find stops near you
                         </Text>
                       </TouchableOpacity>
-                    ))
-                  ) : (
-                    <View style={[styles.suggestedCard, { backgroundColor: colors.card }]}>
-                      <Text style={styles.suggestedSubtitle}>No routes found nearby. Try searching for a destination.</Text>
                     </View>
+                  </Animated.View>
+
+                  {/* Recent Searches Section */}
+                  {recentSearches.length > 0 && (
+                    <Animated.View style={[styles.sectionWrapper, { transform: [{ translateY: anims.recentsY }] }]}>
+                      <View style={styles.sectionHeader}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Searches</Text>
+                        <TouchableOpacity onPress={clearRecentSearches}>
+                          <Text style={styles.clearAllText}>Clear all</Text>
+                        </TouchableOpacity>
+                      </View>
+                      {recentSearches.map((item) => (
+                        <RecentSearchItem
+                          key={item.id}
+                          item={item}
+                          onPress={() => handleRecentSearchPress(item)}
+                          onSave={() => handleSaveRecentAddress(item)}
+                          colors={colors}
+                        />
+                      ))}
+                    </Animated.View>
                   )}
-                </Animated.View>
-              </View>
-            </ScrollView>
+
+                  {/* Suggested Routes Section */}
+                  <Animated.View style={[styles.sectionWrapper, { transform: [{ translateY: anims.suggestedY }] }]}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Suggested for You</Text>
+                    {loadingSuggestions ? (
+                      <View style={styles.suggestionLoading}>
+                        <ActivityIndicator size="small" color={colors.primary} />
+                        <Text style={styles.loadingText}>Finding nearby routes...</Text>
+                      </View>
+                    ) : suggestedRoutes.length > 0 ? (
+                      suggestedRoutes.map((route, index) => (
+                        <TouchableOpacity
+                          key={route.id}
+                          style={[
+                            styles.suggestedCard,
+                            { backgroundColor: colors.card },
+                            index < suggestedRoutes.length - 1 && styles.suggestedCardWithMargin
+                          ]}
+                          onPress={() => {
+                            handleClose();
+                            setTimeout(() => {
+                              router.push(`/route-details?routeId=${route.id}`);
+                            }, 300);
+                          }}
+                        >
+                          <View style={styles.suggestedHeader}>
+                            <View style={[styles.fastestBadge, { backgroundColor: `${colors.primary}15` }]}>
+                              <Zap size={10} color={colors.primary} style={{ marginRight: 4 }} />
+                              <Text style={[styles.fastestText, { color: colors.primary }]}>NEARBY</Text>
+                            </View>
+                            <Bus size={22} color={colors.text} />
+                          </View>
+                          <Text style={[styles.suggestedTitle, { color: colors.text }]}>{route.name}</Text>
+                          <Text style={styles.suggestedSubtitle}>
+                            Nearest stop: {route.nearestStopName} ({route.distanceToStop?.toFixed(1)}km away)
+                          </Text>
+                        </TouchableOpacity>
+                      ))
+                    ) : (
+                      <View style={[styles.suggestedCard, { backgroundColor: colors.card }]}>
+                        <Text style={styles.suggestedSubtitle}>No routes found nearby. Try searching for a destination.</Text>
+                      </View>
+                    )}
+                  </Animated.View>
+                </View>
+              </ScrollView>
+            )}
           </View>
         </Animated.View>
       </Modal>
@@ -1239,7 +1305,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    zIndex: 1000,
+    zIndex: 2000,
     borderWidth: 1,
     borderColor: '#2A2D2E',
   },
@@ -1248,6 +1314,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#2A2D2E',
+  },
+  webSuggestionItemLast: {
+    borderBottomWidth: 0,
   },
   webSuggestionContent: {
     flexDirection: 'row',
