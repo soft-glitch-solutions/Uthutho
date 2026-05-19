@@ -1060,8 +1060,6 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
                 </View>
 
                 <View style={styles.countryIndicator}>
-                  <MapPin size={12} color="#1ea2b1" />
-
                 </View>
               </View>
             </Animated.View>
