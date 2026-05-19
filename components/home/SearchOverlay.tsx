@@ -32,7 +32,6 @@ import {
   AlertCircle,
   Save,
   X,
-  Trash2,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
@@ -60,7 +59,10 @@ const SOUTH_AFRICA_BIAS = {
   },
 };
 
-const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+// Use different API keys based on platform
+const GOOGLE_PLACES_API_KEY = Platform.OS === 'web'
+  ? process.env.EXPO_PUBLIC_WEB_GOOGLE_PLACES_API_KEY
+  : process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
 
 interface SearchOverlayProps {
   visible: boolean;
@@ -673,10 +675,7 @@ const SearchOverlay = ({ visible, onClose, initialY = 160 }: SearchOverlayProps)
 
   // Handle empty home/work - show add address option
   const handleAddHomeAddress = () => {
-    // Focus the search input to let user search for an address
-    setSearchQuery('');
-    // The user will search and select an address, then we'll save it
-    setSuccessMessage('Search for an address and select it, then you can save it as Home');
+    setSuccessMessage('Search for an address and select it, then you can save it as Home or Work');
     setShowSuccessModal(true);
   };
 
