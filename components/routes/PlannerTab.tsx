@@ -1,3 +1,4 @@
+// app/(tabs)/planner.tsx
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
@@ -9,6 +10,7 @@ import {
   ActivityIndicator,
   Animated,
   Platform,
+  Alert,
 } from 'react-native';
 import {
   MapPin,
@@ -25,6 +27,7 @@ import {
   LocateFixed,
   Train,
   Building2,
+  AlertCircle,
 } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import {
@@ -33,12 +36,38 @@ import {
   type AddressSuggestion,
 } from '@/services/addressAutocomplete';
 import * as Location from 'expo-location';
+import { supabase } from '@/lib/supabase';
+
+interface Stop {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
+interface Route {
+  id: string;
+  name: string;
+  start_point: string;
+  end_point: string;
+  transport_type: string;
+  cost: number;
+}
+
+interface RouteStop {
+  route_id: string;
+  stop_id: string;
+  order_number: number;
+}
 
 interface TripLeg {
-  mode: 'walk' | 'bus';
+  mode: 'walk' | 'bus' | 'train' | 'taxi';
   description: string;
   duration: number;
   distance: string;
+  route?: Route;
+  fromStop?: Stop;
+  toStop?: Stop;
 }
 
 interface TripPlan {
@@ -50,27 +79,102 @@ interface TripPlan {
   arriveTime: string;
 }
 
-function generateMockPlan(from: string, to: string): TripPlan {
-  const now = new Date();
-  const departStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const dur = 30 + Math.floor(Math.random() * 40);
-  const arrive = new Date(now.getTime() + dur * 60 * 1000);
-  const arriveStr = arrive.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const dist = (5 + Math.random() * 15).toFixed(1);
+// Calculate distance between two coordinates
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371;
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+const deg2rad = (deg: number) => deg * (Math.PI / 180);
+
+// Calculate walking time (assume 5 km/h = 83.33 m/min)
+const calculateWalkingTime = (distanceKm: number): number => {
+  return Math.round(distanceKm / 5 * 60);
+};
+
+// Find nearest stops to a location
+const findNearestStops = async (lat: number, lng: number, limit: number = 5): Promise<Stop[]> => {
+  const { data: allStops, error } = await supabase
+    .from('stops')
+    .select('*');
+
+  if (error) throw error;
+  if (!allStops) return [];
+
+  const stopsWithDistance = allStops.map(stop => ({
+    ...stop,
+    distance: calculateDistance(lat, lng, stop.latitude, stop.longitude)
+  }));
+
+  stopsWithDistance.sort((a, b) => a.distance - b.distance);
+
+  return stopsWithDistance.slice(0, limit);
+};
+
+// Find routes between stops
+const findRoutesBetweenStops = async (fromStopId: string, toStopId: string): Promise<Route | null> => {
+  // Get route_stops for both stops
+  const { data: routeStops, error } = await supabase
+    .from('route_stops')
+    .select(`
+      route_id,
+      order_number,
+      routes (
+        id,
+        name,
+        start_point,
+        end_point,
+        transport_type,
+        cost
+      )
+    `)
+    .in('stop_id', [fromStopId, toStopId]);
+
+  if (error || !routeStops) return null;
+
+  // Group by route_id
+  const routeMap = new Map<string, { route: Route, orderNumbers: number[] }>();
+
+  routeStops.forEach(rs => {
+    if (rs.routes) {
+      const route = rs.routes as Route;
+      if (!routeMap.has(route.id)) {
+        routeMap.set(route.id, { route, orderNumbers: [] });
+      }
+      routeMap.get(route.id)!.orderNumbers.push(rs.order_number);
+    }
+  });
+
+  // Find routes where both stops exist and from order < to order (same direction)
+  for (const [_, value] of routeMap) {
+    const orders = value.orderNumbers;
+    if (orders.length === 2 && orders[0] < orders[1]) {
+      return value.route;
+    }
+  }
+
+  return null;
+};
+
+// Get walking directions between coordinates
+const getWalkingLeg = async (fromLat: number, fromLng: number, toLat: number, toLng: number): Promise<TripLeg> => {
+  const distance = calculateDistance(fromLat, fromLng, toLat, toLng);
+  const duration = calculateWalkingTime(distance);
 
   return {
-    totalDuration: dur,
-    totalDistance: `${dist} km`,
-    fare: `R ${(8 + Math.random() * 20).toFixed(2)}`,
-    departTime: departStr,
-    arriveTime: arriveStr,
-    legs: [
-      { mode: 'walk', description: `Walk to nearest stop`, duration: 4 + Math.floor(Math.random() * 4), distance: `${200 + Math.floor(Math.random() * 400)} m` },
-      { mode: 'bus', description: `Bus toward ${to.split('–')[0].trim()}`, duration: dur - 12, distance: `${(parseFloat(dist) - 1.5).toFixed(1)} km` },
-      { mode: 'walk', description: `Walk to destination`, duration: 5 + Math.floor(Math.random() * 5), distance: `${300 + Math.floor(Math.random() * 500)} m` },
-    ],
+    mode: 'walk',
+    description: `Walk ${distance < 1 ? `${Math.round(distance * 1000)}m` : `${distance.toFixed(1)}km`}`,
+    duration: duration,
+    distance: distance < 1 ? `${Math.round(distance * 1000)}m` : `${distance.toFixed(1)}km`,
   };
-}
+};
 
 export default function PlannerTab() {
   const { colors } = useTheme();
@@ -84,6 +188,7 @@ export default function PlannerTab() {
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [locatingUser, setLocatingUser] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -135,22 +240,34 @@ export default function PlannerTab() {
     setActiveField(null);
     setSuggestions([]);
     setTripPlan(null);
+    setError(null);
   };
 
   const handleUseMyLocation = async () => {
     setLocatingUser(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setLocatingUser(false);
-        return;
+      let coords;
+
+      if (Platform.OS === 'web') {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject);
+        });
+        coords = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        };
+      } else {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Denied', 'Please enable location permissions to use this feature');
+          setLocatingUser(false);
+          return;
+        }
+        const location = await Location.getCurrentPositionAsync({});
+        coords = location.coords;
       }
 
-      const location = await Location.getCurrentPositionAsync({});
-      const result = await reverseGeocode(
-        location.coords.latitude,
-        location.coords.longitude
-      );
+      const result = await reverseGeocode(coords.latitude, coords.longitude);
 
       if (result) {
         if (activeField === 'from') {
@@ -163,9 +280,11 @@ export default function PlannerTab() {
         setActiveField(null);
         setSuggestions([]);
         setTripPlan(null);
+        setError(null);
       }
     } catch (e) {
       console.error('Location error:', e);
+      Alert.alert('Error', 'Could not get your location');
     } finally {
       setLocatingUser(false);
     }
@@ -176,18 +295,147 @@ export default function PlannerTab() {
     setFromSelected(toSelected); setFromQuery(toQuery);
     setToSelected(ts); setToQuery(tq);
     setTripPlan(null);
+    setError(null);
   };
 
-  const handlePlan = async () => {
+  const planJourney = async () => {
     if (!fromSelected || !toSelected) return;
+
+    console.log('Planning journey from:', fromSelected, 'to:', toSelected);
     setPlanning(true);
     setTripPlan(null);
+    setError(null);
     fadeAnim.setValue(0);
-    await new Promise((r) => setTimeout(r, 1200));
-    const plan = generateMockPlan(fromSelected.label, toSelected.label);
-    setTripPlan(plan);
-    setPlanning(false);
-    Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+
+    try {
+      const fromLat = fromSelected.latitude;
+      const fromLng = fromSelected.longitude;
+      const toLat = toSelected.latitude;
+      const toLng = toSelected.longitude;
+
+      // Find nearest stops to origin and destination
+      const [nearbyFromStops, nearbyToStops] = await Promise.all([
+        findNearestStops(fromLat, fromLng, 5),
+        findNearestStops(toLat, toLng, 5)
+      ]);
+
+      console.log('Nearby from stops:', nearbyFromStops.length);
+      console.log('Nearby to stops:', nearbyToStops.length);
+
+      if (nearbyFromStops.length === 0 || nearbyToStops.length === 0) {
+        setError('No public transport stops found near your locations. Try a different area.');
+        setPlanning(false);
+        return;
+      }
+
+      // Try to find a direct route between any from-stop and to-stop
+      let bestRoute: { route: Route, fromStop: Stop, toStop: Stop, walkToStop: number, walkFromStop: number } | null = null;
+      let minTotalTime = Infinity;
+
+      for (const fromStop of nearbyFromStops) {
+        for (const toStop of nearbyToStops) {
+          const route = await findRoutesBetweenStops(fromStop.id, toStop.id);
+          if (route) {
+            const walkToStopTime = calculateWalkingTime(fromStop.distance);
+            const walkFromStopTime = calculateWalkingTime(toStop.distance);
+            const totalTime = walkToStopTime + walkFromStopTime + 30; // Assume bus takes ~30 min as base
+            if (totalTime < minTotalTime) {
+              minTotalTime = totalTime;
+              bestRoute = { route, fromStop, toStop, walkToStop: walkToStopTime, walkFromStop: walkFromStopTime };
+            }
+          }
+        }
+      }
+
+      if (bestRoute) {
+        // Build trip plan with the found route
+        const now = new Date();
+        const departStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const totalDuration = bestRoute.walkToStop + 30 + bestRoute.walkFromStop;
+        const arrive = new Date(now.getTime() + totalDuration * 60 * 1000);
+        const arriveStr = arrive.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const legs: TripLeg[] = [
+          {
+            mode: 'walk',
+            description: `Walk to ${bestRoute.fromStop.name}`,
+            duration: bestRoute.walkToStop,
+            distance: bestRoute.fromStop.distance < 1
+              ? `${Math.round(bestRoute.fromStop.distance * 1000)}m`
+              : `${bestRoute.fromStop.distance.toFixed(1)}km`,
+          },
+          {
+            mode: bestRoute.route.transport_type === 'bus' ? 'bus' : 'train',
+            description: `${bestRoute.route.transport_type?.toUpperCase() || 'Bus'} ${bestRoute.route.name} toward ${bestRoute.route.end_point}`,
+            duration: 30,
+            distance: '~15 km',
+            route: bestRoute.route,
+            fromStop: bestRoute.fromStop,
+            toStop: bestRoute.toStop,
+          },
+          {
+            mode: 'walk',
+            description: `Walk to destination`,
+            duration: bestRoute.walkFromStop,
+            distance: bestRoute.toStop.distance < 1
+              ? `${Math.round(bestRoute.toStop.distance * 1000)}m`
+              : `${bestRoute.toStop.distance.toFixed(1)}km`,
+          },
+        ];
+
+        const totalDistance = (bestRoute.fromStop.distance + bestRoute.toStop.distance + 15).toFixed(1);
+
+        setTripPlan({
+          totalDuration: totalDuration,
+          totalDistance: `${totalDistance} km`,
+          fare: `R${bestRoute.route.cost?.toFixed(2) || '15.00'}`,
+          departTime: departStr,
+          arriveTime: arriveStr,
+          legs: legs,
+        });
+      } else {
+        // No direct route found, create a walking-only plan
+        const walkingDistance = calculateDistance(fromLat, fromLng, toLat, toLng);
+        const walkingTime = calculateWalkingTime(walkingDistance);
+        const now = new Date();
+        const departStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const arrive = new Date(now.getTime() + walkingTime * 60 * 1000);
+        const arriveStr = arrive.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        setTripPlan({
+          totalDuration: walkingTime,
+          totalDistance: walkingDistance < 1
+            ? `${Math.round(walkingDistance * 1000)}m`
+            : `${walkingDistance.toFixed(1)} km`,
+          fare: 'R0.00 (Walking)',
+          departTime: departStr,
+          arriveTime: arriveStr,
+          legs: [{
+            mode: 'walk',
+            description: `Walk to destination`,
+            duration: walkingTime,
+            distance: walkingDistance < 1
+              ? `${Math.round(walkingDistance * 1000)}m`
+              : `${walkingDistance.toFixed(1)} km`,
+          }],
+        });
+
+        if (walkingDistance > 10) {
+          setError('No public transport routes found. The walking distance is significant.');
+        }
+      }
+
+      Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+    } catch (err) {
+      console.error('Planning error:', err);
+      setError('Failed to plan journey. Please try again.');
+    } finally {
+      setPlanning(false);
+    }
+  };
+
+  const handlePlan = () => {
+    planJourney();
   };
 
   const getTypeIcon = (type: AddressSuggestion['type']) => {
@@ -212,6 +460,15 @@ export default function PlannerTab() {
     }
   };
 
+  const getLegIcon = (mode: string) => {
+    switch (mode) {
+      case 'bus': return <Bus size={14} color={colors.primary || '#1ea2b1'} />;
+      case 'train': return <Train size={14} color={colors.primary || '#1ea2b1'} />;
+      case 'walk': return <Footprints size={14} color="#888" />;
+      default: return <Bus size={14} color={colors.primary || '#1ea2b1'} />;
+    }
+  };
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -228,7 +485,7 @@ export default function PlannerTab() {
             placeholder="Where from? Search any address…"
             placeholderTextColor="#555"
             value={fromQuery}
-            onChangeText={(t) => { setFromQuery(t); setFromSelected(null); setTripPlan(null); }}
+            onChangeText={(t) => { setFromQuery(t); setFromSelected(null); setTripPlan(null); setError(null); }}
             onFocus={() => { setActiveField('from'); setSuggestions([]); }}
           />
           {fromSelected && <CheckCircle2 size={16} color={colors.primary || '#1ea2b1'} />}
@@ -243,7 +500,7 @@ export default function PlannerTab() {
             placeholder="Where to? Search any address…"
             placeholderTextColor="#555"
             value={toQuery}
-            onChangeText={(t) => { setToQuery(t); setToSelected(null); setTripPlan(null); }}
+            onChangeText={(t) => { setToQuery(t); setToSelected(null); setTripPlan(null); setError(null); }}
             onFocus={() => { setActiveField('to'); setSuggestions([]); }}
           />
           {toSelected && <CheckCircle2 size={16} color={colors.primary || '#1ea2b1'} />}
@@ -256,7 +513,7 @@ export default function PlannerTab() {
               <Text style={[styles.actionText, { color: colors.primary || '#1ea2b1' }]}>Swap</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => { setFromQuery(''); setToQuery(''); setFromSelected(null); setToSelected(null); setTripPlan(null); setActiveField(null); setSuggestions([]); }}
+              onPress={() => { setFromQuery(''); setToQuery(''); setFromSelected(null); setToSelected(null); setTripPlan(null); setActiveField(null); setSuggestions([]); setError(null); }}
               style={styles.actionBtn}
             >
               <X size={14} color="#666" />
@@ -315,11 +572,15 @@ export default function PlannerTab() {
                   <Text style={[styles.suggestionLabel, { color: colors.text }]} numberOfLines={1}>{item.label}</Text>
                   <Text style={styles.suggestionAddr} numberOfLines={1}>{item.address}</Text>
                 </View>
-                {item.city ? (
-                  <View style={[styles.cityBadge, { backgroundColor: badgeColors.bg }]}>
-                    <Text style={[styles.cityText, { color: badgeColors.text }]}>{item.city}</Text>
+                {item.distance && (
+                  <View style={[styles.distanceBadge, { backgroundColor: badgeColors.bg }]}>
+                    <Text style={[styles.distanceText, { color: badgeColors.text }]}>
+                      {item.distance < 1
+                        ? `${Math.round(item.distance * 1000)}m`
+                        : `${item.distance.toFixed(1)}km`}
+                    </Text>
                   </View>
-                ) : null}
+                )}
               </TouchableOpacity>
             );
           })}
@@ -331,6 +592,14 @@ export default function PlannerTab() {
         <View style={[styles.noResults, { backgroundColor: colors.card || '#1A1D1E' }]}>
           <Search size={16} color="#555" />
           <Text style={styles.noResultsText}>No addresses found for "{query}"</Text>
+        </View>
+      )}
+
+      {/* Error message */}
+      {error && !tripPlan && (
+        <View style={[styles.errorContainer, { backgroundColor: colors.card || '#1A1D1E' }]}>
+          <AlertCircle size={20} color="#ff4444" />
+          <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
 
@@ -391,10 +660,15 @@ export default function PlannerTab() {
               </View>
               <View style={styles.legInfo}>
                 <View style={styles.legTop}>
-                  {leg.mode === 'walk' ? <Footprints size={14} color="#888" /> : <Bus size={14} color={colors.primary || '#1ea2b1'} />}
+                  {getLegIcon(leg.mode)}
                   <Text style={[styles.legDesc, { color: colors.text }]}>{leg.description}</Text>
                 </View>
                 <Text style={styles.legMeta}>{leg.duration} min · {leg.distance}</Text>
+                {leg.route && (
+                  <Text style={styles.legRoute}>
+                    {leg.route.name} • {leg.route.cost ? `R${leg.route.cost.toFixed(2)}` : 'Free'}
+                  </Text>
+                )}
               </View>
             </View>
           ))}
@@ -437,12 +711,15 @@ const styles = StyleSheet.create({
   suggestionInfo: { flex: 1 },
   suggestionLabel: { fontSize: 14, fontWeight: '600', marginBottom: 1 },
   suggestionAddr: { fontSize: 12, color: '#666' },
-  cityBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  cityText: { fontSize: 11, fontWeight: '600' },
+  distanceBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  distanceText: { fontSize: 11, fontWeight: '600' },
   loadingRow: { paddingVertical: 20, alignItems: 'center' },
 
   noResults: { borderRadius: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16 },
   noResultsText: { color: '#555', fontSize: 14 },
+
+  errorContainer: { borderRadius: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16 },
+  errorText: { color: '#ff4444', fontSize: 13, flex: 1 },
 
   planBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, borderRadius: 14, marginBottom: 20 },
   planBtnDisabled: { opacity: 0.35 },
@@ -466,4 +743,5 @@ const styles = StyleSheet.create({
   legTop: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
   legDesc: { fontSize: 14, fontWeight: '500' },
   legMeta: { fontSize: 12, color: '#888' },
+  legRoute: { fontSize: 11, color: '#1ea2b1', marginTop: 2 },
 });
