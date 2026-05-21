@@ -431,9 +431,6 @@ export default function NotificationScreen() {
                     <Text style={styles.notificationTime}>
                       {formatTimeAgo(notification.created_at)}
                     </Text>
-                    
-
-                    )}
                   </View>
 
                   {!notification.is_read && (
