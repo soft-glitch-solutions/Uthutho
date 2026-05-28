@@ -164,29 +164,35 @@ export default function Auth() {
         contentContainerStyle={[styles.contentContainer, isDesktop && styles.contentContainerDesktop]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.card, isDesktop && styles.cardDesktop]}>
-          <View style={styles.brandingHeader}>
+        <View style={isDesktop ? styles.desktopLayout : undefined}>
+          <View style={[styles.brandingHeader, isDesktop && styles.leftColumn]}>
             <View style={styles.logoRow}>
               <Image 
                 source={require('../../assets/logo.png')} 
-                style={styles.logoImage}
+                style={[styles.logoImage, isDesktop && styles.logoImageDesktop]}
                 resizeMode="contain"
               />
               <View style={styles.brandInfo}>
                 <View style={styles.logoTextRow}>
-                  <Text style={styles.brandText}>Uthutho</Text>
-                  <Text style={[styles.brandDot, { color: '#00f5d4' }]}>.</Text>
+                  <Text style={[styles.brandText, isDesktop && styles.brandTextDesktop]}>Uthutho</Text>
+                  <Text style={[styles.brandDot, isDesktop && styles.brandDotDesktop, { color: '#00f5d4' }]}>.</Text>
                 </View>
-                <Text style={styles.moveSmarter}>MOVE SMARTER</Text>
+                <Text style={[styles.moveSmarter, isDesktop && styles.moveSmarterDesktop]}>MOVE SMARTER</Text>
               </View>
             </View>
             
-            <Text style={styles.welcomeBack}>
+            <Text style={[styles.welcomeBack, isDesktop && styles.welcomeBackDesktop]}>
               {isLogin ? 'Welcome Back' : 'Join Uthutho'}
             </Text>
+            {isDesktop && (
+              <Text style={styles.desktopDescription}>
+                Uthutho is built around commuters. Stay connected, informed, and part of a shared journey with every trip you take.
+              </Text>
+            )}
           </View>
 
-          <View style={styles.tabContainer}>
+          <View style={[styles.card, isDesktop && styles.cardDesktop]}>
+            <View style={styles.tabContainer}>
             <TouchableOpacity
               style={[styles.tab, isLogin && styles.activeTab]}
               onPress={() => setIsLogin(true)}>
@@ -306,7 +312,14 @@ export default function Auth() {
                     <View style={styles.checkbox}>
                       {acceptedTerms && <Check size={14} color="#00f5d4" />}
                     </View>
-                    <Text style={styles.termsText}>I agree to the Terms</Text>
+                    <Text style={styles.termsText}>I agree to the Terms & Conditions</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={[styles.termsRow, { marginTop: 12 }]} onPress={() => setAcceptedPrivacy(!acceptedPrivacy)}>
+                    <View style={styles.checkbox}>
+                      {acceptedPrivacy && <Check size={14} color="#00f5d4" />}
+                    </View>
+                    <Text style={styles.termsText}>I agree to the Privacy Policy</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -323,6 +336,7 @@ export default function Auth() {
 
             </View>
           )}
+        </View>
         </View>
       </ScrollView>
     </View>
@@ -571,5 +585,43 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     resizeMode: 'contain',
+  },
+  desktopLayout: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 80,
+    width: '100%',
+    maxWidth: 1200,
+  },
+  leftColumn: {
+    flex: 1,
+    alignItems: 'flex-start',
+    maxWidth: 500,
+    marginBottom: 0,
+  },
+  logoImageDesktop: {
+    width: 80,
+    height: 80,
+  },
+  brandTextDesktop: {
+    fontSize: 64,
+  },
+  brandDotDesktop: {
+    fontSize: 64,
+  },
+  moveSmarterDesktop: {
+    fontSize: 16,
+  },
+  welcomeBackDesktop: {
+    fontSize: 48,
+    marginTop: 24,
+    textAlign: 'left',
+  },
+  desktopDescription: {
+    fontSize: 18,
+    color: '#94a3b8',
+    marginTop: 16,
+    lineHeight: 28,
   },
 });

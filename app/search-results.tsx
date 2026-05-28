@@ -1,5 +1,5 @@
 // app/search-results.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  ActivityIndicator,
   Platform,
   Alert,
-  Animated
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -18,20 +18,18 @@ import {
   MapPin,
   Bus,
   Navigation,
-  Clock,
   ChevronRight,
-  Star,
-  Users,
-  Zap,
   DollarSign,
   Train,
   Car,
   AlertCircle,
-  Image as ImageIcon
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH >= 1024;
 
 interface Stop {
   id: string;
@@ -39,8 +37,6 @@ interface Stop {
   latitude: number;
   longitude: number;
   image_url: string;
-  cost: number;
-  order_number: number;
 }
 
 interface Route {
@@ -50,10 +46,6 @@ interface Route {
   end_point: string;
   transport_type: string;
   cost: number;
-  instructions?: string;
-  hub_id?: string;
-  organisation_id?: string;
-  image_url?: string;
 }
 
 interface NearbyStop {
@@ -62,77 +54,37 @@ interface NearbyStop {
   routes: Route[];
 }
 
-interface PlaceImage {
-  url: string;
-  attribution?: string;
-}
-
-// Skeleton Loader Component with web support
-const SkeletonLoader = () => {
-  const [opacity] = useState(new Animated.Value(0.3));
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, {
-          toValue: 0.7,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 0.3,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    animation.start();
-    return () => animation.stop();
-  }, []);
-
-  const SkeletonItem = ({ style }: { style: any }) => (
-    <Animated.View style={[style, { opacity, backgroundColor: '#222' }]} />
-  );
-
+// Skeleton Loader
+const SkeletonLoader = ({ colors }: { colors: any }) => {
   return (
-    <View style={styles.skeletonContainer}>
-      <View style={[styles.header, styles.skeletonHeader]}>
-        <View style={{ width: 40 }} />
-        <SkeletonItem style={styles.skeletonHeaderTitle} />
-        <View style={{ width: 40 }} />
-      </View>
-
-      <View style={styles.skeletonAddressCard}>
-        <SkeletonItem style={styles.skeletonAddressIcon} />
-        <View style={styles.skeletonAddressInfo}>
-          <SkeletonItem style={styles.skeletonAddressLabel} />
-          <SkeletonItem style={styles.skeletonAddressText} />
-          <SkeletonItem style={styles.skeletonAddressCoords} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.skeletonHeader, { backgroundColor: colors.card }]}>
+        <View style={styles.skeletonHeaderActions}>
+          <View style={[styles.skeletonIconButton, { backgroundColor: 'rgba(255,255,255,0.1)' }]} />
         </View>
       </View>
-
-      <View style={styles.summaryContainer}>
-        <SkeletonItem style={styles.skeletonSummary} />
-      </View>
-
-      {[1, 2, 3, 4, 5].map((item) => (
-        <View key={item} style={styles.skeletonStopCard}>
-          <View style={styles.skeletonStopHeader}>
-            <SkeletonItem style={styles.skeletonStopIcon} />
-            <View style={styles.skeletonStopInfo}>
-              <SkeletonItem style={styles.skeletonStopName} />
-              <SkeletonItem style={styles.skeletonDistance} />
+      <ScrollView style={styles.container}>
+        <View style={styles.content}>
+          <View style={[styles.skeletonCard, { backgroundColor: colors.card }]}>
+            <View style={[styles.skeletonCircle, { backgroundColor: colors.border }]} />
+            <View style={styles.skeletonTextContainer}>
+              <View style={[styles.skeletonTextSmall, { backgroundColor: colors.border, width: '40%' }]} />
+              <View style={[styles.skeletonTextLarge, { backgroundColor: colors.border, width: '70%' }]} />
             </View>
           </View>
-          <View style={styles.skeletonRoutesContainer}>
-            <SkeletonItem style={styles.skeletonRoutesLabel} />
-            <View style={styles.skeletonRoutesList}>
-              <SkeletonItem style={styles.skeletonRouteBadge} />
-              <SkeletonItem style={styles.skeletonRouteBadge} />
+          {[1, 2, 3, 4, 5].map((item) => (
+            <View key={item} style={[styles.skeletonStopCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.skeletonStopHeader}>
+                <View style={[styles.skeletonIcon, { backgroundColor: colors.border }]} />
+                <View style={styles.skeletonStopInfo}>
+                  <View style={[styles.skeletonTextMedium, { backgroundColor: colors.border, width: '60%' }]} />
+                  <View style={[styles.skeletonTextSmall, { backgroundColor: colors.border, width: '40%' }]} />
+                </View>
+              </View>
             </View>
-          </View>
+          ))}
         </View>
-      ))}
+      </ScrollView>
     </View>
   );
 };
@@ -146,13 +98,15 @@ export default function SearchResultsScreen() {
   const [loading, setLoading] = useState(true);
   const [nearbyStops, setNearbyStops] = useState<NearbyStop[]>([]);
   const [addressName, setAddressName] = useState('');
-  const [addressDetails, setAddressDetails] = useState<any>(null);
-  const [addressImage, setAddressImage] = useState<PlaceImage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
-  // Parse coordinates with validation
   const addressLat = parseFloat(params.latitude as string);
   const addressLng = parseFloat(params.longitude as string);
+
+  const HEADER_MAX_HEIGHT = 100;
+  const HEADER_MIN_HEIGHT = Platform.OS === 'ios' ? 70 : 60;
+  const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371;
@@ -168,63 +122,15 @@ export default function SearchResultsScreen() {
 
   const deg2rad = (deg: number) => deg * (Math.PI / 180);
 
-  // Function to get place image from Google Places API
-  const getPlaceImage = async (lat: number, lng: number, placeName: string): Promise<PlaceImage | null> => {
-    const apiKey = Platform.OS === 'web'
-      ? process.env.EXPO_PUBLIC_WEB_GOOGLE_PLACES_API_KEY
-      : process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
-
-    if (!apiKey) {
-      console.warn('Google Places API key missing');
-      return null;
-    }
-
-    try {
-      // First, search for the place by name and location
-      const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(placeName)}&location=${lat},${lng}&radius=500&key=${apiKey}`;
-
-      let response;
-      if (Platform.OS === 'web') {
-        // For web, use the proxy or direct fetch (might need proxy)
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(searchUrl)}`;
-        response = await fetch(proxyUrl);
-      } else {
-        response = await fetch(searchUrl);
-      }
-
-      const data = await response.json();
-
-      if (data.status === 'OK' && data.results && data.results.length > 0) {
-        const place = data.results[0];
-        if (place.photos && place.photos.length > 0) {
-          const photoReference = place.photos[0].photo_reference;
-          const imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&maxheight=600&photo_reference=${photoReference}&key=${apiKey}`;
-
-          return {
-            url: imageUrl,
-            attribution: place.photos[0].html_attributions?.[0]
-          };
-        }
-      }
-      return null;
-    } catch (error) {
-      console.error('Error fetching place image:', error);
-      return null;
-    }
-  };
-
   const findNearbyStopsWithRoutes = async (latitude: number, longitude: number, radiusKm: number = 10) => {
     try {
-      // Get all stops
       const { data: allStops, error: stopsError } = await supabase
         .from('stops')
         .select('*');
 
       if (stopsError) throw stopsError;
-
       if (!allStops || allStops.length === 0) return [];
 
-      // Calculate distances and sort to get top 5 nearest stops
       const stopsWithDistance = allStops.map(stop => ({
         ...stop,
         distance: calculateDistance(latitude, longitude, stop.latitude, stop.longitude)
@@ -232,7 +138,6 @@ export default function SearchResultsScreen() {
         .sort((a, b) => a.distance - b.distance)
         .slice(0, 5);
 
-      // For each nearby stop, fetch its routes via route_stops
       const nearbyStopsWithRoutes = await Promise.all(
         stopsWithDistance.map(async (stop) => {
           const { data: routeStops, error: routeStopError } = await supabase
@@ -245,27 +150,18 @@ export default function SearchResultsScreen() {
                 start_point,
                 end_point,
                 transport_type,
-                cost,
-                instructions,
-                hub_id,
-                organisation_id,
-                image_url
+                cost
               )
             `)
-            .eq('stop_id', stop.id)
-            .order('order_number');
+            .eq('stop_id', stop.id);
 
           if (routeStopError) {
-            console.error(`Error fetching routes for stop ${stop.id}:`, routeStopError);
             return { stop, distance: stop.distance, routes: [] };
           }
 
           const routes = routeStops
             .filter(rs => rs.routes)
-            .map(rs => ({
-              ...rs.routes,
-              order_number: rs.order_number
-            }));
+            .map(rs => rs.routes);
 
           return { stop, distance: stop.distance, routes };
         })
@@ -273,37 +169,13 @@ export default function SearchResultsScreen() {
 
       return nearbyStopsWithRoutes;
     } catch (error) {
-      console.error('Error finding nearby stops with routes:', error);
+      console.error('Error finding nearby stops:', error);
       throw error;
     }
   };
 
-  // Function to get address name from coordinates (for web fallback)
   const getAddressFromCoords = async (lat: number, lng: number) => {
     try {
-      const apiKey = Platform.OS === 'web'
-        ? process.env.EXPO_PUBLIC_WEB_GOOGLE_PLACES_API_KEY
-        : process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
-
-      if (apiKey) {
-        // Use Google Geocoding API for better results
-        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
-
-        let response;
-        if (Platform.OS === 'web') {
-          const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(geocodeUrl)}`;
-          response = await fetch(proxyUrl);
-        } else {
-          response = await fetch(geocodeUrl);
-        }
-
-        const data = await response.json();
-        if (data.status === 'OK' && data.results && data.results[0]) {
-          return data.results[0].formatted_address;
-        }
-      }
-
-      // Fallback to Nominatim
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
         {
@@ -314,10 +186,17 @@ export default function SearchResultsScreen() {
         }
       );
       const data = await response.json();
-      return data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      // Get a clean address without coordinates
+      if (data.address) {
+        const parts = [];
+        if (data.address.road) parts.push(data.address.road);
+        if (data.address.suburb) parts.push(data.address.suburb);
+        if (data.address.city || data.address.town) parts.push(data.address.city || data.address.town);
+        if (parts.length > 0) return parts.join(', ');
+      }
+      return data.display_name?.split(',')[0] || 'Selected Location';
     } catch (error) {
-      console.error('Error getting address from coordinates:', error);
-      return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      return 'Selected Location';
     }
   };
 
@@ -327,62 +206,40 @@ export default function SearchResultsScreen() {
       setError(null);
 
       try {
-        // Handle address name - decode if it was encoded
         let address = params.address as string || 'Selected Location';
-        let fullAddress = params.fullAddress as string || address;
 
         try {
           address = decodeURIComponent(address);
-          fullAddress = decodeURIComponent(fullAddress);
-        } catch (e) {
-          // If decoding fails, use as is
-        }
+        } catch (e) { }
 
-        setAddressName(address);
-
-        // If coordinates are valid, try to get a better address name and image
         if (!isNaN(addressLat) && !isNaN(addressLng) && addressLat && addressLng) {
-          if (address === 'Selected Location' || address === fullAddress) {
+          if (address === 'Selected Location') {
             const detailedAddress = await getAddressFromCoords(addressLat, addressLng);
             setAddressName(detailedAddress);
+          } else {
+            setAddressName(address);
           }
 
-          // Fetch place image
-          const image = await getPlaceImage(addressLat, addressLng, address);
-          if (image) {
-            setAddressImage(image);
-          }
+          const nearby = await findNearbyStopsWithRoutes(addressLat, addressLng);
+          setNearbyStops(nearby);
+        } else {
+          setError('Invalid location');
         }
-
-        setAddressDetails({
-          label: address,
-          latitude: addressLat,
-          longitude: addressLng
-        });
-
-        const nearby = await findNearbyStopsWithRoutes(addressLat, addressLng);
-        setNearbyStops(nearby);
       } catch (error) {
         console.error('Error loading search results:', error);
-        setError('Failed to load nearby stops. Please check your connection and try again.');
-        if (Platform.OS !== 'web') {
-          Alert.alert('Error', 'Failed to load nearby stops');
-        }
+        setError('Failed to load nearby stops');
       } finally {
-        setTimeout(() => {
-          setLoading(false);
-        }, 500);
+        setLoading(false);
       }
     };
 
-    if (!isNaN(addressLat) && !isNaN(addressLng) && addressLat && addressLng) {
+    if (!isNaN(addressLat) && !isNaN(addressLng)) {
       loadSearchResults();
     } else {
       setLoading(false);
-      setAddressName('Invalid Location');
-      setError('The selected location coordinates are invalid. Please try searching again.');
+      setError('Invalid location coordinates');
     }
-  }, [addressLat, addressLng, params.address, params.fullAddress]);
+  }, [addressLat, addressLng, params.address]);
 
   const getDistanceDisplay = (distance: number) => {
     if (distance < 1) {
@@ -399,14 +256,14 @@ export default function SearchResultsScreen() {
   const getTransportIcon = (type: string) => {
     switch (type?.toLowerCase()) {
       case 'bus':
-        return <Bus size={14} color="#1ea2b1" />;
+        return <Bus size={14} color={colors.primary} />;
       case 'train':
-        return <Train size={14} color="#1ea2b1" />;
+        return <Train size={14} color={colors.primary} />;
       case 'taxi':
       case 'car':
-        return <Car size={14} color="#1ea2b1" />;
+        return <Car size={14} color={colors.primary} />;
       default:
-        return <Bus size={14} color="#1ea2b1" />;
+        return <Bus size={14} color={colors.primary} />;
     }
   };
 
@@ -418,202 +275,247 @@ export default function SearchResultsScreen() {
     router.push(`/route-details?routeId=${routeId}`);
   };
 
-  const handleRetry = () => {
-    if (!isNaN(addressLat) && !isNaN(addressLng) && addressLat && addressLng) {
-      setLoading(true);
-      setError(null);
-      findNearbyStopsWithRoutes(addressLat, addressLng)
-        .then(setNearbyStops)
-        .catch((err) => {
-          console.error('Retry error:', err);
-          setError('Failed to load nearby stops. Please try again.');
-        })
-        .finally(() => setLoading(false));
-    }
-  };
-
   if (loading) {
+    return <SkeletonLoader colors={colors} />;
+  }
+
+  // Desktop Layout
+  if (isDesktop) {
     return (
-      <View style={[styles.container, { backgroundColor: '#000' }]}>
-        <SkeletonLoader />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.desktopHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <View style={styles.desktopHeaderContent}>
+            <TouchableOpacity style={styles.desktopBackButton} onPress={() => router.back()}>
+              <ArrowLeft size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.desktopHeaderTitle, { color: colors.text }]}>Search Results</Text>
+            <View style={{ width: 40 }} />
+          </View>
+        </View>
+
+        <ScrollView style={styles.container} contentContainerStyle={styles.desktopContentContainer}>
+          <View style={styles.desktopWrapper}>
+            {/* Left Column - Location Info */}
+            <View style={styles.desktopLeftColumn}>
+              <View style={[styles.locationCardDesktop, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[styles.locationIconDesktop, { backgroundColor: `${colors.primary}15` }]}>
+                  <MapPin size={24} color={colors.primary} />
+                </View>
+                <View style={styles.locationInfoDesktop}>
+                  <Text style={[styles.locationLabelDesktop, { color: colors.primary }]}>Selected Location</Text>
+                  <Text style={[styles.locationNameDesktop, { color: colors.text }]}>{addressName}</Text>
+                </View>
+              </View>
+
+              <View style={styles.summaryCardDesktop}>
+                <Text style={[styles.summaryCountDesktop, { color: colors.primary }]}>
+                  {nearbyStops.length}
+                </Text>
+                <Text style={[styles.summaryTextDesktop, { color: colors.text }]}>
+                  stop{nearbyStops.length !== 1 ? 's' : ''} nearby
+                </Text>
+              </View>
+            </View>
+
+            {/* Right Column - Stops List */}
+            <View style={styles.desktopRightColumn}>
+              <Text style={[styles.sectionTitleDesktop, { color: colors.text }]}>Nearby Stops</Text>
+
+              {error ? (
+                <View style={[styles.errorCardDesktop, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <AlertCircle size={48} color="#ff4444" />
+                  <Text style={[styles.errorTextDesktop, { color: colors.text }]}>{error}</Text>
+                  <TouchableOpacity style={[styles.retryButtonDesktop, { backgroundColor: colors.primary }]} onPress={() => window.location.reload()}>
+                    <Text style={styles.retryButtonTextDesktop}>Try Again</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : nearbyStops.length > 0 ? (
+                nearbyStops.map((item) => (
+                  <TouchableOpacity
+                    key={item.stop.id}
+                    style={[styles.stopCardDesktop, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => handleStopPress(item.stop.id)}
+                  >
+                    <View style={styles.stopCardHeaderDesktop}>
+                      <View style={[styles.stopIconDesktop, { backgroundColor: `${colors.primary}10` }]}>
+                        <MapPin size={20} color={colors.primary} />
+                      </View>
+                      <View style={styles.stopInfoDesktop}>
+                        <Text style={[styles.stopNameDesktop, { color: colors.text }]}>{item.stop.name}</Text>
+                        <View style={styles.distanceRowDesktop}>
+                          <Navigation size={12} color={colors.primary} />
+                          <Text style={[styles.distanceTextDesktop, { color: colors.primary }]}>{getDistanceDisplay(item.distance)}</Text>
+                        </View>
+                      </View>
+                      <ChevronRight size={20} color={colors.text} />
+                    </View>
+
+                    {item.routes.length > 0 && (
+                      <View style={styles.routesSectionDesktop}>
+                        <Text style={[styles.routesLabelDesktop, { color: colors.text }]}>Routes at this stop:</Text>
+                        <View style={styles.routesListDesktop}>
+                          {item.routes.slice(0, 3).map((route) => (
+                            <TouchableOpacity
+                              key={route.id}
+                              style={[styles.routeBadgeDesktop, { backgroundColor: `${colors.primary}10` }]}
+                              onPress={() => handleRoutePress(route.id)}
+                            >
+                              {getTransportIcon(route.transport_type)}
+                              <Text style={[styles.routeNameDesktop, { color: colors.primary }]}>{route.name}</Text>
+                            </TouchableOpacity>
+                          ))}
+                          {item.routes.length > 3 && (
+                            <Text style={[styles.moreRoutesDesktop, { color: colors.text }]}>+{item.routes.length - 3} more</Text>
+                          )}
+                        </View>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={[styles.emptyCardDesktop, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <MapPin size={48} color={colors.text} />
+                  <Text style={[styles.emptyTextDesktop, { color: colors.text }]}>No stops found nearby</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </ScrollView>
       </View>
     );
   }
 
-  return (
-    <View style={[styles.container, { backgroundColor: '#000' }]}>
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ArrowLeft size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Nearby Stops</Text>
-        <View style={{ width: 40 }} />
-      </View>
+  // Mobile Layout
+  const headerTranslateY = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE],
+    outputRange: [0, -HEADER_SCROLL_DISTANCE],
+    extrapolate: 'clamp',
+  });
 
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.contentContainer}
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE / 2, HEADER_SCROLL_DISTANCE],
+    outputRange: [0, 0, 1],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Animated.ScrollView
+        style={styles.container}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
       >
-        {/* Address Header with Image */}
-        <View style={styles.addressHeader}>
-          {addressImage ? (
-            <Image
-              source={{ uri: addressImage.url }}
-              style={styles.addressImage}
-              onError={() => setAddressImage(null)}
-            />
-          ) : (
-            <View style={styles.addressIconContainer}>
-              <MapPin size={24} color="#1ea2b1" />
+        <View style={{ marginTop: HEADER_MAX_HEIGHT }}>
+          <View style={styles.content}>
+            {/* Location Card */}
+            <View style={[styles.locationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.locationIcon, { backgroundColor: `${colors.primary}15` }]}>
+                <MapPin size={24} color={colors.primary} />
+              </View>
+              <View style={styles.locationInfo}>
+                <Text style={[styles.locationLabel, { color: colors.primary }]}>Selected Location</Text>
+                <Text style={[styles.locationName, { color: colors.text }]}>{addressName}</Text>
+              </View>
             </View>
-          )}
-          <View style={styles.addressInfo}>
-            <Text style={styles.addressLabel}>Selected Location</Text>
-            <Text style={styles.addressText}>{addressName}</Text>
-            {addressDetails?.latitude && addressDetails?.longitude && (
-              <Text style={styles.addressCoordinates}>
-                {addressDetails.latitude.toFixed(6)}, {addressDetails.longitude.toFixed(6)}
-              </Text>
-            )}
-            {addressImage?.attribution && (
-              <Text style={styles.imageAttribution} numberOfLines={1}>
-                {addressImage.attribution.replace(/<[^>]*>/g, '')}
-              </Text>
+
+            {/* Results Summary */}
+            <View style={styles.summarySection}>
+              <Text style={[styles.summaryCount, { color: colors.primary }]}>{nearbyStops.length}</Text>
+              <Text style={[styles.summaryText, { color: colors.text }]}>nearby stops found</Text>
+            </View>
+
+            {/* Error State */}
+            {error ? (
+              <View style={[styles.errorCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <AlertCircle size={48} color="#ff4444" />
+                <Text style={[styles.errorText, { color: colors.text }]}>{error}</Text>
+                <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={() => router.back()}>
+                  <Text style={styles.retryButtonText}>Go Back</Text>
+                </TouchableOpacity>
+              </View>
+            ) : nearbyStops.length > 0 ? (
+              <>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Nearby Stops</Text>
+                {nearbyStops.map((item) => (
+                  <TouchableOpacity
+                    key={item.stop.id}
+                    style={[styles.stopCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => handleStopPress(item.stop.id)}
+                  >
+                    <View style={styles.stopCardHeader}>
+                      <View style={[styles.stopIcon, { backgroundColor: `${colors.primary}10` }]}>
+                        <MapPin size={20} color={colors.primary} />
+                      </View>
+                      <View style={styles.stopInfo}>
+                        <Text style={[styles.stopName, { color: colors.text }]}>{item.stop.name}</Text>
+                        <View style={styles.distanceRow}>
+                          <Navigation size={12} color={colors.primary} />
+                          <Text style={[styles.distanceText, { color: colors.primary }]}>{getDistanceDisplay(item.distance)}</Text>
+                        </View>
+                      </View>
+                      <ChevronRight size={20} color={colors.text} />
+                    </View>
+
+                    {item.routes.length > 0 && (
+                      <View style={styles.routesSection}>
+                        <Text style={[styles.routesLabel, { color: colors.text }]}>Routes:</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.routesScroll}>
+                          {item.routes.map((route) => (
+                            <TouchableOpacity
+                              key={route.id}
+                              style={[styles.routeBadge, { backgroundColor: `${colors.primary}10` }]}
+                              onPress={() => handleRoutePress(route.id)}
+                            >
+                              {getTransportIcon(route.transport_type)}
+                              <Text style={[styles.routeName, { color: colors.primary }]}>{route.name}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </>
+            ) : (
+              <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <MapPin size={48} color={colors.text} />
+                <Text style={[styles.emptyText, { color: colors.text }]}>No stops found nearby</Text>
+                <Text style={[styles.emptySubtext, { color: colors.text }]}>Try searching for a different location</Text>
+              </View>
             )}
           </View>
         </View>
+      </Animated.ScrollView>
 
-        {/* Error State */}
-        {error && (
-          <View style={styles.errorContainer}>
-            <AlertCircle size={48} color="#ff4444" />
-            <Text style={styles.errorTitle}>Something went wrong</Text>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-              <Text style={styles.retryButtonText}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+      {/* Animated Header */}
+      <Animated.View
+        style={[
+          styles.animatedHeader,
+          {
+            height: HEADER_MAX_HEIGHT,
+            transform: [{ translateY: headerTranslateY }],
+            backgroundColor: colors.card,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <View style={[styles.headerContent, { paddingTop: Math.max(insets.top, 20) }]}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Search Results</Text>
+          <View style={{ width: 40 }} />
+        </View>
 
-        {/* Results Summary */}
-        {!error && (
-          <View style={styles.summaryContainer}>
-            <Text style={styles.summaryText}>
-              Found {nearbyStops.length} stop{nearbyStops.length !== 1 ? 's' : ''} nearby
-            </Text>
-            {nearbyStops.length > 0 && (
-              <Text style={styles.summarySubtext}>
-                Showing the 5 closest stops to your location
-              </Text>
-            )}
-          </View>
-        )}
-
-        {/* Nearby Stops List */}
-        {!error && nearbyStops.length > 0 ? (
-          nearbyStops.map((item, index) => (
-            <TouchableOpacity
-              key={item.stop.id}
-              style={[styles.stopCard, { backgroundColor: '#111' }]}
-              onPress={() => handleStopPress(item.stop.id)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.stopHeader}>
-                <View style={styles.stopIconContainer}>
-                  <MapPin size={20} color="#1ea2b1" />
-                </View>
-                <View style={styles.stopInfo}>
-                  <Text style={styles.stopName}>{item.stop.name}</Text>
-                  <View style={styles.distanceContainer}>
-                    <Navigation size={12} color="#1ea2b1" />
-                    <Text style={styles.distanceText}>{getDistanceDisplay(item.distance)}</Text>
-                  </View>
-                </View>
-                <ChevronRight size={20} color="#444" />
-              </View>
-
-              {/* Routes served by this stop */}
-              {item.routes.length > 0 ? (
-                <View style={styles.routesContainer}>
-                  <Text style={styles.routesLabel}>Routes served:</Text>
-                  <View style={styles.routesList}>
-                    {item.routes.slice(0, 3).map((route) => (
-                      <TouchableOpacity
-                        key={route.id}
-                        style={styles.routeBadge}
-                        onPress={() => handleRoutePress(route.id)}
-                        activeOpacity={0.7}
-                      >
-                        {getTransportIcon(route.transport_type)}
-                        <Text style={styles.routeName} numberOfLines={1}>
-                          {route.name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                    {item.routes.length > 3 && (
-                      <Text style={styles.moreRoutes}>+{item.routes.length - 3} more</Text>
-                    )}
-                  </View>
-
-                  {/* Show route details for the first route */}
-                  {item.routes[0] && (
-                    <View style={styles.routeDetails}>
-                      <View style={styles.routeDetailItem}>
-                        <Bus size={12} color="#666" />
-                        <Text style={styles.routeDetailText}>
-                          {item.routes[0].start_point} → {item.routes[0].end_point}
-                        </Text>
-                      </View>
-                      {item.routes[0].cost > 0 && (
-                        <View style={styles.routeDetailItem}>
-                          <DollarSign size={12} color="#666" />
-                          <Text style={styles.routeDetailText}>
-                            {formatCurrency(item.routes[0].cost)}
-                          </Text>
-                        </View>
-                      )}
-                      {item.routes[0].transport_type && (
-                        <View style={styles.routeDetailItem}>
-                          {getTransportIcon(item.routes[0].transport_type)}
-                          <Text style={styles.routeDetailText}>
-                            {item.routes[0].transport_type.toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
-                </View>
-              ) : (
-                <View style={styles.noRoutesContainer}>
-                  <AlertCircle size={16} color="#666" />
-                  <Text style={styles.noRoutesText}>
-                    No routes are currently linked to this stop
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          ))
-        ) : !error && (
-          <View style={styles.emptyContainer}>
-            <MapPin size={64} color="#333" />
-            <Text style={styles.emptyTitle}>No stops found nearby</Text>
-            <Text style={styles.emptyText}>
-              Try searching for a different location or check back later
-            </Text>
-          </View>
-        )}
-
-        {/* Help Section */}
-        {!error && (
-          <View style={styles.helpSection}>
-            <Text style={styles.helpTitle}>Need help finding a stop?</Text>
-            <Text style={styles.helpText}>
-              You can also search for specific route names or browse the map to find stops near you.
-            </Text>
-          </View>
-        )}
-      </ScrollView>
+        <Animated.View style={[styles.stickySubtitle, { opacity: headerOpacity }]}>
+          <Text style={[styles.stickySubtitleText, { color: colors.text }]}>
+            {nearbyStops.length} stop{nearbyStops.length !== 1 ? 's' : ''} found
+          </Text>
+        </Animated.View>
+      </Animated.View>
     </View>
   );
 }
@@ -621,118 +523,116 @@ export default function SearchResultsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
   },
-  header: {
+  content: {
+    padding: 20,
+  },
+
+  // Header
+  animatedHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    borderBottomWidth: 1,
+    zIndex: 10,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#222',
   },
   backButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    cursor: Platform.OS === 'web' ? 'pointer' : 'default',
   },
   headerTitle: {
-    color: '#FFF',
     fontSize: 18,
     fontWeight: 'bold',
   },
-  content: {
-    flex: 1,
+  stickySubtitle: {
+    position: 'absolute',
+    bottom: 16,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
-  contentContainer: {
-    paddingBottom: 40,
+  stickySubtitleText: {
+    fontSize: 13,
   },
-  addressHeader: {
+
+  // Location Card
+  locationCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111',
-    margin: 16,
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#222',
+    marginBottom: 24,
   },
-  addressImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 16,
-    backgroundColor: '#222',
-  },
-  addressIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+  locationIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
-  addressInfo: {
+  locationInfo: {
     flex: 1,
   },
-  addressLabel: {
-    color: '#1ea2b1',
+  locationLabel: {
     fontSize: 12,
     fontWeight: 'bold',
     letterSpacing: 1,
     marginBottom: 4,
   },
-  addressText: {
-    color: '#FFF',
+  locationName: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
   },
-  addressCoordinates: {
-    color: '#666',
-    fontSize: 12,
+
+  // Summary Section
+  summarySection: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 24,
+    gap: 8,
   },
-  imageAttribution: {
-    color: '#555',
-    fontSize: 9,
-    marginTop: 4,
-  },
-  summaryContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
+  summaryCount: {
+    fontSize: 32,
+    fontWeight: 'bold',
   },
   summaryText: {
-    color: '#1ea2b1',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
   },
-  summarySubtext: {
-    color: '#666',
-    fontSize: 12,
-    marginTop: 4,
+
+  // Section Title
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
   },
+
+  // Stop Card
   stopCard: {
-    backgroundColor: '#111',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#222',
+    padding: 16,
+    marginBottom: 12,
   },
-  stopHeader: {
+  stopCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  stopIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(30, 162, 177, 0.1)',
+  stopIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -741,268 +641,348 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stopName: {
-    color: '#FFF',
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
   },
-  distanceContainer: {
+  distanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
   distanceText: {
-    color: '#1ea2b1',
     fontSize: 12,
   },
-  routesContainer: {
+  routesSection: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#222',
   },
   routesLabel: {
-    color: '#666',
     fontSize: 12,
     marginBottom: 8,
   },
-  routesList: {
+  routesScroll: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
   },
   routeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(30, 162, 177, 0.1)',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
     gap: 6,
-    cursor: Platform.OS === 'web' ? 'pointer' : 'default',
+    marginRight: 8,
   },
   routeName: {
-    color: '#1ea2b1',
     fontSize: 12,
     fontWeight: '500',
-    maxWidth: 150,
   },
-  moreRoutes: {
-    color: '#666',
-    fontSize: 12,
-    alignSelf: 'center',
-  },
-  routeDetails: {
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#222',
-    gap: 6,
-  },
-  routeDetailItem: {
-    flexDirection: 'row',
+
+  // Error & Empty States
+  errorCard: {
     alignItems: 'center',
-    gap: 6,
-  },
-  routeDetailText: {
-    color: '#888',
-    fontSize: 11,
-    flex: 1,
-  },
-  noRoutesContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#222',
-    gap: 8,
-  },
-  noRoutesText: {
-    color: '#666',
-    fontSize: 12,
-    flex: 1,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-    marginHorizontal: 16,
-  },
-  emptyTitle: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyText: {
-    color: '#666',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  helpSection: {
-    backgroundColor: '#111',
-    margin: 16,
-    marginTop: 24,
-    padding: 16,
+    padding: 40,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#222',
-  },
-  helpTitle: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  helpText: {
-    color: '#666',
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  errorContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-    marginHorizontal: 16,
-    backgroundColor: '#111',
-    borderRadius: 16,
-    marginTop: 20,
-  },
-  errorTitle: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
-    marginBottom: 8,
   },
   errorText: {
-    color: '#666',
-    fontSize: 14,
+    fontSize: 16,
     textAlign: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: '#1ea2b1',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
-    cursor: Platform.OS === 'web' ? 'pointer' : 'default',
   },
   retryButtonText: {
     color: '#FFF',
     fontSize: 14,
     fontWeight: '600',
   },
-  // Skeleton Styles
-  skeletonContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  skeletonHeader: {
-    borderBottomWidth: 0,
-    marginBottom: 0,
-  },
-  skeletonHeaderTitle: {
-    width: 120,
-    height: 22,
-    borderRadius: 4,
-  },
-  skeletonAddressCard: {
-    flexDirection: 'row',
+  emptyCard: {
     alignItems: 'center',
-    backgroundColor: '#111',
-    margin: 16,
-    padding: 16,
+    padding: 48,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#222',
   },
-  skeletonAddressIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  emptyText: {
+    fontSize: 16,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+
+  // Desktop Layout
+  desktopHeader: {
+    borderBottomWidth: 1,
+  },
+  desktopHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    maxWidth: 1200,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  desktopBackButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  desktopHeaderTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  desktopContentContainer: {
+    paddingBottom: 40,
+  },
+  desktopWrapper: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    maxWidth: 1200,
+    alignSelf: 'center',
+    width: '100%',
+    gap: 32,
+  },
+  desktopLeftColumn: {
+    width: '35%',
+  },
+  desktopRightColumn: {
+    width: '65%',
+  },
+
+  // Desktop Location Card
+  locationCardDesktop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 24,
+  },
+  locationIconDesktop: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 16,
   },
-  skeletonAddressInfo: {
+  locationInfoDesktop: {
+    flex: 1,
+  },
+  locationLabelDesktop: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  locationNameDesktop: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  // Desktop Summary Card
+  summaryCardDesktop: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+    gap: 8,
+  },
+  summaryCountDesktop: {
+    fontSize: 36,
+    fontWeight: 'bold',
+  },
+  summaryTextDesktop: {
+    fontSize: 16,
+  },
+
+  // Desktop Section Title
+  sectionTitleDesktop: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+
+  // Desktop Stop Card
+  stopCardDesktop: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 20,
+    marginBottom: 16,
+  },
+  stopCardHeaderDesktop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stopIconDesktop: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  stopInfoDesktop: {
+    flex: 1,
+  },
+  stopNameDesktop: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  distanceRowDesktop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  distanceTextDesktop: {
+    fontSize: 13,
+  },
+  routesSectionDesktop: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+  },
+  routesLabelDesktop: {
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  routesListDesktop: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  routeBadgeDesktop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 8,
+  },
+  routeNameDesktop: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  moreRoutesDesktop: {
+    fontSize: 13,
+    alignSelf: 'center',
+  },
+
+  // Desktop Error & Empty
+  errorCardDesktop: {
+    alignItems: 'center',
+    padding: 60,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  errorTextDesktop: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 20,
+    marginBottom: 28,
+  },
+  retryButtonDesktop: {
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 8,
+  },
+  retryButtonTextDesktop: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyCardDesktop: {
+    alignItems: 'center',
+    padding: 60,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  emptyTextDesktop: {
+    fontSize: 16,
+    marginTop: 20,
+  },
+
+  // Skeleton Styles
+  skeletonHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+    zIndex: 10,
+  },
+  skeletonHeaderActions: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 55 : 35,
+    left: 20,
+  },
+  skeletonIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  skeletonCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 24,
+  },
+  skeletonCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 16,
+  },
+  skeletonTextContainer: {
     flex: 1,
     gap: 8,
   },
-  skeletonAddressLabel: {
-    width: 80,
-    height: 14,
+  skeletonTextLarge: {
+    height: 20,
     borderRadius: 4,
   },
-  skeletonAddressText: {
-    width: 200,
-    height: 18,
-    borderRadius: 4,
-  },
-  skeletonAddressCoords: {
-    width: 150,
-    height: 12,
-    borderRadius: 4,
-  },
-  skeletonSummary: {
-    width: 150,
+  skeletonTextMedium: {
     height: 16,
     borderRadius: 4,
   },
+  skeletonTextSmall: {
+    height: 12,
+    borderRadius: 4,
+  },
   skeletonStopCard: {
-    backgroundColor: '#111',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#222',
+    padding: 16,
+    marginBottom: 12,
   },
   skeletonStopHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  skeletonStopIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  skeletonIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     marginRight: 12,
   },
   skeletonStopInfo: {
     flex: 1,
     gap: 6,
-  },
-  skeletonStopName: {
-    width: 150,
-    height: 18,
-    borderRadius: 4,
-  },
-  skeletonDistance: {
-    width: 80,
-    height: 14,
-    borderRadius: 4,
-  },
-  skeletonRoutesContainer: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#222',
-    gap: 8,
-  },
-  skeletonRoutesLabel: {
-    width: 100,
-    height: 14,
-    borderRadius: 4,
-  },
-  skeletonRoutesList: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  skeletonRouteBadge: {
-    width: 80,
-    height: 28,
-    borderRadius: 8,
   },
 });
