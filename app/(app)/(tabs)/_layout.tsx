@@ -205,7 +205,8 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
         backgroundColor: colors.card || 'rgba(30, 30, 30, 0.95)',
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
         shadowColor: '#000',
         shadowOffset: {
           width: 0,
@@ -221,11 +222,10 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
     >
       {/* App Logo/Brand */}
       <View style={{
-        position: 'absolute',
-        left: 20,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8
+        gap: 8,
+        flex: 1,
       }}>
         <Pressable
           onPress={openSidebar}
@@ -236,7 +236,7 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
             style={{ width: 30, height: 30, marginRight: 8 }}
           />
           <Text style={{
-            fontSize: 30,
+            fontSize: 24,
             fontWeight: 'bold',
             color: colors.primary,
             letterSpacing: -0.5
@@ -250,7 +250,9 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
       <View style={{
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: 8,
+        flex: 2,
       }}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
@@ -345,7 +347,7 @@ const DesktopTopNavBar = ({ state, descriptors, navigation, colors, unreadCount 
       </View>
 
       {/* Search Icon instead of Profile Icon */}
-      <View style={{ position: 'absolute', right: 20 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', flex: 1 }}>
         <Pressable
           onPress={() => router.push('/favorites')}
           style={{

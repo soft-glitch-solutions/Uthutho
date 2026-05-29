@@ -1084,13 +1084,7 @@ export default function HomeScreen() {
           }
         >
           <View style={styles.desktopHeader}>
-            <AnimatedHamburgerMenu
-              onPress={openSidebar}
-              onLongPress={() => setShowDebugPanel(true)}
-              delayLongPress={2000}
-              color={colors.primary}
-              textColor={colors.text}
-            />
+            <View style={{ flex: 1 }} />
             {isProfileLoading ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <View style={[styles.pointsContainer, {
@@ -1170,7 +1164,7 @@ export default function HomeScreen() {
                   onPress={() => router.push('/journey')}
                 >
                   <View style={styles.journeyContent}>
-                    <Navigation size={24} color="#ffffff" />
+                    <Navigation size={28} color="#ffffff" />
                     <View style={styles.journeyInfo}>
                       <Text style={styles.journeyTitle}>Active Journey</Text>
                       <Text style={styles.journeyRoute} numberOfLines={1}>
@@ -1542,32 +1536,35 @@ const styles = StyleSheet.create({
     maxWidth: 1400,
     alignSelf: 'center',
     width: '100%',
-    gap: 20,
+    gap: 32,
+    paddingTop: 16,
     minHeight: 'calc(100vh - 80px)',
   },
   leftColumn: {
     width: '25%',
-    minWidth: 0,
+    minWidth: 260,
   },
   middleColumn: {
-    width: '40%',
-    minWidth: 0,
+    flex: 1,
+    minWidth: 400,
   },
   rightColumn: {
-    width: '35%',
-    minWidth: 0,
+    width: '30%',
+    minWidth: 300,
   },
 
   // Profile Card
   profileCard: {
-    borderRadius: 16,
-    padding: IS_SMALL_SCREEN ? 12 : 20,
-    marginBottom: IS_SMALL_SCREEN ? 12 : 20,
+    borderRadius: 24,
+    padding: IS_SMALL_SCREEN ? 16 : 24,
+    marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   profileHeader: {
     flexDirection: 'row',

@@ -15,6 +15,7 @@ import { supabase } from '../../lib/supabase';
 import { ArrowRight, MapPin, Users, MessageCircle, ChevronLeft, Navigation } from 'lucide-react-native';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import LottieView from 'lottie-react-native';
+import { CornerAnimations } from './CornerAnimations';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -141,6 +142,7 @@ export default function Onboarding() {
   if (isLoading) {
     return (
       <View style={styles.splashContainer}>
+        <CornerAnimations />
         <View style={styles.splashLogoRow}>
           <Text style={styles.logosplash}>Uthutho</Text>
           <Text style={styles.splashDot}>.</Text>
@@ -154,6 +156,7 @@ export default function Onboarding() {
 
   return (
     <View style={[styles.container, isDesktop && styles.containerDesktop]}>
+      <CornerAnimations />
       <View style={[styles.header, isDesktop && styles.headerDesktop]}>
         <TouchableOpacity style={styles.skipBtn} onPress={() => router.replace('/auth')}>
           <Text style={styles.skipText}>Skip</Text>
