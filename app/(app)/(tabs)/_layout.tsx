@@ -399,7 +399,7 @@ const FloatingTabBar = ({ state, descriptors, navigation, colors, unreadCount })
         if (options.href === null || !options.tabBarIcon) return null;
 
         const isFocused = state.index === index;
-        
+
         // Match refs to tab names
         let tabRef = null;
         if (route.name === 'home') tabRef = refs.homeTabRef;
@@ -496,7 +496,7 @@ export default function EnhancedTabLayout() {
     // Start prefetching GIFs immediately when the tab layout mounts
     // This ensures GIFs are downloading while user navigates
     gifPrefetchService.startPrefetching();
-  }, []); 
+  }, []);
 
   const checkTutorial = async () => {
     const needsTutorial = await shouldShowTutorial();
@@ -614,10 +614,6 @@ export default function EnhancedTabLayout() {
       </Tabs>
 
       {/* Login Streak Tracker - Shows across all tabs */}
-      <LoginStreakPopup
-        open={showStreakOverlay}
-        onClose={() => setShowStreakOverlay(false)}
-      />
 
       <AppTutorial
         visible={showTutorial}

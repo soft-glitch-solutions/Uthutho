@@ -16,9 +16,12 @@ const CARD_WIDTH = (width - 48) / 2;
 interface ServicesSectionProps {
   colors: any;
   router: any;
+  isUnsupportedRegion?: boolean;
 }
 
-const ServicesSection: React.FC<ServicesSectionProps> = ({ colors, router }) => {
+const ServicesSection: React.FC<ServicesSectionProps> = ({ colors, router, isUnsupportedRegion }) => {
+  if (isUnsupportedRegion) return null;
+
   return (
     <View style={styles.container}>
       <Text style={[styles.sectionTitle, { color: '#FFF' }]}>

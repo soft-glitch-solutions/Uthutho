@@ -337,12 +337,18 @@ export default function HomeScreen() {
   const [searchBarY, setSearchBarY] = useState(160);
   const [suggestedRoutes, setSuggestedRoutes] = useState<any[]>([]);
   const [isSuggestedLoading, setIsSuggestedLoading] = useState(false);
+  const [userGeoInfo, setUserGeoInfo] = useState<{ country: string | null; city: string | null; region: string | null } | null>(null);
   const isInitialMount = useRef(true);
   const hasCheckedOnboarding = useRef(false);
   const prevShowTutorial = useRef(false);
   const { showTutorial, refs, setOnStepChange, setShowTutorial, setShowStreakOverlay } = useTutorial();
 
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const isUnsupportedRegion = !isNearestLoading &&
+    nearestLocations !== null &&
+    (nearestLocations.nearestStop === null ||
+      (nearestLocations.nearestStop?.distance ?? Infinity) >= 15);
 
   const handleStepChange = useCallback((stepId: string) => {
     if (!scrollViewRef.current) {
@@ -682,6 +688,28 @@ export default function HomeScreen() {
 
     return () => clearTimeout(timer);
   }, [userLocation, fetchNearestLocations]);
+
+  // Reverse-geocode to get country/city/region when user is in an unsupported region
+  useEffect(() => {
+    if (!isUnsupportedRegion || !userLocation || userGeoInfo) return;
+    (async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLocation.lat}&lon=${userLocation.lng}`,
+          { headers: { 'Accept-Language': 'en' } }
+        );
+        const data = await res.json();
+        setUserGeoInfo({
+          country: data.address?.country || null,
+          city: data.address?.city || data.address?.town || data.address?.village || data.address?.county || null,
+          region: data.address?.state || data.address?.province || data.address?.region || null,
+        });
+      } catch (e) {
+        console.warn('Reverse geocode failed:', e);
+        setUserGeoInfo({ country: null, city: null, region: null });
+      }
+    })();
+  }, [isUnsupportedRegion, userLocation, userGeoInfo]);
 
   const handleNearestStopPress = (stopId: string) => {
     router.push(`/stop-details?stopId=${stopId}`);
@@ -1068,6 +1096,10 @@ export default function HomeScreen() {
     }
   }, [activeJourney, journeyLoading]);
 
+  // A user is in an "unsupported region" when we've finished fetching AND either
+  // there are no stops at all, or the nearest stop is ≥ 15 walking minutes away.
+
+
   if (isDesktop) {
     return (
       <ScreenTransition>
@@ -1186,27 +1218,42 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.middleColumn}>
-              <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.sectionTitle, styles.sectionTitleDesktop, { color: colors.text }]}>
-                  Explore Map
-                </Text>
-              </View>
-
-
-
-              <NearbySection
-                locationError={locationError}
-                isNearestLoading={isNearestLoading}
-                userLocation={userLocation}
-                nearestLocations={nearestLocations}
-                colors={colors}
-                handleNearestStopPress={handleNearestStopPress}
-                handleNearestHubPress={handleNearestHubPress}
-                calculateWalkingTime={calculateWalkingTime}
-                hasActiveJourney={!!activeJourney}
-                onMarkAsWaiting={handleMarkAsWaiting}
-                compact={true}
-              />
+              {isUnsupportedRegion ? (
+                <View style={styles.desktopUnsupportedPanel}>
+                  <Text style={styles.desktopUnsupportedTitle}>
+                    Uthutho isn't fully functional in your country.
+                  </Text>
+                  <Text style={styles.desktopUnsupportedSubtitle}>
+                    But you can start the movement.
+                  </Text>
+                  <Text style={styles.desktopUnsupportedBody}>
+                    Suggest stops and routes near you. Once your area gets enough community votes,
+                    we'll go live there!
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
+                    <Text style={[styles.sectionTitle, styles.sectionTitleDesktop, { color: colors.text }]}>
+                      Explore Map
+                    </Text>
+                  </View>
+                  <NearbySection
+                    locationError={locationError}
+                    isNearestLoading={isNearestLoading}
+                    userLocation={userLocation}
+                    nearestLocations={nearestLocations}
+                    colors={colors}
+                    handleNearestStopPress={handleNearestStopPress}
+                    handleNearestHubPress={handleNearestHubPress}
+                    calculateWalkingTime={calculateWalkingTime}
+                    hasActiveJourney={!!activeJourney}
+                    onMarkAsWaiting={handleMarkAsWaiting}
+                    compact={true}
+                    isUnsupportedRegion={false}
+                  />
+                </>
+              )}
             </View>
 
             <View style={styles.rightColumn}>
@@ -1373,6 +1420,9 @@ export default function HomeScreen() {
             setSearchBarY(y);
             setIsSearchOverlayVisible(true);
           }}
+          isUnsupportedRegion={isUnsupportedRegion}
+          userLat={userLocation?.lat ?? null}
+          userLng={userLocation?.lng ?? null}
         />
 
         {!journeyLoading && activeJourney && (
@@ -1422,8 +1472,8 @@ export default function HomeScreen() {
             calculateWalkingTime={calculateWalkingTime}
             hasActiveJourney={!!activeJourney}
             onMarkAsWaiting={handleMarkAsWaiting}
+            isUnsupportedRegion={isUnsupportedRegion}
           />
-
         </View>
 
 
@@ -1433,7 +1483,7 @@ export default function HomeScreen() {
         )}
 
         <View ref={refs.servicesRef} collapsable={false} renderToHardwareTextureAndroid style={{ minHeight: 1 }}>
-          <ServicesSection colors={colors} router={router} />
+          <ServicesSection colors={colors} router={router} isUnsupportedRegion={isUnsupportedRegion} />
         </View>
 
         <SquadsSection userId={userId} colors={colors} />
@@ -1496,11 +1546,13 @@ export default function HomeScreen() {
         onRatingSubmitted={handleRatingSubmitted}
       />
 
-      <SearchOverlay
-        visible={isSearchOverlayVisible}
-        onClose={() => setIsSearchOverlayVisible(false)}
-        initialY={searchBarY}
-      />
+      {!isUnsupportedRegion && (
+        <SearchOverlay
+          visible={isSearchOverlayVisible}
+          onClose={() => setIsSearchOverlayVisible(false)}
+          initialY={searchBarY}
+        />
+      )}
     </ScreenTransition>
   );
 }
@@ -1547,6 +1599,34 @@ const styles = StyleSheet.create({
   middleColumn: {
     flex: 1,
     minWidth: 400,
+  },
+  desktopUnsupportedPanel: {
+    padding: 32,
+    borderRadius: 24,
+    backgroundColor: 'rgba(30,162,177,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(30,162,177,0.12)',
+  },
+  desktopUnsupportedTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#fff',
+    letterSpacing: -0.8,
+    lineHeight: 36,
+    marginBottom: 10,
+  },
+  desktopUnsupportedSubtitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1ea2b1',
+    fontStyle: 'italic',
+    letterSpacing: -0.5,
+    marginBottom: 16,
+  },
+  desktopUnsupportedBody: {
+    color: '#888',
+    fontSize: 15,
+    lineHeight: 24,
   },
   rightColumn: {
     width: '30%',
