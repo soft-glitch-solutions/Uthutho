@@ -38,6 +38,7 @@ import { useTutorial } from '@/context/TutorialContext';
 import { DriverStatsSummary } from '@/components/home/DriverStatsSummary';
 import { shouldShowTutorial } from '@/components/AppTutorial';
 import Shimmer from '@/components/home/skeletons/Shimmer';
+import CountryProgressCard from '@/components/home/CountryProgressCard';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -1475,6 +1476,14 @@ export default function HomeScreen() {
             isUnsupportedRegion={isUnsupportedRegion}
           />
         </View>
+
+        {isUnsupportedRegion && userGeoInfo?.country && (
+          <CountryProgressCard
+            country={userGeoInfo.country}
+            city={userGeoInfo.city}
+            region={userGeoInfo.region}
+          />
+        )}
 
 
 

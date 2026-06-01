@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Dimensions, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, Dimensions, StyleSheet, TouchableOpacity, ActivityIndicator, Share } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import InteractiveNearbyMap from './InteractiveNearbyMap';
 import NearbyCards from './NearbyCards';
 import NearestLocationsSkeleton from './skeletons/NearestLocationsSkeleton';
-import { Users, MapPin, Target, TrendingUp, Flag, Globe, Award } from 'lucide-react-native';
+import { Users, MapPin, Target, TrendingUp, Flag, CheckCircle, Share2, Plus } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -36,22 +37,32 @@ interface LocationInfo {
   city: string;
   country: string;
   displayName: string;
-  continent?: string;
+}
+
+interface CommunityProgress {
+  requiredStops: number;
+  currentStops: number;
+  requiredUsers: number;
+  currentUsers: number;
+  percentageComplete: number;
+  contributors: number;
 }
 
 const NearbySection: React.FC<NearbySectionProps> = (props) => {
   const { colors } = useTheme();
+  const router = useRouter();
   const [locationInfo, setLocationInfo] = useState<LocationInfo | null>(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
-  const [communityProgress, setCommunityProgress] = useState({
+  const [communityProgress, setCommunityProgress] = useState<CommunityProgress>({
     requiredStops: 50,
     currentStops: 0,
-    requiredUsers: 500,
+    requiredUsers: 200,
     currentUsers: 0,
     percentageComplete: 0,
     contributors: 0,
   });
   const [isProgressLoading, setIsProgressLoading] = useState(true);
+  const [isSharing, setIsSharing] = useState(false);
 
   const {
     locationError,
@@ -63,7 +74,6 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
 
   const showHeader = !compact;
 
-  // Reverse geocode to get city and country
   useEffect(() => {
     const getLocationName = async () => {
       if (!userLocation || !isUnsupportedRegion) return;
@@ -72,40 +82,21 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
       try {
         const response = await fetch(
           `https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLocation.lat}&lon=${userLocation.lng}&addressdetails=1&accept-language=en`,
-          {
-            headers: {
-              'User-Agent': 'UthuthoApp/1.0'
-            }
-          }
+          { headers: { 'User-Agent': 'UthuthoApp/1.0' } }
         );
-
         const data = await response.json();
-
-        const city = data.address?.city ||
+        const city =
+          data.address?.city ||
           data.address?.town ||
           data.address?.village ||
           data.address?.county ||
           'Your Area';
-
         const country = data.address?.country || 'Your Country';
 
-        setLocationInfo({
-          city: city,
-          country: country,
-          displayName: `${city}, ${country}`,
-          continent: data.address?.continent,
-        });
-
-        // Fetch community progress for this specific location
+        setLocationInfo({ city, country, displayName: `${city}, ${country}` });
         await fetchCommunityProgress(city, country);
-
-      } catch (error) {
-        console.error('Geocoding error:', error);
-        setLocationInfo({
-          city: 'Your Area',
-          country: 'Your Country',
-          displayName: 'Your Area',
-        });
+      } catch {
+        setLocationInfo({ city: 'Your Area', country: 'Your Country', displayName: 'Your Area' });
         await fetchCommunityProgress('Your Area', 'Your Country');
       } finally {
         setIsGeocoding(false);
@@ -118,80 +109,112 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
   const fetchCommunityProgress = async (city: string, country: string) => {
     setIsProgressLoading(true);
     try {
-      // Try to get region-specific requirements from database
-      const { data: regionData, error: regionError } = await supabase
+      let requiredStops = 50;
+      let requiredUsers = 200;
+
+      const { data: regionData } = await supabase
         .from('region_requirements')
-        .select('*')
+        .select('required_stops, required_users')
         .eq('city', city)
         .eq('country', country)
-        .single();
-
-      let requiredStops = 50;
-      let requiredUsers = 500;
+        .maybeSingle();
 
       if (regionData) {
         requiredStops = regionData.required_stops;
         requiredUsers = regionData.required_users;
-      } else {
-        // Adjust requirements based on population/region size
-        const { count: existingStops } = await supabase
-          .from('stops')
-          .select('*', { count: 'exact', head: true });
-
-        const { count: existingUsers } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true });
-
-        requiredStops = Math.max(25, Math.min(100, Math.floor((existingStops || 0) * 1.5)));
-        requiredUsers = Math.max(200, Math.min(1000, Math.floor((existingUsers || 0) * 1.2)));
       }
 
-      // Get current stats for this region
-      const { count: stopsCount } = await supabase
-        .from('stops')
-        .select('*', { count: 'exact', head: true });
+      if (userLocation) {
+        const { lat, lng } = userLocation;
+        const delta = 0.45;
 
-      const { count: usersCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
+        const { count: stopsCount } = await supabase
+          .from('stop_requests')
+          .select('*', { count: 'exact', head: true })
+          .gte('latitude', lat - delta)
+          .lte('latitude', lat + delta)
+          .gte('longitude', lng - delta)
+          .lte('longitude', lng + delta);
 
-      const { count: contributorsCount } = await supabase
-        .from('stop_suggestions')
-        .select('user_id', { count: 'exact', head: true });
+        const { data: contributorRows } = await supabase
+          .from('stop_requests')
+          .select('user_id')
+          .gte('latitude', lat - delta)
+          .lte('latitude', lat + delta)
+          .gte('longitude', lng - delta)
+          .lte('longitude', lng + delta);
 
-      const currentStops = stopsCount || 0;
-      const currentUsers = usersCount || 0;
+        const uniqueUsers = new Set((contributorRows || []).map(r => r.user_id));
+        const uniqueUserCount = uniqueUsers.size;
+        const currentStops = stopsCount || 0;
 
-      const stopsPercentage = Math.min((currentStops / requiredStops) * 100, 100);
-      const usersPercentage = Math.min((currentUsers / requiredUsers) * 100, 100);
-      const percentageComplete = (stopsPercentage + usersPercentage) / 2;
+        const stopsPercentage = Math.min((currentStops / requiredStops) * 100, 100);
+        const usersPercentage = Math.min((uniqueUserCount / requiredUsers) * 100, 100);
+        const percentageComplete = Math.round((stopsPercentage + usersPercentage) / 2);
 
-      setCommunityProgress({
-        requiredStops,
-        currentStops,
-        requiredUsers,
-        currentUsers,
-        percentageComplete,
-        contributors: contributorsCount || 0,
-      });
-
-    } catch (error) {
-      console.error('Error fetching community progress:', error);
+        setCommunityProgress({
+          requiredStops,
+          currentStops,
+          requiredUsers,
+          currentUsers: uniqueUserCount,
+          percentageComplete,
+          contributors: uniqueUserCount,
+        });
+      }
+    } catch {
       setCommunityProgress({
         requiredStops: 50,
-        currentStops: 12,
-        requiredUsers: 500,
-        currentUsers: 87,
-        percentageComplete: 15,
-        contributors: 23,
+        currentStops: 0,
+        requiredUsers: 200,
+        currentUsers: 0,
+        percentageComplete: 0,
+        contributors: 0,
       });
     } finally {
       setIsProgressLoading(false);
     }
   };
 
-  // Render community progress for unsupported regions
+  const handleShare = async () => {
+    setIsSharing(true);
+    try {
+      const city = locationInfo?.city || 'Your City';
+      const country = locationInfo?.country || 'Your Country';
+      const stopsLeft = Math.max(0, communityProgress.requiredStops - communityProgress.currentStops);
+      await Share.share({
+        title: `Help bring Uthutho to ${city}!`,
+        message:
+          `🚌 Help bring Uthutho to ${city}, ${country}!\n\n` +
+          `We need ${stopsLeft} more stop suggestions to go live.\n\n` +
+          `Join our community and suggest stops near you — every contribution counts!\n\n` +
+          `#Uthutho #MoveSmarter #PublicTransport`,
+      });
+    } catch {
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   if (isUnsupportedRegion) {
+    const milestone1Target = Math.ceil(communityProgress.requiredStops * 0.5);
+    const milestone2Target = Math.ceil(communityProgress.requiredUsers * 0.4);
+    const milestone1Done = communityProgress.currentStops >= milestone1Target;
+    const milestone2Done = communityProgress.currentUsers >= milestone2Target;
+    const launchDone =
+      communityProgress.currentStops >= communityProgress.requiredStops &&
+      communityProgress.currentUsers >= communityProgress.requiredUsers;
+
+    const stopsBarWidth = Math.min(
+      (communityProgress.currentStops / communityProgress.requiredStops) * 100,
+      100
+    );
+    const usersBarWidth = Math.min(
+      (communityProgress.currentUsers / communityProgress.requiredUsers) * 100,
+      100
+    );
+    const stopsLeft = Math.max(0, communityProgress.requiredStops - communityProgress.currentStops);
+    const usersLeft = Math.max(0, communityProgress.requiredUsers - communityProgress.currentUsers);
+
     return (
       <View style={[styles.section, isDesktop && styles.sectionDesktop, compact && styles.sectionCompact]}>
         {showHeader && (
@@ -207,12 +230,12 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#2bb8b3" />
               <Text style={[styles.loadingText, { color: colors.text, opacity: 0.7 }]}>
-                Detecting your location...
+                Detecting your location…
               </Text>
             </View>
           ) : (
             <>
-              {/* Progress Header with Location */}
+              {/* Header */}
               <View style={styles.progressHeader}>
                 <View style={[styles.progressIconContainer, { backgroundColor: '#2bb8b315' }]}>
                   <Flag size={24} color="#2bb8b3" />
@@ -222,7 +245,9 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
                     Help Bring Uthutho to {locationInfo?.city || 'Your City'}
                   </Text>
                   <Text style={[styles.progressSubtitle, { color: colors.text, opacity: 0.7 }]}>
-                    {communityProgress.contributors} community members are making this happen
+                    {communityProgress.contributors === 0
+                      ? 'Be the first to start the movement'
+                      : `${communityProgress.contributors} community ${communityProgress.contributors === 1 ? 'member' : 'members'} making this happen`}
                   </Text>
                 </View>
               </View>
@@ -233,15 +258,12 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
                   <View
                     style={[
                       styles.progressBarFill,
-                      {
-                        backgroundColor: '#2bb8b3',
-                        width: `${communityProgress.percentageComplete}%`
-                      }
+                      { backgroundColor: '#2bb8b3', width: `${communityProgress.percentageComplete}%` }
                     ]}
                   />
                 </View>
                 <Text style={[styles.progressPercentage, { color: '#2bb8b3' }]}>
-                  {Math.round(communityProgress.percentageComplete)}% Complete
+                  {communityProgress.percentageComplete}% Complete
                 </Text>
               </View>
 
@@ -260,27 +282,21 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
                 </View>
                 <View style={[styles.progressBarBackground, { backgroundColor: colors.border }]}>
                   <View
-                    style={[
-                      styles.progressBarFill,
-                      {
-                        backgroundColor: '#2bb8b3',
-                        width: `${(communityProgress.currentStops / communityProgress.requiredStops) * 100}%`
-                      }
-                    ]}
+                    style={[styles.progressBarFill, { backgroundColor: '#2bb8b3', width: `${stopsBarWidth}%` }]}
                   />
                 </View>
                 <Text style={[styles.progressItemSubtext, { color: colors.text, opacity: 0.6 }]}>
-                  {communityProgress.requiredStops - communityProgress.currentStops} more stops needed
+                  {stopsLeft > 0 ? `${stopsLeft} more stops needed` : '✓ Stop goal reached!'}
                 </Text>
               </View>
 
-              {/* Users Progress */}
+              {/* Contributors Progress */}
               <View style={styles.progressItem}>
                 <View style={styles.progressItemHeader}>
                   <View style={styles.progressItemLeft}>
                     <Users size={20} color="#2bb8b3" />
                     <Text style={[styles.progressItemTitle, { color: colors.text }]}>
-                      People Onboarded
+                      Community Members
                     </Text>
                   </View>
                   <Text style={[styles.progressItemCount, { color: '#2bb8b3' }]}>
@@ -289,18 +305,35 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
                 </View>
                 <View style={[styles.progressBarBackground, { backgroundColor: colors.border }]}>
                   <View
-                    style={[
-                      styles.progressBarFill,
-                      {
-                        backgroundColor: '#2bb8b3',
-                        width: `${(communityProgress.currentUsers / communityProgress.requiredUsers) * 100}%`
-                      }
-                    ]}
+                    style={[styles.progressBarFill, { backgroundColor: '#2bb8b3', width: `${usersBarWidth}%` }]}
                   />
                 </View>
                 <Text style={[styles.progressItemSubtext, { color: colors.text, opacity: 0.6 }]}>
-                  {communityProgress.requiredUsers - communityProgress.currentUsers} more people needed
+                  {usersLeft > 0 ? `${usersLeft} more contributors needed` : '✓ Community goal reached!'}
                 </Text>
+              </View>
+
+              {/* CTA Buttons */}
+              <View style={styles.ctaContainer}>
+                <TouchableOpacity
+                  style={[styles.ctaButton, { backgroundColor: '#2bb8b3' }]}
+                  onPress={() => router.push('/AddStop?mode=community')}
+                  activeOpacity={0.85}
+                >
+                  <Plus size={16} color="#FFF" />
+                  <Text style={styles.ctaButtonText}>Suggest a Stop</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.ctaButton, styles.ctaButtonOutline, { borderColor: '#2bb8b3' }]}
+                  onPress={handleShare}
+                  disabled={isSharing}
+                  activeOpacity={0.85}
+                >
+                  <Share2 size={16} color="#2bb8b3" />
+                  <Text style={[styles.ctaButtonTextOutline, { color: '#2bb8b3' }]}>
+                    {isSharing ? 'Sharing…' : 'Invite Friends'}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* Milestone Badges */}
@@ -309,28 +342,54 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
                   Next Milestones:
                 </Text>
                 <View style={styles.milestonesList}>
-                  <View style={[styles.milestoneBadge, { backgroundColor: '#f18f0110', borderColor: '#f18f0130' }]}>
-                    <Target size={14} color="#f18f01" />
-                    <Text style={[styles.milestoneText, { color: colors.text }]}>
-                      {Math.ceil(communityProgress.requiredStops * 0.5)} Stops
+                  <View style={[
+                    styles.milestoneBadge,
+                    {
+                      backgroundColor: milestone1Done ? '#f18f0125' : '#f18f0110',
+                      borderColor: milestone1Done ? '#f18f01' : '#f18f0130',
+                    }
+                  ]}>
+                    {milestone1Done
+                      ? <CheckCircle size={14} color="#f18f01" />
+                      : <Target size={14} color="#f18f01" />}
+                    <Text style={[styles.milestoneText, { color: milestone1Done ? '#f18f01' : colors.text }]}>
+                      {milestone1Target} Stops{milestone1Done ? ' ✓' : ''}
                     </Text>
                   </View>
-                  <View style={[styles.milestoneBadge, { backgroundColor: '#bdd35810', borderColor: '#bdd35830' }]}>
-                    <Award size={14} color="#bdd358" />
-                    <Text style={[styles.milestoneText, { color: colors.text }]}>
-                      {Math.ceil(communityProgress.requiredUsers * 0.4)} Users
+
+                  <View style={[
+                    styles.milestoneBadge,
+                    {
+                      backgroundColor: milestone2Done ? '#bdd35825' : '#bdd35810',
+                      borderColor: milestone2Done ? '#bdd358' : '#bdd35830',
+                    }
+                  ]}>
+                    {milestone2Done
+                      ? <CheckCircle size={14} color="#bdd358" />
+                      : <Users size={14} color="#bdd358" />}
+                    <Text style={[styles.milestoneText, { color: milestone2Done ? '#bdd358' : colors.text }]}>
+                      {milestone2Target} Members{milestone2Done ? ' ✓' : ''}
                     </Text>
                   </View>
-                  <View style={[styles.milestoneBadge, { backgroundColor: '#e151af10', borderColor: '#e151af30' }]}>
-                    <TrendingUp size={14} color="#e151af" />
-                    <Text style={[styles.milestoneText, { color: colors.text }]}>
-                      Launch Ready
+
+                  <View style={[
+                    styles.milestoneBadge,
+                    {
+                      backgroundColor: launchDone ? '#e151af25' : '#e151af10',
+                      borderColor: launchDone ? '#e151af' : '#e151af30',
+                    }
+                  ]}>
+                    {launchDone
+                      ? <CheckCircle size={14} color="#e151af" />
+                      : <TrendingUp size={14} color="#e151af" />}
+                    <Text style={[styles.milestoneText, { color: launchDone ? '#e151af' : colors.text }]}>
+                      Launch Ready{launchDone ? ' ✓' : ''}
                     </Text>
                   </View>
                 </View>
               </View>
 
-              {/* Community Impact Note */}
+              {/* Impact Note */}
               <View style={[styles.impactNote, { backgroundColor: '#2bb8b308', borderColor: '#2bb8b320' }]}>
                 <TrendingUp size={16} color="#2bb8b3" />
                 <Text style={[styles.impactText, { color: colors.text, opacity: 0.8 }]}>
@@ -358,7 +417,6 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
         </View>
       ) : isNearestLoading || !userLocation ? (
         <NearestLocationsSkeleton colors={colors} compact={compact} />
-
       ) : isDesktop ? (
         <InteractiveNearbyMap
           userLocation={userLocation}
@@ -376,25 +434,16 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
 };
 
 const styles = StyleSheet.create({
-  section: {
-    marginBottom: 24,
-  },
-  sectionDesktop: {
-    marginBottom: 20,
-  },
-  sectionCompact: {
-    marginBottom: 0,
-  },
+  section: { marginBottom: 24 },
+  sectionDesktop: { marginBottom: 20 },
+  sectionCompact: { marginBottom: 0 },
   sectionTitle: {
     fontSize: 32,
     fontWeight: '900',
     marginBottom: 20,
     letterSpacing: -1,
   },
-  sectionTitleDesktop: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
+  sectionTitleDesktop: { fontSize: 16, marginBottom: 10 },
   headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -402,18 +451,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     flexWrap: 'wrap',
     gap: 12,
-  },
-  locationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
-  },
-  locationText: {
-    fontSize: 13,
-    fontWeight: '600',
   },
   card: {
     borderRadius: 8,
@@ -424,19 +461,14 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  errorText: {
-    fontSize: 14,
-  },
+  errorText: { fontSize: 14 },
   loadingContainer: {
     padding: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-  },
-  // Community Progress Styles
+  loadingText: { marginTop: 12, fontSize: 14 },
+
   communityProgressCard: {
     borderRadius: 20,
     padding: 20,
@@ -460,20 +492,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 16,
   },
-  progressHeaderText: {
-    flex: 1,
-  },
+  progressHeaderText: { flex: 1 },
   progressTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 4,
   },
-  progressSubtitle: {
-    fontSize: 13,
-  },
-  overallProgressContainer: {
-    marginBottom: 24,
-  },
+  progressSubtitle: { fontSize: 13 },
+  overallProgressContainer: { marginBottom: 24 },
   progressBarBackground: {
     height: 8,
     borderRadius: 4,
@@ -489,9 +515,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: 'right',
   },
-  progressItem: {
-    marginBottom: 20,
-  },
+  progressItem: { marginBottom: 20 },
   progressItemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -503,22 +527,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  progressItemTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  progressItemCount: {
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  progressItemSubtext: {
-    fontSize: 12,
-    marginTop: 6,
-  },
+  progressItemTitle: { fontSize: 15, fontWeight: '600' },
+  progressItemCount: { fontSize: 15, fontWeight: 'bold' },
+  progressItemSubtext: { fontSize: 12, marginTop: 6 },
+
   ctaContainer: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
+    marginTop: 4,
     marginBottom: 20,
   },
   ctaButton: {
@@ -526,13 +542,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 13,
     borderRadius: 12,
     gap: 8,
   },
   ctaButtonOutline: {
     backgroundColor: 'transparent',
-    borderWidth: 1,
+    borderWidth: 1.5,
   },
   ctaButtonText: {
     color: '#FFF',
@@ -543,19 +559,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14,
   },
+
   milestonesContainer: {
-    marginTop: 8,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    marginBottom: 16,
   },
-  milestonesTitle: {
-    fontSize: 12,
-    marginBottom: 12,
-  },
+  milestonesTitle: { fontSize: 12, marginBottom: 12 },
   milestonesList: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     flexWrap: 'wrap',
   },
   milestoneBadge: {
@@ -567,12 +581,9 @@ const styles = StyleSheet.create({
     gap: 6,
     borderWidth: 1,
   },
-  milestoneText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  milestoneText: { fontSize: 12, fontWeight: '600' },
+
   impactNote: {
-    marginTop: 16,
     padding: 12,
     borderRadius: 12,
     flexDirection: 'row',
@@ -580,11 +591,7 @@ const styles = StyleSheet.create({
     gap: 10,
     borderWidth: 1,
   },
-  impactText: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 16,
-  },
+  impactText: { flex: 1, fontSize: 12, lineHeight: 16 },
 });
 
 export default NearbySection;
