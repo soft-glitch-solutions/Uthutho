@@ -8,6 +8,7 @@ import { WaitingProvider } from '../context/WaitingContext';
 import { LanguageProvider } from '../context/LanguageContext';
 import { supabase } from '../lib/supabase';
 import NetworkGate from '@/components/NetworkGate';
+import WebInstallBanner from '@/components/WebInstallBanner';
 
 // Only import native modules on native platforms
 let Linking: any = null;
@@ -169,6 +170,7 @@ export default function RootLayout() {
       <WaitingProvider>
         <LanguageProvider>
           <NetworkGate>
+            <WebInstallBanner />
             <Stack
               screenOptions={{
                 headerShown: false,
