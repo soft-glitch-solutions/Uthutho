@@ -966,9 +966,18 @@ export default function WaitingDrawer({
           <Text style={styles.resultsTitle}>
             {activeFilter === 'all' ? 'All Routes' : `${TRANSPORT_TYPES.find(t => t.id === activeFilter)?.label} Routes`}
           </Text>
-          <Text style={styles.resultsCount}>
-            {filteredRoutes.length} {filteredRoutes.length === 1 ? 'route' : 'routes'}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.resultsCount}>
+              {filteredRoutes.length} {filteredRoutes.length === 1 ? 'route' : 'routes'}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowSuggestModal(true)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: `${ORANGE}18`, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: `${ORANGE}50` }}
+            >
+              <Plus size={13} color={ORANGE} />
+              <Text style={{ color: ORANGE, fontSize: 12, fontWeight: '700' }}>Add Route</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
       
