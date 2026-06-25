@@ -14,13 +14,16 @@ import {
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
-import { Clock, Users, CircleCheck as CheckCircle, Search, UserPlus, ChevronRight, Filter, Info, HelpCircle, ArrowLeft, Leaf } from 'lucide-react-native';
+import { Clock, Users, CircleCheck as CheckCircle, Search, UserPlus, ChevronRight, Filter, Info, HelpCircle, ArrowLeft, Leaf, Plus } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useJourney } from '@/hook/useJourney';
+import SuggestRouteForStopModal from '@/components/home/SuggestRouteForStopModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IS_SMALL_SCREEN = SCREEN_HEIGHT < 700; // For 667px height
+
+const ORANGE = '#f97316';
 
 interface Route {
   id: string;
@@ -29,6 +32,7 @@ interface Route {
   cost: number;
   start_point: string;
   end_point: string;
+  Suggested?: boolean;
 }
 
 interface WaitingDrawerProps {
@@ -101,6 +105,7 @@ export default function WaitingDrawer({
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [currentEmission, setCurrentEmission] = useState(WAITING_EMISSIONS[0]);
   const [estimatedTime, setEstimatedTime] = useState(ESTIMATED_WAIT_TIMES[0]);
+  const [showSuggestModal, setShowSuggestModal] = useState(false);
   const { createOrJoinJourney } = useJourney();
 
   // Debounced stopId to prevent rapid updates
@@ -335,7 +340,8 @@ export default function WaitingDrawer({
             transport_type,
             cost,
             start_point,
-            end_point
+            end_point,
+            Suggested
           )
         `)
         .eq('stop_id', stopId);
@@ -856,6 +862,7 @@ export default function WaitingDrawer({
   const renderRouteCard = (route: Route) => {
     const waitingCount = getWaitingCountForRoute(route.id);
     const transportIcon = getTransportIcon(route.transport_type);
+    const isSuggested = !!route.Suggested;
     
     return (
       <TouchableOpacity
@@ -863,10 +870,19 @@ export default function WaitingDrawer({
         style={[
           styles.routeCard,
           waitingCount > 0 && styles.routeWithWaiters,
-          isDriver && styles.driverRouteCard
+          isDriver && styles.driverRouteCard,
+          isSuggested && { borderColor: ORANGE, borderLeftWidth: 3, backgroundColor: `${ORANGE}08` },
         ]}
         onPress={() => handleRouteSelect(route)}
       >
+        {isSuggested && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+            <View style={{ backgroundColor: `${ORANGE}20`, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: `${ORANGE}40`, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Plus size={10} color={ORANGE} />
+              <Text style={{ color: ORANGE, fontSize: 10, fontWeight: '700' }}>Community Suggested</Text>
+            </View>
+          </View>
+        )}
         <View style={styles.routeHeader}>
           <View style={styles.transportBadge}>
             {transportIcon && (
@@ -969,12 +985,12 @@ export default function WaitingDrawer({
               style={styles.noResultsIcon}
             />
             <Text style={styles.noResultsTitle}>
-              No routes found
+              {activeFilter === 'all' ? 'No routes yet' : `No ${TRANSPORT_TYPES.find(t => t.id === activeFilter)?.label} routes`}
             </Text>
             <Text style={styles.noResultsText}>
               {activeFilter === 'all' 
-                ? 'No transport routes available at this stop.'
-                : `No ${TRANSPORT_TYPES.find(t => t.id === activeFilter)?.label} routes found.`
+                ? 'Be the first to suggest a route for this stop.'
+                : `No ${TRANSPORT_TYPES.find(t => t.id === activeFilter)?.label} routes found. Try another type or suggest one.`
               }
             </Text>
             {activeFilter !== 'all' && (
@@ -985,6 +1001,13 @@ export default function WaitingDrawer({
                 <Text style={styles.clearFilterText}>Show all routes</Text>
               </TouchableOpacity>
             )}
+            <TouchableOpacity
+              style={[styles.clearFilterButton, { backgroundColor: `${ORANGE}18`, borderColor: `${ORANGE}40`, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }]}
+              onPress={() => setShowSuggestModal(true)}
+            >
+              <Plus size={14} color={ORANGE} />
+              <Text style={[styles.clearFilterText, { color: ORANGE }]}>Suggest a Route</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <FlatList
@@ -1116,6 +1139,7 @@ export default function WaitingDrawer({
   };
 
   return (
+    <>
     <Modal
       visible={visible}
       transparent
@@ -1216,6 +1240,14 @@ export default function WaitingDrawer({
         </Animated.View>
       </TouchableOpacity>
     </Modal>
+    <SuggestRouteForStopModal
+      visible={showSuggestModal}
+      onClose={() => setShowSuggestModal(false)}
+      stopId={stopId || ''}
+      stopName={stopName || ''}
+      onSuccess={() => { setShowSuggestModal(false); loadRoutesForStop(); }}
+    />
+    </>
   );
 }
 
@@ -1915,4 +1947,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-

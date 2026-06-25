@@ -38,6 +38,9 @@ import {
 } from 'lucide-react-native';
 import * as Sharing from 'expo-sharing';
 import { formatTimeAgo } from '../../components/utils';
+import SuggestRouteForStopModal from '../../components/home/SuggestRouteForStopModal';
+
+const ORANGE = '#f97316';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -78,6 +81,7 @@ interface Route {
   created_at: string;
   updated_at: string;
   order_number?: number;
+  Suggested?: boolean;
 }
 
 interface Post {
@@ -160,6 +164,7 @@ export default function StopDetailsScreen() {
   const [showAddPost, setShowAddPost] = useState(false);
   const [stopInfo, setStopInfo] = useState<StopInfo | null>(null);
   const [routes, setRoutes] = useState<Route[]>([]);
+  const [showSuggestRouteModal, setShowSuggestRouteModal] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [followerCount, setFollowerCount] = useState(0);
   const [activeTab, setActiveTab] = useState<'activity' | 'routes'>('activity');
@@ -304,7 +309,8 @@ export default function StopDetailsScreen() {
             start_point,
             end_point,
             created_at,
-            updated_at
+            updated_at,
+            Suggested
           )
         `)
         .eq('stop_id', stopId)
@@ -508,31 +514,48 @@ export default function StopDetailsScreen() {
     </TouchableOpacity>
   );
 
-  const renderRoute = (route: Route) => (
-    <TouchableOpacity
-      style={[styles.routeItem, isDesktop && styles.routeItemDesktop, { backgroundColor: colors.card, borderColor: colors.border }]}
-      onPress={() => navigateToRoute(route.id)}
-    >
-      <View style={[styles.routeInfo, isDesktop && styles.routeInfoDesktop]}>
-        <Text style={[styles.routeName, isDesktop && styles.routeNameDesktop, { color: colors.text }]}>{route.name}</Text>
-        <Text style={[styles.routeDestination, isDesktop && styles.routeDestinationDesktop, { color: colors.text }]}>
-          {route.start_point} → {route.end_point}
-        </Text>
-        <View style={[styles.routeDetails, isDesktop && styles.routeDetailsDesktop]}>
-          <Text style={[styles.routeType, isDesktop && styles.routeTypeDesktop, { color: colors.primary, backgroundColor: `${colors.primary}20` }]}>
-            {route.transport_type}
+  const renderRoute = (route: Route) => {
+    const isSuggested = !!route.Suggested;
+    return (
+      <TouchableOpacity
+        key={route.id}
+        style={[
+          styles.routeItem,
+          isDesktop && styles.routeItemDesktop,
+          { backgroundColor: colors.card, borderColor: isSuggested ? ORANGE : colors.border },
+          isSuggested && { borderLeftWidth: 3, backgroundColor: `${ORANGE}08` },
+        ]}
+        onPress={() => navigateToRoute(route.id)}
+      >
+        {isSuggested && (
+          <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+            <View style={{ backgroundColor: `${ORANGE}18`, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: `${ORANGE}40`, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <RouteIcon size={10} color={ORANGE} />
+              <Text style={{ color: ORANGE, fontSize: 10, fontWeight: '700' }}>Community Suggested</Text>
+            </View>
+          </View>
+        )}
+        <View style={[styles.routeInfo, isDesktop && styles.routeInfoDesktop]}>
+          <Text style={[styles.routeName, isDesktop && styles.routeNameDesktop, { color: colors.text }]}>{route.name}</Text>
+          <Text style={[styles.routeDestination, isDesktop && styles.routeDestinationDesktop, { color: colors.text }]}>
+            {route.start_point} → {route.end_point}
           </Text>
-          <Text style={[styles.routeCost, isDesktop && styles.routeCostDesktop, { color: colors.primary }]}>R {route.cost}</Text>
-          <Text style={[styles.stopNumber, isDesktop && styles.stopNumberDesktop, { color: colors.text }]}>
-            Stop #{route.order_number}
-          </Text>
+          <View style={[styles.routeDetails, isDesktop && styles.routeDetailsDesktop]}>
+            <Text style={[styles.routeType, isDesktop && styles.routeTypeDesktop, { color: isSuggested ? ORANGE : colors.primary, backgroundColor: isSuggested ? `${ORANGE}20` : `${colors.primary}20` }]}>
+              {route.transport_type}
+            </Text>
+            <Text style={[styles.routeCost, isDesktop && styles.routeCostDesktop, { color: isSuggested ? ORANGE : colors.primary }]}>R {route.cost}</Text>
+            <Text style={[styles.stopNumber, isDesktop && styles.stopNumberDesktop, { color: colors.text }]}>
+              Stop #{route.order_number}
+            </Text>
+          </View>
         </View>
-      </View>
-      <View style={[styles.routeArrow, isDesktop && styles.routeArrowDesktop]}>
-        <Text style={[styles.routeArrowText, isDesktop && styles.routeArrowTextDesktop, { color: colors.text }]}>›</Text>
-      </View>
-    </TouchableOpacity>
-  );
+        <View style={[styles.routeArrow, isDesktop && styles.routeArrowDesktop]}>
+          <Text style={[styles.routeArrowText, isDesktop && styles.routeArrowTextDesktop, { color: colors.text }]}>›</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderTabContent = () => {
     if (activeTab === 'activity') {
@@ -593,11 +616,18 @@ export default function StopDetailsScreen() {
             <View style={[styles.emptyState, isDesktop && styles.emptyStateDesktop]}>
               <RouteIcon size={isDesktop ? 32 : 24} color={colors.text} />
               <Text style={[styles.emptyStateText, isDesktop && styles.emptyStateTextDesktop, { color: colors.text }]}>
-                No routes available
+                No routes yet
               </Text>
               <Text style={[styles.emptyStateSubtext, isDesktop && styles.emptyStateSubtextDesktop, { color: colors.text }]}>
-                This stop is not currently on any routes
+                Be the first to suggest a route for this stop
               </Text>
+              <TouchableOpacity
+                style={{ marginTop: 12, backgroundColor: `${ORANGE}18`, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, borderWidth: 1, borderColor: `${ORANGE}40`, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                onPress={() => setShowSuggestRouteModal(true)}
+              >
+                <RouteIcon size={14} color={ORANGE} />
+                <Text style={{ color: ORANGE, fontWeight: '700', fontSize: 14 }}>Suggest a Route</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
