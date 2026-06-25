@@ -655,6 +655,7 @@ export default function StopDetailsScreen() {
   // Desktop Layout
   if (isDesktop) {
     return (
+      <>
       <ScrollView style={[styles.container, styles.containerDesktop, { backgroundColor: colors.background }]}>
         <View style={styles.desktopWrapper}>
           {/* Left Column - Stop Info */}
@@ -861,6 +862,14 @@ export default function StopDetailsScreen() {
           </View>
         </View>
       </ScrollView>
+      <SuggestRouteForStopModal
+        visible={showSuggestRouteModal}
+        onClose={() => setShowSuggestRouteModal(false)}
+        stopId={stopId as string || ''}
+        stopName={stopDetails?.name || ''}
+        onSuccess={() => { setShowSuggestRouteModal(false); loadStopRoutes(); }}
+      />
+    </>
     );
   }
 
@@ -1108,6 +1117,13 @@ export default function StopDetailsScreen() {
       </TouchableOpacity>
     </View>
   </Animated.View>
+  <SuggestRouteForStopModal
+    visible={showSuggestRouteModal}
+    onClose={() => setShowSuggestRouteModal(false)}
+    stopId={typeof stopId === 'string' ? stopId : (stopId?.[0] || '')}
+    stopName={stopDetails?.name || ''}
+    onSuccess={() => { setShowSuggestRouteModal(false); loadStopRoutes(); }}
+  />
 </View>
   );
 }
