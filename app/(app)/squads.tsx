@@ -32,6 +32,7 @@ import Animated, {
   useAnimatedStyle,
   interpolate,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Components
 import { MySquadTab } from '@/components/squads/MySquadTab';

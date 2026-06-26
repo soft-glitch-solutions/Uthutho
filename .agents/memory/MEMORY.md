@@ -1,0 +1,2 @@
+- [Transport feature layout](transport-feature-layout.md) — all transport components/services/modals already exist; missing piece was the `/transport-application` route.
+- [Carpool ApplyModal type](carpool-apply-modal.md) — ApplyModal.onSubmit expects data param; carpool handler must accept optional `_data?` arg even if unused.

@@ -117,7 +117,7 @@ export default function CarpoolDetailScreen() {
     setShowApplyModal(true);
   };
 
-  const handleSubmitApplication = async () => {
+  const handleSubmitApplication = async (_data?: { pickupAddress?: string; additionalNotes?: string }) => {
     if (!user || !carpool) return;
     setApplyLoading(true);
     try {
