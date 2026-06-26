@@ -95,12 +95,13 @@ export default function DriverDashboardScreen() {
         .from('drivers')
         .select('id')
         .eq('user_id', user?.id)
-        .single();
+        .maybeSingle();
 
-      if (driverError) {
-        console.error('Error fetching driver:', driverError);
+      if (driverError || !driverData) {
+        if (driverError) console.error('Error fetching driver:', driverError);
         Alert.alert('Error', 'You are not registered as a driver');
-        router.back();
+        if (router.canGoBack()) router.back();
+        else router.replace('/(tabs)/home');
         return;
       }
 

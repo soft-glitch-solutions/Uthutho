@@ -3,7 +3,7 @@ import { Alert, Share } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
-import { useJourney } from '@/hook/useJourney';
+import { useJourneyContext } from '@/context/JourneyContext';
 import Constants from 'expo-constants';
 
 export function useJourneyActions(
@@ -19,7 +19,7 @@ export function useJourneyActions(
   setUserStopName?: (name: string) => void
 ) {
   const router = useRouter();
-  const { completeJourney } = useJourney();
+  const { completeJourney } = useJourneyContext();
 
   const requestLocationPermission = async () => {
     try {

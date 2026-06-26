@@ -21,7 +21,7 @@ import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useJourney } from '@/hook/useJourney';
+import { useJourneyContext } from '@/context/JourneyContext';
 import { JourneySkeleton } from '@/components/journey/JourneySkeleton';
 import { NoActiveJourney } from '@/components/journey/NoActiveJourney';
 import { JourneyContent } from '@/components/journey/JourneyContent';
@@ -70,7 +70,7 @@ const PremiumHeader = ({ onBack, userProfile, colors }: any) => {
 export default function JourneyScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { activeJourney, loading, refreshActiveJourney } = useJourney();
+  const { activeJourney, loading, refreshActiveJourney } = useJourneyContext();
 
   const [showArrivedAnimation, setShowArrivedAnimation] = useState(false);
   const [isProcessingArrival, setIsProcessingArrival] = useState(false);

@@ -17,7 +17,7 @@ import {
 import { Clock, Users, CircleCheck as CheckCircle, Search, UserPlus, ChevronRight, Filter, Info, HelpCircle, ArrowLeft, Leaf, Plus } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
-import { useJourney } from '@/hook/useJourney';
+import { useJourneyContext } from '@/context/JourneyContext';
 import SuggestRouteForStopModal from '@/components/home/SuggestRouteForStopModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -106,7 +106,7 @@ export default function WaitingDrawer({
   const [currentEmission, setCurrentEmission] = useState(WAITING_EMISSIONS[0]);
   const [estimatedTime, setEstimatedTime] = useState(ESTIMATED_WAIT_TIMES[0]);
   const [showSuggestModal, setShowSuggestModal] = useState(false);
-  const { createOrJoinJourney } = useJourney();
+  const { createOrJoinJourney } = useJourneyContext();
 
   // Debounced stopId to prevent rapid updates
   const debouncedStopId = useDebounce(stopId, 300);

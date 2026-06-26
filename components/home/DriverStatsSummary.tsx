@@ -39,10 +39,10 @@ export const DriverStatsSummary: React.FC<DriverStatsSummaryProps> = ({ userId, 
         .from('drivers')
         .select('id')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (driverError || !driver) {
-        console.error('Error fetching driver:', driverError);
+        if (driverError) console.error('Error fetching driver:', driverError);
         return;
       }
 

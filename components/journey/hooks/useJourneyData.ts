@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { JourneyStop, Passenger, ChatMessage } from '@/types/journey';
-import { useJourney } from '@/hook/useJourney';
+import { useJourneyContext } from '@/context/JourneyContext';
 
 export function useJourneyData() {
-  const { activeJourney, refreshActiveJourney } = useJourney();
+  const { activeJourney, refreshActiveJourney } = useJourneyContext();
   
   const [journeyStops, setJourneyStops] = useState<JourneyStop[]>([]);
   const [otherPassengers, setOtherPassengers] = useState<Passenger[]>([]);

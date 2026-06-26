@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './useAuth';
 
@@ -41,6 +41,7 @@ export function useJourney() {
   const [activeJourney, setActiveJourney] = useState<Journey | null>(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const isLoadingJourneyRef = useRef(false);
 
   // Helper function to properly complete a journey
   const completeJourneyProperly = async (journeyId: string, routeId?: string) => {
@@ -255,7 +256,7 @@ export function useJourney() {
         subscription.unsubscribe();
       };
     }
-  }, [user]);
+  }, [user?.id]);
 
   // Driver assignment function using driver_journeys table
   const checkAndAssignJourneyDriver = async (journeyId: string) => {
@@ -575,6 +576,9 @@ export function useJourney() {
       return;
     }
 
+    if (isLoadingJourneyRef.current) return;
+    isLoadingJourneyRef.current = true;
+
     try {
       console.log('🔄 Loading active journey for user:', user.id);
 
@@ -681,6 +685,8 @@ export function useJourney() {
       console.error('💥 Error loading active journey:', error);
       setActiveJourney(null);
       setLoading(false);
+    } finally {
+      isLoadingJourneyRef.current = false;
     }
   };
 

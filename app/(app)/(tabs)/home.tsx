@@ -20,7 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useTheme } from '@/context/ThemeContext';
 import { MapPin, Bus, Brain as Train, Navigation, Users, Clock, Flag, Route, BookmarkCheck, Plus, Menu, User, Target, Map as MapIcon } from 'lucide-react-native';
-import { useJourney } from '@/hook/useJourney';
+import { useJourneyContext } from '@/context/JourneyContext';
 import HeaderSection from '@/components/home/HeaderSection';
 import NearbySection from '@/components/home/NearbySection';
 import ServicesSection from '@/components/home/ServicesSection';
@@ -329,7 +329,7 @@ export default function HomeScreen() {
   const [isStatsLoading, setIsStatsLoading] = useState(true);
   const [isFavoritesLoading, setIsFavoritesLoading] = useState(false);
   const navigation = useNavigation();
-  const { activeJourney, loading: journeyLoading, refreshActiveJourney } = useJourney();
+  const { activeJourney, loading: journeyLoading, refreshActiveJourney } = useJourneyContext();
   const [refreshing, setRefreshing] = useState(false);
   const [favoritesCountMap, setFavoritesCountMap] = useState<Record<string, number>>({});
   const [showDebugPanel, setShowDebugPanel] = useState(false);
@@ -1066,11 +1066,6 @@ export default function HomeScreen() {
       journeyRatingId: journeyRatingId ? `${journeyRatingId.substring(0, 8)}...` : 'null'
     });
   }, [showRatingModal, journeyRatingId]);
-
-  // Debug logging to track re-renders
-  useEffect(() => {
-    console.log('🔄 HomeScreen rendered');
-  });
 
   const bannerPulse = useRef(new Animated.Value(1)).current;
 

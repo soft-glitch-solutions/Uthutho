@@ -27,7 +27,7 @@ import {
   AlertCircle,
 } from 'lucide-react-native';
 
-import { useJourney } from '@/hook/useJourney';
+import { useJourneyContext } from '@/context/JourneyContext';
 import { supabase } from '@/lib/supabase';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -184,7 +184,7 @@ const MapVisualization = ({ stops, currentStopIndex, userLocation, searchLat, se
 export default function JourneyMapScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { activeJourney } = useJourney();
+  const { activeJourney } = useJourneyContext();
 
   const searchLat = params.latitude ? parseFloat(params.latitude as string) : null;
   const searchLng = params.longitude ? parseFloat(params.longitude as string) : null;

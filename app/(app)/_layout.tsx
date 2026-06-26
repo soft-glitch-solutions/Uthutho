@@ -33,6 +33,7 @@ import {
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hook/useAuth';
+import { JourneyProvider } from '@/context/JourneyContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isSmallMobile = SCREEN_HEIGHT < 700;
@@ -215,6 +216,7 @@ export default function AppLayout() {
   const { colors } = useTheme();
 
   return (
+    <JourneyProvider>
     <Drawer
       screenOptions={{
         headerShown: false,
@@ -237,6 +239,7 @@ export default function AppLayout() {
       <Drawer.Screen name="driver-dashboard" options={{ title: 'Driver Dashboard', drawerItemStyle: { display: 'none' } }} />
       <Drawer.Screen name="driver-onboarding" options={{ title: 'Become a Driver', drawerItemStyle: { display: 'none' } }} />
     </Drawer>
+    </JourneyProvider>
   );
 };
 

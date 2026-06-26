@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { useWaiting } from '@/context/WaitingContext';
 import { Square, Hand, X, AlertTriangle, Trash2, Bug } from "lucide-react-native";
 import WaitingDrawer from '@/components/WaitingDrawer';
-import { useJourney } from '@/hook/useJourney';
+import { useJourneyContext } from '@/context/JourneyContext';
 import { getCurrentLocation, isWithinRadius } from '@/utils/location';
 import SimpleDebugPanel from '@/components/debug/SimpleDebugPanel';
 
@@ -69,7 +69,7 @@ const StopBlock = ({
   const [debugWaitingDrawerVisible, setDebugWaitingDrawerVisible] = useState(false);
   const [debugWelcomeVisible, setDebugWelcomeVisible] = useState(false);
   
-  const { activeJourney, loading: journeyLoading, refreshActiveJourney } = useJourney();
+  const { activeJourney, loading: journeyLoading, refreshActiveJourney } = useJourneyContext();
   
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
