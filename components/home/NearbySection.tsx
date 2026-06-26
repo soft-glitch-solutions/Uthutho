@@ -8,6 +8,9 @@ import { Users, MapPin, Target, TrendingUp, Flag, CheckCircle, Share2, Plus, Rou
 import { supabase } from '@/lib/supabase';
 import SuggestStopSheet from './SuggestStopSheet';
 import SuggestRouteSheet from './SuggestRouteSheet';
+import SuggestStopToStopsModal from './SuggestStopToStopsModal';
+
+const PINK = '#e91e8c';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isDesktop = SCREEN_WIDTH >= 1024;
@@ -62,6 +65,7 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
   const [isSharing, setIsSharing] = useState(false);
   const [showStopSheet, setShowStopSheet] = useState(false);
   const [showRouteSheet, setShowRouteSheet] = useState(false);
+  const [showSuggestStopModal, setShowSuggestStopModal] = useState(false);
 
   const {
     locationError,
@@ -388,7 +392,22 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
   return (
     <View style={[styles.section, compact && styles.sectionCompact]}>
       {!compact && (
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Nearby Stops</Text>
+        <View style={styles.nearbySectionHeader}>
+          <Text
+            style={[styles.sectionTitle, styles.nearbySectionTitle, { color: colors.text }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            Nearby Stops
+          </Text>
+          <TouchableOpacity
+            style={[styles.nearbySectionAdd, { backgroundColor: `${PINK}18`, borderColor: `${PINK}45` }]}
+            onPress={() => setShowSuggestStopModal(true)}
+            activeOpacity={0.75}
+          >
+            <Plus size={18} color={PINK} strokeWidth={2.5} />
+          </TouchableOpacity>
+        </View>
       )}
 
       {locationError ? (
@@ -409,6 +428,12 @@ const NearbySection: React.FC<NearbySectionProps> = (props) => {
       ) : (
         <NearbyCards {...props} />
       )}
+      <SuggestStopToStopsModal
+        visible={showSuggestStopModal}
+        onClose={() => setShowSuggestStopModal(false)}
+        userLocation={userLocation || { lat: 0, lng: 0 }}
+        onSuccess={() => setShowSuggestStopModal(false)}
+      />
     </View>
   );
 };
@@ -438,6 +463,27 @@ const styles = StyleSheet.create({
   sectionCompact: { marginBottom: 0 },
   headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
   sectionTitle: { fontSize: 30, fontWeight: '900', letterSpacing: -0.8 },
+  nearbySectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  nearbySectionTitle: {
+    flex: 1,
+    marginBottom: 0,
+    fontSize: 26,
+  },
+  nearbySectionAdd: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
+    flexShrink: 0,
+  },
   errorCard: { borderRadius: 12, padding: 16 },
 
   card: {
