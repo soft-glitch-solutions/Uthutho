@@ -158,6 +158,9 @@ export default function SuggestRouteForStopModal({ visible, onClose, stopId, sto
         setIsSubmitting(false);
         return;
       }
+      // Mark the route as community-suggested
+      await supabase.from('routes').update({ Suggested: true }).eq('id', selectedRoute.id);
+
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -166,7 +169,7 @@ export default function SuggestRouteForStopModal({ visible, onClose, stopId, sto
         }
       } catch {}
       setStep('success');
-      setTimeout(() => { onSuccess?.(); onClose(); }, 2000);
+      setTimeout(() => { onSuccess?.(); onClose(); }, 2800);
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Could not link stop to route. Please try again.');
     } finally {
@@ -397,8 +400,21 @@ export default function SuggestRouteForStopModal({ visible, onClose, stopId, sto
               </View>
               <Text style={[styles.successTitle, { color: colors.text }]}>Stop Linked!</Text>
               <Text style={[styles.successBody, { color: colors.text, opacity: 0.65 }]}>
-                {stopName} has been added{'\n'}to {selectedRoute?.name}.
+                {stopName} has been added to{'\n'}
+                <Text style={{ fontWeight: '800', opacity: 1 }}>{selectedRoute?.name}</Text>.
               </Text>
+
+              {/* Community-suggested badge */}
+              <View style={[styles.suggestedBadge, { backgroundColor: `${ORANGE}18`, borderColor: `${ORANGE}45` }]}>
+                <RouteIcon size={13} color={ORANGE} />
+                <Text style={[styles.suggestedBadgeText, { color: ORANGE }]}>
+                  Community Suggested
+                </Text>
+              </View>
+              <Text style={[styles.suggestedNote, { color: colors.text }]}>
+                This route is now marked as community-suggested and will show the orange badge wherever it appears.
+              </Text>
+
               <Text style={[styles.successPoints, { color: ORANGE }]}>+5 TP earned 🎉</Text>
             </View>
           )}
@@ -543,6 +559,26 @@ const styles = StyleSheet.create({
   submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   rewardNote: { textAlign: 'center', fontSize: 12, opacity: 0.45, marginTop: 10 },
 
+  suggestedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginTop: 16,
+    marginBottom: 10,
+  },
+  suggestedBadgeText: { fontSize: 13, fontWeight: '800' },
+  suggestedNote: {
+    fontSize: 12,
+    opacity: 0.5,
+    textAlign: 'center',
+    lineHeight: 17,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+  },
   successContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
   successCircle: {
     width: 100,
