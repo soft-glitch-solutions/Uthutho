@@ -187,12 +187,7 @@ export default function TrackerScreen() {
           </View>
 
           <View style={styles.rightBranding}>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-            >
-              {viewMode === 'grid' ? <LayoutList size={22} color="#FFF" /> : <Grid3x3 size={22} color="#FFF" />}
-            </TouchableOpacity>
+      
             <TouchableOpacity
               style={styles.addButton}
               onPress={() => setShowAddCardModal(true)}
