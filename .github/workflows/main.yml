@@ -65,13 +65,13 @@ jobs:
           BRANCH="${GITHUB_REF##*/}"
 
           if [[ "$BRANCH" == "shaqeel" ]]; then
-            echo "DIR=/home/bpyshwey/public_html/shaqeel" >> $GITHUB_OUTPUT
+            echo "DIR=/home/bpyshwey/public_html/shaqeel.uthutho.co.za" >> $GITHUB_OUTPUT
           elif [[ "$BRANCH" == "Mahki" ]]; then
-            echo "DIR=/home/bpyshwey/public_html/makhi" >> $GITHUB_OUTPUT
+            echo "DIR=/home/bpyshwey/public_html/makhi.uthutho.co.za" >> $GITHUB_OUTPUT
           elif [[ "$BRANCH" == "mirror" ]]; then
-            echo "DIR=/home/bpyshwey/public_html/mirror" >> $GITHUB_OUTPUT
+            echo "DIR=/home/bpyshwey/public_html/mirror.uthutho.co.za" >> $GITHUB_OUTPUT
           elif [[ "$BRANCH" == "Ishmael" ]]; then
-            echo "DIR=/home/bpyshwey/public_html/ishmael" >> $GITHUB_OUTPUT
+            echo "DIR=/home/bpyshwey/public_html/ishmael.uthutho.co.za" >> $GITHUB_OUTPUT
           else
             echo "DIR=/home/bpyshwey/mobile.uthutho.co.za" >> $GITHUB_OUTPUT
           fi
