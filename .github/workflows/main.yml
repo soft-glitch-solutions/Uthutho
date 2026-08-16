@@ -8,6 +8,7 @@ on:
       - Mahki
       - Ishmael
       - mirror
+      - waseem
 
 jobs:
   deploy:
@@ -72,6 +73,8 @@ jobs:
             echo "DIR=/home/bpyshwey/mirror.uthutho.co.za" >> $GITHUB_OUTPUT
           elif [[ "$BRANCH" == "Ishmael" ]]; then
             echo "DIR=/home/bpyshwey/ishmael.uthutho.co.za" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == "waseem" ]]; then
+            echo "DIR=/home/bpyshwey/waseem.uthutho.co.za" >> $GITHUB_OUTPUT
           else
             echo "DIR=/home/bpyshwey/mobile.uthutho.co.za" >> $GITHUB_OUTPUT
           fi
