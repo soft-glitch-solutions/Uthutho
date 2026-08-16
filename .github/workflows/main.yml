@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - shaqeel
-      - Mahki
+      - Makhi
       - Ishmael
       - mirror
       - waseem
@@ -67,7 +67,7 @@ jobs:
 
           if [[ "$BRANCH" == "shaqeel" ]]; then
             echo "DIR=/home/bpyshwey/shaqeel.uthutho.co.za" >> $GITHUB_OUTPUT
-          elif [[ "$BRANCH" == "Mahki" ]]; then
+          elif [[ "$BRANCH" == "Makhi" ]]; then
             echo "DIR=/home/bpyshwey/makhi.uthutho.co.za" >> $GITHUB_OUTPUT
           elif [[ "$BRANCH" == "mirror" ]]; then
             echo "DIR=/home/bpyshwey/mirror.uthutho.co.za" >> $GITHUB_OUTPUT
